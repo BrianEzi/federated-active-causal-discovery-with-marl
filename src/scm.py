@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from src.types import SCMConfig, EnvState, InterventionSpec, InterventionType
 from src.functional import apply_mechanism, generate_noise
+from functools import partial
 
 def _sample_single_scm(key: jax.Array, 
                        state: EnvState, 
@@ -55,6 +56,7 @@ def _sample_single_scm(key: jax.Array,
     final_vals, _ = jax.lax.scan(scan_fn, vals, jnp.arange(config.d))
     return final_vals
 
+@partial(jax.jit, static_argnums=(2, 3))
 def sample_scm(key: jax.Array, 
                state: EnvState, 
                config: SCMConfig, 

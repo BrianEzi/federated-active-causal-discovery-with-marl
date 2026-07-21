@@ -10,6 +10,17 @@ from src.alignment import stitch_global_covariance
 from src.rewards import compute_global_reward
 from src.scm import sample_scm
 
+@jax.jit
+def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax.Array:
+    def _compute_single_agent(mask):
+        masked_samples = samples * mask[None, :]
+        mean = jnp.mean(masked_samples, axis=0)
+        centered = masked_samples - mean
+        N = jnp.maximum(1.0, samples.shape[0] - 1.0)
+        cov = jnp.dot(centered.T, centered) / N
+        return cov
+    return jax.vmap(_compute_single_agent)(agent_masks)
+
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, adjacency: jax.Array, scm_params: SCMParams, 
                  topological_order: jax.Array, agent_masks: jax.Array, action_costs: jax.Array):
@@ -72,16 +83,7 @@ class FederatedCausalEnv:
         )
         samples = sample_scm(obs_key, self.jax_state, self.config, 1000, obs_spec)
         
-        obs_dict = {}
-        local_covs = []
-        for k in range(self.config.K):
-            agent_mask = self.agent_masks[k]
-            masked_samples = samples * agent_mask[None, :]
-            mean = jnp.mean(masked_samples, axis=0)
-            centered = masked_samples - mean
-            cov = jnp.dot(centered.T, centered) / 999.0
-            local_covs.append(cov)
-        local_covs_jnp = jnp.stack(local_covs)
+        local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
             
         sample_counts = jnp.full(self.config.K, 1000.0)
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
@@ -127,17 +129,7 @@ class FederatedCausalEnv:
         # Generate batched interventional data
         samples = sample_scm(key, self.jax_state, self.config, 500, intervention_spec)
         
-        local_covs = []
-        obs_dict = {}
-        for k in range(self.config.K):
-            agent_mask = self.agent_masks[k]
-            masked_samples = samples * agent_mask[None, :]
-            mean = jnp.mean(masked_samples, axis=0)
-            centered = masked_samples - mean
-            cov = jnp.dot(centered.T, centered) / 499.0
-            local_covs.append(cov)
-            
-        local_covs_jnp = jnp.stack(local_covs)
+        local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
         
         # Stitch global covariance
         sample_counts = jnp.full(self.config.K, 500.0)

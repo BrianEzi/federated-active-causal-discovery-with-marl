@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+@jax.jit
 def stouffer_z_score_fusion(p_values_matrix: jax.Array, sample_sizes: jax.Array) -> jax.Array:
     """
     Accepts an array of client-level p-values for edge independence testing across overlapping variables
@@ -33,6 +34,7 @@ def stouffer_z_score_fusion(p_values_matrix: jax.Array, sample_sizes: jax.Array)
     
     return weighted_sum / norm_factor
 
+@jax.jit
 def stitch_global_covariance(local_covariances: jax.Array, 
                              agent_masks: jax.Array, 
                              sample_counts: jax.Array) -> jax.Array:
