@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from src.types import SCMConfig, MechanismType, NoiseType
 from src.generators import generate_er_dag, generate_ba_dag, generate_scm_params
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.agent import MLPAgent
+from src.marl.agent import MLPAgent, RNNAgent, CausalTransformerAgent
 from src.marl.mixer import QMIXMixer
 from src.marl.trainer import QMIXTrainer
 from src.marl.buffer import TrajectoryBuffer
@@ -22,6 +22,10 @@ except ImportError:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Federated Active Causal Discovery MARL Trainer")
+    # Architecture Choice
+    parser.add_argument("--agent_type", type=str, default="mlp", choices=["mlp", "rnn", "transformer"],
+                        help="Decentralized agent architecture: mlp, rnn (GRU), or transformer (Causal Self-Attention)")
+    
     # Environment & SCM Hyperparameters
     parser.add_argument("--num_variables", "-d", type=int, default=5, help="Number of nodes in SCM graph")
     parser.add_argument("--num_agents", "-K", type=int, default=2, help="Number of decentralized agents")
@@ -47,7 +51,7 @@ def parse_args():
     parser.add_argument("--buffer_capacity", type=int, default=100, help="Replay buffer episode capacity")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for Optax Adam")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--hidden_dim", type=int, default=64, help="Agent MLP hidden dimension")
+    parser.add_argument("--hidden_dim", type=int, default=64, help="Agent hidden dimension")
     parser.add_argument("--mixer_hidden_dim", type=int, default=32, help="QMIX hypernetwork hidden dimension")
     parser.add_argument("--epsilon_start", type=float, default=1.0, help="Initial exploration epsilon")
     parser.add_argument("--epsilon_min", type=float, default=0.05, help="Minimum exploration epsilon")
@@ -59,7 +63,7 @@ def parse_args():
     parser.add_argument("--use_wandb", action="store_true", help="Enable WandB experiment tracking")
     parser.add_argument("--wandb_project", type=str, default="federated-causal-marl", help="WandB project name")
     parser.add_argument("--wandb_entity", type=str, default=None, help="WandB entity/username")
-    parser.add_argument("--run_name", type=str, default=None, help="WandB run name")
+    parser.add_argument("--run_name", type=str, default=None, help="WandB run name override")
     parser.add_argument("--seed", type=int, default=42, help="Random PRNG seed")
     
     return parser.parse_args()
@@ -75,9 +79,10 @@ def create_agent_masks(num_variables: int, num_agents: int) -> jax.Array:
         
     return jnp.array(masks)
 
-def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
+def evaluate_agent(env, trainer, train_state, key, agent_type="mlp", num_eval_episodes=3):
     """Performs deterministic evaluation rollouts and logs structural graph metrics."""
     shd_list, f1_list, prec_list, rec_list, return_list = [], [], [], [], []
+    K = env.config.K
     
     for ep in range(num_eval_episodes):
         obs_dict, info = env.reset(jax.random.fold_in(key, ep + 999))
@@ -85,17 +90,29 @@ def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
         step_count = 0
         ep_reward = 0.0
         
+        if agent_type == "rnn":
+            rnn_carry = trainer.agent.initialize_carry((K,))
+        elif agent_type == "transformer":
+            obs_history = []
+        
         while not done and step_count < env.max_steps:
-            K = env.config.K
             obs_array = jnp.stack([obs_dict[f"agent_{k}"] for k in range(K)])
             avail_array = np.array([info["avail_actions"][f"agent_{k}"] for k in range(K)])
             
             # Greedy action selection (epsilon = 0.0)
-            q_values_flat = trainer.agent.apply(train_state.params['agent'], obs_array)
-            
+            if agent_type == "mlp":
+                q_values_jnp = trainer.agent.apply(train_state.params['agent'], obs_array)
+            elif agent_type == "rnn":
+                rnn_carry, q_values_jnp = trainer.agent.apply(train_state.params['agent'], rnn_carry, obs_array)
+            elif agent_type == "transformer":
+                obs_history.append(obs_array)
+                seq_jnp = jnp.array(obs_history).transpose(1, 0, 2)
+                q_seq = trainer.agent.apply(train_state.params['agent'], seq_jnp)
+                q_values_jnp = q_seq[:, -1, :]
+                
             joint_actions = {}
             for k in range(K):
-                q_k = np.array(q_values_flat[k])
+                q_k = np.array(q_values_jnp[k])
                 q_k[avail_array[k] == 0] = -1e9
                 greedy_action = int(np.argmax(q_k))
                 joint_actions[f"agent_{k}"] = greedy_action
@@ -125,6 +142,13 @@ def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
 def main():
     args = parse_args()
     
+    # Format a descriptive WandB run name reflecting parameters and model choice
+    descriptive_run_name = (
+        args.run_name or 
+        f"qmix_{args.agent_type}_d{args.num_variables}_K{args.num_agents}_{args.graph_type}_"
+        f"lr{args.lr}_cost{args.action_cost}_cr{args.circle_reward}_noop{args.noop_penalty}_s{args.seed}"
+    )
+    
     if args.use_wandb:
         if not WANDB_AVAILABLE:
             print("[Warning] wandb package not found. Continuing without wandb logging.")
@@ -133,12 +157,13 @@ def main():
             wandb.init(
                 project=args.wandb_project,
                 entity=args.wandb_entity,
-                name=args.run_name or f"qmix_d{args.num_variables}_K{args.num_agents}_{args.graph_type}",
+                name=descriptive_run_name,
                 config=vars(args)
             )
             
     print(f"=== Starting Training Session ===")
-    print(f"Config: d={args.num_variables}, K={args.num_agents}, Graph={args.graph_type}, Episodes={args.num_episodes}")
+    print(f"Run Name: {descriptive_run_name}")
+    print(f"Config: agent={args.agent_type}, d={args.num_variables}, K={args.num_agents}, Graph={args.graph_type}, Episodes={args.num_episodes}")
     
     key = jax.random.PRNGKey(args.seed)
     k1, k2, key = jax.random.split(key, 3)
@@ -168,7 +193,7 @@ def main():
         noise_scale=args.noise_scale
     )
     
-    # 2. Initialize Environment with Configurable Rewards & Budget
+    # 2. Initialize Environment
     env = FederatedCausalEnv(
         config, adj, scm_params, topological_order, agent_masks, action_costs,
         initial_budget=args.initial_budget,
@@ -179,17 +204,25 @@ def main():
     )
     env.max_steps = args.max_steps
     
-    # 3. Initialize QMIX Agent, Mixer, and Trainer
+    # 3. Initialize Agent Architecture (MLP, RNN, or CausalTransformer)
     obs_dim = 2 * d * d + d + 1
     state_dim = d * d * 2 + K
     num_actions = d + 1
     
-    agent = MLPAgent(num_actions=num_actions, hidden_dim=args.hidden_dim)
+    if args.agent_type == "mlp":
+        agent = MLPAgent(num_actions=num_actions, hidden_dim=args.hidden_dim)
+    elif args.agent_type == "rnn":
+        agent = RNNAgent(num_actions=num_actions, hidden_dim=args.hidden_dim)
+    elif args.agent_type == "transformer":
+        agent = CausalTransformerAgent(num_actions=num_actions, hidden_dim=args.hidden_dim, num_heads=2)
+    else:
+        raise ValueError(f"Unknown agent_type: {args.agent_type}")
+        
     mixer = QMIXMixer(hidden_dim=args.mixer_hidden_dim)
-    trainer = QMIXTrainer(agent, mixer, lr=args.lr, gamma=args.gamma)
+    trainer = QMIXTrainer(agent, mixer, lr=args.lr, gamma=args.gamma, agent_type=args.agent_type)
     
     k_init, key = jax.random.split(key)
-    train_state, target_state = trainer.init_state(k_init, obs_dim, state_dim, K)
+    train_state, target_state = trainer.init_state(k_init, obs_dim, state_dim, K, max_steps=args.max_steps)
     
     buffer = TrajectoryBuffer(
         capacity=args.buffer_capacity,
@@ -217,6 +250,11 @@ def main():
         step_count = 0
         ep_reward = 0.0
         
+        if args.agent_type == "rnn":
+            rnn_carry = agent.initialize_carry((K,))
+        elif args.agent_type == "transformer":
+            obs_history = []
+            
         ep_states, ep_obs, ep_acts, ep_rews, ep_dones, ep_avail = [], [], [], [], [], []
         
         while not done and step_count < args.max_steps:
@@ -226,17 +264,29 @@ def main():
             
             # Epsilon-greedy action selection
             actions = []
-            for k in range(K):
-                valid_actions = np.where(avail[k] == 1.0)[0]
-                if np.random.rand() < epsilon:
+            if np.random.rand() < epsilon:
+                for k in range(K):
+                    valid_actions = np.where(avail[k] == 1.0)[0]
                     a = np.random.choice(valid_actions)
-                else:
-                    q_values = trainer.agent.apply(train_state.params['agent'], obs[k])
-                    q_values_np = np.array(q_values)
-                    q_values_np[avail[k] == 0] = -1e9
-                    a = int(np.argmax(q_values_np))
-                actions.append(a)
-                
+                    actions.append(a)
+            else:
+                if args.agent_type == "mlp":
+                    q_values_jnp = trainer.agent.apply(train_state.params['agent'], obs)
+                elif args.agent_type == "rnn":
+                    rnn_carry, q_values_jnp = trainer.agent.apply(train_state.params['agent'], rnn_carry, obs)
+                elif args.agent_type == "transformer":
+                    obs_history.append(obs)
+                    seq_jnp = jnp.array(obs_history).transpose(1, 0, 2)
+                    q_seq = trainer.agent.apply(train_state.params['agent'], seq_jnp)
+                    q_values_jnp = q_seq[:, -1, :]
+                    
+                q_values_np = np.array(q_values_jnp)
+                for k in range(K):
+                    q_k = q_values_np[k].copy()
+                    q_k[avail[k] == 0] = -1e9
+                    a = int(np.argmax(q_k))
+                    actions.append(a)
+                    
             joint_actions = {f"agent_{k}": actions[k] for k in range(K)}
             
             k_step, key = jax.random.split(key)
@@ -284,23 +334,22 @@ def main():
         
         if episode % args.eval_freq == 0:
             k_eval, key = jax.random.split(key)
-            eval_metrics = evaluate_agent(env, trainer, train_state, k_eval)
+            eval_metrics = evaluate_agent(env, trainer, train_state, k_eval, agent_type=args.agent_type)
             log_data.update(eval_metrics)
             
-            print(f"[Episode {episode}/{args.num_episodes}] "
-                  f"Train Reward: {ep_reward:.2f} | Loss: {td_loss:.4f} | "
+            print(f"[{args.agent_type.upper()} | Episode {episode}/{args.num_episodes}] "
+                  f"Reward: {ep_reward:.2f} | Loss: {td_loss:.4f} | "
                   f"Eval F1: {eval_metrics['eval/mean_f1']:.3f} | SHD: {eval_metrics['eval/mean_shd']:.2f}")
                   
-            # Checkpoint best parameters
             if eval_metrics['eval/mean_f1'] > best_eval_f1:
                 best_eval_f1 = eval_metrics['eval/mean_f1']
                 os.makedirs("checkpoints", exist_ok=True)
-                np.savez("checkpoints/best_qmix_params.npz", params=train_state.params)
+                np.savez(f"checkpoints/best_{args.agent_type}_params.npz", params=train_state.params)
                 
         if args.use_wandb:
             wandb.log(log_data)
             
-    print(f"=== Training Complete! Best Eval F1: {best_eval_f1:.3f} ===")
+    print(f"=== Training Complete! Best {args.agent_type.upper()} Eval F1: {best_eval_f1:.3f} ===")
     if args.use_wandb:
         wandb.finish()
 
