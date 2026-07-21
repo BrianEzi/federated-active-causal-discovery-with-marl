@@ -100,7 +100,10 @@ class QMIXTrainer:
         new_state = state.apply_gradients(grads=grads)
         return new_state, loss
 
-    def get_epsilon(self, episode: int, total_episodes: int) -> float:
-        # Linear decay from 1.0 to 0.05
-        epsilon = 1.0 - (1.0 - 0.05) * (episode / total_episodes)
-        return max(0.05, epsilon)
+    def get_epsilon(self, episode: int, total_episodes: int, start: float = 1.0, min_eps: float = 0.05, decay_frac: float = 0.8) -> float:
+        """Computes linear epsilon decay over a specified fraction of total episodes."""
+        decay_episodes = max(1, int(total_episodes * decay_frac))
+        progress = min(1.0, episode / decay_episodes)
+        epsilon = start - (start - min_eps) * progress
+        return max(min_eps, epsilon)
+

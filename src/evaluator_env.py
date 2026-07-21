@@ -23,13 +23,20 @@ def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax
 
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, adjacency: jax.Array, scm_params: SCMParams, 
-                 topological_order: jax.Array, agent_masks: jax.Array, action_costs: jax.Array):
+                 topological_order: jax.Array, agent_masks: jax.Array, action_costs: jax.Array,
+                 initial_budget: float = 10.0, sample_count: int = 500,
+                 circle_reward: float = 10.0, noop_penalty: float = 0.5, violation_penalty: float = 20.0):
         self.config = config
         self.adjacency = adjacency
         self.scm_params = scm_params
         self.topological_order = topological_order
         self.agent_masks = agent_masks
         self.action_costs = action_costs
+        self.initial_budget = initial_budget
+        self.sample_count = sample_count
+        self.circle_reward = circle_reward
+        self.noop_penalty = noop_penalty
+        self.violation_penalty = violation_penalty
         
         self.pag_tracker = None
         self.jax_state = None
@@ -70,7 +77,7 @@ class FederatedCausalEnv:
         return obs_dict, global_state, avail_dict
         
     def reset(self, key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict]:
-        budgets = jnp.full(self.config.K, 10.0) # initial budgets
+        budgets = jnp.full(self.config.K, self.initial_budget) # initial budgets
         self.jax_state = init_env(key, self.config, self.adjacency, self.scm_params, self.topological_order, self.agent_masks, budgets)
         self.pag_tracker = PAGTracker(self.config.d)
         
@@ -81,11 +88,11 @@ class FederatedCausalEnv:
             type=jnp.zeros(self.config.d, dtype=jnp.int32),
             value=jnp.zeros(self.config.d)
         )
-        samples = sample_scm(obs_key, self.jax_state, self.config, 1000, obs_spec)
+        samples = sample_scm(obs_key, self.jax_state, self.config, self.sample_count, obs_spec)
         
         local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
             
-        sample_counts = jnp.full(self.config.K, 1000.0)
+        sample_counts = jnp.full(self.config.K, float(self.sample_count))
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
         stitched_cov_np = np.array(stitched_cov)
         
@@ -127,12 +134,12 @@ class FederatedCausalEnv:
         self.jax_state, _ = step_env(self.jax_state, jnp.array(action_array), jnp.array(costs))
         
         # Generate batched interventional data
-        samples = sample_scm(key, self.jax_state, self.config, 500, intervention_spec)
+        samples = sample_scm(key, self.jax_state, self.config, self.sample_count, intervention_spec)
         
         local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
         
         # Stitch global covariance
-        sample_counts = jnp.full(self.config.K, 500.0)
+        sample_counts = jnp.full(self.config.K, float(self.sample_count))
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
         stitched_cov_np = np.array(stitched_cov)
         
@@ -146,8 +153,14 @@ class FederatedCausalEnv:
         curr_circles = self.pag_tracker.count_circle_marks()
         violations = self.pag_tracker.check_structural_violations()
         
-        # Compute Global Reward
-        reward = compute_global_reward(prev_circles, curr_circles, action_array, costs, violations)
+        # Compute Global Reward with NO-OP penalty and configurable multipliers
+        reward = compute_global_reward(
+            prev_circles, curr_circles, action_array, costs, violations,
+            num_variables=self.config.d,
+            circle_reward=self.circle_reward,
+            noop_penalty=self.noop_penalty,
+            violation_penalty=self.violation_penalty
+        )
         
         # Check termination
         terminated = False

@@ -22,20 +22,36 @@ except ImportError:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Federated Active Causal Discovery MARL Trainer")
-    # Environment Hyperparameters
+    # Environment & SCM Hyperparameters
     parser.add_argument("--num_variables", "-d", type=int, default=5, help="Number of nodes in SCM graph")
     parser.add_argument("--num_agents", "-K", type=int, default=2, help="Number of decentralized agents")
     parser.add_argument("--graph_type", type=str, default="ER", choices=["ER", "BA"], help="Graph generator type")
     parser.add_argument("--edge_prob", type=float, default=0.5, help="ER edge probability")
     parser.add_argument("--ba_edges", type=int, default=1, help="BA edges per node")
     parser.add_argument("--max_steps", type=int, default=20, help="Max steps per episode")
+    parser.add_argument("--initial_budget", type=float, default=10.0, help="Initial intervention budget per agent")
+    parser.add_argument("--action_cost", type=float, default=0.05, help="Cost per intervention action")
+    parser.add_argument("--sample_count", type=int, default=500, help="Interventional sample count per step")
+    parser.add_argument("--noise_scale", type=float, default=0.1, help="SCM observational noise scale")
+    parser.add_argument("--mechanism_type", type=str, default="LINEAR", choices=["LINEAR", "NONLINEAR_ANM"], help="SCM mechanism type")
+    parser.add_argument("--noise_type", type=str, default="GAUSSIAN", choices=["GAUSSIAN", "GUMBEL", "UNIFORM"], help="SCM noise distribution")
     
-    # Training Hyperparameters
+    # Reward Shaping Hyperparameters
+    parser.add_argument("--circle_reward", type=float, default=10.0, help="Reward per resolved circle mark")
+    parser.add_argument("--noop_penalty", type=float, default=0.5, help="Penalty applied when ALL agents NO-OP while circles remain")
+    parser.add_argument("--violation_penalty", type=float, default=20.0, help="Penalty per structural PAG violation")
+    
+    # Exploration & QMIX Hyperparameters
     parser.add_argument("--num_episodes", type=int, default=100, help="Total training episodes")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size for QMIX TD loss")
     parser.add_argument("--buffer_capacity", type=int, default=100, help="Replay buffer episode capacity")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for Optax Adam")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--hidden_dim", type=int, default=64, help="Agent MLP hidden dimension")
+    parser.add_argument("--mixer_hidden_dim", type=int, default=32, help="QMIX hypernetwork hidden dimension")
+    parser.add_argument("--epsilon_start", type=float, default=1.0, help="Initial exploration epsilon")
+    parser.add_argument("--epsilon_min", type=float, default=0.05, help="Minimum exploration epsilon")
+    parser.add_argument("--epsilon_decay_frac", type=float, default=0.8, help="Fraction of episodes over which epsilon decays")
     parser.add_argument("--target_update_freq", type=int, default=10, help="Episodes between target network updates")
     parser.add_argument("--eval_freq", type=int, default=10, help="Episodes between evaluation runs")
     
@@ -51,7 +67,6 @@ def parse_args():
 def create_agent_masks(num_variables: int, num_agents: int) -> jax.Array:
     """Creates overlapping variable jurisdiction masks for K agents."""
     masks = np.zeros((num_agents, num_variables), dtype=np.float32)
-    # Simple overlapping assignment: each agent sees a subset of variables
     vars_per_agent = max(2, int(np.ceil(num_variables * 0.7)))
     for k in range(num_agents):
         start_idx = (k * (num_variables - vars_per_agent)) // max(1, num_agents - 1)
@@ -81,7 +96,6 @@ def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
             joint_actions = {}
             for k in range(K):
                 q_k = np.array(q_values_flat[k])
-                # Mask invalid actions
                 q_k[avail_array[k] == 0] = -1e9
                 greedy_action = int(np.argmax(q_k))
                 joint_actions[f"agent_{k}"] = greedy_action
@@ -90,7 +104,6 @@ def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
             ep_reward += reward
             step_count += 1
             
-        # Compute final PAG metrics against true DAG
         pag_matrix = info["pag"]
         true_dag = np.array(env.adjacency)
         metrics = evaluate_pag_against_dag(pag_matrix, true_dag)
@@ -112,7 +125,6 @@ def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
 def main():
     args = parse_args()
     
-    # Initialize WandB if requested
     if args.use_wandb:
         if not WANDB_AVAILABLE:
             print("[Warning] wandb package not found. Continuing without wandb logging.")
@@ -134,27 +146,37 @@ def main():
     d = args.num_variables
     K = args.num_agents
     
+    mech_enum = MechanismType.LINEAR if args.mechanism_type == "LINEAR" else MechanismType.NONLINEAR_ANM
+    noise_enum = getattr(NoiseType, args.noise_type)
+    
     # 1. Generate synthetic graph & SCM parameters
     if args.graph_type == "ER":
         adj = generate_er_dag(k1, d, edge_prob=args.edge_prob)
     else:
         adj = generate_ba_dag(k1, d, num_edges_per_node=args.ba_edges)
         
-    scm_params = generate_scm_params(k2, adj, MechanismType.LINEAR)
+    scm_params = generate_scm_params(k2, adj, mech_enum)
     topological_order = jnp.arange(d)
     agent_masks = create_agent_masks(d, K)
-    action_costs = jnp.full(K, 0.1) # low action cost
+    action_costs = jnp.full(K, args.action_cost)
     
     config = SCMConfig(
         d=d,
         K=K,
-        mechanism_type=MechanismType.LINEAR,
-        noise_type=NoiseType.GAUSSIAN,
-        noise_scale=0.1
+        mechanism_type=int(mech_enum),
+        noise_type=int(noise_enum),
+        noise_scale=args.noise_scale
     )
     
-    # 2. Initialize Environment
-    env = FederatedCausalEnv(config, adj, scm_params, topological_order, agent_masks, action_costs)
+    # 2. Initialize Environment with Configurable Rewards & Budget
+    env = FederatedCausalEnv(
+        config, adj, scm_params, topological_order, agent_masks, action_costs,
+        initial_budget=args.initial_budget,
+        sample_count=args.sample_count,
+        circle_reward=args.circle_reward,
+        noop_penalty=args.noop_penalty,
+        violation_penalty=args.violation_penalty
+    )
     env.max_steps = args.max_steps
     
     # 3. Initialize QMIX Agent, Mixer, and Trainer
@@ -162,8 +184,8 @@ def main():
     state_dim = d * d * 2 + K
     num_actions = d + 1
     
-    agent = MLPAgent(num_actions=num_actions, hidden_dim=64)
-    mixer = QMIXMixer(hidden_dim=32)
+    agent = MLPAgent(num_actions=num_actions, hidden_dim=args.hidden_dim)
+    mixer = QMIXMixer(hidden_dim=args.mixer_hidden_dim)
     trainer = QMIXTrainer(agent, mixer, lr=args.lr, gamma=args.gamma)
     
     k_init, key = jax.random.split(key)
@@ -182,7 +204,12 @@ def main():
     
     # 4. Main Training Loop
     for episode in range(1, args.num_episodes + 1):
-        epsilon = trainer.get_epsilon(episode, args.num_episodes)
+        epsilon = trainer.get_epsilon(
+            episode, args.num_episodes, 
+            start=args.epsilon_start, 
+            min_eps=args.epsilon_min, 
+            decay_frac=args.epsilon_decay_frac
+        )
         k_ep, key = jax.random.split(key)
         
         obs_dict, info = env.reset(k_ep)
