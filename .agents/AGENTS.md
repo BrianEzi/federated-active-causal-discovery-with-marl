@@ -34,3 +34,8 @@ When working on this repository, you must adhere strictly to the following archi
 ## 7. Workspace Hygiene & Scratch Management
 - **Never Commit Scratch Files:** Temporary profiling scripts, benchmark harnesses, or scratch files (e.g., `scratch/`, temporary logs) MUST NEVER be committed to Git.
 - **Gitignore Enforcement:** Always ensure temporary folders (e.g., `scratch/`, `shelved/`, `.venv/`) are explicitly listed in `.gitignore`. Clean up or untrack any temporary files before committing work.
+
+## 8. Continuous Documentation Maintenance
+- **Keep Documentation Updated:** Whenever you add a feature, refactor code, fix a bug, or introduce new hyperparameters or agent architectures, you MUST update the relevant files in `docs/` (`docs/ARCHITECTURE.md`, `docs/AGENTS_AND_MODELS.md`, `docs/CAUSAL_EVALUATOR.md`, `docs/CHANGELOG.md`) and `README.md`.
+- **Changelog Tracking:** Always add an entry under `docs/CHANGELOG.md` summarizing what was added, fixed, or refactored.
+
