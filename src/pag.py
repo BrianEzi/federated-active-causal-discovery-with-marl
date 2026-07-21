@@ -12,31 +12,53 @@ class PAGTracker:
         # Initialize a fully connected unoriented PAG: P[i,j] = 3 for i != j, 0 for i == j
         self.P = np.full((self.d, self.d), self.CIRCLE, dtype=np.int32)
         np.fill_diagonal(self.P, self.NULL)
+        self.intervened_history = set()
 
     def count_circle_marks(self) -> int:
         """Counts the total number of circle marks in the PAG matrix."""
         return int(np.sum(self.P == self.CIRCLE))
 
-    def update_pag_from_intervention(self, intervened_nodes: list, p_values_matrix: np.ndarray, threshold: float = 0.05):
+    def update_skeleton_from_observational(self, cov_matrix: np.ndarray, threshold: float = 0.08):
         """
-        Takes active intervention targets, and updates the PAG based on conditional independence.
-        p_values_matrix: [d, d] symmetric matrix of p-values.
+        Removes edges between variables that are unconditionally independent under observational data.
+        Ignores NaN entries (unobserved pairs).
+        """
+        for i in range(self.d):
+            for j in range(i + 1, self.d):
+                cov_val = cov_matrix[i, j]
+                if not np.isnan(cov_val):
+                    if abs(cov_val) < threshold:
+                        self.P[i, j] = self.NULL
+                        self.P[j, i] = self.NULL
+
+    def update_pag_from_intervention(self, intervened_nodes: list, interventional_data: np.ndarray, threshold: float = 0.5):
+        """
+        Takes active intervention targets and interventional data (1D mean shifts [d] or 2D matrix [d, d]).
         """
         for i in intervened_nodes:
+            self.intervened_history.add(i)
             for j in range(self.d):
                 if i == j:
                     continue
-                # If there is a circle mark at i-j
-                if self.P[i, j] == self.CIRCLE or self.P[j, i] == self.CIRCLE:
-                    p_val = p_values_matrix[i, j]
-                    if p_val < threshold:
-                        # Dependent under do(Xi) -> Xi -> Xj
-                        self.P[i, j] = self.TAIL
-                        self.P[j, i] = self.ARROW
-                    else:
-                        # Independent under do(Xi) -> no edge
-                        self.P[i, j] = self.NULL
-                        self.P[j, i] = self.NULL
+                val = float(interventional_data[i, j]) if interventional_data.ndim == 2 else float(interventional_data[j])
+                
+                if np.isnan(val):
+                    continue
+                
+                # Check for dependency (p-value < threshold OR mean shift >= threshold)
+                if interventional_data.ndim == 2 and threshold < 0.1:
+                    is_dependent = (val < threshold)
+                else:
+                    is_dependent = (abs(val) >= threshold)
+                    
+                if is_dependent:
+                    # Dependent under do(Xi) -> Xi -> Xj
+                    self.P[i, j] = self.TAIL
+                    self.P[j, i] = self.ARROW
+                else:
+                    # Independent under do(Xi) -> Xi does NOT cause Xj
+                    self.P[i, j] = self.NULL
+                    self.P[j, i] = self.NULL
                         
         self._propagate_meek_rules()
 

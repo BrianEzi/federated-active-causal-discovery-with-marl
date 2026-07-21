@@ -96,6 +96,9 @@ class FederatedCausalEnv:
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
         stitched_cov_np = np.array(stitched_cov)
         
+        # Prune non-adjacent edges from initial PAG using observational covariance
+        self.pag_tracker.update_skeleton_from_observational(stitched_cov_np, threshold=0.08)
+        
         obs_dict, global_state, avail_dict = self._get_obs_state_avail(local_covs_jnp, stitched_cov_np)
             
         return obs_dict, {"pag": self.pag_tracker.P.copy(), "state": global_state, "avail_actions": avail_dict}
@@ -143,13 +146,12 @@ class FederatedCausalEnv:
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
         stitched_cov_np = np.array(stitched_cov)
         
-        # Generate proxy P-values from stitched covariance
-        # High covariance means dependent (low p-value)
-        p_values_matrix = np.exp(-np.abs(np.nan_to_num(stitched_cov_np)) * 10)
+        # Compute interventional means across all nodes to detect causal propagation
+        sample_means = np.array(jnp.mean(samples, axis=0))
         
-        # Update PAGTracker
+        # Update PAGTracker with interventional mean shifts
         prev_circles = self.pag_tracker.count_circle_marks()
-        self.pag_tracker.update_pag_from_intervention(intervened_nodes, p_values_matrix, threshold=0.05)
+        self.pag_tracker.update_pag_from_intervention(intervened_nodes, sample_means, threshold=0.5)
         curr_circles = self.pag_tracker.count_circle_marks()
         violations = self.pag_tracker.check_structural_violations()
         
