@@ -20,3 +20,13 @@ When working on this repository, you must adhere strictly to the following archi
 ## 4. Documentation & Style
 - Maintain clean, descriptive Docstrings for all functions.
 - Ensure all matrices and arrays are annotated with their expected shapes (e.g., `[batch_size, K, d, d]`) in the comments or type hints.
+
+## 5. Software Engineering & Performance Discipline
+- **Empirical Profiling Over Speculation:** NEVER diagnose a performance bottleneck or claim an optimization works without writing a local profiling/benchmark script (`time.perf_counter()`) to measure actual millisecond execution times.
+- **Trace Full Execution Paths:** Trace the complete call stack from top-level training scripts (`train.py`) down to step functions (`evaluator_env.py`), graph interpretation (`pag.py`), and backend kernels (`scm.py`). Identify exact lines causing latency or memory transfer blocks (e.g., `np.array()` host-device syncs).
+- **Algorithmic Vectorization:** Avoid $O(d^2)$ or $O(d^3)$ nested Python `for` loops. Always replace dynamic loops with vectorized NumPy matrix operations (`np.dot`, `@`, Boolean indexing) for graph orientations and graph checks.
+- **JIT Compilation Safety:** Ensure `@jax.jit` boundaries are respected. Primitive integers (`d`, `mechanism_type`) must be passed statically, while PyTrees (`chex.dataclass`) must remain dynamic to prevent unhashable object compilation errors.
+
+## 6. Testing & Quality Verification
+- **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally.
+- **Equivalence Verification:** When refactoring algorithms for performance (e.g., vectorizing loops), verify that the optimized output matches the reference implementation 100% using `np.array_equal` or `np.allclose`.

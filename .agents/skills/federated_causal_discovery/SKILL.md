@@ -27,3 +27,11 @@ The distributed agents are controlled by a QMIX architecture (`src/marl/`).
 - `QMIXTrainer` executes the Temporal Difference double Q-learning steps via `optax.adam`, sampling padded sequences from the `TrajectoryBuffer`.
 
 **When debugging or extending the framework, ensure you strictly respect the JAX/NumPy hybrid boundaries and NEVER introduce in-place updates into the JAX `step_env` pipeline.**
+
+## 🛠️ Software Engineering & Performance Protocol
+Every AI agent modifying or optimizing this codebase must execute the following protocol:
+1. **Performance Profiling**: Before claiming an algorithm is slow or optimized, create an empirical benchmark script measuring execution time with `time.perf_counter()`. Profile step-by-step to isolate CPU vs GPU bottlenecks.
+2. **Matrix Vectorization**: Convert any dynamic nested Python `for` loops in CPU code into vectorized NumPy matrix operations (`np.dot`, `@`, Boolean indexing).
+3. **JIT Type Safety**: Never pass `chex.dataclass` objects to `static_argnums` in `@jax.jit`. Extract primitive integers (`int(config.d)`) outside compilation boundaries.
+4. **Empirical Verification**: Always run `pytest tests/ -v` and verify numerical equivalence (`np.array_equal`) before pushing or completing a task.
+
