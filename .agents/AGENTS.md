@@ -30,3 +30,7 @@ When working on this repository, you must adhere strictly to the following archi
 ## 6. Testing & Quality Verification
 - **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally.
 - **Equivalence Verification:** When refactoring algorithms for performance (e.g., vectorizing loops), verify that the optimized output matches the reference implementation 100% using `np.array_equal` or `np.allclose`.
+
+## 7. Workspace Hygiene & Scratch Management
+- **Never Commit Scratch Files:** Temporary profiling scripts, benchmark harnesses, or scratch files (e.g., `scratch/`, temporary logs) MUST NEVER be committed to Git.
+- **Gitignore Enforcement:** Always ensure temporary folders (e.g., `scratch/`, `shelved/`, `.venv/`) are explicitly listed in `.gitignore`. Clean up or untrack any temporary files before committing work.
