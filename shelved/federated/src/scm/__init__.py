@@ -1,3 +1,0 @@
-"""
-Structural Causal Model module.
-"""
