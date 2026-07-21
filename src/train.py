@@ -1,0 +1,281 @@
+import argparse
+import os
+import time
+import numpy as np
+import jax
+import jax.numpy as jnp
+
+from src.types import SCMConfig, MechanismType, NoiseType
+from src.generators import generate_er_dag, generate_ba_dag, generate_scm_params
+from src.evaluator_env import FederatedCausalEnv
+from src.marl.agent import MLPAgent
+from src.marl.mixer import QMIXMixer
+from src.marl.trainer import QMIXTrainer
+from src.marl.buffer import TrajectoryBuffer
+from src.metrics import evaluate_pag_against_dag
+
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Federated Active Causal Discovery MARL Trainer")
+    # Environment Hyperparameters
+    parser.add_argument("--num_variables", "-d", type=int, default=5, help="Number of nodes in SCM graph")
+    parser.add_argument("--num_agents", "-K", type=int, default=2, help="Number of decentralized agents")
+    parser.add_argument("--graph_type", type=str, default="ER", choices=["ER", "BA"], help="Graph generator type")
+    parser.add_argument("--edge_prob", type=float, default=0.5, help="ER edge probability")
+    parser.add_argument("--ba_edges", type=int, default=1, help="BA edges per node")
+    parser.add_argument("--max_steps", type=int, default=20, help="Max steps per episode")
+    
+    # Training Hyperparameters
+    parser.add_argument("--num_episodes", type=int, default=100, help="Total training episodes")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for QMIX TD loss")
+    parser.add_argument("--buffer_capacity", type=int, default=100, help="Replay buffer episode capacity")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate for Optax Adam")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
+    parser.add_argument("--target_update_freq", type=int, default=10, help="Episodes between target network updates")
+    parser.add_argument("--eval_freq", type=int, default=10, help="Episodes between evaluation runs")
+    
+    # WandB Settings
+    parser.add_argument("--use_wandb", action="store_true", help="Enable WandB experiment tracking")
+    parser.add_argument("--wandb_project", type=str, default="federated-causal-marl", help="WandB project name")
+    parser.add_argument("--wandb_entity", type=str, default=None, help="WandB entity/username")
+    parser.add_argument("--run_name", type=str, default=None, help="WandB run name")
+    parser.add_argument("--seed", type=int, default=42, help="Random PRNG seed")
+    
+    return parser.parse_args()
+
+def create_agent_masks(num_variables: int, num_agents: int) -> jax.Array:
+    """Creates overlapping variable jurisdiction masks for K agents."""
+    masks = np.zeros((num_agents, num_variables), dtype=np.float32)
+    # Simple overlapping assignment: each agent sees a subset of variables
+    vars_per_agent = max(2, int(np.ceil(num_variables * 0.7)))
+    for k in range(num_agents):
+        start_idx = (k * (num_variables - vars_per_agent)) // max(1, num_agents - 1)
+        end_idx = min(num_variables, start_idx + vars_per_agent)
+        masks[k, start_idx:end_idx] = 1.0
+        
+    return jnp.array(masks)
+
+def evaluate_agent(env, trainer, train_state, key, num_eval_episodes=3):
+    """Performs deterministic evaluation rollouts and logs structural graph metrics."""
+    shd_list, f1_list, prec_list, rec_list, return_list = [], [], [], [], []
+    
+    for ep in range(num_eval_episodes):
+        obs_dict, info = env.reset(jax.random.fold_in(key, ep + 999))
+        done = False
+        step_count = 0
+        ep_reward = 0.0
+        
+        while not done and step_count < env.max_steps:
+            K = env.config.K
+            obs_array = jnp.stack([obs_dict[f"agent_{k}"] for k in range(K)])
+            avail_array = np.array([info["avail_actions"][f"agent_{k}"] for k in range(K)])
+            
+            # Greedy action selection (epsilon = 0.0)
+            q_values_flat = trainer.agent.apply(train_state.params['agent'], obs_array)
+            
+            joint_actions = {}
+            for k in range(K):
+                q_k = np.array(q_values_flat[k])
+                # Mask invalid actions
+                q_k[avail_array[k] == 0] = -1e9
+                greedy_action = int(np.argmax(q_k))
+                joint_actions[f"agent_{k}"] = greedy_action
+                
+            obs_dict, reward, done, info = env.step(joint_actions, jax.random.fold_in(key, step_count))
+            ep_reward += reward
+            step_count += 1
+            
+        # Compute final PAG metrics against true DAG
+        pag_matrix = info["pag"]
+        true_dag = np.array(env.adjacency)
+        metrics = evaluate_pag_against_dag(pag_matrix, true_dag)
+        
+        shd_list.append(metrics["shd"])
+        f1_list.append(metrics["f1"])
+        prec_list.append(metrics["precision"])
+        rec_list.append(metrics["recall"])
+        return_list.append(ep_reward)
+        
+    return {
+        "eval/mean_return": float(np.mean(return_list)),
+        "eval/mean_shd": float(np.mean(shd_list)),
+        "eval/mean_f1": float(np.mean(f1_list)),
+        "eval/mean_precision": float(np.mean(prec_list)),
+        "eval/mean_recall": float(np.mean(rec_list)),
+    }
+
+def main():
+    args = parse_args()
+    
+    # Initialize WandB if requested
+    if args.use_wandb:
+        if not WANDB_AVAILABLE:
+            print("[Warning] wandb package not found. Continuing without wandb logging.")
+            args.use_wandb = False
+        else:
+            wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                name=args.run_name or f"qmix_d{args.num_variables}_K{args.num_agents}_{args.graph_type}",
+                config=vars(args)
+            )
+            
+    print(f"=== Starting Training Session ===")
+    print(f"Config: d={args.num_variables}, K={args.num_agents}, Graph={args.graph_type}, Episodes={args.num_episodes}")
+    
+    key = jax.random.PRNGKey(args.seed)
+    k1, k2, key = jax.random.split(key, 3)
+    
+    d = args.num_variables
+    K = args.num_agents
+    
+    # 1. Generate synthetic graph & SCM parameters
+    if args.graph_type == "ER":
+        adj = generate_er_dag(k1, d, edge_prob=args.edge_prob)
+    else:
+        adj = generate_ba_dag(k1, d, num_edges_per_node=args.ba_edges)
+        
+    scm_params = generate_scm_params(k2, adj, MechanismType.LINEAR)
+    topological_order = jnp.arange(d)
+    agent_masks = create_agent_masks(d, K)
+    action_costs = jnp.full(K, 0.1) # low action cost
+    
+    config = SCMConfig(
+        d=d,
+        K=K,
+        mechanism_type=MechanismType.LINEAR,
+        noise_type=NoiseType.GAUSSIAN,
+        noise_scale=0.1
+    )
+    
+    # 2. Initialize Environment
+    env = FederatedCausalEnv(config, adj, scm_params, topological_order, agent_masks, action_costs)
+    env.max_steps = args.max_steps
+    
+    # 3. Initialize QMIX Agent, Mixer, and Trainer
+    obs_dim = 2 * d * d + d + 1
+    state_dim = d * d * 2 + K
+    num_actions = d + 1
+    
+    agent = MLPAgent(num_actions=num_actions, hidden_dim=64)
+    mixer = QMIXMixer(hidden_dim=32)
+    trainer = QMIXTrainer(agent, mixer, lr=args.lr, gamma=args.gamma)
+    
+    k_init, key = jax.random.split(key)
+    train_state, target_state = trainer.init_state(k_init, obs_dim, state_dim, K)
+    
+    buffer = TrajectoryBuffer(
+        capacity=args.buffer_capacity,
+        max_steps=args.max_steps,
+        state_dim=state_dim,
+        obs_dim=obs_dim,
+        num_agents=K,
+        num_actions=num_actions
+    )
+    
+    best_eval_f1 = -1.0
+    
+    # 4. Main Training Loop
+    for episode in range(1, args.num_episodes + 1):
+        epsilon = trainer.get_epsilon(episode, args.num_episodes)
+        k_ep, key = jax.random.split(key)
+        
+        obs_dict, info = env.reset(k_ep)
+        done = False
+        step_count = 0
+        ep_reward = 0.0
+        
+        ep_states, ep_obs, ep_acts, ep_rews, ep_dones, ep_avail = [], [], [], [], [], []
+        
+        while not done and step_count < args.max_steps:
+            state = info["state"]
+            obs = np.array([obs_dict[f"agent_{k}"] for k in range(K)])
+            avail = np.array([info["avail_actions"][f"agent_{k}"] for k in range(K)])
+            
+            # Epsilon-greedy action selection
+            actions = []
+            for k in range(K):
+                valid_actions = np.where(avail[k] == 1.0)[0]
+                if np.random.rand() < epsilon:
+                    a = np.random.choice(valid_actions)
+                else:
+                    q_values = trainer.agent.apply(train_state.params['agent'], obs[k])
+                    q_values_np = np.array(q_values)
+                    q_values_np[avail[k] == 0] = -1e9
+                    a = int(np.argmax(q_values_np))
+                actions.append(a)
+                
+            joint_actions = {f"agent_{k}": actions[k] for k in range(K)}
+            
+            k_step, key = jax.random.split(key)
+            next_obs_dict, reward, done, info = env.step(joint_actions, k_step)
+            
+            ep_states.append(state)
+            ep_obs.append(obs)
+            ep_acts.append(actions)
+            ep_rews.append([reward])
+            ep_dones.append([done])
+            ep_avail.append(avail)
+            
+            obs_dict = next_obs_dict
+            ep_reward += reward
+            step_count += 1
+            
+        buffer.add_episode({
+            'states': ep_states,
+            'observations': ep_obs,
+            'actions': ep_acts,
+            'rewards': ep_rews,
+            'dones': ep_dones,
+            'avail_actions': ep_avail
+        })
+        
+        # Train Step
+        td_loss = 0.0
+        if buffer.size >= args.batch_size:
+            batch = buffer.sample(args.batch_size)
+            train_state, loss_val = trainer.train_step(train_state, target_state, batch)
+            td_loss = float(loss_val)
+            
+        # Target Network Update
+        if episode % args.target_update_freq == 0:
+            target_state = target_state.replace(params=train_state.params)
+            
+        # Logging & Evaluation
+        log_data = {
+            "train/episode": episode,
+            "train/episode_reward": ep_reward,
+            "train/td_loss": td_loss,
+            "train/epsilon": epsilon,
+            "train/remaining_circles": env.pag_tracker.count_circle_marks()
+        }
+        
+        if episode % args.eval_freq == 0:
+            k_eval, key = jax.random.split(key)
+            eval_metrics = evaluate_agent(env, trainer, train_state, k_eval)
+            log_data.update(eval_metrics)
+            
+            print(f"[Episode {episode}/{args.num_episodes}] "
+                  f"Train Reward: {ep_reward:.2f} | Loss: {td_loss:.4f} | "
+                  f"Eval F1: {eval_metrics['eval/mean_f1']:.3f} | SHD: {eval_metrics['eval/mean_shd']:.2f}")
+                  
+            # Checkpoint best parameters
+            if eval_metrics['eval/mean_f1'] > best_eval_f1:
+                best_eval_f1 = eval_metrics['eval/mean_f1']
+                os.makedirs("checkpoints", exist_ok=True)
+                np.savez("checkpoints/best_qmix_params.npz", params=train_state.params)
+                
+        if args.use_wandb:
+            wandb.log(log_data)
+            
+    print(f"=== Training Complete! Best Eval F1: {best_eval_f1:.3f} ===")
+    if args.use_wandb:
+        wandb.finish()
+
+if __name__ == "__main__":
+    main()

@@ -81,7 +81,7 @@ def test_federated_causal_env():
     
     assert "agent_0" in obs_dict
     assert "agent_1" in obs_dict
-    assert obs_dict["agent_0"].shape == (d, d)
+    assert obs_dict["agent_0"].shape == (2 * d * d + d + 1,)
     assert "pag" in info
     
     for i in range(10):
