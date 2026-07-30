@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument("--eval_freq", type=int, default=10)
     
     parser.add_argument("--use_rnn", action="store_true")
-    parser.add_argument("--fixed_graph", action="store_true")
+    parser.add_argument("--fixed_graph", type=int, nargs='?', const=-1, default=None, help="Pass an int (0-7) to fix to a specific topology, or pass without int to fix a random topology.")
     parser.add_argument("--save_file", action="store_true")
     
     parser.add_argument("--use_wandb", action="store_true")
@@ -57,7 +57,8 @@ def main():
     args = parse_args()
     
     if args.use_wandb and WANDB_AVAILABLE:
-        name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if args.fixed_graph else ''}_d{args.num_variables}"
+        is_fixed = args.fixed_graph is not None
+        name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
         wandb.init(project=args.wandb_project, name=name, config=vars(args))
             
     print(f"=== Starting Training Session ===")
@@ -76,7 +77,10 @@ def main():
         noise_scale=args.noise_scale
     )
     
-    env = FederatedCausalEnv(config, action_costs, initial_budget=args.initial_budget, sample_count=args.sample_count, fixed_graph=args.fixed_graph)
+    is_fixed = args.fixed_graph is not None
+    fixed_idx = args.fixed_graph if (is_fixed and args.fixed_graph >= 0) else None
+    
+    env = FederatedCausalEnv(config, action_costs, initial_budget=args.initial_budget, sample_count=args.sample_count, fixed_graph=is_fixed)
     env.max_steps = args.max_steps
     
     if args.agent_type == "ippo":
@@ -126,7 +130,7 @@ def main():
     
     for episode in range(1, args.num_episodes + 1):
         k_ep, key = jax.random.split(key)
-        obs_dict, info = env.reset(k_ep)
+        obs_dict, info = env.reset(k_ep, force_idx=fixed_idx)
         true_adj = info["true_adjacency"]
         
         if args.agent_type == "ippo" and args.use_rnn:
