@@ -120,6 +120,7 @@ def main():
         agents = [RandomAgent(i, args.num_variables) if args.agent_type == "random" else RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
     
     best_shd = 999.0
+    best_f1 = -1.0
     
     all_metrics_history = []
     
@@ -261,6 +262,25 @@ def main():
         if episode % 10 == 0:
             print(f"[Episode {episode}] Reward: {ep_reward:.2f} | SHD: {eval_metrics['shd']:.2f} | F1: {eval_metrics['f1']:.2f}")
 
+        # Checkpoint Best Model
+        if args.agent_type == "ippo":
+            current_shd = eval_metrics["shd"]
+            current_f1 = eval_metrics["f1"]
+            is_best = False
+            
+            if current_shd < best_shd:
+                is_best = True
+            elif current_shd == best_shd and current_f1 > best_f1:
+                is_best = True
+                
+            if is_best:
+                best_shd = current_shd
+                best_f1 = current_f1
+                import pickle
+                os.makedirs("checkpoints", exist_ok=True)
+                with open("checkpoints/best_ippo_params.pkl", "wb") as f:
+                    pickle.dump({"actor": actor_params, "critic": critic_params}, f)
+
     if args.save_file:
         import pandas as pd
         df = pd.DataFrame(all_metrics_history)
@@ -268,7 +288,17 @@ def main():
         print("Saved metrics to training_metrics.csv")
         
     if args.agent_type == "ippo":
-        print("Running post-training evaluation suite...")
+        print("Running post-training evaluation suite on the BEST model...")
+        import pickle
+        try:
+            with open("checkpoints/best_ippo_params.pkl", "rb") as f:
+                ckpt = pickle.load(f)
+                actor_params = ckpt["actor"]
+                critic_params = ckpt["critic"]
+                print("Successfully loaded best_ippo_params.pkl for evaluation.")
+        except Exception as e:
+            print("Could not load checkpoint, evaluating final model instead.")
+            
         from src.evaluate import run_evaluation_suite
         import json
         trace = run_evaluation_suite(
@@ -282,6 +312,10 @@ def main():
         with open("evaluation_trace.json", "w") as f:
             json.dump(trace, f, indent=2)
         print("Saved evaluation trace to evaluation_trace.json")
+        
+        if args.use_wandb and WANDB_AVAILABLE:
+            wandb.save("evaluation_trace.json")
+            print("Uploaded evaluation trace to WandB.")
 
 if __name__ == "__main__":
     main()
