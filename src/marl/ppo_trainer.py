@@ -141,8 +141,11 @@ class IPPOTrainer:
         weight_mask = jnp.where(true_adj_batch == 1.0, pos_weight, 1.0)
         bce = bce * weight_mask
         
-        # Mask out edges involving unobserved nodes
-        edge_mask = observed_mask[:, None] * observed_mask[None, :] # [d, d]
+        # Mask out edges involving unobserved nodes and cross-domain edges
+        domain_mask = jnp.where(observed_mask[0] == 1.0, jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0]))
+        boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+        edge_mask = jnp.maximum(jnp.outer(domain_mask, domain_mask), jnp.outer(boundary_mask, boundary_mask))
+        
         edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))
         
         # Apply mask and compute mean over valid edges

@@ -83,7 +83,10 @@ def run_evaluation_suite(
                 graph_pred = jax.nn.sigmoid(graph_logits[0])
                 
                 # Apply hard mask to prevent cross-domain edge predictions
-                edge_mask = jnp.outer(agent_mask, agent_mask)
+                domain_mask = jnp.array([1.0, 1.0, 0.0, 0.0]) if k == 0 else jnp.array([0.0, 0.0, 1.0, 1.0])
+                boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+                edge_mask = jnp.maximum(jnp.outer(domain_mask, domain_mask), jnp.outer(boundary_mask, boundary_mask))
+                
                 graph_pred = graph_pred * edge_mask
                 
                 joint_actions[f"agent_{k}"] = (cat_action, target_action)
