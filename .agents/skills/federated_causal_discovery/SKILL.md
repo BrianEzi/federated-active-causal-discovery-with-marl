@@ -1,37 +1,37 @@
 ---
 name: Federated Causal Discovery Framework Context
-description: Immediate architectural context for the JAX SCM environment and QMIX MARL training pipeline.
+description: Immediate architectural context for the JAX SCM environment and IPPO DAG training pipeline.
 ---
 
 # 🧠 Federated Causal Discovery Architecture Context
 
-You are working on a multi-agent reinforcement learning (MARL) causal discovery engine. Here is the dense contextual map of the system:
+You are working on a multi-agent reinforcement learning (MARL) causal discovery engine. Here is the dense contextual map of the system following the Decentralized IPPO pivot:
 
-## The JAX Backend (Phases 1 & 2)
-The environment simulates structural causal models (SCMs) purely in JAX using `src/scm.py`. 
-- Graphs are dynamically generated using `src/generators.py` (Erdős-Rényi and Barabási-Albert).
-- The `sample_scm` function loops over a topological order using `jax.lax.scan`.
-- We support interventions via `InterventionSpec` (Hard, Soft Shift, Soft Scale) injected seamlessly into the mathematical mechanism evaluation inside `src/functional.py`.
-- Agents only observe a localized slice of the true graph, masked by `agent_masks`. Local covariance matrices are stitched globally via `src/alignment.py`.
+## The JAX Backend (Environment & Topologies)
+The environment simulates structural causal models (SCMs) natively in JAX using `src/scm.py`. 
+- **Meta-Learning Topologies**: Graphs are dynamically sampled at $t=0$ using `src/generators.py` (Chains, Colliders, Forks) to force policy generalization.
+- **Algorithmic State Aggregation**: Instead of relying on recurrent memory (RNNs), the environment natively tracks and updates a **running covariance matrix** across all steps.
+- **Jurisdictions**: Agents observe only a localized slice of the true graph, governed strictly by `agent_masks` and budget constraints. 
 
-## The Hybrid Evaluator (Phase 3)
-Because complex graph traversals (like FCI rule orientations and DFS cycle detection) choke the JAX static compiler, we deployed a Hybrid Architecture.
-- `src/pag.py` runs on the CPU in NumPy. It tracks the Partial Ancestral Graph using an explicit integer matrix (`0: NULL, 1: TAIL, 2: ARROW, 3: CIRCLE`).
-- It applies Meek rules to orient edges based on proxy p-values derived from interventional covariance tests.
-- `src/evaluator_env.py` is the PettingZoo/Gym wrapper bridging JAX and the PAG tracker.
+## The Hybrid Evaluator (Stitching & Rewards)
+Because complex graph algorithms choke the JAX static compiler, we utilize a Hybrid CPU-GPU Architecture.
+- `src/stitching.py` runs on the CPU. It deterministically merges the agents' localized continuous DAG predictions. Boundary edge conflicts are resolved by averaging probabilities.
+- **DFS Cycle Detection**: If boundary predictions cause a cycle in the stitched graph, a Depth-First Search triggers a massive joint penalty.
+- `src/rewards.py` evaluates the stitched DAG against $G^*$ at every step to calculate a **Dense Structural Hamming Distance (SHD)** penalty, applying exclusive penalties for local errors and shared penalties for boundary/cycle errors.
 
-## The QMIX Control Layer (Phase 4)
-The distributed agents are controlled by a QMIX architecture (`src/marl/`).
-- `MLPAgent` uses Flax to produce masked local Q-values.
-- `QMIXMixer` translates the global state into mixing weights, constrained strictly non-negative via absolute value operations (`jnp.abs`).
-- `QMIXTrainer` executes the Temporal Difference double Q-learning steps via `optax.adam`, sampling padded sequences from the `TrajectoryBuffer`.
+## The IPPO Control Layer (Dual-Head Architecture)
+The distributed agents are controlled by Independent PPO (`src/marl/`).
+- **`IPPOActor`**: A Haiku network containing:
+  - **Node Embeddings**: Projects covariance rows into dense vectors.
+  - **Action Head**: Multi-discrete (Category & Target) with strict $-1\text{e}9$ masking on unobservable targets.
+  - **Graph Head**: A shared MLP Edge Scorer that predicts the local DAG matrix.
+- **`IPPOTrainer`**: Executes PPO steps (Clipping, GAE, Value Loss, Entropy Bonus, plus supervised Graph BCE Loss).
 
 **When debugging or extending the framework, ensure you strictly respect the JAX/NumPy hybrid boundaries and NEVER introduce in-place updates into the JAX `step_env` pipeline.**
 
 ## 🛠️ Software Engineering & Performance Protocol
 Every AI agent modifying or optimizing this codebase must execute the following protocol:
-1. **Performance Profiling**: Before claiming an algorithm is slow or optimized, create an empirical benchmark script measuring execution time with `time.perf_counter()`. Profile step-by-step to isolate CPU vs GPU bottlenecks.
-2. **Matrix Vectorization**: Convert any dynamic nested Python `for` loops in CPU code into vectorized NumPy matrix operations (`np.dot`, `@`, Boolean indexing).
+1. **Performance Profiling**: Before claiming an algorithm is slow or optimized, create an empirical benchmark script measuring execution time with `time.perf_counter()`. 
+2. **Matrix Vectorization**: Convert any dynamic nested Python `for` loops in CPU code into vectorized NumPy matrix operations.
 3. **JIT Type Safety**: Never pass `chex.dataclass` objects to `static_argnums` in `@jax.jit`. Extract primitive integers (`int(config.d)`) outside compilation boundaries.
-4. **Empirical Verification**: Always run `pytest tests/ -v` and verify numerical equivalence (`np.array_equal`) before pushing or completing a task.
-
+4. **Empirical Verification**: Always run the relevant scripts (e.g. `python src/train.py` or `pytest`) to verify functionality before pushing or declaring a task complete.
