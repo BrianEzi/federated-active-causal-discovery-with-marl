@@ -156,8 +156,11 @@ def main():
                     cat_dist = jax.nn.softmax(cat_logits[0])
                     cat = int(np.random.choice(3, p=np.array(cat_dist)))
                     
-                    # Mask targets
-                    mask = env.agent_masks[k]
+                    if k == 0:
+                        mask = jnp.array([1.0, 1.0, 1.0, 0.0])
+                    else:
+                        mask = jnp.array([0.0, 1.0, 1.0, 1.0])
+                        
                     masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, mask)[0]
                     tgt_dist = jax.nn.softmax(masked_targets)
                     # Safe fallback if all nan
