@@ -38,10 +38,11 @@ def test_mask_invalid_targets():
     cat_actions = jnp.array([0, 1, 2])
     target_logits = jnp.zeros((3, 4))
     
-    # agent 1 mask (local nodes 0, 1. boundary node 2)
-    agent_mask = jnp.array([1, 1, 0, 0])
+    # Agent 1: local ownership (0, 1), peer boundary (1, 2)
+    local_mask = jnp.array([1, 1, 0, 0])
+    boundary_mask = jnp.array([0, 1, 1, 0])
     
-    masked = mask_invalid_targets(cat_actions, target_logits, agent_mask)
+    masked = mask_invalid_targets(cat_actions, target_logits, local_mask, boundary_mask)
     
     # Batch 0: LOCAL. Valid targets: 0, 1
     assert masked[0, 0] == 0.0
@@ -49,14 +50,11 @@ def test_mask_invalid_targets():
     assert masked[0, 2] < -1e8
     assert masked[0, 3] < -1e8
     
-    # Batch 1: PEER. Valid targets: 2, 3
+    # Batch 1: PEER. Valid targets: 1, 2 (boundary nodes)
     assert masked[1, 0] < -1e8
-    assert masked[1, 1] < -1e8
+    assert masked[1, 1] == 0.0
     assert masked[1, 2] == 0.0
-    assert masked[1, 3] == 0.0
+    assert masked[1, 3] < -1e8
     
-    # Batch 2: NOOP. Nothing is valid, mask all. 
-    # Wait, in the code, peer_valid is 1.0 - local_valid. So peer valid is [0, 0, 1, 1].
-    # local_valid is [1, 1, 0, 0].
-    # NOOP doesn't activate local or peer valid. So everything should be -1e9.
+    # Batch 2: NOOP. Nothing is valid, mask all.
     assert (masked[2] < -1e8).all()

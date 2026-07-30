@@ -71,13 +71,14 @@ def run_evaluation_suite(
                 from src.marl.ppo_agent import mask_invalid_targets
                 
                 if k == 0:
-                    agent_mask = jnp.array([1.0, 1.0, 1.0, 0.0])
+                    local_mask = jnp.array([1.0, 1.0, 0.0, 0.0])
                 else:
-                    agent_mask = jnp.array([0.0, 1.0, 1.0, 1.0])
+                    local_mask = jnp.array([0.0, 0.0, 1.0, 1.0])
+                boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
                     
                 # Greedy action selection
                 cat_action = int(jnp.argmax(cat_logits, axis=-1)[0])
-                masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, agent_mask)
+                masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
                 target_action = int(jnp.argmax(masked_target_logits, axis=-1)[0])
                 
                 graph_pred = jax.nn.sigmoid(graph_logits[0])

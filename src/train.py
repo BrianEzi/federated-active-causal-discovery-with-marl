@@ -161,11 +161,12 @@ def main():
                     cat = int(np.random.choice(3, p=np.array(cat_dist)))
                     
                     if k == 0:
-                        mask = jnp.array([1.0, 1.0, 1.0, 0.0])
+                        local_mask = jnp.array([1.0, 1.0, 0.0, 0.0])
                     else:
-                        mask = jnp.array([0.0, 1.0, 1.0, 1.0])
+                        local_mask = jnp.array([0.0, 0.0, 1.0, 1.0])
+                    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
                         
-                    masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, mask)[0]
+                    masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, local_mask, boundary_mask)[0]
                     tgt_dist = jax.nn.softmax(masked_targets)
                     # Safe fallback if all nan
                     if jnp.isnan(tgt_dist).any():

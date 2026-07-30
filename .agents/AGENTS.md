@@ -41,9 +41,14 @@ When working on this repository, you must adhere strictly to the following archi
 ## 8. Continuous Documentation Maintenance
 - **Keep Documentation Updated:** Whenever you add a feature, refactor code, fix a bug, or introduce new hyperparameters or agent architectures, you MUST update the relevant files in `docs/` (`docs/ARCHITECTURE.md`, `docs/AGENTS_AND_MODELS.md`, `docs/CAUSAL_EVALUATOR.md`, `docs/CHANGELOG.md`) and `README.md`.
 - **Changelog Tracking:** Always add an entry under `docs/CHANGELOG.md` summarizing what was added, fixed, or refactored.
-## 9. Effort Levels & Verification Standards
-- **Never Declare Done Prematurely:** Do not announce that a task, refactor, or bug fix is "done" until you have verified it functionally. Passing unit tests is not enough if the entry point (e.g., the training script) is broken.
-- **End-to-End Verification:** If you modify core components, you MUST run the primary integration scripts (e.g., `python -m src.train ...` with a few episodes) to guarantee that your changes actually execute in the target environment (Kaggle/CLI) without throwing exceptions.
-- **Proactive Debugging:** If you hit an error during your end-to-end verification, you must debug and resolve it iteratively before concluding your turn. Do not pass the burden of testing back to the user.
-- **Bare Minimum Standard:** The bare minimum effort requires that all code written must be syntactically valid, type-safe, unit-tested (via `pytest`), AND empirically verified to run via its main execution pipeline without crashing.
+## 10. Deep Run Analysis & Artifact Standards
+- **Empirical WandB Extraction**: When requested to analyze a training run or evaluation run, NEVER rely on high-level summaries or hand-waving assertions. You MUST query the WandB API to extract full history logs, run configuration, summary metrics, and JSON traces.
+- **Deep Notebook Generation**: Any requested analysis MUST be saved as a fully executable, self-contained Jupyter Notebook under `notebooks/` (e.g. `notebooks/run_analysis_<run_id>.ipynb`).
+- **Required Notebook Content**:
+  1. Complete Hyperparameter and Configuration Tables.
+  2. Tabular Metric Progression across training episodes (Rewards, SHD, F1 Score, Loss components).
+  3. Action Category and Target Distribution analysis per agent.
+  4. Step-by-step per-topology evaluation traces.
+  5. Causal DAG / Theoretical domain explanations (e.g., Markov Equivalence Class breakdowns vs. active interventional requirements).
+- **No Placeholder Code**: All analysis notebooks must contain active, functioning Python code (using `matplotlib` / standard libraries) to plot metrics directly from local or extracted data files.
 

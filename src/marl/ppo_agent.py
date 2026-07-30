@@ -174,19 +174,19 @@ class IPPORNNCritic(hk.Module):
         return jnp.zeros((batch_size, hidden_dim))
 
 
-def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, agent_mask: jax.Array) -> jax.Array:
+def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, local_ownership_mask: jax.Array, peer_boundary_mask: jax.Array = None) -> jax.Array:
     """
     Masks out invalid target logits based on the chosen category action.
     cat_action: [batch_size] (0: Local, 1: Peer, 2: NOOP)
     target_logits: [batch_size, d]
-    agent_mask: [d] (1 if local, 0 if peer boundary)
+    local_ownership_mask: [d] (1 if owned by agent, 0 otherwise)
+    peer_boundary_mask: [d] (1 if boundary node requestable via peer, 0 otherwise)
     """
-    # For Local Intervention (0), only local nodes (mask==1) are valid
-    # For Peer Request (1), only boundary nodes (mask==0) are valid
-    # For NOOP (2), target doesn't matter, but we can just mask all to 0 to be safe
-    
-    local_valid = agent_mask[None, :] # [1, d]
-    peer_valid = 1.0 - local_valid
+    local_valid = local_ownership_mask[None, :] # [1, d]
+    if peer_boundary_mask is not None:
+        peer_valid = peer_boundary_mask[None, :] # [1, d]
+    else:
+        peer_valid = 1.0 - local_valid
     
     is_local = (cat_action == int(ActionCategory.LOCAL_INTERVENTION))[:, None]
     is_peer = (cat_action == int(ActionCategory.PEER_REQUEST))[:, None]
