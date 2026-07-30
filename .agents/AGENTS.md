@@ -10,11 +10,11 @@ When working on this repository, you must adhere strictly to the following archi
 
 ## 2. Hybrid Architecture Boundaries
 - **GPU/TPU Operations:** Data generation (`sample_scm`), SCM mechanisms, and multi-agent budget transitions are highly batched and must remain in strict JAX.
-- **CPU Operations:** Graph interpretation logic, specifically the Partial Ancestral Graph (PAG) tracking (`src/pag.py`) and FCI rule orientation, must remain in pure NumPy on the CPU. Attempting to statically compile DFS cycle detection inside JAX will stall the compiler. The `FederatedCausalEnv` wrapper securely bridges this boundary.
+- **CPU Operations:** Graph interpretation logic, specifically the causal DAG stitching and cycle checking (`src/stitching.py`), must remain in pure NumPy on the CPU. Attempting to statically compile DFS cycle detection inside JAX will stall the compiler. The `FederatedCausalEnv` wrapper securely bridges this boundary.
 
-## 3. CTDE MARL Paradigm
-- The reinforcement learning layer (`src/marl/`) strictly follows Centralized Training with Decentralized Execution.
-- **Monotonicity:** The central mixing network (`QMIXMixer`) MUST enforce absolute value constraints (`jnp.abs`) on all generated mixing weights to guarantee $\frac{\partial Q_{tot}}{\partial Q_k} \ge 0$.
+## 3. Independent MARL Paradigm (IPPO)
+- The reinforcement learning layer (`src/marl/`) strictly follows a decentralized independent Proximal Policy Optimization (IPPO) paradigm.
+- **Shared Parameters & Decentralized Execution:** Each agent acts completely independently during the rollout phase using local observations.
 - **Action Masking:** Forbidden actions (interventions on unobservable variables or those exceeding agent budgets) must be masked with `-1e9` prior to greedy action selection.
 
 ## 4. Documentation & Style
@@ -23,7 +23,8 @@ When working on this repository, you must adhere strictly to the following archi
 
 ## 5. Software Engineering & Performance Discipline
 - **Empirical Profiling Over Speculation:** NEVER diagnose a performance bottleneck or claim an optimization works without writing a local profiling/benchmark script (`time.perf_counter()`) to measure actual millisecond execution times.
-- **Trace Full Execution Paths:** Trace the complete call stack from top-level training scripts (`train.py`) down to step functions (`evaluator_env.py`), graph interpretation (`pag.py`), and backend kernels (`scm.py`). Identify exact lines causing latency or memory transfer blocks (e.g., `np.array()` host-device syncs).
+- **Absolute Performance Mandate:** You are expected to write highly performant, state-of-the-art code *always*. Do not settle for minimum viable performance. If an algorithmic vectorization or JIT compilation opportunity exists, you must implement it. 
+- **Trace Full Execution Paths:** Trace the complete call stack from top-level training scripts (`train.py`) down to step functions (`evaluator_env.py`), graph interpretation (`stitching.py`), and backend kernels (`scm.py`). Identify exact lines causing latency or memory transfer blocks (e.g., `np.array()` host-device syncs).
 - **Algorithmic Vectorization:** Avoid $O(d^2)$ or $O(d^3)$ nested Python `for` loops. Always replace dynamic loops with vectorized NumPy matrix operations (`np.dot`, `@`, Boolean indexing) for graph orientations and graph checks.
 - **JIT Compilation Safety:** Ensure `@jax.jit` boundaries are respected. Primitive integers (`d`, `mechanism_type`) must be passed statically, while PyTrees (`chex.dataclass`) must remain dynamic to prevent unhashable object compilation errors.
 
