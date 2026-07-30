@@ -28,7 +28,7 @@ When working on this repository, you must adhere strictly to the following archi
 - **JIT Compilation Safety:** Ensure `@jax.jit` boundaries are respected. Primitive integers (`d`, `mechanism_type`) must be passed statically, while PyTrees (`chex.dataclass`) must remain dynamic to prevent unhashable object compilation errors.
 
 ## 6. Testing & Quality Verification
-- **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally.
+- **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally. If `pytest` is unavailable, you **MUST** run the relevant scripts directly (e.g., `python src/train.py`) to confirm that your code executes without crashing and behaves as expected. **Do not assume code works without executing it.**
 - **Equivalence Verification:** When refactoring algorithms for performance (e.g., vectorizing loops), verify that the optimized output matches the reference implementation 100% using `np.array_equal` or `np.allclose`.
 
 ## 7. Workspace Hygiene & Scratch Management

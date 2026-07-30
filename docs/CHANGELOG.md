@@ -7,6 +7,13 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 ## [Unreleased] - 2026-07-22
 
 ### Added
+- **Major Architectural Pivot to IPPO**: Transitioned from centralized QMIX to Independent PPO (IPPO). Each agent now utilizes an independent Actor/Critic with multi-discrete, hierarchical action spaces (Category and Target).
+- **Dual-Head IPPO Architecture**: Agents now contain both an Action Head for interventions and a Graph Head (Shared MLP Edge Scorer) for generating dense predicted local DAGs.
+- **Mixed-Cooperative SHD Rewards**: Replaced PAG circle reduction rewards with a Dense Structural Hamming Distance (SHD) penalty. Agents are penalized individually for private edge errors, but share penalties for boundary edge errors.
+- **Deterministic Graph Stitching**: Added `src/stitching.py` to compile predicted local DAGs into a global DAG on the server side, incorporating a DFS cycle penalty for conflicting boundary predictions.
+- **Meta-Learning Topologies**: Updated `src/generators.py` to randomly spawn Chain, Collider, Fork, and Fork+Collider configurations per episode.
+- **Algorithmic State Aggregation**: Replaced RNN/Transformer context logic with a running covariance matrix tracked natively within `FederatedCausalEnv` to maintain the Markov property.
+- **Baselines (`src/baselines.py`)**: Added `RandomAgent` and `RoundRobinAgent` models to establish non-learning benchmarking for IPPO.
 - **`RNNAgent` (GRU)**: Added Gated Recurrent Unit agent model in `src/marl/agent.py` to maintain hidden carry $h_{k,t}$ across episode steps for Dec-POMDP causal discovery.
 - **`CausalTransformerAgent`**: Added Self-Attention Trajectory Transformer agent model in `src/marl/agent.py` for long-context trajectory reasoning.
 - **Dynamic WandB Run Naming**: Configured automatic WandB run names reflecting agent choice, graph size, agent count, learning rate, action cost, and seed.

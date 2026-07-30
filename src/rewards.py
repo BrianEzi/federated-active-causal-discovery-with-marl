@@ -1,34 +1,28 @@
 import numpy as np
 
-def compute_global_reward(prev_circle_count: int, 
-                          curr_circle_count: int, 
-                          joint_action: np.ndarray, 
-                          action_costs: np.ndarray,
-                          structural_violations: int,
-                          num_variables: int = 5,
-                          circle_reward: float = 1.0,
-                          noop_penalty: float = 0.5,
-                          violation_penalty: float = 20.0) -> float:
+def compute_ippo_rewards(stitched_dag: np.ndarray, true_dag: np.ndarray, has_cycle: bool, 
+                         cycle_penalty: float = 10.0, edge_penalty: float = 1.0) -> dict:
     """
-    Computes the global scalar reward for the federated system.
+    Computes the mixed cooperative SHD penalty reward for the IPPO agents.
+    Returns: {"agent_0": r1, "agent_1": r2}
     """
-    # 1. Delta Circles (Positive reward for orienting ambiguous marks)
-    delta_circles = prev_circle_count - curr_circle_count
-    r_circles = delta_circles * circle_reward
+    diff = np.abs(stitched_dag - true_dag)
     
-    # 2. Action Cost
-    total_action_cost = np.sum(action_costs)
+    # Local penalty for Agent 1 (edges involving its private node Z1=0)
+    a1_local_errors = np.sum(diff[0, :]) + np.sum(diff[:, 0])
     
-    # 3. NO-OP penalty when unresolved circles remain
-    all_noop = np.all(joint_action == num_variables) if joint_action is not None else False
-    r_noop = -noop_penalty if (all_noop and curr_circle_count > 0) else 0.0
+    # Local penalty for Agent 2 (edges involving its private node Z2=3)
+    a2_local_errors = np.sum(diff[3, :]) + np.sum(diff[:, 3])
     
-    # 4. Structural Violation Penalty
-    r_violations = -violation_penalty * structural_violations
+    # Boundary errors (edges between X1=1 and X2=2)
+    boundary_errors = diff[1, 2] + diff[2, 1]
     
-    # R_t
-    reward = r_circles - total_action_cost + r_noop + r_violations
+    # Base reward is the negative SHD penalty
+    r1 = -(a1_local_errors + boundary_errors) * edge_penalty
+    r2 = -(a2_local_errors + boundary_errors) * edge_penalty
     
-    return float(reward)
-
-
+    if has_cycle:
+        r1 -= cycle_penalty
+        r2 -= cycle_penalty
+        
+    return {"agent_0": float(r1), "agent_1": float(r2)}

@@ -39,6 +39,13 @@ class EnvState:
     scm_params: SCMParams
     budgets: chex.Array           # [K]
     step_count: int
+    running_covariance: chex.Array # [d, d] (For algorithmic aggregation)
+    total_samples: chex.Array      # [1] (To keep track of N for running average)
+
+class ActionCategory(enum.IntEnum):
+    LOCAL_INTERVENTION = 0
+    PEER_REQUEST = 1
+    NOOP = 2
 
 @chex.dataclass
 class AgentObservation:

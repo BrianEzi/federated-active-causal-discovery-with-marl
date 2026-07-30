@@ -2,13 +2,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Tuple
-
-from src.types import SCMConfig, SCMParams, InterventionSpec, InterventionType
-from src.environment import init_env, step_env
-from src.pag import PAGTracker
-from src.alignment import stitch_global_covariance
-from src.rewards import compute_global_reward
 from src.scm import sample_scm
+
+from src.types import SCMConfig, SCMParams, InterventionSpec, InterventionType, ActionCategory
+from src.environment import init_env, step_env, update_running_statistics
+from src.alignment import stitch_global_covariance
+from src.generators import generate_4node_topologies, generate_scm_params
 
 @jax.jit
 def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax.Array:
@@ -22,64 +21,56 @@ def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax
     return jax.vmap(_compute_single_agent)(agent_masks)
 
 class FederatedCausalEnv:
-    def __init__(self, config: SCMConfig, adjacency: jax.Array, scm_params: SCMParams, 
-                 topological_order: jax.Array, agent_masks: jax.Array, action_costs: jax.Array,
-                 initial_budget: float = 10.0, sample_count: int = 500,
-                 circle_reward: float = 10.0, noop_penalty: float = 0.5, violation_penalty: float = 20.0):
+    def __init__(self, config: SCMConfig, action_costs: np.ndarray,
+                 initial_budget: float = 10.0, sample_count: int = 100):
         self.config = config
-        self.adjacency = adjacency
-        self.scm_params = scm_params
-        self.topological_order = topological_order
-        self.agent_masks = agent_masks
         self.action_costs = action_costs
         self.initial_budget = initial_budget
         self.sample_count = sample_count
-        self.circle_reward = circle_reward
-        self.noop_penalty = noop_penalty
-        self.violation_penalty = violation_penalty
         
-        self.pag_tracker = None
+        # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
+        self.agent_masks = jnp.array([
+            [1.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 1.0]
+        ])
+        
         self.jax_state = None
+        self.max_steps = 20
         
-        # Max steps per episode
-        self.max_steps = 50
-        
-    def _get_obs_state_avail(self, local_covs_jnp, stitched_cov_np):
-        """Constructs MARL observations, state, and available actions."""
-        # Global state: flattened stitched cov (d^2), flattened adjacency (d^2), budgets (K)
-        # Using stitched_cov_np as the proxy for global covariance
-        stitched_flat = np.nan_to_num(stitched_cov_np.flatten())
-        adj_flat = np.array(self.adjacency).flatten()
-        budgets_np = np.array(self.jax_state.budgets)
-        
-        global_state = np.concatenate([stitched_flat, adj_flat, budgets_np])
-        
+    def _get_obs_dict(self):
+        """Constructs IPPO observations."""
         obs_dict = {}
-        avail_dict = {}
-        
         for k in range(self.config.K):
-            local_flat = np.array(local_covs_jnp[k]).flatten()
-            mask_np = np.array(self.agent_masks[k])
+            # Agent sees its own running covariance mask
+            mask = np.array(self.agent_masks[k])
+            # To allow boundary observation, we let agents see correlations with peer boundary nodes.
+            # Boundary nodes: X1 (1) and X2 (2). 
+            # Agent 1 observes 0, 1, 2. Agent 2 observes 1, 2, 3.
+            obs_mask = np.zeros(self.config.d)
+            if k == 0:
+                obs_mask[0] = 1.0; obs_mask[1] = 1.0; obs_mask[2] = 1.0
+            else:
+                obs_mask[1] = 1.0; obs_mask[2] = 1.0; obs_mask[3] = 1.0
+                
+            cov = np.array(self.jax_state.running_covariance)
+            masked_cov = cov * obs_mask[:, None] * obs_mask[None, :]
+            
             budget = np.array([self.jax_state.budgets[k]])
             
-            # obs: [local_cov, mask, budget, global_cov]
-            obs = np.concatenate([local_flat, mask_np, budget, stitched_flat])
+            # obs: flattened masked covariance + budget
+            obs = np.concatenate([masked_cov.flatten(), budget])
             obs_dict[f"agent_{k}"] = obs
             
-            # Avail actions: 1 if mask is true and budget >= cost, NO-OP always 1
-            avail = np.zeros(self.config.d + 1, dtype=np.float32)
-            for i in range(self.config.d):
-                if mask_np[i] > 0 and budget[0] >= self.action_costs[k]:
-                    avail[i] = 1.0
-            avail[self.config.d] = 1.0 # NO-OP
-            avail_dict[f"agent_{k}"] = avail
-            
-        return obs_dict, global_state, avail_dict
+        return obs_dict
         
     def reset(self, key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict]:
-        budgets = jnp.full(self.config.K, self.initial_budget) # initial budgets
-        self.jax_state = init_env(key, self.config, self.adjacency, self.scm_params, self.topological_order, self.agent_masks, budgets)
-        self.pag_tracker = PAGTracker(self.config.d)
+        # Meta-learning: Generate random topology
+        k1, k2, k3, key = jax.random.split(key, 4)
+        adjacency, topo_order = generate_4node_topologies(k1)
+        scm_params = generate_scm_params(k2, adjacency, int(self.config.mechanism_type))
+        
+        budgets = jnp.full(self.config.K, self.initial_budget)
+        self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets)
         
         # Get initial observational data
         obs_key, key = jax.random.split(key)
@@ -91,88 +82,72 @@ class FederatedCausalEnv:
         samples = sample_scm(obs_key, self.jax_state, self.config, self.sample_count, obs_spec)
         
         local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
-            
         sample_counts = jnp.full(self.config.K, float(self.sample_count))
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
-        stitched_cov_np = np.array(stitched_cov)
         
-        # Prune non-adjacent edges from initial PAG using observational covariance
-        self.pag_tracker.update_skeleton_from_observational(stitched_cov_np, threshold=0.08)
+        self.jax_state = update_running_statistics(self.jax_state, stitched_cov, self.sample_count)
         
-        obs_dict, global_state, avail_dict = self._get_obs_state_avail(local_covs_jnp, stitched_cov_np)
+        obs_dict = self._get_obs_dict()
             
-        return obs_dict, {"pag": self.pag_tracker.P.copy(), "state": global_state, "avail_actions": avail_dict}
+        return obs_dict, {"true_adjacency": np.array(self.jax_state.true_adjacency)}
         
-    def step(self, joint_actions: Dict[str, int], key: jax.Array) -> Tuple[Dict[str, np.ndarray], float, bool, Dict]:
+    def step(self, joint_actions: Dict[str, Tuple[int, int]], predicted_dags: Dict[str, np.ndarray], key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict[str, float], bool, Dict]:
         """
-        joint_actions: Dictionary mapping agent id (e.g. "agent_0") to a discrete action.
-        If action < d, it corresponds to a hard intervention on that node.
-        If action == d, it's a NO-OP (observe only).
+        joint_actions: Dictionary mapping agent id to (Category, Target Node).
+        predicted_dags: Dictionary mapping agent id to its predicted local DAG [d, d].
         """
-        action_array = np.array([joint_actions[f"agent_{k}"] for k in range(self.config.K)])
-        
         mask = np.zeros(self.config.d)
         types = np.full(self.config.d, int(InterventionType.HARD), dtype=np.int32)
         values = np.zeros(self.config.d) 
-        
         costs = np.zeros(self.config.K)
-        intervened_nodes = []
         
         for k in range(self.config.K):
-            a = action_array[k]
-            if a < self.config.d:
-                # Agent k intervenes on node a
-                mask[a] = 1.0
-                values[a] = 5.0 # hard intervene to 5.0
-                costs[k] = self.action_costs[k]
-                intervened_nodes.append(int(a))
-                
+            cat, target = joint_actions[f"agent_{k}"]
+            budget_k = self.jax_state.budgets[k]
+            
+            # Only process if agent has budget and didn't NO-OP
+            if budget_k >= self.action_costs[k] and cat != ActionCategory.NOOP:
+                if cat == ActionCategory.LOCAL_INTERVENTION:
+                    # Verify target is local
+                    if self.agent_masks[k, target] == 1.0:
+                        mask[target] = 1.0
+                        values[target] = 5.0
+                        costs[k] = self.action_costs[k]
+                elif cat == ActionCategory.PEER_REQUEST:
+                    # Peer request targets boundary nodes
+                    if target in [1, 2]: # Node 1 (X1) or 2 (X2)
+                        mask[target] = 1.0
+                        values[target] = 5.0
+                        costs[k] = self.action_costs[k] # Cost deducted from requester
+                        
         intervention_spec = InterventionSpec(
             mask=jnp.array(mask),
             type=jnp.array(types),
             value=jnp.array(values)
         )
         
-        # Step JAX Env (decay budgets)
-        self.jax_state, _ = step_env(self.jax_state, jnp.array(action_array), jnp.array(costs))
+        self.jax_state, _ = step_env(self.jax_state, jnp.array([]), jnp.array(costs))
         
-        # Generate batched interventional data
         samples = sample_scm(key, self.jax_state, self.config, self.sample_count, intervention_spec)
-        
         local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
-        
-        # Stitch global covariance
         sample_counts = jnp.full(self.config.K, float(self.sample_count))
         stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
-        stitched_cov_np = np.array(stitched_cov)
         
-        # Compute interventional means across all nodes to detect causal propagation
-        sample_means = np.array(jnp.mean(samples, axis=0))
+        self.jax_state = update_running_statistics(self.jax_state, stitched_cov, self.sample_count)
         
-        # Update PAGTracker with interventional mean shifts
-        prev_circles = self.pag_tracker.count_circle_marks()
-        self.pag_tracker.update_pag_from_intervention(intervened_nodes, sample_means, threshold=0.5)
-        curr_circles = self.pag_tracker.count_circle_marks()
-        violations = self.pag_tracker.check_structural_violations()
+        from src.stitching import stitch_predicted_dags
+        from src.rewards import compute_ippo_rewards
         
-        # Compute Global Reward with NO-OP penalty and configurable multipliers
-        reward = compute_global_reward(
-            prev_circles, curr_circles, action_array, costs, violations,
-            num_variables=self.config.d,
-            circle_reward=self.circle_reward,
-            noop_penalty=self.noop_penalty,
-            violation_penalty=self.violation_penalty
-        )
+        stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d)
+        true_dag = np.array(self.jax_state.true_adjacency)
+        rewards = compute_ippo_rewards(stitched_dag, true_dag, has_cycle)
         
-        # Check termination
         terminated = False
-        if curr_circles == 0:
-            terminated = True
         if self.jax_state.step_count >= self.max_steps:
             terminated = True
         if np.all(np.array(self.jax_state.budgets) <= 0):
             terminated = True
             
-        obs_dict, global_state, avail_dict = self._get_obs_state_avail(local_covs_jnp, stitched_cov_np)
+        obs_dict = self._get_obs_dict()
             
-        return obs_dict, reward, terminated, {"pag": self.pag_tracker.P.copy(), "state": global_state, "avail_actions": avail_dict}
+        return obs_dict, rewards, terminated, {"true_adjacency": np.array(self.jax_state.true_adjacency)}

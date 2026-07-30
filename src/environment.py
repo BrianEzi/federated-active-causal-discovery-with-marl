@@ -20,7 +20,9 @@ def init_env(key: jax.Array,
         topological_order=topological_order,
         scm_params=scm_params,
         budgets=initial_budgets,
-        step_count=0
+        step_count=0,
+        running_covariance=jnp.zeros((config.d, config.d)),
+        total_samples=jnp.array([0.0])
     )
 
 def get_observations(state: EnvState, 
@@ -70,12 +72,26 @@ def get_observations(state: EnvState,
     # Vmap over the K agents
     return jax.vmap(get_agent_obs)(jnp.arange(config.K))
 
+def update_running_statistics(state: EnvState, new_cov: jax.Array, num_new_samples: int) -> EnvState:
+    """Updates the running covariance using a weighted average."""
+    n_old = state.total_samples[0]
+    n_new = float(num_new_samples)
+    n_total = n_old + n_new
+    
+    # Weighted average of covariances
+    updated_cov = (state.running_covariance * n_old + new_cov * n_new) / n_total
+    
+    return state.replace(
+        running_covariance=updated_cov,
+        total_samples=jnp.array([n_total])
+    )
+
 def step_env(state: EnvState, 
              joint_action: jax.Array, 
              cost_vector: jax.Array) -> Tuple[EnvState, jax.Array]:
     """
     Advances the environment, decays budgets, and updates step logs.
-    joint_action: A representation of the joint actions. For Phase 1, we just apply the cost decay.
+    joint_action: A representation of the joint actions.
     cost_vector: [K] array of budget costs corresponding to the joint action.
     """
     new_budgets = state.budgets - cost_vector
@@ -85,6 +101,5 @@ def step_env(state: EnvState,
         step_count=state.step_count + 1
     )
     
-    # Return a dummy reward for now, as the actual reward mechanism isn't specified in Phase 1
     reward = jnp.zeros(())
     return new_state, reward

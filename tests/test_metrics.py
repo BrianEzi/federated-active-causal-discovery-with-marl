@@ -1,28 +1,43 @@
-import pytest
 import numpy as np
-from src.pag import PAGTracker
-from src.metrics import evaluate_pag_against_dag
+import pytest
+from src.metrics import evaluate_dag_against_true
 
-def test_evaluate_pag_against_dag():
-    d = 4
-    # True DAG: 0 -> 1 -> 2 -> 3
-    true_dag = np.zeros((d, d))
-    true_dag[0, 1] = 1.0
-    true_dag[1, 2] = 1.0
-    true_dag[2, 3] = 1.0
+def test_evaluate_dag_against_true_perfect():
+    pred = np.zeros((4, 4))
+    true = np.zeros((4, 4))
+    pred[0, 1] = 1.0
+    true[0, 1] = 1.0
     
-    # Perfect PAG: 0 -> 1 -> 2 -> 3
-    pag = np.zeros((d, d), dtype=np.int32)
-    pag[0, 1] = PAGTracker.TAIL
-    pag[1, 0] = PAGTracker.ARROW
-    pag[1, 2] = PAGTracker.TAIL
-    pag[2, 1] = PAGTracker.ARROW
-    pag[2, 3] = PAGTracker.TAIL
-    pag[3, 2] = PAGTracker.ARROW
-    
-    metrics = evaluate_pag_against_dag(pag, true_dag)
+    metrics = evaluate_dag_against_true(pred, true)
     
     assert metrics["shd"] == 0.0
     assert metrics["precision"] == 1.0
     assert metrics["recall"] == 1.0
     assert metrics["f1"] == 1.0
+    assert metrics["true_positives"] == 1.0
+    assert metrics["false_positives"] == 0.0
+    assert metrics["false_negatives"] == 0.0
+
+def test_evaluate_dag_against_true_fp():
+    pred = np.zeros((4, 4))
+    true = np.zeros((4, 4))
+    pred[0, 1] = 1.0
+    
+    metrics = evaluate_dag_against_true(pred, true)
+    
+    assert metrics["shd"] == 1.0
+    assert metrics["precision"] == 0.0
+    assert metrics["recall"] == 0.0
+    assert metrics["false_positives"] == 1.0
+
+def test_evaluate_dag_against_true_fn():
+    pred = np.zeros((4, 4))
+    true = np.zeros((4, 4))
+    true[0, 1] = 1.0
+    
+    metrics = evaluate_dag_against_true(pred, true)
+    
+    assert metrics["shd"] == 1.0
+    assert metrics["precision"] == 0.0
+    assert metrics["recall"] == 0.0
+    assert metrics["false_negatives"] == 1.0

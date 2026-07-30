@@ -12,78 +12,54 @@ def generate_er_dag(key: jax.Array, num_variables: int, edge_prob: float) -> jax
     # Mask to keep strictly upper triangular part
     return jnp.triu(adj, k=1)
 
-def generate_ba_dag(key: jax.Array, num_variables: int, num_edges_per_node: int) -> jax.Array:
+def generate_4node_topologies(key: jax.Array) -> tuple[jax.Array, jax.Array]:
     """
-    Generates a Barabási-Albert scale-free DAG using sequential preferential attachment.
-    Returns a strictly upper-triangular adjacency matrix.
+    Generates one of the 4 base topologies (and their reversed perspectives) for a 4-node federated system.
+    Nodes: 0 (Z1, Agent 1 Private), 1 (X1, Agent 1 Boundary), 2 (X2, Agent 2 Boundary), 3 (Z2, Agent 2 Private).
+    Returns: (adjacency matrix, topological order).
     """
-    # Start with a small fully connected component? 
-    # For a DAG, we can just attach each new node i (from m to d-1) to m previous nodes (from 0 to i-1).
-    m = num_edges_per_node
+    # Define adjacency matrices (adj[i, j] means i -> j)
+    # 0=Z1, 1=X1, 2=X2, 3=Z2
     
-    # We will build the transposed adjacency matrix iteratively and then transpose it,
-    # or build it such that adj[i, j] means j -> i.
-    # We want upper triangular, so i < j means i -> j. We will fill row by row?
-    # No, it's easier to add node i and pick its parents from {0, ..., i-1}.
-    # Since we want an upper triangular matrix where i < j means i->j, 
-    # the parents of j are some i < j. 
-    # So we will iterate j from m to num_variables - 1.
+    matrices = []
+    orders = []
     
-    adj = jnp.zeros((num_variables, num_variables))
-    
-    # Initialize the first m nodes as a clique or just a chain.
-    # To keep it simple, let's just make the first m nodes a chain (which is a DAG).
-    def init_chain(adj):
-        for i in range(m - 1):
-            adj = adj.at[i, i+1].set(1.0)
-        return adj
-    
-    # Since JAX requires static shapes, we'll use scan over nodes j from m to num_variables - 1.
-    # Actually, a python loop is fine since num_variables is static. But let's use scan for efficiency.
-    def scan_fn(carry, j):
-        adj, k = carry
-        
-        # Calculate degrees of nodes 0 to j-1
-        # In-degree + out-degree in the DAG so far. 
-        # out-degree of i: sum(adj[i, :])
-        # in-degree of i: sum(adj[:, i])
-        degrees = jnp.sum(adj, axis=1) + jnp.sum(adj, axis=0)
-        
-        # We only consider nodes 0 to j-1. Set degrees of nodes >= j to 0.
-        mask = jnp.arange(num_variables) < j
-        valid_degrees = degrees * mask
-        
-        # Add a small epsilon to avoid zero probabilities (e.g. for disconnected nodes)
-        probs = (valid_degrees + 1e-5) * mask
-        probs = probs / jnp.sum(probs)
-        
-        # Sample m parents from 0 to j-1 without replacement
-        k, subk = jax.random.split(k)
-        
-        # Gumbel-max trick for sampling without replacement
-        gumbel = jax.random.gumbel(subk, shape=(num_variables,))
-        log_probs = jnp.log(probs + 1e-10)
-        scores = log_probs + gumbel
-        
-        # We want the top m scores, but we can't easily do top_k in a jittable way dynamically?
-        # Actually jax.lax.top_k works with static k.
-        _, parent_indices = jax.lax.top_k(scores, m)
-        
-        # Set edges from parents to j
-        # We want parents -> j, which means adj[parent, j] = 1.0 since parent < j (upper triangular)
-        adj_new = adj.at[parent_indices, j].set(1.0)
-        
-        return (adj_new, k), None
+    def add_top(edges, order):
+        adj = jnp.zeros((4, 4))
+        for u, v in edges:
+            adj = adj.at[u, v].set(1.0)
+        matrices.append(adj)
+        orders.append(jnp.array(order))
 
-    # Initial edges (first m nodes are connected in a chain to ensure non-zero degrees)
-    # Actually, just connecting 0 -> 1, 1 -> 2 ... up to m-1 is enough.
-    initial_adj = jnp.zeros((num_variables, num_variables))
-    # We use a static loop for initialization
-    for i in range(m - 1):
-        initial_adj = initial_adj.at[i, i+1].set(1.0)
-        
-    (final_adj, _), _ = jax.lax.scan(scan_fn, (initial_adj, key), jnp.arange(m, num_variables))
-    return final_adj
+    # 1. Chain: Z1 -> X1 -> X2 -> Z2
+    add_top([(0, 1), (1, 2), (2, 3)], [0, 1, 2, 3])
+    
+    # 1b. Reversed Chain: Z1 <- X1 <- X2 <- Z2
+    add_top([(1, 0), (2, 1), (3, 2)], [3, 2, 1, 0])
+    
+    # 2. Collider: Z1 -> X1 <- X2 <- Z2 (X1 is collider, X2 is chain)
+    add_top([(0, 1), (2, 1), (3, 2)], [0, 3, 2, 1])
+    
+    # 2b. Reversed Collider: Z1 -> X1 -> X2 <- Z2 (X2 is collider)
+    add_top([(0, 1), (1, 2), (3, 2)], [0, 1, 3, 2])
+    
+    # 3. Fork: Z1 <- X1 -> X2 -> Z2 (X1 is fork)
+    add_top([(1, 0), (1, 2), (2, 3)], [1, 0, 2, 3])
+    
+    # 3b. Reversed Fork: Z1 <- X1 <- X2 -> Z2 (X2 is fork)
+    add_top([(1, 0), (2, 1), (2, 3)], [2, 1, 0, 3])
+    
+    # 4. Fork + Collider: Z1 -> X1 <- X2 -> Z2 (X1 is collider, X2 is fork)
+    add_top([(0, 1), (2, 1), (2, 3)], [0, 2, 1, 3])
+    
+    # 4b. Reversed Fork + Collider: Z1 <- X1 -> X2 <- Z2 (X1 is fork, X2 is collider)
+    add_top([(1, 0), (1, 2), (3, 2)], [1, 3, 0, 2])
+    
+    matrices = jnp.stack(matrices)
+    orders = jnp.stack(orders)
+    
+    idx = jax.random.randint(key, (), 0, 8)
+    return matrices[idx], orders[idx]
 
 def generate_scm_params(key: jax.Array, adjacency: jax.Array, mechanism_type: int) -> SCMParams:
     """
