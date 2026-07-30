@@ -5,8 +5,7 @@ from typing import Dict, Tuple
 from src.scm import sample_scm
 
 from src.types import SCMConfig, SCMParams, InterventionSpec, InterventionType, ActionCategory
-from src.environment import init_env, step_env, update_running_statistics
-from src.alignment import stitch_global_covariance
+from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
 from src.generators import generate_4node_topologies, generate_scm_params
 
 @jax.jit

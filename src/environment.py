@@ -103,3 +103,39 @@ def step_env(state: EnvState,
     
     reward = jnp.zeros(())
     return new_state, reward
+
+@jax.jit
+def stitch_global_covariance(local_covariances: jax.Array, 
+                             agent_masks: jax.Array, 
+                             sample_counts: jax.Array) -> jax.Array:
+    """
+    Aggregates local sample covariance matrices into an initial d x d global covariance matrix.
+    Averages overlapping entries weighted by sample counts and marks unobserved entries as NaN.
+    
+    local_covariances: [m, d, d]
+    agent_masks: [m, d]
+    sample_counts: [m]
+    Returns: [d, d] global covariance matrix.
+    """
+    # Create pairwise masks indicating which agent observed both variable i and j
+    # agent_masks[k, i] * agent_masks[k, j] = 1 if agent k observes both
+    pairwise_masks = agent_masks[:, :, None] * agent_masks[:, None, :] # [m, d, d]
+    
+    # Reshape sample counts for broadcasting
+    weights = sample_counts.reshape(-1, 1, 1) # [m, 1, 1]
+    
+    # Total valid samples observing each pair (i, j)
+    total_weights = jnp.sum(weights * pairwise_masks, axis=0) # [d, d]
+    
+    # Weighted sum of covariances
+    sum_covariances = jnp.sum(weights * pairwise_masks * local_covariances, axis=0) # [d, d]
+    
+    # Avoid division by zero by safely defaulting to 1.0 where total_weight is 0
+    safe_total_weights = jnp.where(total_weights > 0, total_weights, 1.0)
+    
+    global_cov = sum_covariances / safe_total_weights
+    
+    # Mark unobserved entries (where total_weights == 0) as 0.0 (nan breaks IPPO obs)
+    global_cov = jnp.where(total_weights > 0, global_cov, 0.0)
+    
+    return global_cov
