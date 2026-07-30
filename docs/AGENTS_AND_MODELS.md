@@ -32,7 +32,8 @@ The Critic is a standard Feedforward MLP that evaluates the value $V(o_k)$ of th
 The training loop (`IPPOTrainer`) utilizes a standard on-policy actor-critic update:
 
 - **Rollout Buffer**: Trajectories (observations, actions, log-probabilities, rewards, values) are collected in a batched `RolloutBuffer` across multiple environment episodes.
-- **Generalized Advantage Estimation (GAE)**: Advantages $A_t$ are computed using GAE ($\lambda=0.95$) to reduce variance while maintaining a reasonable bias.
+- **Generalized Advantage Estimation (GAE)**: Advantages $A_t$ are computed using GAE ($\lambda=0.95$). To prevent catastrophic forgetting and gradient explosions when encountering sparse, massive reward shifts, **GAE advantages are batch-normalized** ($\mu=0, \sigma=1$) before the PPO update.
 - **PPO Clipped Surrogate Loss**: The policy network is updated using the standard clipped PPO objective to prevent destructively large policy updates.
+- **Global Gradient Clipping**: Both Actor and Critic optimizers are wrapped in `optax.clip_by_global_norm(0.5)` to provide an absolute ceiling on gradient magnitude, ensuring policy stability.
 - **Entropy Bonus**: An entropy regularization term is added to the Actor loss to encourage exploration over the hierarchical action space.
-- **Graph BCE Loss**: The Graph Head is trained using Binary Cross-Entropy (BCE) loss in a supervised manner against the true graph $G^*$. This stabilizes the node embeddings, ensuring they contain meaningful structural information that the Action Head can subsequently exploit for better interventions.
+- **Graph BCE Loss & Logical Hard Masking**: The Graph Head is trained using Binary Cross-Entropy (BCE) loss in a supervised manner against the true graph $G^*$. Crucially, the graph logits are multiplied by a **Logical Hard Mask**. This mask is constructed via the logical `OR` of the agent's Domain space and Boundary space. This physically isolates the domains, preventing the agent from ever predicting an invalid cross-domain edge (e.g. A1 Private to A2 Boundary), while successfully permitting boundary stitching.

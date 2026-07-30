@@ -4,7 +4,18 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
-## [Unreleased] - 2026-07-22
+## [Unreleased] - 2026-07-30
+
+### Added
+- **Best Model Checkpointing (`src/train.py`)**: Added functionality to track `best_shd` (and `f1` score ties) across training episodes. Auto-saves `checkpoints/best_ippo_params.pkl` via `pickle` to preserve the globally optimal actor/critic parameters.
+- **Post-Training Evaluation Suite (`src/evaluate.py`)**: Implemented an automated end-of-training pipeline that actively loads the best saved checkpoint and evaluates the deterministic greedy policy across all 8 possible topologies.
+- **WandB Evaluation Tracing**: `train.py` now saves and uploads a comprehensive step-by-step `evaluation_trace.json` to WandB upon training completion.
+- **Trace Visualization Tool (`src/visualize_trace.py`)**: Added a Kaggle-compatible utility to parse `evaluation_trace.json`, print human-readable agent step behaviors, and generate `matplotlib` SHD progression line plots.
+- **Specific Fixed Topology Selection**: Upgraded the `--fixed_graph` argument in `train.py` to optionally accept an integer index (0-7). Allows developers to enforce strict environment overfitting to a singular topology ID.
+
+### Fixed
+- **IPPO Catastrophic Policy Collapse (`src/marl/ppo_trainer.py`)**: Stabilized PPO updates by implementing Generalized Advantage Estimation (GAE) batch normalization and `optax.clip_by_global_norm(0.5)`. This mathematically prevents gradient explosions and catastrophic forgetting when the agent discovers a high-reward topology solution.
+- **Strict Hard Mask Domain Enforcement (`src/train.py`, `src/evaluate.py`, `src/marl/ppo_trainer.py`)**: Replaced the flawed outer-product observable mask with a precise logical `OR` matrix of the disjoint domain and boundary spaces. Structurally prevents cross-domain Private-to-Boundary edge predictions (e.g., Z1-X2) while enabling proper boundary stitching.
 
 ### Added
 - **Major Architectural Pivot to IPPO**: Transitioned from centralized QMIX to Independent PPO (IPPO). Each agent now utilizes an independent Actor/Critic with multi-discrete, hierarchical action spaces (Category and Target).

@@ -59,7 +59,14 @@ python -m src.train \
     --initial_budget 10.0 \
     --learning_rate 3e-4 \
     --use_wandb \
-    --wandb_project "federated-causal-marl"
+    --wandb_project "federated-causal-marl" \
+    --fixed_graph 0  # Forces environment to use Topology 0 exclusively
+```
+
+#### B. Post-Training Visualization
+After training completes and `evaluation_trace.json` is generated, visualize the agent's behavior:
+```bash
+python -m src.visualize_trace
 ```
 
 #### B. Random Baseline (Sanity Check)

@@ -11,7 +11,7 @@ Under the IPPO framework, agents do not directly orient a global matrix using ha
 ### Resolving Boundary Conflicts
 At every timestep, the environment deterministically stitches these local predictions on the server side to form a global adjacency matrix $\hat{A}_{\text{global}}$:
 - **Private Nodes**: If an edge only involves nodes within agent $k$'s local jurisdiction, the probability is taken directly from $\hat{A}_k$.
-- **Boundary Nodes**: If an edge connects boundary nodes shared between multiple agents, their probabilities are averaged.
+- **Boundary Nodes**: If an edge connects boundary nodes shared between multiple agents, their probabilities are combined using the element-wise maximum (`np.maximum`). This preserves any predicted edge if either agent strongly believes it exists.
 - **Thresholding**: The resulting continuous matrix is thresholded at $0.5$ to produce a discrete DAG.
 
 ### DFS Cycle Detection
@@ -65,3 +65,17 @@ r1 = circles & (np.dot(directed.T.astype(int), no_edge.astype(int)) > 0)
 P[r1] = TAIL
 P.T[r1] = ARROW
 ```
+
+---
+
+## 5. Post-Training Tracing & Visualization
+
+To understand agent behavior and learning dynamics over time, the system includes an automated evaluation tracing tool.
+
+### WandB Tracing (`src/evaluate.py`)
+At the end of training, the main loop loads the parameters of the best-performing model (based on lowest `best_shd` and highest `f1`). It then runs a completely deterministic, greedy evaluation episode across all possible fixed graph topologies. The step-by-step actions and predictions are saved to `evaluation_trace.json` and automatically uploaded to WandB.
+
+### Local Visualization (`src/visualize_trace.py`)
+The generated trace can be visually analyzed using the `parse_and_visualize_trace` utility. This parses the JSON trace to:
+1. Print a human-readable log of exactly what action each agent took at every environment step.
+2. Render line plots representing the SHD progression across the 20 steps of the evaluation episode using `matplotlib`.
