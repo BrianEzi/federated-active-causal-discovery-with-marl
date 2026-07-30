@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+import random
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -57,6 +58,8 @@ def main():
     print(f"=== Starting Training Session ===")
     print(f"Config: agent={args.agent_type}, d={args.num_variables}, Episodes={args.num_episodes}")
     
+    random.seed(args.seed)
+    np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
     
     action_costs = jnp.full(args.num_agents, args.action_cost)
@@ -169,6 +172,9 @@ def main():
         # End of episode update
         if args.agent_type == "ippo":
             actor_loss = 0.0
+            critic_loss = 0.0
+            graph_loss = 0.0
+            entropy = 0.0
             for k in range(args.num_agents):
                 # Calculate GAE
                 b = buffers[k].get_batches()
@@ -181,6 +187,9 @@ def main():
                     actor_params, critic_params, actor_opt, critic_opt, b, true_adj
                 )
                 actor_loss += metrics["actor_loss"]
+                critic_loss += metrics["critic_loss"]
+                graph_loss += metrics["graph_loss"]
+                entropy += metrics["entropy"]
                 buffers[k].reset()
                 
         # Evaluate Stitched DAG (final step)
@@ -195,7 +204,10 @@ def main():
             "eval/f1": eval_metrics["f1"],
         }
         if args.agent_type == "ippo":
-            log_data["train/actor_loss"] = actor_loss
+            log_data["train/actor_loss"] = actor_loss / args.num_agents
+            log_data["train/critic_loss"] = critic_loss / args.num_agents
+            log_data["train/graph_loss"] = graph_loss / args.num_agents
+            log_data["train/entropy"] = entropy / args.num_agents
             
         if args.use_wandb and WANDB_AVAILABLE:
             if episode % args.eval_freq == 0:
