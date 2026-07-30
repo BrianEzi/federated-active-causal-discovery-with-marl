@@ -45,9 +45,11 @@ def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: 
 class IPPOTrainer:
     def __init__(self, actor_transform, critic_transform, 
                  actor_lr: float = 3e-4, critic_lr: float = 1e-3, 
-                 clip_eps: float = 0.2, entropy_coef: float = 0.01, graph_coef: float = 0.5):
+                 clip_eps: float = 0.2, entropy_coef: float = 0.01, graph_coef: float = 0.5,
+                 use_rnn: bool = False):
         self.actor = actor_transform
         self.critic = critic_transform
+        self.use_rnn = use_rnn
         
         self.actor_opt = optax.adam(learning_rate=actor_lr)
         self.critic_opt = optax.adam(learning_rate=critic_lr)
@@ -56,8 +58,10 @@ class IPPOTrainer:
         self.entropy_coef = entropy_coef
         self.graph_coef = graph_coef
         
-    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array], true_adj: jax.Array):
-        """Computes the PPO loss for a single agent."""
+    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array], true_adj: jax.Array, observed_mask: jax.Array):
+        """Computes the PPO loss for a single agent.
+        observed_mask: [d] boolean or float mask indicating which nodes the agent can observe.
+        """
         obs = batch["obs"]
         cat_acts = batch["cat_actions"]
         tgt_acts = batch["target_actions"]
@@ -68,11 +72,34 @@ class IPPOTrainer:
         advs = (advs - jnp.mean(advs)) / (jnp.std(advs) + 1e-8)
         
         # 1. Critic Loss
-        v_preds = self.critic.apply(critic_params, obs)
+        if self.use_rnn:
+            # Manual unroll over time dimension using scan
+            def scan_critic(state, x):
+                v, next_state = self.critic.apply(critic_params, x, state)
+                return next_state, v
+            obs_t = jnp.expand_dims(obs, axis=1)
+            h0 = jnp.zeros((1, 64))
+            _, v_preds = jax.lax.scan(scan_critic, h0, obs_t)
+            v_preds = jnp.squeeze(v_preds, axis=1)
+        else:
+            v_preds = self.critic.apply(critic_params, obs)
+            
         critic_loss = jnp.mean((v_preds - returns) ** 2)
         
         # 2. Actor Loss
-        cat_logits, target_logits, graph_logits = self.actor.apply(actor_params, obs)
+        if self.use_rnn:
+            def scan_actor(state, x):
+                outs, next_state = self.actor.apply(actor_params, x, state)
+                return next_state, outs
+            obs_t = jnp.expand_dims(obs, axis=1)
+            h0 = jnp.zeros((1, 64))
+            _, outs = jax.lax.scan(scan_actor, h0, obs_t)
+            cat_logits, target_logits, graph_logits = outs
+            cat_logits = jnp.squeeze(cat_logits, axis=1)
+            target_logits = jnp.squeeze(target_logits, axis=1)
+            graph_logits = jnp.squeeze(graph_logits, axis=1)
+        else:
+            cat_logits, target_logits, graph_logits = self.actor.apply(actor_params, obs)
         
         # Action log probs
         cat_dist = jax.nn.log_softmax(cat_logits)
@@ -98,17 +125,27 @@ class IPPOTrainer:
         # 4. Graph Supervised Loss (BCE against true DAG for fast convergence)
         # Using optax.sigmoid_binary_cross_entropy
         true_adj_batch = jnp.tile(true_adj[None, :, :], (obs.shape[0], 1, 1))
-        graph_loss = jnp.mean(optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch))
+        bce = optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch)
+        
+        # Mask out edges involving unobserved nodes
+        edge_mask = observed_mask[:, None] * observed_mask[None, :] # [d, d]
+        edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))
+        
+        # Apply mask and compute mean over valid edges
+        masked_bce = bce * edge_mask_batch
+        valid_edge_count = jnp.sum(edge_mask)
+        graph_loss = jnp.sum(masked_bce) / (obs.shape[0] * jnp.maximum(1.0, valid_edge_count))
+        
         total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * graph_loss
         total_loss = total_actor_loss + critic_loss
         return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
         
     import functools
     @functools.partial(jax.jit, static_argnums=(0,))
-    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, true_adj):
+    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, true_adj, observed_mask):
         # Compute losses and gradients
         (total_loss, metrics), (a_grads, c_grads) = jax.value_and_grad(self.loss_fn, argnums=(0, 1), has_aux=True)(
-            actor_params, critic_params, batch, true_adj
+            actor_params, critic_params, batch, true_adj, observed_mask
         )
         
         # Apply updates

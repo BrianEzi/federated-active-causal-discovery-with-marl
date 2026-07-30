@@ -91,6 +91,89 @@ class IPPOCritic(hk.Module):
         ])(obs)
         return jnp.squeeze(v, axis=-1)
 
+class IPPORNNActor(hk.Module):
+    def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, name: str = None):
+        super().__init__(name=name)
+        self.d = d
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+
+    def __call__(self, obs: jax.Array, state: jax.Array) -> Tuple[Tuple[jax.Array, jax.Array, jax.Array], jax.Array]:
+        """
+        obs: [batch_size, obs_dim]
+        state: [batch_size, hidden_dim]
+        """
+        cov_flat = obs[:, :-1]
+        cov = jnp.reshape(cov_flat, (-1, self.d, self.d))
+        node_features = cov
+        
+        node_embeddings = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(self.embed_dim)
+        ])(node_features)
+        
+        global_rep = hk.Flatten()(node_embeddings)
+        
+        # RNN Core
+        gru = hk.GRU(self.hidden_dim)
+        rnn_out, next_state = gru(global_rep, state)
+        
+        action_hidden = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu
+        ])(rnn_out)
+        
+        cat_logits = hk.Linear(3)(action_hidden)
+        target_logits = hk.Linear(self.d)(action_hidden)
+        
+        emb_expand_i = jnp.expand_dims(node_embeddings, axis=2)
+        emb_expand_j = jnp.expand_dims(node_embeddings, axis=1)
+        emb_expand_i = jnp.tile(emb_expand_i, (1, 1, self.d, 1))
+        emb_expand_j = jnp.tile(emb_expand_j, (1, self.d, 1, 1))
+        
+        # Also broadcast the RNN output to the pairs so graph prediction depends on memory
+        rnn_expand = jnp.expand_dims(jnp.expand_dims(rnn_out, axis=1), axis=1)
+        rnn_expand = jnp.tile(rnn_expand, (1, self.d, self.d, 1))
+        
+        pairs = jnp.concatenate([emb_expand_i, emb_expand_j, rnn_expand], axis=-1)
+        
+        edge_scorer = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])
+        
+        graph_logits = edge_scorer(pairs)
+        graph_logits = jnp.squeeze(graph_logits, axis=-1)
+        
+        return (cat_logits, target_logits, graph_logits), next_state
+
+    @staticmethod
+    def initial_state(batch_size: int, hidden_dim: int = 64) -> jax.Array:
+        return jnp.zeros((batch_size, hidden_dim))
+
+class IPPORNNCritic(hk.Module):
+    def __init__(self, hidden_dim: int = 64, name: str = None):
+        super().__init__(name=name)
+        self.hidden_dim = hidden_dim
+
+    def __call__(self, obs: jax.Array, state: jax.Array) -> Tuple[jax.Array, jax.Array]:
+        gru = hk.GRU(self.hidden_dim)
+        rnn_out, next_state = gru(obs, state)
+        
+        v = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])(rnn_out)
+        return jnp.squeeze(v, axis=-1), next_state
+
+    @staticmethod
+    def initial_state(batch_size: int, hidden_dim: int = 64) -> jax.Array:
+        return jnp.zeros((batch_size, hidden_dim))
+
+
 def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, agent_mask: jax.Array) -> jax.Array:
     """
     Masks out invalid target logits based on the chosen category action.

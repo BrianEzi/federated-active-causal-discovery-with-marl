@@ -9,7 +9,7 @@ import haiku as hk
 
 from src.types import SCMConfig, MechanismType, NoiseType
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, mask_invalid_targets
+from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, mask_invalid_targets
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent
 from src.metrics import evaluate_dag_against_true
@@ -42,6 +42,10 @@ def parse_args():
     parser.add_argument("--graph_coef", type=float, default=1.0)
     parser.add_argument("--eval_freq", type=int, default=10)
     
+    parser.add_argument("--use_rnn", action="store_true")
+    parser.add_argument("--fixed_graph", action="store_true")
+    parser.add_argument("--save_file", action="store_true")
+    
     parser.add_argument("--use_wandb", action="store_true")
     parser.add_argument("--wandb_project", type=str, default="federated-causal-ippo")
     parser.add_argument("--run_name", type=str, default=None)
@@ -53,7 +57,8 @@ def main():
     args = parse_args()
     
     if args.use_wandb and WANDB_AVAILABLE:
-        wandb.init(project=args.wandb_project, name=args.run_name or f"{args.agent_type}_d{args.num_variables}", config=vars(args))
+        name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if args.fixed_graph else ''}_d{args.num_variables}"
+        wandb.init(project=args.wandb_project, name=name, config=vars(args))
             
     print(f"=== Starting Training Session ===")
     print(f"Config: agent={args.agent_type}, d={args.num_variables}, Episodes={args.num_episodes}")
@@ -71,16 +76,20 @@ def main():
         noise_scale=args.noise_scale
     )
     
-    env = FederatedCausalEnv(config, action_costs, initial_budget=args.initial_budget, sample_count=args.sample_count)
+    env = FederatedCausalEnv(config, action_costs, initial_budget=args.initial_budget, sample_count=args.sample_count, fixed_graph=args.fixed_graph)
     env.max_steps = args.max_steps
     
     if args.agent_type == "ippo":
         def make_actor():
-            def forward(obs): return IPPOActor(d=args.num_variables)(obs)
+            def forward(obs, state=None): 
+                if state is not None: return IPPORNNActor(d=args.num_variables)(obs, state)
+                return IPPOActor(d=args.num_variables)(obs)
             return hk.without_apply_rng(hk.transform(forward))
             
         def make_critic():
-            def forward(obs): return IPPOCritic()(obs)
+            def forward(obs, state=None): 
+                if state is not None: return IPPORNNCritic()(obs, state)
+                return IPPOCritic()(obs)
             return hk.without_apply_rng(hk.transform(forward))
             
         actor_trans = make_actor()
@@ -89,13 +98,20 @@ def main():
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
-                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef)
+                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn)
                               
         # Init params
         dummy_obs = jnp.zeros((1, args.num_variables * args.num_variables + 1))
         k1, k2, key = jax.random.split(key, 3)
-        actor_params = actor_trans.init(k1, dummy_obs)
-        critic_params = critic_trans.init(k2, dummy_obs)
+        if args.use_rnn:
+            dummy_state_a = IPPORNNActor.initial_state(1)
+            dummy_state_c = IPPORNNCritic.initial_state(1)
+            actor_params = actor_trans.init(k1, dummy_obs, dummy_state_a)
+            critic_params = critic_trans.init(k2, dummy_obs, dummy_state_c)
+        else:
+            actor_params = actor_trans.init(k1, dummy_obs)
+            critic_params = critic_trans.init(k2, dummy_obs)
+            
         actor_opt = trainer.actor_opt.init(actor_params)
         critic_opt = trainer.critic_opt.init(critic_params)
         
@@ -105,11 +121,17 @@ def main():
     
     best_shd = 999.0
     
+    all_metrics_history = []
+    
     for episode in range(1, args.num_episodes + 1):
         k_ep, key = jax.random.split(key)
         obs_dict, info = env.reset(k_ep)
         true_adj = info["true_adjacency"]
         
+        if args.agent_type == "ippo" and args.use_rnn:
+            actor_states = [IPPORNNActor.initial_state(1) for _ in range(args.num_agents)]
+            critic_states = [IPPORNNCritic.initial_state(1) for _ in range(args.num_agents)]
+            
         done = False
         ep_reward = 0.0
         
@@ -121,7 +143,13 @@ def main():
                 # IPPO Act
                 for k in range(args.num_agents):
                     obs_k = jnp.array([obs_dict[f"agent_{k}"]])
-                    cat_logits, target_logits, graph_logits = actor_trans.apply(actor_params, obs_k)
+                    if args.use_rnn:
+                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_trans.apply(actor_params, obs_k, actor_states[k])
+                        val_batch, critic_states[k] = critic_trans.apply(critic_params, obs_k, critic_states[k])
+                        val = val_batch[0]
+                    else:
+                        cat_logits, target_logits, graph_logits = actor_trans.apply(actor_params, obs_k)
+                        val = critic_trans.apply(critic_params, obs_k)[0]
                     
                     # Action selection
                     cat_dist = jax.nn.softmax(cat_logits[0])
@@ -141,8 +169,6 @@ def main():
                         
                     cat_lp = jnp.log(cat_dist[cat])
                     log_prob = cat_lp + tgt_lp
-                    
-                    val = critic_trans.apply(critic_params, obs_k)[0]
                     
                     graph_pred = jax.nn.sigmoid(graph_logits[0])
                     
@@ -182,9 +208,15 @@ def main():
                 b["advantages"] = advs
                 b["returns"] = rets
                 
+                # Mask out unobservable nodes for the graph BCE loss
+                if k == 0:
+                    observed_mask = jnp.array([1.0, 1.0, 1.0, 0.0])
+                else:
+                    observed_mask = jnp.array([0.0, 1.0, 1.0, 1.0])
+                
                 # Update
                 actor_params, critic_params, actor_opt, critic_opt, metrics = trainer.update_step(
-                    actor_params, critic_params, actor_opt, critic_opt, b, true_adj
+                    actor_params, critic_params, actor_opt, critic_opt, b, true_adj, observed_mask
                 )
                 actor_loss += metrics["actor_loss"]
                 critic_loss += metrics["critic_loss"]
@@ -203,11 +235,16 @@ def main():
             "eval/shd": eval_metrics["shd"],
             "eval/f1": eval_metrics["f1"],
         }
+        for k in range(args.num_agents):
+            log_data[f"agent_{k}_budget"] = env.jax_state.budgets[k]
+            
         if args.agent_type == "ippo":
             log_data["train/actor_loss"] = actor_loss / args.num_agents
             log_data["train/critic_loss"] = critic_loss / args.num_agents
             log_data["train/graph_loss"] = graph_loss / args.num_agents
             log_data["train/entropy"] = entropy / args.num_agents
+            
+        all_metrics_history.append(log_data.copy())
             
         if args.use_wandb and WANDB_AVAILABLE:
             if episode % args.eval_freq == 0:
@@ -219,6 +256,12 @@ def main():
             
         if episode % 10 == 0:
             print(f"[Episode {episode}] Reward: {ep_reward:.2f} | SHD: {eval_metrics['shd']:.2f} | F1: {eval_metrics['f1']:.2f}")
+
+    if args.save_file:
+        import pandas as pd
+        df = pd.DataFrame(all_metrics_history)
+        df.to_csv("training_metrics.csv", index=False)
+        print("Saved metrics to training_metrics.csv")
 
 if __name__ == "__main__":
     main()

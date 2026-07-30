@@ -21,11 +21,12 @@ def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax
 
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
-                 initial_budget: float = 10.0, sample_count: int = 100):
+                 initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
         self.sample_count = sample_count
+        self.fixed_graph = fixed_graph
         
         # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
         self.agent_masks = jnp.array([
@@ -35,6 +36,7 @@ class FederatedCausalEnv:
         
         self.jax_state = None
         self.max_steps = 20
+        self._fixed_topology_cache = None
         
     def _get_obs_dict(self):
         """Constructs IPPO observations."""
@@ -65,8 +67,17 @@ class FederatedCausalEnv:
     def reset(self, key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict]:
         # Meta-learning: Generate random topology
         k1, k2, k3, key = jax.random.split(key, 4)
-        adjacency, topo_order = generate_4node_topologies(k1)
-        scm_params = generate_scm_params(k2, adjacency, int(self.config.mechanism_type))
+        
+        if self.fixed_graph:
+            if self._fixed_topology_cache is None:
+                adjacency, topo_order = generate_4node_topologies(jax.random.PRNGKey(42))
+                scm_params = generate_scm_params(jax.random.PRNGKey(43), adjacency, int(self.config.mechanism_type))
+                self._fixed_topology_cache = (adjacency, topo_order, scm_params)
+            else:
+                adjacency, topo_order, scm_params = self._fixed_topology_cache
+        else:
+            adjacency, topo_order = generate_4node_topologies(k1)
+            scm_params = generate_scm_params(k2, adjacency, int(self.config.mechanism_type))
         
         budgets = jnp.full(self.config.K, self.initial_budget)
         self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets)
