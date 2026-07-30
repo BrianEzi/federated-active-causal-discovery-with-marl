@@ -31,9 +31,10 @@ When working on this repository, you must adhere strictly to the following archi
 - **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally. If `pytest` is unavailable, you **MUST** run the relevant scripts directly (e.g., `python src/train.py`) to confirm that your code executes without crashing and behaves as expected. **Do not assume code works without executing it.**
 - **Equivalence Verification:** When refactoring algorithms for performance (e.g., vectorizing loops), verify that the optimized output matches the reference implementation 100% using `np.array_equal` or `np.allclose`.
 
-## 7. Workspace Hygiene & Scratch Management
+## 7. Workspace Hygiene & Git Standards
 - **Never Commit Scratch Files:** Temporary profiling scripts, benchmark harnesses, or scratch files (e.g., `scratch/`, temporary logs) MUST NEVER be committed to Git.
 - **Gitignore Enforcement:** Always ensure temporary folders (e.g., `scratch/`, `shelved/`, `.venv/`) are explicitly listed in `.gitignore`. Clean up or untrack any temporary files before committing work.
+- **Commit Messages:** Follow the detailed guidelines outlined in `.agents/COMMIT_CONVENTIONS.md`. Major changes **must** include a descriptive multi-line body explaining *what* changed and *why*.
 
 ## 8. Continuous Documentation Maintenance
 - **Keep Documentation Updated:** Whenever you add a feature, refactor code, fix a bug, or introduce new hyperparameters or agent architectures, you MUST update the relevant files in `docs/` (`docs/ARCHITECTURE.md`, `docs/AGENTS_AND_MODELS.md`, `docs/CAUSAL_EVALUATOR.md`, `docs/CHANGELOG.md`) and `README.md`.
