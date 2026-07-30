@@ -1,6 +1,6 @@
 # 🏛️ System Architecture: JAX/NumPy Hybrid Pipeline
 
-The **Federated Active Causal Discovery Engine** is formulated as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)**. It enables distributed agents to collaboratively discover a hidden global causal graph through active interventions.
+The **Federated Active Causal Discovery Engine** is formulated as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)**. It enables distributed agents to collaboratively discover a hidden global causal graph through active interventions and localized continuous structural predictions.
 
 ---
 
@@ -12,15 +12,10 @@ The **Federated Active Causal Discovery Engine** is formulated as a **Decentrali
 |                                                                       |
 |  +---------------------+      +------------------------------------+  |
 |  |   SCM Generation    | ---> |      Covariance Calculation        |  |
-|  | (sample_scm in JAX) |      | (compute_local_covariances + vmap) |  |
+|  | (sample_scm in JAX) |      | (Algorithmic State Aggregation)    |  |
 |  +---------------------+      +------------------------------------+  |
 |                                                  |                    |
-|                                                  v                    |
-|                               +------------------------------------+  |
-|                               |    Global Covariance Stitching     |  |
-|                               |     (stitch_global_covariance)     |  |
-|                               +------------------------------------+  |
-+-----------------------------------------------------------------------+
++--------------------------------------------------|--------------------+
                                                    |
                                          Host-Device Bridge
                                                    |
@@ -29,35 +24,43 @@ The **Federated Active Causal Discovery Engine** is formulated as a **Decentrali
 |                               CPU (NUMPY)                             |
 |                                                                       |
 |  +---------------------+      +------------------------------------+  |
-|  | Interventional Mean | ---> |         PAG Graph Orientation      |  |
-|  |    Shift Testing    |      | (Vectorized Meek Rules & DFS Cycle)|  |
+|  |     IPPO Network    | ---> |        DAG Edge Prediction         |  |
+|  | (Haiku Forward Pass)|      |   (Local Adjacency Matrix)         |  |
 |  +---------------------+      +------------------------------------+  |
 |                                                  |                    |
 |                                                  v                    |
 |                               +------------------------------------+  |
+|                               |    Deterministic Graph Stitching   |  |
+|                               |     (Stouffer/Average Merging)     |  |
+|                               +------------------------------------+  |
+|                                                  |                    |
+|                                                  v                    |
+|                               +------------------------------------+  |
 |                               |     Reward & Metric Calculation    |  |
-|                               |     (SHD, Precision, Recall, F1)   |  |
+|                               |       (Dense SHD, DFS Cycles)      |  |
 |                               +------------------------------------+  |
 +-----------------------------------------------------------------------+
 ```
 
 ### Why a Hybrid Architecture?
-- **Accelerated Simulation (JAX)**: Structural Causal Model (SCM) data generation produces thousands of observational and interventional samples per step. Executing this on a GPU/TPU using `jax.lax.scan` and `jax.vmap` yields a 100x–1000x speedup over standard Python loops.
-- **CPU Graph Interpretation (NumPy)**: Complex dynamic graph algorithms (such as Depth-First Search cycle checks and FCI Meek rule propagation) involve data-dependent recursion. Compiling such dynamic recursions into static JAX arrays causes compilation stalls. Running these on CPU with vectorized NumPy matrix operations maintains high efficiency without compiler overhead.
+- **Accelerated Simulation (JAX)**: Structural Causal Model (SCM) data generation produces thousands of observational and interventional samples per step. Executing this on a GPU/TPU using `jax.lax.scan` and `jax.vmap` yields a massive speedup over standard Python loops.
+- **CPU Graph Interpretation & Network Execution (NumPy / JAX-CPU)**: Complex dynamic graph algorithms (such as Depth-First Search for cycle detection during stitching) involve data-dependent recursion. Compiling such dynamic recursions into static JAX arrays causes compilation stalls. These run safely on the CPU alongside the agent's inference pass.
 
 ---
 
 ## 2. Dec-POMDP Mathematical Formulation
 
-- **State Space $\mathcal{S}$**: Global stitched covariance matrix $\Sigma_{\text{global}} \in \mathbb{R}^{d \times d}$, ground-truth adjacency $G^*$, and current agent budget array $\mathbf{b} \in \mathbb{R}^K$.
-- **Observation Space $\Omega_k$**: Local covariance matrix $\Sigma_k \in \mathbb{R}^{d \times d}$, agent jurisdiction mask $M_k \in \{0, 1\}^d$, remaining budget $b_k$, and global covariance proxy.
-- **Action Space $\mathcal{A}_k$**: Discrete choice $a_k \in \{0, 1, \dots, d\}$.
-  - $a_k < d$: Execute a Hard Intervention $\text{do}(X_{a_k} = 5.0)$ on node $a_k$.
-  - $a_k = d$: Execute `NO-OP` (observe without intervening).
+- **State Space $\mathcal{S}$**: Global ground-truth Directed Acyclic Graph $G^*$, current agent budget array $\mathbf{b} \in \mathbb{R}^K$, and the running global covariance matrix $\Sigma_{\text{global}}$.
+- **Observation Space $\Omega_k$**: Agent $k$'s private running covariance matrix $\Sigma_k$ (containing only its local nodes and exposed boundary nodes), its remaining budget $b_k$, its local jurisdictional mask $M_k \in \{0, 1\}^d$, and its previous predicted local DAG matrix.
+- **Action Space $\mathcal{A}_k$**: Hierarchical Multi-Discrete Actions.
+  - **Stage 1 (Category)**: `[Local Intervention, Peer Request, NO-OP]`.
+  - **Stage 2 (Target)**: Node index $t \in \{0, 1, \dots, d-1\}$ generated via node embeddings.
+  - *Constraints*: Masking forces agents to only target nodes they are permitted to see and act upon (e.g. peer requests can only target boundary nodes).
 
 ---
 
-## 3. Data Flow & Compilation Safety
+## 3. Data Flow & Meta-Learning Topologies
 
-1. **Primitive Integers in JIT**: Functions decorated with `@jax.jit` (such as `_sample_scm_jitted`) receive primitive Python integers (`d`, `mechanism_type`, `noise_type`) as static arguments (`static_argnums`).
-2. **PyTree State Objects**: Dynamic simulation states (`EnvState`, `InterventionSpec`) remain PyTrees (`chex.dataclass`), allowing seamless gradient tracing without unhashable PyTree compilation errors.
+1. **Meta-Learning Topologies**: At $t=0$, the environment randomly samples a base topology (Chain, Collider, Fork, Fork+Collider) rather than a fixed Erdős-Rényi graph. The agents must adapt and generalize.
+2. **Algorithmic State Aggregation**: Rather than relying on Recurrent Neural Networks (RNNs) which are unstable in MARL causal tasks, the environment continuously tracks and updates a running covariance matrix of all samples observed during the episode. This preserves the Markov property explicitly in the state vector.
+3. **Continuous Reward Shaping**: At every step, the agents output a dense predicted local DAG. These are stitched together, checked for cycles, and compared against $G^*$ to compute a Dense Structural Hamming Distance (SHD). Agents are penalized per step for structural errors, forcing them to learn optimal interventions to reduce their error rapidly.

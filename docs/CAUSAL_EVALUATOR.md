@@ -1,41 +1,60 @@
-# 🔬 Causal Evaluator & PAG Tracker Engine
+# 🔬 Causal Evaluator & DAG Engine
 
-This document details the causal reasoning engine (`src/pag.py`), interventional dependency testing, reward shaping, and structural evaluation metrics (`src/metrics.py`).
+This document details the causal reasoning engine used to combine decentralized predictions (`src/stitching.py`), generate mixed-cooperative rewards (`src/rewards.py`), and evaluate structural performance (`src/metrics.py`).
 
 ---
 
-## 1. Partial Ancestral Graphs (PAGs)
+## 1. Deterministic Graph Stitching (`src/stitching.py`)
 
-A Partial Ancestral Graph (PAG) represents an equivalence class of causal DAGs under observational and interventional data.
+Under the IPPO framework, agents do not directly orient a global matrix using hard algorithmic rules. Instead, each agent $k$ outputs a continuous probability matrix $\hat{A}_k \in [0, 1]^{d \times d}$ representing its belief of the local DAG structure.
 
-We encode PAG edge marks as an integer matrix $P \in \{0, 1, 2, 3\}^{d \times d}$:
-- `0 (NULL)`: No edge exists between $X_i$ and $X_j$.
-- `1 (TAIL)`: Tail mark ($-$ facing $X_j$).
-- `2 (ARROW)`: Arrowhead mark ($\to$ facing $X_j$).
+### Resolving Boundary Conflicts
+At every timestep, the environment deterministically stitches these local predictions on the server side to form a global adjacency matrix $\hat{A}_{\text{global}}$:
+- **Private Nodes**: If an edge only involves nodes within agent $k$'s local jurisdiction, the probability is taken directly from $\hat{A}_k$.
+- **Boundary Nodes**: If an edge connects boundary nodes shared between multiple agents, their probabilities are averaged.
+- **Thresholding**: The resulting continuous matrix is thresholded at $0.5$ to produce a discrete DAG.
+
+### DFS Cycle Detection
+The resulting stitched graph is validated for topological correctness using a Depth-First Search (DFS) algorithm. If conflicts between agent boundary predictions result in a cycle (e.g. $X_1 \to X_2$ from Agent 1, and $X_2 \to X_1$ from Agent 2), the graph is flagged as invalid and heavily penalized.
+
+---
+
+## 2. Mixed Cooperative/Competitive Reward Shaping (`src/rewards.py`)
+
+Rather than waiting until the end of the episode to receive a terminal reward, the environment evaluates the stitched DAG against the true global DAG $G^*$ at *every step*.
+
+### Dense Structural Hamming Distance (SHD) Penalty
+Agents receive a continuous step-by-step penalty based on the Structural Hamming Distance (SHD). Because agents begin with an empty or random graph prediction at $t=0$, they incur massive initial penalties, creating an active pressure to rapidly intervene and resolve structural uncertainty.
+
+### Reward Assignment
+- **Local Error Penalty**: Agent $k$ is penalized $-1.0$ exclusively if it mispredicts an edge involving its private local nodes.
+- **Boundary Error Penalty**: If an edge involving shared boundary nodes is mispredicted, *both* sharing agents receive a $-1.0$ penalty, encouraging cooperation.
+- **Cycle Penalty**: If the stitched graph contains a cycle, *all* agents involved in the cycle receive a massive joint penalty (default $-10.0$).
+
+---
+
+## 3. Structural Evaluation Metrics (`src/metrics.py`)
+
+During training and evaluation, the following metrics are tracked by comparing the discrete stitched DAG against $G^*$:
+- **Structural Hamming Distance (SHD)**: Counts edge additions, deletions, and orientation mismatches.
+- **Precision**: $\frac{\text{True Positives}}{\text{True Positives} + \text{False Positives}}$.
+- **Recall**: $\frac{\text{True Positives}}{\text{True Positives} + \text{False Negatives}}$.
+- **F1 Score**: $\frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$.
+
+---
+
+## 4. Future Work: Partial Ancestral Graphs (PAGs)
+
+*(Note: The following logic has been temporarily shelved in `shelved/pag.py` while the system focuses on environments without latent confounders. It will be reintroduced in subsequent phases.)*
+
+In the presence of unobserved latent confounders, DAGs are insufficient. The system will revert to predicting **Partial Ancestral Graphs (PAGs)**:
+- `0 (NULL)`: No edge.
+- `1 (TAIL)`: Tail mark ($-$).
+- `2 (ARROW)`: Arrowhead mark ($\to$).
 - `3 (CIRCLE)`: Circle mark ($\circ$ unoriented ambiguity).
 
----
-
-## 2. Interventional Mean Shift Testing
-
-Under a Hard Intervention $\text{do}(X_i = 5.0)$:
-- The variable $X_i$ is clamped to $5.0 + \text{noise}$.
-- The sample mean of all variables is computed: $\boldsymbol{\mu}_{\text{int}} = \mathbf{E}[\mathbf{X} \mid \text{do}(X_i = 5.0)]$.
-- **Causal Propagation Principle**:
-  - If $|\mu_{j, \text{int}}| \ge \text{threshold}$ (e.g. $\ge 0.5$), then $X_i$ causes $X_j$.
-  - The edge is oriented: $P[i, j] = \text{TAIL} (1)$ and $P[j, i] = \text{ARROW} (2)$.
-  - If $|\mu_{j, \text{int}}| < \text{threshold}$ and both $X_i$ and $X_j$ have been intervened on without mutual dependency, the edge is removed ($P[i, j] = \text{NULL}, P[j, i] = \text{NULL}$).
-
----
-
-## 3. Vectorized FCI Meek Rule Propagation
-
-Meek orientation rules propagate structural orientation constraints:
-- **Rule 1 (R1)**: $a \to b \circ\!\!-\!\!\circ c$ and $a \not\sim c \implies b \to c$.
-- **Rule 2 (R2)**: $a \to b \to c$ and $a \circ\!\!-\!\!\circ c \implies a \to c$.
-
-### Vectorized NumPy BLAS Matrix Implementation (120x Speedup)
-Instead of nested $O(d^3)$ Python loops, Meek rules are computed using NumPy boolean matrix operations:
+**Vectorized FCI Meek Rule Propagation**:
+Instead of nested $O(d^3)$ Python loops, PAG Meek rules (R1, R2) are computed using NumPy boolean matrix operations:
 ```python
 directed = (P == TAIL) & (P.T == ARROW)
 circles = (P == CIRCLE) & (P.T == CIRCLE)
@@ -45,31 +64,4 @@ no_edge = (P == NULL) & (P.T == NULL)
 r1 = circles & (np.dot(directed.T.astype(int), no_edge.astype(int)) > 0)
 P[r1] = TAIL
 P.T[r1] = ARROW
-
-# R2: circles & (directed @ directed > 0)
-r2 = circles & (np.dot(directed.astype(int), directed.astype(int)) > 0)
-P[r2] = TAIL
-P.T[r2] = ARROW
 ```
-
----
-
-## 4. Global Reward Function (`src/rewards.py`)
-
-To prevent the **NO-OP Penalty Trap**, the global reward is defined as:
-
-$$R_t = c_{\text{circle}} \cdot \Delta \text{Circles} - \sum_{k=1}^K \text{cost}_k + R_{\text{noop}} - c_{\text{viol}} \cdot \text{Violations}$$
-
-- **$\Delta \text{Circles}$**: $\text{Circles}_{t-1} - \text{Circles}_t$. Positive reward for orienting circle marks ($+10.0$ default).
-- **$R_{\text{noop}}$**: Penalty ($-0.5$ default) applied if ALL agents choose `NO-OP` while unresolved circles remain.
-- **Action Cost**: Cost per intervention ($-0.05$ default).
-
----
-
-## 5. Structural Evaluation Metrics (`src/metrics.py`)
-
-- **Directed Edge Extraction**: $X_i \to X_j$ iff $P[i, j] = \text{TAIL} (1)$ and $P[j, i] = \text{ARROW} (2)$.
-- **Precision**: $\frac{\text{True Positives}}{\text{True Positives} + \text{False Positives}}$.
-- **Recall**: $\frac{\text{True Positives}}{\text{True Positives} + \text{False Negatives}}$.
-- **F1 Score**: $\frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$.
-- **Structural Hamming Distance (SHD)**: Counts edge additions, deletions, and orientation mismatches against the true DAG $G^*$.
