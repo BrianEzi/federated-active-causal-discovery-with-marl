@@ -127,6 +127,11 @@ class IPPOTrainer:
         true_adj_batch = jnp.tile(true_adj[None, :, :], (obs.shape[0], 1, 1))
         bce = optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch)
         
+        # Apply pos_weight to balance sparse edges (assume ~3 edges out of 12 possible = weight of 4.0)
+        pos_weight = 4.0
+        weight_mask = jnp.where(true_adj_batch == 1.0, pos_weight, 1.0)
+        bce = bce * weight_mask
+        
         # Mask out edges involving unobserved nodes
         edge_mask = observed_mask[:, None] * observed_mask[None, :] # [d, d]
         edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))

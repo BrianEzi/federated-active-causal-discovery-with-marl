@@ -20,8 +20,8 @@ def stitch_predicted_dags(predicted_probs: dict, d: int) -> tuple[np.ndarray, bo
     global_probs[1:3, 3] = prob_2[1:3, 3]
     
     # Overlapping boundary nodes: {1, 2}
-    # Both agents predict edges between X1 (1) and X2 (2). Average their probabilities.
-    global_probs[1:3, 1:3] = (prob_1[1:3, 1:3] + prob_2[1:3, 1:3]) / 2.0
+    # Both agents predict edges between X1 (1) and X2 (2). Use maximum to avoid suppression.
+    global_probs[1:3, 1:3] = np.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3])
     
     # Clear self-loops
     np.fill_diagonal(global_probs, 0.0)
