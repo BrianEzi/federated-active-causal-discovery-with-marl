@@ -52,3 +52,8 @@ When working on this repository, you must adhere strictly to the following archi
   5. Causal DAG / Theoretical domain explanations (e.g., Markov Equivalence Class breakdowns vs. active interventional requirements).
 - **No Placeholder Code**: All analysis notebooks must contain active, functioning Python code (using `matplotlib` / standard libraries) to plot metrics directly from local or extracted data files.
 
+## 11. High-Effort Analysis Standards & Mandatory Output Inspection
+- **Zero-Tolerance for NULL/N/A Data**: You MUST inspect raw JSON/DataFrame keys prior to rendering markdown tables or plotting. Delivering tables filled with `N/A`, `NaN`, or `null` due to key mismatches (e.g. `train/episode_reward` vs `mean_reward`) is UNACCEPTABLE.
+- **Mandatory Notebook Execution Verification**: Before declaring a notebook complete, you must execute the generation script, inspect the resulting notebook/JSON output, verify that every metric array is populated with valid numbers, and confirm that all plots render real data.
+- **Exhaustive Deep Dive**: High-effort analysis requires exhaustive detail: exact step-by-step action sequences, exact loss curve progressions, per-agent action distribution breakdowns, and detailed mathematical explanations of domain failure modes. Never settle for high-level summaries.
+
