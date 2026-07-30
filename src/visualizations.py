@@ -19,8 +19,14 @@ def plot_dag_to_wandb_image(adj: np.ndarray, title: str):
     pos = nx.circular_layout(G)
     
     # Draw
-    nx.draw(G, pos, ax=ax, with_labels=True, node_color='lightblue', 
-            node_size=800, arrowsize=20, font_size=12, font_weight='bold')
+    labels = {
+        0: "Z1\n(A1 Pvt)",
+        1: "X1\n(A1 Bndry)",
+        2: "X2\n(A2 Bndry)",
+        3: "Z2\n(A2 Pvt)"
+    }
+    nx.draw(G, pos, ax=ax, labels=labels, node_color='lightblue', 
+            node_size=2000, arrowsize=20, font_size=9, font_weight='bold')
     
     ax.set_title(title)
     

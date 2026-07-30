@@ -172,6 +172,10 @@ def main():
                     
                     graph_pred = jax.nn.sigmoid(graph_logits[0])
                     
+                    # Apply hard mask to prevent cross-domain edge predictions
+                    edge_mask = jnp.outer(mask, mask)
+                    graph_pred = graph_pred * edge_mask
+                    
                     joint_actions[f"agent_{k}"] = (cat, target)
                     predicted_dags[f"agent_{k}"] = np.array(graph_pred)
                     
