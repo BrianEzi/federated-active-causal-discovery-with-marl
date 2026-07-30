@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 import optax
 import haiku as hk
-import rlax
 from typing import Dict, Any, Tuple
 
 class RolloutBuffer:
@@ -95,9 +94,9 @@ class IPPOTrainer:
                             jnp.sum(jnp.exp(tgt_dist) * tgt_dist, axis=-1))
         
         # 4. Graph Supervised Loss (BCE against true DAG for fast convergence)
-        # Using rlax.sigmoid_cross_entropy
+        # Using optax.sigmoid_binary_cross_entropy
         true_adj_batch = jnp.tile(true_adj[None, :, :], (obs.shape[0], 1, 1))
-        graph_loss = jnp.mean(rlax.sigmoid_cross_entropy(graph_logits, true_adj_batch))
+        graph_loss = jnp.mean(optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch))
         
         total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * graph_loss
         
