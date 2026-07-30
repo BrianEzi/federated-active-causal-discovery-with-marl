@@ -66,11 +66,11 @@ class IPPOTrainer:
         returns = batch["returns"]
         
         # 1. Critic Loss
-        v_preds = self.critic.apply(critic_params, None, obs)
+        v_preds = self.critic.apply(critic_params, obs)
         critic_loss = jnp.mean((v_preds - returns) ** 2)
         
         # 2. Actor Loss
-        cat_logits, target_logits, graph_logits = self.actor.apply(actor_params, None, obs)
+        cat_logits, target_logits, graph_logits = self.actor.apply(actor_params, obs)
         
         # Action log probs
         cat_dist = jax.nn.log_softmax(cat_logits)
@@ -97,15 +97,15 @@ class IPPOTrainer:
         # Using optax.sigmoid_binary_cross_entropy
         true_adj_batch = jnp.tile(true_adj[None, :, :], (obs.shape[0], 1, 1))
         graph_loss = jnp.mean(optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch))
-        
         total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * graph_loss
+        total_loss = total_actor_loss + critic_loss
+        return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
         
-        return total_actor_loss, critic_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
-        
-    @jax.jit
+    import functools
+    @functools.partial(jax.jit, static_argnums=(0,))
     def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, true_adj):
         # Compute losses and gradients
-        (a_loss, c_loss, metrics), (a_grads, c_grads) = jax.value_and_grad(self.loss_fn, argnums=(0, 1), has_aux=True)(
+        (total_loss, metrics), (a_grads, c_grads) = jax.value_and_grad(self.loss_fn, argnums=(0, 1), has_aux=True)(
             actor_params, critic_params, batch, true_adj
         )
         

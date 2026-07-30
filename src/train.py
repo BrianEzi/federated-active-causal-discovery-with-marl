@@ -33,10 +33,13 @@ def parse_args():
     parser.add_argument("--mechanism_type", type=str, default="LINEAR", choices=["LINEAR", "NONLINEAR_ANM"])
     
     parser.add_argument("--num_episodes", type=int, default=5000)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--learning_rate", type=float, default=3e-4)
     parser.add_argument("--actor_lr", type=float, default=3e-4)
     parser.add_argument("--critic_lr", type=float, default=1e-3)
     parser.add_argument("--entropy_coef", type=float, default=0.01)
     parser.add_argument("--graph_coef", type=float, default=1.0)
+    parser.add_argument("--eval_freq", type=int, default=10)
     
     parser.add_argument("--use_wandb", action="store_true")
     parser.add_argument("--wandb_project", type=str, default="federated-causal-ippo")
@@ -80,7 +83,9 @@ def main():
         actor_trans = make_actor()
         critic_trans = make_critic()
         
-        trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=args.actor_lr, critic_lr=args.critic_lr,
+        actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
+        critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
+        trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
                               entropy_coef=args.entropy_coef, graph_coef=args.graph_coef)
                               
         # Init params
