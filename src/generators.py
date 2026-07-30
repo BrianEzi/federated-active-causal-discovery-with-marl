@@ -12,7 +12,7 @@ def generate_er_dag(key: jax.Array, num_variables: int, edge_prob: float) -> jax
     # Mask to keep strictly upper triangular part
     return jnp.triu(adj, k=1)
 
-def generate_4node_topologies(key: jax.Array) -> tuple[jax.Array, jax.Array]:
+def generate_4node_topologies(key: jax.Array, force_idx: int = None) -> tuple[jax.Array, jax.Array]:
     """
     Generates one of the 4 base topologies (and their reversed perspectives) for a 4-node federated system.
     Nodes: 0 (Z1, Agent 1 Private), 1 (X1, Agent 1 Boundary), 2 (X2, Agent 2 Boundary), 3 (Z2, Agent 2 Private).
@@ -58,7 +58,10 @@ def generate_4node_topologies(key: jax.Array) -> tuple[jax.Array, jax.Array]:
     matrices = jnp.stack(matrices)
     orders = jnp.stack(orders)
     
-    idx = jax.random.randint(key, (), 0, 8)
+    if force_idx is not None:
+        idx = force_idx
+    else:
+        idx = jax.random.randint(key, (), 0, 8)
     return matrices[idx], orders[idx]
 
 def generate_scm_params(key: jax.Array, adjacency: jax.Array, mechanism_type: int) -> SCMParams:

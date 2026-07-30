@@ -63,8 +63,8 @@ def test_stitch_predicted_dags_conflict():
     
     stitched_dag, has_cycle = stitch_predicted_dags(predicted_probs, d)
     
-    # 1->2 gets 0.45, 2->1 gets 0.45. Both < 0.5, so neither edge is formed!
-    # Wait, the threshold is > 0.5. So stitched_dag should have no edges.
-    assert stitched_dag[1, 2] == 0.0
-    assert stitched_dag[2, 1] == 0.0
-    assert not has_cycle
+    # Using np.maximum, 1->2 gets max(0.9, 0) = 0.9, 2->1 gets max(0, 0.9) = 0.9. Both > 0.5.
+    # So both edges are formed! A cycle is detected.
+    assert stitched_dag[1, 2] == 1.0
+    assert stitched_dag[2, 1] == 1.0
+    assert has_cycle == True

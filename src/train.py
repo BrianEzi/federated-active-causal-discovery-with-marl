@@ -262,6 +262,22 @@ def main():
         df = pd.DataFrame(all_metrics_history)
         df.to_csv("training_metrics.csv", index=False)
         print("Saved metrics to training_metrics.csv")
+        
+    if args.agent_type == "ippo":
+        print("Running post-training evaluation suite...")
+        from src.evaluate import run_evaluation_suite
+        import json
+        trace = run_evaluation_suite(
+            actor=actor_trans,
+            actor_params=actor_params,
+            config=config,
+            action_costs=action_costs,
+            initial_budget=args.initial_budget,
+            use_rnn=args.use_rnn
+        )
+        with open("evaluation_trace.json", "w") as f:
+            json.dump(trace, f, indent=2)
+        print("Saved evaluation trace to evaluation_trace.json")
 
 if __name__ == "__main__":
     main()
