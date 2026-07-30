@@ -39,6 +39,9 @@ def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: 
     _, advs_rev = jax.lax.scan(scan_fn, 0.0, transitions)
     advs = advs_rev[::-1]
     
+    # Normalize advantages
+    advs = (advs - jnp.mean(advs)) / (jnp.std(advs) + 1e-8)
+    
     returns = advs + values
     return advs, returns
 
@@ -51,8 +54,14 @@ class IPPOTrainer:
         self.critic = critic_transform
         self.use_rnn = use_rnn
         
-        self.actor_opt = optax.adam(learning_rate=actor_lr)
-        self.critic_opt = optax.adam(learning_rate=critic_lr)
+        self.actor_opt = optax.chain(
+            optax.clip_by_global_norm(0.5),
+            optax.adam(learning_rate=actor_lr)
+        )
+        self.critic_opt = optax.chain(
+            optax.clip_by_global_norm(0.5),
+            optax.adam(learning_rate=critic_lr)
+        )
         
         self.clip_eps = clip_eps
         self.entropy_coef = entropy_coef
