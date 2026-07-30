@@ -64,6 +64,8 @@ class IPPOTrainer:
         old_log_probs = batch["log_probs"]
         advs = batch["advantages"]
         returns = batch["returns"]
+        # Normalize advantages
+        advs = (advs - jnp.mean(advs)) / (jnp.std(advs) + 1e-8)
         
         # 1. Critic Loss
         v_preds = self.critic.apply(critic_params, obs)

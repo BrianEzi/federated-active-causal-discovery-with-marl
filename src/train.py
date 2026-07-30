@@ -198,6 +198,11 @@ def main():
             log_data["train/actor_loss"] = actor_loss
             
         if args.use_wandb and WANDB_AVAILABLE:
+            if episode % args.eval_freq == 0:
+                from src.visualizations import plot_dag_to_wandb_image
+                log_data["eval/true_dag_img"] = plot_dag_to_wandb_image(true_adj, f"True DAG (Ep {episode})")
+                log_data["eval/pred_dag_img"] = plot_dag_to_wandb_image(final_dag, f"Predicted DAG (Ep {episode})")
+                
             wandb.log(log_data)
             
         if episode % 10 == 0:
