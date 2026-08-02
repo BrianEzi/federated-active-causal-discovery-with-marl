@@ -99,6 +99,17 @@ def main():
         actor_trans = make_actor()
         critic_trans = make_critic()
         
+        actor_apply = jax.jit(actor_trans.apply)
+        critic_apply = jax.jit(critic_trans.apply)
+        
+        local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
+        boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+        observed_masks = [jnp.array([1.0, 1.0, 1.0, 0.0]), jnp.array([0.0, 1.0, 1.0, 1.0])]
+        edge_masks = [
+            jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
+            jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
+        ]
+        
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
@@ -156,24 +167,18 @@ def main():
                 for k in range(args.num_agents):
                     obs_k = jnp.array([obs_dict[f"agent_{k}"]])
                     if args.use_rnn:
-                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_trans.apply(actor_params_list[k], obs_k, actor_states[k])
-                        val_batch, critic_states[k] = critic_trans.apply(critic_params_list[k], obs_k, critic_states[k])
+                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_apply(actor_params_list[k], obs_k, actor_states[k])
+                        val_batch, critic_states[k] = critic_apply(critic_params_list[k], obs_k, critic_states[k])
                         val = val_batch[0]
                     else:
-                        cat_logits, target_logits, graph_logits = actor_trans.apply(actor_params_list[k], obs_k)
-                        val = critic_trans.apply(critic_params_list[k], obs_k)[0]
+                        cat_logits, target_logits, graph_logits = actor_apply(actor_params_list[k], obs_k)
+                        val = critic_apply(critic_params_list[k], obs_k)[0]
                     
                     # Action selection
                     cat_dist = jax.nn.softmax(cat_logits[0])
                     cat = int(np.random.choice(3, p=np.array(cat_dist)))
                     
-                    if k == 0:
-                        local_mask = jnp.array([1.0, 1.0, 0.0, 0.0])
-                    else:
-                        local_mask = jnp.array([0.0, 0.0, 1.0, 1.0])
-                    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-                        
-                    masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, local_mask, boundary_mask)[0]
+                    masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, local_masks[k], boundary_mask)[0]
                     tgt_dist = jax.nn.softmax(masked_targets)
                     # Safe fallback if all nan
                     if jnp.isnan(tgt_dist).any():
@@ -186,14 +191,7 @@ def main():
                     cat_lp = jnp.log(cat_dist[cat])
                     log_prob = cat_lp + tgt_lp
                     
-                    graph_pred = jax.nn.sigmoid(graph_logits[0])
-                    
-                    # Apply hard mask to prevent cross-domain edge predictions
-                    domain_mask = jnp.array([1.0, 1.0, 0.0, 0.0]) if k == 0 else jnp.array([0.0, 0.0, 1.0, 1.0])
-                    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-                    edge_mask = jnp.maximum(jnp.outer(domain_mask, domain_mask), jnp.outer(boundary_mask, boundary_mask))
-                    
-                    graph_pred = graph_pred * edge_mask
+                    graph_pred = jax.nn.sigmoid(graph_logits[0]) * edge_masks[k]
                     
                     joint_actions[f"agent_{k}"] = (cat, target)
                     predicted_dags[f"agent_{k}"] = np.array(graph_pred)
@@ -226,21 +224,15 @@ def main():
             entropy = 0.0
             per_agent_metrics = {}
             for k in range(args.num_agents):
-                # Calculate GAE
-                b = buffers[k].get_batches()
+                # Calculate GAE and pad batches to static shape max_steps to prevent XLA recompilations
+                b = buffers[k].get_batches(max_size=args.max_steps)
                 advs, rets = compute_gae(b["rewards"], b["values"], b["dones"])
                 b["advantages"] = advs
                 b["returns"] = rets
                 
-                # Mask out unobservable nodes for the graph BCE loss
-                if k == 0:
-                    observed_mask = jnp.array([1.0, 1.0, 1.0, 0.0])
-                else:
-                    observed_mask = jnp.array([0.0, 1.0, 1.0, 1.0])
-                
                 # Update agent k's private parameters strictly on its own buffer
                 a_p, c_p, a_opt, c_opt, metrics = trainer.update_step(
-                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, true_adj, observed_mask
+                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, true_adj, observed_masks[k]
                 )
                 actor_params_list[k] = a_p
                 critic_params_list[k] = c_p

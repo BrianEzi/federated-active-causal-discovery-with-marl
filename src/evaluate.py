@@ -24,6 +24,18 @@ def run_evaluation_suite(
     Returns a detailed execution trace.
     """
     trace = {}
+    actor_apply = jax.jit(actor.apply)
+    
+    local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
+    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+    edge_masks = [
+        jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
+        jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
+    ]
+    
+    from src.marl.ppo_agent import mask_invalid_targets
+    from src.stitching import stitch_predicted_dags
+    from src.metrics import evaluate_dag_against_true
     
     # Run evaluation on all 8 graphs
     for graph_idx in range(8):
@@ -62,23 +74,15 @@ def run_evaluation_suite(
             
             for k in range(config.K):
                 obs = jnp.expand_dims(obs_dict[f"agent_{k}"], axis=0)
-                agent_mask = env.agent_masks[k]
                 params_k = actor_params[k] if isinstance(actor_params, list) else actor_params
                 
                 if use_rnn:
-                    (cat_logits, target_logits, graph_logits), next_state = actor.apply(params_k, obs, actor_states[f"agent_{k}"])
+                    (cat_logits, target_logits, graph_logits), next_state = actor_apply(params_k, obs, actor_states[f"agent_{k}"])
                     actor_states[f"agent_{k}"] = next_state
                 else:
-                    cat_logits, target_logits, graph_logits = actor.apply(params_k, obs)
+                    cat_logits, target_logits, graph_logits = actor_apply(params_k, obs)
                 
-                # Mask targets
-                from src.marl.ppo_agent import mask_invalid_targets
-                
-                if k == 0:
-                    local_mask = jnp.array([1.0, 1.0, 0.0, 0.0])
-                else:
-                    local_mask = jnp.array([0.0, 0.0, 1.0, 1.0])
-                boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+                local_mask = local_masks[k]
                     
                 # Action selection: Greedy deterministic or temperature-controlled stochastic
                 if temperature <= 0.0:
@@ -95,14 +99,7 @@ def run_evaluation_suite(
                     else:
                         target_action = int(np.random.choice(len(tgt_probs), p=tgt_probs))
                 
-                graph_pred = jax.nn.sigmoid(graph_logits[0])
-                
-                # Apply hard mask to prevent cross-domain edge predictions
-                domain_mask = jnp.array([1.0, 1.0, 0.0, 0.0]) if k == 0 else jnp.array([0.0, 0.0, 1.0, 1.0])
-                boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-                edge_mask = jnp.maximum(jnp.outer(domain_mask, domain_mask), jnp.outer(boundary_mask, boundary_mask))
-                
-                graph_pred = graph_pred * edge_mask
+                graph_pred = jax.nn.sigmoid(graph_logits[0]) * edge_masks[k]
                 
                 joint_actions[f"agent_{k}"] = (cat_action, target_action)
                 predicted_dags[f"agent_{k}"] = np.array(graph_pred)
@@ -114,8 +111,6 @@ def run_evaluation_suite(
             
             step_trace["rewards"] = {k: float(v) for k, v in rewards.items()}
             
-            from src.stitching import stitch_predicted_dags
-            from src.metrics import evaluate_dag_against_true
             stitched_dag, _ = stitch_predicted_dags(predicted_dags, config.d)
             eval_metrics = evaluate_dag_against_true(stitched_dag, true_adj)
             

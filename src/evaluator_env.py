@@ -1,10 +1,11 @@
+import functools
 import jax
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Tuple
-from src.scm import sample_scm
+from src.scm import sample_scm, _sample_scm_jitted
 
-from src.types import SCMConfig, SCMParams, InterventionSpec, InterventionType, ActionCategory
+from src.types import SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory
 from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
 from src.generators import generate_4node_topologies, generate_scm_params
 
@@ -18,6 +19,104 @@ def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax
         cov = jnp.dot(centered.T, centered) / N
         return cov
     return jax.vmap(_compute_single_agent)(agent_masks)
+
+@functools.partial(jax.jit, static_argnames=("sample_count", "d", "mech_type", "noise_type", "noise_scale"))
+def jitted_initial_obs_kernel(
+    key: jax.Array,
+    state: EnvState,
+    sample_count: int,
+    agent_masks: jax.Array,
+    obs_masks: jax.Array,
+    d: int,
+    mech_type: int,
+    noise_type: int,
+    noise_scale: float
+) -> Tuple[EnvState, jax.Array]:
+    obs_spec = InterventionSpec(
+        mask=jnp.zeros(d),
+        type=jnp.zeros(d, dtype=jnp.int32),
+        value=jnp.zeros(d)
+    )
+    samples = _sample_scm_jitted(key, state, obs_spec, sample_count, d, mech_type, noise_type, noise_scale)
+    
+    def _compute_single_agent(m):
+        masked_samples = samples * m[None, :]
+        mean = jnp.mean(masked_samples, axis=0)
+        centered = masked_samples - mean
+        N = jnp.maximum(1.0, float(sample_count) - 1.0)
+        return jnp.dot(centered.T, centered) / N
+    local_covs = jax.vmap(_compute_single_agent)(agent_masks)
+    
+    sample_counts = jnp.full(agent_masks.shape[0], float(sample_count))
+    stitched_cov = stitch_global_covariance(local_covs, agent_masks, sample_counts)
+    
+    n_total = float(sample_count)
+    final_state = state.replace(
+        running_covariance=stitched_cov,
+        total_samples=jnp.array([n_total])
+    )
+    
+    def _get_agent_obs(k):
+        m = obs_masks[k]
+        m_cov = stitched_cov * m[:, None] * m[None, :]
+        return jnp.concatenate([m_cov.flatten(), jnp.array([final_state.budgets[k]])])
+    agent_observations = jax.vmap(_get_agent_obs)(jnp.arange(agent_masks.shape[0]))
+    
+    return final_state, agent_observations
+
+@functools.partial(jax.jit, static_argnames=("sample_count", "d", "mech_type", "noise_type", "noise_scale"))
+def jitted_env_step_kernel(
+    key: jax.Array,
+    state: EnvState,
+    mask: jax.Array,
+    types: jax.Array,
+    values: jax.Array,
+    costs: jax.Array,
+    sample_count: int,
+    agent_masks: jax.Array,
+    obs_masks: jax.Array,
+    d: int,
+    mech_type: int,
+    noise_type: int,
+    noise_scale: float
+) -> Tuple[EnvState, jax.Array]:
+    new_budgets = state.budgets - costs
+    new_state = state.replace(
+        budgets=new_budgets,
+        step_count=state.step_count + 1
+    )
+    
+    int_spec = InterventionSpec(mask=mask, type=types, value=values)
+    samples = _sample_scm_jitted(key, new_state, int_spec, sample_count, d, mech_type, noise_type, noise_scale)
+    
+    def _compute_single_agent(m):
+        masked_samples = samples * m[None, :]
+        mean = jnp.mean(masked_samples, axis=0)
+        centered = masked_samples - mean
+        N = jnp.maximum(1.0, float(sample_count) - 1.0)
+        return jnp.dot(centered.T, centered) / N
+    local_covs = jax.vmap(_compute_single_agent)(agent_masks)
+    
+    sample_counts = jnp.full(agent_masks.shape[0], float(sample_count))
+    stitched_cov = stitch_global_covariance(local_covs, agent_masks, sample_counts)
+    
+    n_old = new_state.total_samples[0]
+    n_new = float(sample_count)
+    n_total = n_old + n_new
+    updated_cov = (new_state.running_covariance * n_old + stitched_cov * n_new) / n_total
+    
+    final_state = new_state.replace(
+        running_covariance=updated_cov,
+        total_samples=jnp.array([n_total])
+    )
+    
+    def _get_agent_obs(k):
+        m = obs_masks[k]
+        m_cov = updated_cov * m[:, None] * m[None, :]
+        return jnp.concatenate([m_cov.flatten(), jnp.array([final_state.budgets[k]])])
+    agent_observations = jax.vmap(_get_agent_obs)(jnp.arange(agent_masks.shape[0]))
+    
+    return final_state, agent_observations
 
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
@@ -34,34 +133,32 @@ class FederatedCausalEnv:
             [0.0, 0.0, 1.0, 1.0]
         ])
         
+        # Observation masks for Agent 1 (observes 0, 1, 2) and Agent 2 (observes 1, 2, 3)
+        self.obs_masks = jnp.array([
+            [1.0, 1.0, 1.0, 0.0],
+            [0.0, 1.0, 1.0, 1.0]
+        ])
+        
         self.jax_state = None
+        self._agent_observations = None
         self.max_steps = 20
         self._fixed_topology_cache = None
         
     def _get_obs_dict(self):
         """Constructs IPPO observations."""
+        if self._agent_observations is not None:
+            return {
+                f"agent_{k}": np.array(self._agent_observations[k])
+                for k in range(self.config.K)
+            }
         obs_dict = {}
         for k in range(self.config.K):
-            # Agent sees its own running covariance mask
-            mask = np.array(self.agent_masks[k])
-            # To allow boundary observation, we let agents see correlations with peer boundary nodes.
-            # Boundary nodes: X1 (1) and X2 (2). 
-            # Agent 1 observes 0, 1, 2. Agent 2 observes 1, 2, 3.
-            obs_mask = np.zeros(self.config.d)
-            if k == 0:
-                obs_mask[0] = 1.0; obs_mask[1] = 1.0; obs_mask[2] = 1.0
-            else:
-                obs_mask[1] = 1.0; obs_mask[2] = 1.0; obs_mask[3] = 1.0
-                
+            obs_mask = np.array(self.obs_masks[k])
             cov = np.array(self.jax_state.running_covariance)
             masked_cov = cov * obs_mask[:, None] * obs_mask[None, :]
-            
             budget = np.array([self.jax_state.budgets[k]])
-            
-            # obs: flattened masked covariance + budget
             obs = np.concatenate([masked_cov.flatten(), budget])
             obs_dict[f"agent_{k}"] = obs
-            
         return obs_dict
         
     def reset(self, key: jax.Array, force_idx: int = None) -> Tuple[Dict[str, np.ndarray], Dict]:
@@ -82,23 +179,14 @@ class FederatedCausalEnv:
         budgets = jnp.full(self.config.K, self.initial_budget)
         self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets)
         
-        # Get initial observational data
+        # Get initial observational data using fast JIT kernel
         obs_key, key = jax.random.split(key)
-        obs_spec = InterventionSpec(
-            mask=jnp.zeros(self.config.d),
-            type=jnp.zeros(self.config.d, dtype=jnp.int32),
-            value=jnp.zeros(self.config.d)
+        self.jax_state, self._agent_observations = jitted_initial_obs_kernel(
+            obs_key, self.jax_state, self.sample_count, self.agent_masks, self.obs_masks,
+            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
         )
-        samples = sample_scm(obs_key, self.jax_state, self.config, self.sample_count, obs_spec)
-        
-        local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
-        sample_counts = jnp.full(self.config.K, float(self.sample_count))
-        stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
-        
-        self.jax_state = update_running_statistics(self.jax_state, stitched_cov, self.sample_count)
         
         obs_dict = self._get_obs_dict()
-            
         return obs_dict, {"true_adjacency": np.array(self.jax_state.true_adjacency)}
         
     def step(self, joint_actions: Dict[str, Tuple[int, int]], predicted_dags: Dict[str, np.ndarray], key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict[str, float], bool, Dict]:
@@ -130,20 +218,11 @@ class FederatedCausalEnv:
                         values[target] = 5.0
                         costs[k] = self.action_costs[k] # Cost deducted from requester
                         
-        intervention_spec = InterventionSpec(
-            mask=jnp.array(mask),
-            type=jnp.array(types),
-            value=jnp.array(values)
+        self.jax_state, self._agent_observations = jitted_env_step_kernel(
+            key, self.jax_state, jnp.array(mask), jnp.array(types), jnp.array(values), jnp.array(costs),
+            self.sample_count, self.agent_masks, self.obs_masks,
+            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
         )
-        
-        self.jax_state, _ = step_env(self.jax_state, jnp.array([]), jnp.array(costs))
-        
-        samples = sample_scm(key, self.jax_state, self.config, self.sample_count, intervention_spec)
-        local_covs_jnp = compute_local_covariances(samples, self.agent_masks)
-        sample_counts = jnp.full(self.config.K, float(self.sample_count))
-        stitched_cov = stitch_global_covariance(local_covs_jnp, self.agent_masks, sample_counts)
-        
-        self.jax_state = update_running_statistics(self.jax_state, stitched_cov, self.sample_count)
         
         from src.stitching import stitch_predicted_dags
         from src.rewards import compute_ippo_rewards
@@ -152,12 +231,8 @@ class FederatedCausalEnv:
         true_dag = np.array(self.jax_state.true_adjacency)
         rewards = compute_ippo_rewards(stitched_dag, true_dag, has_cycle)
         
-        terminated = False
-        if self.jax_state.step_count >= self.max_steps:
-            terminated = True
-        if np.all(np.array(self.jax_state.budgets) <= 0):
-            terminated = True
+        terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
             
         obs_dict = self._get_obs_dict()
-            
-        return obs_dict, rewards, terminated, {"true_adjacency": np.array(self.jax_state.true_adjacency)}
+        return obs_dict, rewards, terminated, {"true_adjacency": true_dag}
+

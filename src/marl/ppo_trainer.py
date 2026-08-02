@@ -1,3 +1,4 @@
+import functools
 import jax
 import jax.numpy as jnp
 import optax
@@ -19,9 +20,27 @@ class RolloutBuffer:
         for k, v in kwargs.items():
             self.data[k].append(v)
             
-    def get_batches(self):
-        return {k: jnp.array(v) for k, v in self.data.items()}
+    def get_batches(self, max_size: int = None):
+        """Returns batches as jnp arrays, optionally padded to max_size with valid_mask."""
+        curr_len = len(self.data["obs"])
+        if max_size is None or curr_len == 0 or curr_len == max_size:
+            batches = {k: jnp.array(v) for k, v in self.data.items()}
+            batches["valid_mask"] = jnp.ones(curr_len, dtype=jnp.float32)
+            return batches
+            
+        pad_len = max_size - curr_len
+        batches = {}
+        for k, v in self.data.items():
+            arr = jnp.array(v)
+            pad_shape = (pad_len,) + arr.shape[1:]
+            pad_val = jnp.zeros(pad_shape, dtype=arr.dtype)
+            batches[k] = jnp.concatenate([arr, pad_val], axis=0)
+            
+        valid_mask = jnp.concatenate([jnp.ones(curr_len, dtype=jnp.float32), jnp.zeros(pad_len, dtype=jnp.float32)], axis=0)
+        batches["valid_mask"] = valid_mask
+        return batches
 
+@jax.jit
 def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: float = 0.99, lam: float = 0.95):
     """Computes Generalized Advantage Estimation."""
     advs = jnp.zeros_like(rewards)
@@ -29,8 +48,8 @@ def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: 
     def scan_fn(carry, transition):
         r, v, nv, d = transition
         gae = carry
-        delta = r + gamma * nv * (1 - d) - v
-        gae = delta + gamma * lam * (1 - d) * gae
+        delta = r + gamma * nv * (1.0 - d) - v
+        gae = delta + gamma * lam * (1.0 - d) * gae
         return gae, gae
         
     next_values = jnp.append(values[1:], 0.0)
@@ -77,8 +96,13 @@ class IPPOTrainer:
         old_log_probs = batch["log_probs"]
         advs = batch["advantages"]
         returns = batch["returns"]
-        # Normalize advantages
-        advs = (advs - jnp.mean(advs)) / (jnp.std(advs) + 1e-8)
+        valid_mask = batch.get("valid_mask", jnp.ones(obs.shape[0], dtype=jnp.float32))
+        valid_count = jnp.maximum(1.0, jnp.sum(valid_mask))
+        
+        # Normalize advantages strictly over valid transitions
+        adv_mean = jnp.sum(advs * valid_mask) / valid_count
+        adv_var = jnp.sum(((advs - adv_mean) ** 2) * valid_mask) / valid_count
+        advs = ((advs - adv_mean) / (jnp.sqrt(adv_var) + 1e-8)) * valid_mask
         
         # 1. Critic Loss
         if self.use_rnn:
@@ -93,7 +117,7 @@ class IPPOTrainer:
         else:
             v_preds = self.critic.apply(critic_params, obs)
             
-        critic_loss = jnp.mean((v_preds - returns) ** 2)
+        critic_loss = jnp.sum(((v_preds - returns) ** 2) * valid_mask) / valid_count
         
         # 2. Actor Loss
         if self.use_rnn:
@@ -125,11 +149,11 @@ class IPPOTrainer:
         unclipped = ratio * advs
         clipped = jnp.clip(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advs
         
-        actor_loss = -jnp.mean(jnp.minimum(unclipped, clipped))
+        actor_loss = -jnp.sum(jnp.minimum(unclipped, clipped) * valid_mask) / valid_count
         
         # 3. Entropy Bonus
-        entropy = -jnp.mean(jnp.sum(jnp.exp(cat_dist) * cat_dist, axis=-1) + 
-                            jnp.sum(jnp.exp(tgt_dist) * tgt_dist, axis=-1))
+        entropy = -jnp.sum((jnp.sum(jnp.exp(cat_dist) * cat_dist, axis=-1) + 
+                            jnp.sum(jnp.exp(tgt_dist) * tgt_dist, axis=-1)) * valid_mask) / valid_count
         
         # 4. Graph Supervised Loss (BCE against true DAG for fast convergence)
         # Using optax.sigmoid_binary_cross_entropy
@@ -148,16 +172,15 @@ class IPPOTrainer:
         
         edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))
         
-        # Apply mask and compute mean over valid edges
-        masked_bce = bce * edge_mask_batch
+        # Apply mask and compute mean over valid edges and valid timesteps
+        masked_bce = bce * edge_mask_batch * valid_mask[:, None, None]
         valid_edge_count = jnp.sum(edge_mask)
-        graph_loss = jnp.sum(masked_bce) / (obs.shape[0] * jnp.maximum(1.0, valid_edge_count))
+        graph_loss = jnp.sum(masked_bce) / (valid_count * jnp.maximum(1.0, valid_edge_count))
         
         total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * graph_loss
         total_loss = total_actor_loss + critic_loss
         return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
         
-    import functools
     @functools.partial(jax.jit, static_argnums=(0,))
     def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, true_adj, observed_mask):
         # Compute losses and gradients
@@ -173,3 +196,4 @@ class IPPOTrainer:
         new_critic_params = optax.apply_updates(critic_params, c_updates)
         
         return new_actor_params, new_critic_params, new_actor_opt, new_critic_opt, metrics
+
