@@ -151,6 +151,11 @@ def parse_args():
         "--boundary_margin", type=float, default=0.10,
         help="Confidence margin delta for pairwise differential edge orientation in DAG stitching (default: 0.10)"
     )
+    # Intrinsic curiosity reward scaling factor for interventional covariance shift (Solution 2)
+    parser.add_argument(
+        "--intrinsic_coef", type=float, default=0.05,
+        help="Curiosity reward scaling factor for interventional covariance shift (default: 0.05)"
+    )
     # When enabled, normalizes step rewards by max_steps to decouple cumulative episode return from trajectory horizon
     parser.add_argument(
         "--normalize_rewards", action="store_true", default=True,
@@ -237,7 +242,8 @@ def main():
         fixed_graph=is_fixed,
         max_steps=args.max_steps,
         boundary_margin=args.boundary_margin,
-        normalize_rewards=args.normalize_rewards
+        normalize_rewards=args.normalize_rewards,
+        intrinsic_coef=args.intrinsic_coef
     )
     
     if args.agent_type == "ippo":
@@ -320,6 +326,9 @@ def main():
             
         done = False
         ep_reward = 0.0
+        ep_info_gain_0 = 0.0
+        ep_info_gain_1 = 0.0
+        ep_steps = 0
         final_dag = None
         
         while not done:
@@ -349,11 +358,14 @@ def main():
                 c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, edge_masks[1], k1_act)
                 
                 k_step, key = jax.random.split(key)
-                agent_obs, r0, r1, done, final_dag = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
+                agent_obs, r0, r1, done, final_dag, info_gains = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
                 
                 buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, graph_preds=gp0, rewards=r0, dones=done)
                 buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, graph_preds=gp1, rewards=r1, dones=done)
                 ep_reward += float(r0 + r1)
+                ep_info_gain_0 += float(info_gains[0])
+                ep_info_gain_1 += float(info_gains[1])
+                ep_steps += 1
             else:
                 joint_actions = {}
                 predicted_dags = {}
@@ -363,9 +375,13 @@ def main():
                     predicted_dags[f"agent_{k}"] = g_pred
                     
                 k_step, key = jax.random.split(key)
-                next_obs_dict, rewards, done, _ = env.step(joint_actions, predicted_dags, k_step)
+                next_obs_dict, rewards, done, step_info = env.step(joint_actions, predicted_dags, k_step)
                 obs_dict = next_obs_dict
                 ep_reward += sum(rewards.values())
+                if "info_gains" in step_info:
+                    ep_info_gain_0 += float(step_info["info_gains"]["agent_0"])
+                    ep_info_gain_1 += float(step_info["info_gains"]["agent_1"])
+                ep_steps += 1
                 
                 from src.stitching import stitch_predicted_dags
                 final_dag, _ = stitch_predicted_dags(predicted_dags, args.num_variables)
@@ -406,6 +422,8 @@ def main():
         log_data = {
             "train/episode": int(episode),
             "train/episode_reward": float(ep_reward),
+            "train/info_gain_a0": float(ep_info_gain_0 / max(1, ep_steps)),
+            "train/info_gain_a1": float(ep_info_gain_1 / max(1, ep_steps)),
             "eval/shd": float(eval_metrics["shd"]),
             "eval/f1": float(eval_metrics["f1"]),
         }

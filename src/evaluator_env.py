@@ -79,7 +79,7 @@ def jitted_env_step_kernel(
     mech_type: int,
     noise_type: int,
     noise_scale: float
-) -> Tuple[EnvState, jax.Array]:
+) -> Tuple[EnvState, jax.Array, jax.Array]:
     new_budgets = state.budgets - costs
     new_state = state.replace(
         budgets=new_budgets,
@@ -100,6 +100,15 @@ def jitted_env_step_kernel(
     sample_counts = jnp.full(agent_masks.shape[0], float(sample_count))
     stitched_cov = stitch_global_covariance(local_covs, agent_masks, sample_counts)
     
+    # Compute intrinsic information gain: Frobenius norm of covariance shift projected on observable mask
+    diff_cov = stitched_cov - state.running_covariance
+    def _compute_info_gain(m):
+        m_diff = diff_cov * m[:, None] * m[None, :]
+        frob_norm = jnp.sqrt(jnp.sum(m_diff ** 2) + 1e-8)
+        num_obs = jnp.sum(m)
+        return frob_norm / jnp.maximum(1.0, num_obs)
+    info_gains = jax.vmap(_compute_info_gain)(obs_masks)
+    
     n_old = new_state.total_samples[0]
     n_new = float(sample_count)
     n_total = n_old + n_new
@@ -116,7 +125,7 @@ def jitted_env_step_kernel(
         return jnp.concatenate([m_cov.flatten(), jnp.array([final_state.budgets[k]])])
     agent_observations = jax.vmap(_get_agent_obs)(jnp.arange(agent_masks.shape[0]))
     
-    return final_state, agent_observations
+    return final_state, agent_observations, info_gains
 
 @functools.partial(jax.jit, static_argnames=("d",))
 def build_intervention_spec_jitted(
@@ -155,7 +164,8 @@ def build_intervention_spec_jitted(
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
                  initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False,
-                 max_steps: int = 20, boundary_margin: float = 0.10, normalize_rewards: bool = True):
+                 max_steps: int = 20, boundary_margin: float = 0.10, normalize_rewards: bool = True,
+                 intrinsic_coef: float = 0.05):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
@@ -164,6 +174,7 @@ class FederatedCausalEnv:
         self.max_steps = max_steps
         self.boundary_margin = boundary_margin
         self.normalize_rewards = normalize_rewards
+        self.intrinsic_coef = intrinsic_coef
         
         # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
         self.agent_masks = jnp.array([
@@ -264,7 +275,7 @@ class FederatedCausalEnv:
                         values[target] = 5.0
                         costs[k] = self.action_costs[k] # Cost deducted from requester
                         
-        self.jax_state, self._agent_observations = jitted_env_step_kernel(
+        self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             key, self.jax_state, jnp.array(mask), jnp.array(types), jnp.array(values), jnp.array(costs),
             self.sample_count, self.agent_masks, self.obs_masks,
             int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
@@ -276,22 +287,29 @@ class FederatedCausalEnv:
         stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
         true_dag = np.array(self.jax_state.true_adjacency)
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
-        rewards = compute_ippo_rewards(stitched_dag, true_dag, has_cycle, max_steps=norm_factor)
+        ig_dict = {"agent_0": float(info_gains[0]), "agent_1": float(info_gains[1])}
+        rewards = compute_ippo_rewards(
+            stitched_dag, true_dag, has_cycle, 
+            max_steps=norm_factor, 
+            info_gains=ig_dict, 
+            intrinsic_coef=self.intrinsic_coef
+        )
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
             
         obs_dict = self._get_obs_dict()
-        return obs_dict, rewards, terminated, {"true_adjacency": true_dag}
+        return obs_dict, rewards, terminated, {"true_adjacency": true_dag, "info_gains": ig_dict}
 
     def step_jitted(
         self,
         cat_0: jax.Array, target_0: jax.Array, graph_pred_0: jax.Array,
         cat_1: jax.Array, target_1: jax.Array, graph_pred_1: jax.Array,
         key: jax.Array
-    ) -> Tuple[jax.Array, jax.Array, jax.Array, bool, jax.Array]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, bool, jax.Array, jax.Array]:
         """
         Pure JAX step executing intervention building, SCM sampling,
         DAG stitching, and reward computation entirely on GPU.
+        Returns: (agent_observations, r0, r1, terminated, stitched_dag, info_gains)
         """
         from src.stitching import jitted_stitch_dags
         from src.rewards import jitted_compute_ippo_rewards
@@ -302,7 +320,7 @@ class FederatedCausalEnv:
         )
         
         k_step, key = jax.random.split(key)
-        self.jax_state, self._agent_observations = jitted_env_step_kernel(
+        self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             k_step, self.jax_state, mask, types, values, costs,
             self.sample_count, self.agent_masks, self.obs_masks,
             int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
@@ -310,9 +328,14 @@ class FederatedCausalEnv:
         
         stitched_dag, has_cycle = jitted_stitch_dags(graph_pred_0, graph_pred_1, int(self.config.d), margin=self.boundary_margin)
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
-        r0, r1 = jitted_compute_ippo_rewards(stitched_dag, self.jax_state.true_adjacency, has_cycle, max_steps=norm_factor)
+        r0, r1 = jitted_compute_ippo_rewards(
+            stitched_dag, self.jax_state.true_adjacency, has_cycle, 
+            max_steps=norm_factor, 
+            info_gains=info_gains, 
+            intrinsic_coef=self.intrinsic_coef
+        )
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or (self.jax_state.budgets[0] <= 0 and self.jax_state.budgets[1] <= 0))
-        return self._agent_observations, r0, r1, terminated, stitched_dag
+        return self._agent_observations, r0, r1, terminated, stitched_dag, info_gains
 
 

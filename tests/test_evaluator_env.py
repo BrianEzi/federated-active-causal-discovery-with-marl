@@ -63,3 +63,7 @@ def test_env_step(base_config):
     
     assert "agent_0" in rewards
     assert "agent_1" in rewards
+    assert "info_gains" in next_info
+    assert "agent_0" in next_info["info_gains"]
+    assert "agent_1" in next_info["info_gains"]
+    assert next_info["info_gains"]["agent_0"] >= 0.0

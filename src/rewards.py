@@ -6,11 +6,14 @@ def compute_ippo_rewards(
     has_cycle: bool, 
     cycle_penalty: float = 10.0, 
     edge_penalty: float = 1.0,
-    max_steps: float = 1.0
+    max_steps: float = 1.0,
+    info_gains: dict = None,
+    intrinsic_coef: float = 0.0
 ) -> dict:
     """
     Computes the mixed cooperative SHD penalty reward for the IPPO agents.
     If max_steps > 1.0, normalizes step penalties by max_steps to decouple return scale from horizon.
+    If intrinsic_coef > 0.0, adds intrinsic information gain curiosity bonus.
     Returns: {"agent_0": r1, "agent_1": r2}
     """
     diff = np.abs(stitched_dag - true_dag)
@@ -33,12 +36,19 @@ def compute_ippo_rewards(
         r2 -= cycle_penalty
         
     scale = 1.0 / max(1.0, float(max_steps))
-    return {"agent_0": float(r1 * scale), "agent_1": float(r2 * scale)}
+    r1 = r1 * scale
+    r2 = r2 * scale
+    
+    if info_gains is not None and intrinsic_coef > 0.0:
+        r1 += intrinsic_coef * float(info_gains.get("agent_0", 0.0))
+        r2 += intrinsic_coef * float(info_gains.get("agent_1", 0.0))
+        
+    return {"agent_0": float(r1), "agent_1": float(r2)}
 
 
 import jax
 import jax.numpy as jnp
-from typing import Tuple
+from typing import Tuple, Optional
 
 @jax.jit
 def jitted_compute_ippo_rewards(
@@ -47,11 +57,14 @@ def jitted_compute_ippo_rewards(
     has_cycle: jax.Array, 
     cycle_penalty: float = 10.0, 
     edge_penalty: float = 1.0,
-    max_steps: float = 1.0
+    max_steps: float = 1.0,
+    info_gains: Optional[jax.Array] = None,
+    intrinsic_coef: float = 0.0
 ) -> Tuple[jax.Array, jax.Array]:
     """
     Computes the mixed cooperative SHD penalty reward for the IPPO agents in JAX.
     If max_steps > 1.0, normalizes step penalties by max_steps.
+    If intrinsic_coef > 0.0, adds intrinsic information gain curiosity bonus.
     Supports single [d, d] or batched [B, d, d].
     Returns: (r1, r2)
     """
@@ -65,6 +78,11 @@ def jitted_compute_ippo_rewards(
         pen = jnp.where(has_cycle, cycle_penalty, 0.0)
         r1 = (-(a1_local_errors + boundary_errors) * edge_penalty - pen) * scale
         r2 = (-(a2_local_errors + boundary_errors) * edge_penalty - pen) * scale
+        
+        if info_gains is not None:
+            r1 = r1 + intrinsic_coef * info_gains[0]
+            r2 = r2 + intrinsic_coef * info_gains[1]
+            
         return r1, r2
     else:
         a1_local_errors = jnp.sum(diff[:, 0, :], axis=-1) + jnp.sum(diff[:, :, 0], axis=-1)
@@ -74,5 +92,10 @@ def jitted_compute_ippo_rewards(
         pen = jnp.where(has_cycle, cycle_penalty, 0.0)
         r1 = (-(a1_local_errors + boundary_errors) * edge_penalty - pen) * scale
         r2 = (-(a2_local_errors + boundary_errors) * edge_penalty - pen) * scale
+        
+        if info_gains is not None:
+            r1 = r1 + intrinsic_coef * info_gains[:, 0]
+            r2 = r2 + intrinsic_coef * info_gains[:, 1]
+            
         return r1, r2
 

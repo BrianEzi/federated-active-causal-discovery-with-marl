@@ -94,10 +94,12 @@ def test_env_step_jitted_execution():
     t1 = jnp.array(0)
     
     k_step, key = jax.random.split(key)
-    agent_obs, r0, r1, done, final_dag = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
+    agent_obs, r0, r1, done, final_dag, info_gains = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
     
     assert agent_obs.shape == (2, 17)
     assert final_dag.shape == (4, 4)
+    assert info_gains.shape == (2,)
+    assert float(info_gains[0]) >= 0.0
     assert not done
     assert float(env.jax_state.budgets[0]) == 9.0
     assert float(env.jax_state.budgets[1]) == 10.0
