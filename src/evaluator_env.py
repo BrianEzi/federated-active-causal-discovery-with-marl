@@ -218,19 +218,19 @@ class FederatedCausalEnv:
             obs_dict[f"agent_{k}"] = obs
         return obs_dict
         
-    def reset(self, key: jax.Array, force_idx: int = None) -> Tuple[Dict[str, np.ndarray], Dict]:
+    def reset(self, key: jax.Array, force_idx: int = None, allowed_topologies = None) -> Tuple[Dict[str, np.ndarray], Dict]:
         # Meta-learning: Generate random topology
         k1, k2, k3, key = jax.random.split(key, 4)
         
         if self.fixed_graph:
             if self._fixed_topology_cache is None:
-                adjacency, topo_order = generate_4node_topologies(jax.random.PRNGKey(42), force_idx=force_idx)
+                adjacency, topo_order = generate_4node_topologies(jax.random.PRNGKey(42), force_idx=force_idx, allowed_indices=allowed_topologies)
                 scm_params = generate_scm_params(jax.random.PRNGKey(43), adjacency, int(self.config.mechanism_type))
                 self._fixed_topology_cache = (adjacency, topo_order, scm_params)
             else:
                 adjacency, topo_order, scm_params = self._fixed_topology_cache
         else:
-            adjacency, topo_order = generate_4node_topologies(k1, force_idx=force_idx)
+            adjacency, topo_order = generate_4node_topologies(k1, force_idx=force_idx, allowed_indices=allowed_topologies)
             scm_params = generate_scm_params(k2, adjacency, int(self.config.mechanism_type))
         
         budgets = jnp.full(self.config.K, self.initial_budget)

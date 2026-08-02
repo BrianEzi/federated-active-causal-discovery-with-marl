@@ -175,6 +175,22 @@ def parse_args():
         "--save_file", action="store_true",
         help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk"
     )
+    # ---------------------------------------------------------
+    # Curriculum Learning (Solution 3)
+    # ---------------------------------------------------------
+    # When enabled, trains agents progressively through 3 stages of MEC graph complexity
+    parser.add_argument(
+        "--curriculum", action="store_true", default=False,
+        help="Enable 3-stage topology curriculum learning across training episodes (default: False)"
+    )
+    parser.add_argument(
+        "--curriculum_stage1_ratio", type=float, default=0.20,
+        help="Fraction of total training episodes dedicated to Stage 1 (Graph 0 only) (default: 0.20)"
+    )
+    parser.add_argument(
+        "--curriculum_stage2_ratio", type=float, default=0.30,
+        help="Fraction of total training episodes dedicated to Stage 2 (Graphs 0 & 1 MEC pair) (default: 0.30)"
+    )
 
     
     # ---------------------------------------------------------
@@ -202,6 +218,28 @@ def parse_args():
     )
     
     return parser.parse_args()
+
+def get_curriculum_topologies(
+    episode: int, 
+    total_episodes: int, 
+    stage1_ratio: float = 0.20, 
+    stage2_ratio: float = 0.30
+) -> tuple[tuple[int, ...], int]:
+    """
+    Returns (allowed_topology_indices, curriculum_stage) based on current episode:
+    - Stage 1 (0 to stage1_episodes): (0,) (Base forward chain)
+    - Stage 2 (stage1_episodes to stage1_episodes + stage2_episodes): (0, 1) (Chain MEC pair: Forward vs Reverse)
+    - Stage 3 (stage2_episodes to end): (0, 1, 2, 3, 4, 5, 6, 7) (Full 8 topologies)
+    """
+    s1_end = max(1, int(total_episodes * stage1_ratio))
+    s2_end = max(s1_end + 1, int(total_episodes * (stage1_ratio + stage2_ratio)))
+    
+    if episode <= s1_end:
+        return (0,), 1
+    elif episode <= s2_end:
+        return (0, 1), 2
+    else:
+        return tuple(range(8)), 3
 
 def main():
     args = parse_args()
@@ -317,7 +355,16 @@ def main():
     
     for episode in range(1, args.num_episodes + 1):
         k_ep, key = jax.random.split(key)
-        obs_dict, info = env.reset(k_ep, force_idx=fixed_idx)
+        
+        if args.curriculum and fixed_idx is None:
+            allowed_topos, curr_stage = get_curriculum_topologies(
+                episode, args.num_episodes, args.curriculum_stage1_ratio, args.curriculum_stage2_ratio
+            )
+        else:
+            allowed_topos = None
+            curr_stage = 0
+            
+        obs_dict, info = env.reset(k_ep, force_idx=fixed_idx, allowed_topologies=allowed_topos)
         true_adj = info["true_adjacency"]
         
         if args.agent_type == "ippo" and args.use_rnn:
@@ -421,6 +468,7 @@ def main():
         
         log_data = {
             "train/episode": int(episode),
+            "train/curriculum_stage": int(curr_stage),
             "train/episode_reward": float(ep_reward),
             "train/info_gain_a0": float(ep_info_gain_0 / max(1, ep_steps)),
             "train/info_gain_a1": float(ep_info_gain_1 / max(1, ep_steps)),

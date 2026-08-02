@@ -12,10 +12,11 @@ def generate_er_dag(key: jax.Array, num_variables: int, edge_prob: float) -> jax
     # Mask to keep strictly upper triangular part
     return jnp.triu(adj, k=1)
 
-def generate_4node_topologies(key: jax.Array, force_idx: int = None) -> tuple[jax.Array, jax.Array]:
+def generate_4node_topologies(key: jax.Array, force_idx: int = None, allowed_indices = None) -> tuple[jax.Array, jax.Array]:
     """
     Generates one of the 4 base topologies (and their reversed perspectives) for a 4-node federated system.
     Nodes: 0 (Z1, Agent 1 Private), 1 (X1, Agent 1 Boundary), 2 (X2, Agent 2 Boundary), 3 (Z2, Agent 2 Private).
+    If allowed_indices is provided, samples uniformly from that subset.
     Returns: (adjacency matrix, topological order).
     """
     # Define adjacency matrices (adj[i, j] means i -> j)
@@ -60,6 +61,10 @@ def generate_4node_topologies(key: jax.Array, force_idx: int = None) -> tuple[ja
     
     if force_idx is not None:
         idx = force_idx
+    elif allowed_indices is not None and len(allowed_indices) > 0:
+        allowed_arr = jnp.array(allowed_indices)
+        sub_idx = jax.random.randint(key, (), 0, len(allowed_indices))
+        idx = allowed_arr[sub_idx]
     else:
         idx = jax.random.randint(key, (), 0, 8)
     return matrices[idx], orders[idx]
