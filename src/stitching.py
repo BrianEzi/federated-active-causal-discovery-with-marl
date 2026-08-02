@@ -59,3 +59,61 @@ def detect_cycle(adj: np.ndarray) -> bool:
             if dfs(i):
                 return True
     return False
+
+
+import functools
+import jax
+import jax.numpy as jnp
+from typing import Tuple
+
+@jax.jit
+def jitted_detect_cycle(adj: jax.Array) -> jax.Array:
+    """
+    Detects if a directed graph contains any directed cycles using trace matrix powers.
+    For d=4, has_cycle <=> sum_{k=2}^4 Tr(A^k) > 0.
+    Supports single [d, d] or batched [B, d, d].
+    """
+    if adj.ndim == 2:
+        a2 = jnp.dot(adj, adj)
+        a3 = jnp.dot(a2, adj)
+        a4 = jnp.dot(a3, adj)
+        return (jnp.trace(a2) + jnp.trace(a3) + jnp.trace(a4)) > 0
+    else:
+        a2 = jnp.matmul(adj, adj)
+        a3 = jnp.matmul(a2, adj)
+        a4 = jnp.matmul(a3, adj)
+        return (jnp.trace(a2, axis1=-2, axis2=-1) + jnp.trace(a3, axis1=-2, axis2=-1) + jnp.trace(a4, axis1=-2, axis2=-1)) > 0
+
+@functools.partial(jax.jit, static_argnames=("d",))
+def jitted_stitch_dags(prob_1: jax.Array, prob_2: jax.Array, d: int = 4) -> Tuple[jax.Array, jax.Array]:
+    """
+    Stitches predicted edge probabilities in pure JAX and detects cycles.
+    prob_1: [d, d] or [B, d, d]
+    prob_2: [d, d] or [B, d, d]
+    Returns (stitched_dag, has_cycle).
+    """
+    if prob_1.ndim == 2:
+        g0 = jnp.zeros((d, d))
+        g0 = g0.at[0, 0:3].set(prob_1[0, 0:3])
+        g0 = g0.at[1:3, 0].set(prob_1[1:3, 0])
+        g0 = g0.at[3, 1:4].set(prob_2[3, 1:4])
+        g0 = g0.at[1:3, 3].set(prob_2[1:3, 3])
+        g0 = g0.at[1:3, 1:3].set(jnp.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3]))
+        g0 = g0 * (1.0 - jnp.eye(d))
+        stitched_dag = (g0 > 0.5).astype(jnp.float32)
+        has_cycle = jitted_detect_cycle(stitched_dag)
+        return stitched_dag, has_cycle
+    else:
+        B = prob_1.shape[0]
+        g0 = jnp.zeros((B, d, d))
+        g0 = g0.at[:, 0, 0:3].set(prob_1[:, 0, 0:3])
+        g0 = g0.at[:, 1:3, 0].set(prob_1[:, 1:3, 0])
+        g0 = g0.at[:, 3, 1:4].set(prob_2[:, 3, 1:4])
+        g0 = g0.at[:, 1:3, 3].set(prob_2[:, 1:3, 3])
+        g0 = g0.at[:, 1:3, 1:3].set(jnp.maximum(prob_1[:, 1:3, 1:3], prob_2[:, 1:3, 1:3]))
+        g0 = g0 * (1.0 - jnp.eye(d)[None, :, :])
+        stitched_dag = (g0 > 0.5).astype(jnp.float32)
+        has_cycle = jitted_detect_cycle(stitched_dag)
+        return stitched_dag, has_cycle
+
+

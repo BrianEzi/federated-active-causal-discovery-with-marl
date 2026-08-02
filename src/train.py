@@ -9,10 +9,11 @@ import haiku as hk
 
 from src.types import SCMConfig, MechanismType, NoiseType
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, mask_invalid_targets
+from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent
 from src.metrics import evaluate_dag_against_true
+
 
 try:
     import wandb
@@ -89,23 +90,29 @@ def main():
     env.max_steps = args.max_steps
     
     if args.agent_type == "ippo":
-        def make_actor():
-            def forward(obs, state=None): 
-                if state is not None: return IPPORNNActor(d=args.num_variables)(obs, state)
-                return IPPOActor(d=args.num_variables)(obs)
-            return hk.without_apply_rng(hk.transform(forward))
-            
-        def make_critic():
-            def forward(obs, state=None): 
-                if state is not None: return IPPORNNCritic()(obs, state)
-                return IPPOCritic()(obs)
-            return hk.without_apply_rng(hk.transform(forward))
+        if args.use_rnn:
+            def make_actor():
+                def forward(obs, state): return IPPORNNActor(d=args.num_variables)(obs, state)
+                return hk.without_apply_rng(hk.transform(forward))
+                
+            def make_critic():
+                def forward(obs, state): return IPPORNNCritic()(obs, state)
+                return hk.without_apply_rng(hk.transform(forward))
+        else:
+            def make_actor():
+                def forward(obs): return IPPOActor(d=args.num_variables)(obs)
+                return hk.without_apply_rng(hk.transform(forward))
+                
+            def make_critic():
+                def forward(obs): return IPPOCritic()(obs)
+                return hk.without_apply_rng(hk.transform(forward))
             
         actor_trans = make_actor()
         critic_trans = make_critic()
         
         actor_apply = jax.jit(actor_trans.apply)
         critic_apply = jax.jit(critic_trans.apply)
+
         
         local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
         boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
@@ -162,64 +169,55 @@ def main():
             
         done = False
         ep_reward = 0.0
+        final_dag = None
         
         while not done:
-            joint_actions = {}
-            predicted_dags = {}
-            
             if args.agent_type == "ippo":
-                # Disjoint IPPO Act
-                for k in range(args.num_agents):
-                    obs_k = jnp.array([obs_dict[f"agent_{k}"]])
-                    if args.use_rnn:
-                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_apply(actor_params_list[k], obs_k, actor_states[k])
-                        val_batch, critic_states[k] = critic_apply(critic_params_list[k], obs_k, critic_states[k])
-                        val = val_batch[0]
-                    else:
-                        cat_logits, target_logits, graph_logits = actor_apply(actor_params_list[k], obs_k)
-                        val = critic_apply(critic_params_list[k], obs_k)[0]
-                    
-                    # Action selection
-                    cat_dist = jax.nn.softmax(cat_logits[0])
-                    cat = int(np.random.choice(3, p=np.array(cat_dist)))
-                    
-                    masked_targets = mask_invalid_targets(jnp.array([cat]), target_logits, local_masks[k], boundary_mask)[0]
-                    tgt_dist = jax.nn.softmax(masked_targets)
-                    # Safe fallback if all nan
-                    if jnp.isnan(tgt_dist).any():
-                        target = 0
-                        tgt_lp = 0.0
-                    else:
-                        target = int(np.random.choice(args.num_variables, p=np.array(tgt_dist)))
-                        tgt_lp = jnp.log(tgt_dist[target])
-                        
-                    cat_lp = jnp.log(cat_dist[cat])
-                    log_prob = cat_lp + tgt_lp
-                    
-                    graph_pred = jax.nn.sigmoid(graph_logits[0]) * edge_masks[k]
-                    
-                    joint_actions[f"agent_{k}"] = (cat, target)
-                    predicted_dags[f"agent_{k}"] = np.array(graph_pred)
-                    
-                    buffers[k].add(obs=obs_k[0], cat_actions=cat, target_actions=target, 
-                                   values=val, log_probs=log_prob, graph_preds=graph_pred,
-                                   rewards=0.0, dones=False) # rewards/dones updated after step
+                # Agent 0
+                k0_act, key = jax.random.split(key)
+                obs_0 = jnp.expand_dims(env._agent_observations[0], 0)
+                if args.use_rnn:
+                    (cat_l0, tgt_l0, gr_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
+                    v0, critic_states[0] = critic_apply(critic_params_list[0], obs_0, critic_states[0])
+                    val_0 = v0[0]
+                else:
+                    cat_l0, tgt_l0, gr_l0 = actor_apply(actor_params_list[0], obs_0)
+                    val_0 = critic_apply(critic_params_list[0], obs_0)[0]
+                c0, t0, lp0, gp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], gr_l0[0], local_masks[0], boundary_mask, edge_masks[0], k0_act)
+                
+                # Agent 1
+                k1_act, key = jax.random.split(key)
+                obs_1 = jnp.expand_dims(env._agent_observations[1], 0)
+                if args.use_rnn:
+                    (cat_l1, tgt_l1, gr_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
+                    v1, critic_states[1] = critic_apply(critic_params_list[1], obs_1, critic_states[1])
+                    val_1 = v1[0]
+                else:
+                    cat_l1, tgt_l1, gr_l1 = actor_apply(actor_params_list[1], obs_1)
+                    val_1 = critic_apply(critic_params_list[1], obs_1)[0]
+                c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, edge_masks[1], k1_act)
+                
+                k_step, key = jax.random.split(key)
+                agent_obs, r0, r1, done, final_dag = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
+                
+                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, graph_preds=gp0, rewards=r0, dones=done)
+                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, graph_preds=gp1, rewards=r1, dones=done)
+                ep_reward += float(r0 + r1)
             else:
+                joint_actions = {}
+                predicted_dags = {}
                 for k in range(args.num_agents):
                     act, g_pred = agents[k].act(obs_dict[f"agent_{k}"])
                     joint_actions[f"agent_{k}"] = act
                     predicted_dags[f"agent_{k}"] = g_pred
                     
-            k_step, key = jax.random.split(key)
-            next_obs_dict, rewards, done, _ = env.step(joint_actions, predicted_dags, k_step)
-            
-            if args.agent_type == "ippo":
-                for k in range(args.num_agents):
-                    buffers[k].data["rewards"][-1] = rewards[f"agent_{k}"]
-                    buffers[k].data["dones"][-1] = done
-            
-            obs_dict = next_obs_dict
-            ep_reward += sum(rewards.values())
+                k_step, key = jax.random.split(key)
+                next_obs_dict, rewards, done, _ = env.step(joint_actions, predicted_dags, k_step)
+                obs_dict = next_obs_dict
+                ep_reward += sum(rewards.values())
+                
+                from src.stitching import stitch_predicted_dags
+                final_dag, _ = stitch_predicted_dags(predicted_dags, args.num_variables)
             
         # End of episode update
         if args.agent_type == "ippo":
@@ -252,9 +250,7 @@ def main():
                 buffers[k].reset()
                 
         # Evaluate Stitched DAG (final step)
-        from src.stitching import stitch_predicted_dags
-        final_dag, _ = stitch_predicted_dags(predicted_dags, args.num_variables)
-        eval_metrics = evaluate_dag_against_true(final_dag, true_adj)
+        eval_metrics = evaluate_dag_against_true(np.array(final_dag), true_adj)
         
         log_data = {
             "train/episode": int(episode),

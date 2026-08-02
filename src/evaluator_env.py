@@ -118,6 +118,40 @@ def jitted_env_step_kernel(
     
     return final_state, agent_observations
 
+@functools.partial(jax.jit, static_argnames=("d",))
+def build_intervention_spec_jitted(
+    cat_0: jax.Array, target_0: jax.Array,
+    cat_1: jax.Array, target_1: jax.Array,
+    budgets: jax.Array,
+    action_costs: jax.Array,
+    agent_masks: jax.Array,
+    d: int = 4
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    mask = jnp.zeros(d)
+    types = jnp.full(d, int(InterventionType.HARD), dtype=jnp.int32)
+    values = jnp.zeros(d)
+    costs = jnp.zeros(2)
+    
+    # Agent 0
+    valid_a0_local = (budgets[0] >= action_costs[0]) & (cat_0 == int(ActionCategory.LOCAL_INTERVENTION)) & (agent_masks[0, target_0] == 1.0)
+    valid_a0_peer = (budgets[0] >= action_costs[0]) & (cat_0 == int(ActionCategory.PEER_REQUEST)) & ((target_0 == 1) | (target_0 == 2))
+    apply_0 = valid_a0_local | valid_a0_peer
+    
+    mask = jnp.where(apply_0, mask.at[target_0].set(1.0), mask)
+    values = jnp.where(apply_0, values.at[target_0].set(5.0), values)
+    costs = jnp.where(apply_0, costs.at[0].set(action_costs[0]), costs)
+    
+    # Agent 1
+    valid_a1_local = (budgets[1] >= action_costs[1]) & (cat_1 == int(ActionCategory.LOCAL_INTERVENTION)) & (agent_masks[1, target_1] == 1.0)
+    valid_a1_peer = (budgets[1] >= action_costs[1]) & (cat_1 == int(ActionCategory.PEER_REQUEST)) & ((target_1 == 1) | (target_1 == 2))
+    apply_1 = valid_a1_local | valid_a1_peer
+    
+    mask = jnp.where(apply_1, mask.at[target_1].set(1.0), mask)
+    values = jnp.where(apply_1, values.at[target_1].set(5.0), values)
+    costs = jnp.where(apply_1, costs.at[1].set(action_costs[1]), costs)
+    
+    return mask, types, values, costs
+
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
                  initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False):
@@ -139,10 +173,19 @@ class FederatedCausalEnv:
             [0.0, 1.0, 1.0, 1.0]
         ])
         
+        self.local_masks = [self.agent_masks[k] for k in range(self.config.K)]
+        self.boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+        self.edge_masks = [
+            jnp.array([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 0, 0, 0]], dtype=jnp.float32),
+            jnp.array([[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 1, 1]], dtype=jnp.float32)
+        ]
+        self.obs_dim = self.config.d * self.config.d + 1
+        
         self.jax_state = None
         self._agent_observations = None
         self.max_steps = 20
         self._fixed_topology_cache = None
+
         
     def _get_obs_dict(self):
         """Constructs IPPO observations."""
@@ -235,4 +278,36 @@ class FederatedCausalEnv:
             
         obs_dict = self._get_obs_dict()
         return obs_dict, rewards, terminated, {"true_adjacency": true_dag}
+
+    def step_jitted(
+        self,
+        cat_0: jax.Array, target_0: jax.Array, graph_pred_0: jax.Array,
+        cat_1: jax.Array, target_1: jax.Array, graph_pred_1: jax.Array,
+        key: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, bool, jax.Array]:
+        """
+        Pure JAX step executing intervention building, SCM sampling,
+        DAG stitching, and reward computation entirely on GPU.
+        """
+        from src.stitching import jitted_stitch_dags
+        from src.rewards import jitted_compute_ippo_rewards
+        
+        costs_vec = jnp.array(self.action_costs)
+        mask, types, values, costs = build_intervention_spec_jitted(
+            cat_0, target_0, cat_1, target_1, self.jax_state.budgets, costs_vec, self.agent_masks, int(self.config.d)
+        )
+        
+        k_step, key = jax.random.split(key)
+        self.jax_state, self._agent_observations = jitted_env_step_kernel(
+            k_step, self.jax_state, mask, types, values, costs,
+            self.sample_count, self.agent_masks, self.obs_masks,
+            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
+        )
+        
+        stitched_dag, has_cycle = jitted_stitch_dags(graph_pred_0, graph_pred_1, int(self.config.d))
+        r0, r1 = jitted_compute_ippo_rewards(stitched_dag, self.jax_state.true_adjacency, has_cycle)
+        
+        terminated = bool(self.jax_state.step_count >= self.max_steps or (self.jax_state.budgets[0] <= 0 and self.jax_state.budgets[1] <= 0))
+        return self._agent_observations, r0, r1, terminated, stitched_dag
+
 

@@ -196,3 +196,48 @@ def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, local_
     # Apply large negative value to invalid targets
     masked_logits = jnp.where(valid_mask > 0.5, target_logits, -1e9)
     return masked_logits
+
+
+@jax.jit
+def sample_actions_jitted(
+    cat_logits: jax.Array,
+    target_logits: jax.Array,
+    graph_logits: jax.Array,
+    local_ownership_mask: jax.Array,
+    peer_boundary_mask: jax.Array,
+    edge_mask: jax.Array,
+    key: jax.Array
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """
+    Samples category and target actions directly on GPU without host-device synchronization.
+    Supports single observation [3], [d], [d, d] or batched [B, 3], [B, d], [B, d, d].
+    """
+    is_batched = (cat_logits.ndim > 1)
+    k1, k2 = jax.random.split(key)
+    
+    if is_batched:
+        B = cat_logits.shape[0]
+        cat = jax.random.categorical(k1, cat_logits) # [B]
+        masked_target_logits = mask_invalid_targets(cat, target_logits, local_ownership_mask, peer_boundary_mask) # [B, d]
+        safe_masked = jnp.where(jnp.isnan(masked_target_logits), -1e9, masked_target_logits)
+        target = jax.random.categorical(k2, safe_masked) # [B]
+        
+        cat_lp = jax.nn.log_softmax(cat_logits)[jnp.arange(B), cat]
+        target_lp = jax.nn.log_softmax(safe_masked)[jnp.arange(B), target]
+        total_lp = cat_lp + target_lp
+        
+        graph_pred = jax.nn.sigmoid(graph_logits) * edge_mask[None, :, :]
+        return cat, target, total_lp, graph_pred
+    else:
+        cat = jax.random.categorical(k1, cat_logits) # scalar
+        masked_target_logits = mask_invalid_targets(jnp.array([cat]), target_logits[None, :], local_ownership_mask, peer_boundary_mask)[0]
+        safe_masked = jnp.where(jnp.isnan(masked_target_logits), -1e9, masked_target_logits)
+        target = jax.random.categorical(k2, safe_masked) # scalar
+        
+        cat_lp = jax.nn.log_softmax(cat_logits)[cat]
+        target_lp = jax.nn.log_softmax(safe_masked)[target]
+        total_lp = cat_lp + target_lp
+        
+        graph_pred = jax.nn.sigmoid(graph_logits) * edge_mask
+        return cat, target, total_lp, graph_pred
+
