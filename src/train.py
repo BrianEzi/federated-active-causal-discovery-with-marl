@@ -224,6 +224,7 @@ def main():
             critic_loss = 0.0
             graph_loss = 0.0
             entropy = 0.0
+            per_agent_metrics = {}
             for k in range(args.num_agents):
                 # Calculate GAE
                 b = buffers[k].get_batches()
@@ -246,10 +247,11 @@ def main():
                 actor_opts[k] = a_opt
                 critic_opts[k] = c_opt
                 
-                actor_loss += metrics["actor_loss"]
-                critic_loss += metrics["critic_loss"]
-                graph_loss += metrics["graph_loss"]
-                entropy += metrics["entropy"]
+                per_agent_metrics[k] = metrics
+                actor_loss += float(metrics["actor_loss"])
+                critic_loss += float(metrics["critic_loss"])
+                graph_loss += float(metrics["graph_loss"])
+                entropy += float(metrics["entropy"])
                 buffers[k].reset()
                 
         # Evaluate Stitched DAG (final step)
@@ -258,19 +260,24 @@ def main():
         eval_metrics = evaluate_dag_against_true(final_dag, true_adj)
         
         log_data = {
-            "train/episode": episode,
-            "train/episode_reward": ep_reward,
-            "eval/shd": eval_metrics["shd"],
-            "eval/f1": eval_metrics["f1"],
+            "train/episode": int(episode),
+            "train/episode_reward": float(ep_reward),
+            "eval/shd": float(eval_metrics["shd"]),
+            "eval/f1": float(eval_metrics["f1"]),
         }
         for k in range(args.num_agents):
-            log_data[f"agent_{k}_budget"] = env.jax_state.budgets[k]
+            log_data[f"agent_{k}_budget"] = float(env.jax_state.budgets[k])
             
         if args.agent_type == "ippo":
-            log_data["train/actor_loss"] = actor_loss / args.num_agents
-            log_data["train/critic_loss"] = critic_loss / args.num_agents
-            log_data["train/graph_loss"] = graph_loss / args.num_agents
-            log_data["train/entropy"] = entropy / args.num_agents
+            log_data["train/actor_loss"] = float(actor_loss / args.num_agents)
+            log_data["train/critic_loss"] = float(critic_loss / args.num_agents)
+            log_data["train/graph_loss"] = float(graph_loss / args.num_agents)
+            log_data["train/entropy"] = float(entropy / args.num_agents)
+            for k in range(args.num_agents):
+                log_data[f"train/agent_{k}_actor_loss"] = float(per_agent_metrics[k]["actor_loss"])
+                log_data[f"train/agent_{k}_critic_loss"] = float(per_agent_metrics[k]["critic_loss"])
+                log_data[f"train/agent_{k}_graph_loss"] = float(per_agent_metrics[k]["graph_loss"])
+                log_data[f"train/agent_{k}_entropy"] = float(per_agent_metrics[k]["entropy"])
             
         all_metrics_history.append(log_data.copy())
             
