@@ -416,7 +416,12 @@ def main():
                 import pickle
                 os.makedirs("checkpoints", exist_ok=True)
                 with open("checkpoints/best_ippo_params.pkl", "wb") as f:
-                    pickle.dump({"actor_list": actor_params_list, "critic_list": critic_params_list}, f)
+                    pickle.dump({
+                        "actor_list": actor_params_list,
+                        "critic_list": critic_params_list,
+                        "use_rnn": args.use_rnn,
+                        "d": args.num_variables
+                    }, f)
 
     if args.save_file:
         try:

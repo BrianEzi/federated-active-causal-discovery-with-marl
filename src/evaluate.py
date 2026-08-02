@@ -124,3 +124,67 @@ def run_evaluation_suite(
         trace[f"graph_{graph_idx}"] = episode_trace
         
     return trace
+
+def evaluate_checkpoint(
+    ckpt_path: str = "checkpoints/best_ippo_params.pkl",
+    config: SCMConfig = None,
+    action_costs: np.ndarray = None,
+    initial_budget: float = 20.0,
+    temperature: float = 0.0,
+    seed: int = 42
+) -> Dict[str, Any]:
+    """
+    Loads checkpoint, dynamically detects architecture (Feedforward vs RNN),
+    and executes evaluation across all 8 graph topologies.
+    """
+    import os
+    import pickle
+    import haiku as hk
+    from src.types import MechanismType, NoiseType
+
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(
+            f"Checkpoint '{ckpt_path}' not found. "
+            "Please ensure training has completed and saved best_ippo_params.pkl before evaluating."
+        )
+
+    with open(ckpt_path, "rb") as f:
+        ckpt = pickle.load(f)
+
+    if "actor_list" in ckpt:
+        actor_params = ckpt["actor_list"]
+    elif "actor" in ckpt:
+        actor_params = [ckpt["actor"], ckpt["actor"]]
+    else:
+        raise KeyError(f"Unexpected checkpoint format in {ckpt_path}. Keys: {list(ckpt.keys())}")
+
+    # Inspect first parameter key to detect RNN vs Feedforward if not in metadata
+    first_param_key = list(actor_params[0].keys())[0] if len(actor_params) > 0 and len(actor_params[0]) > 0 else ""
+    use_rnn = ckpt.get("use_rnn", "ippornn" in first_param_key.lower() or "rnn" in first_param_key.lower())
+    d = ckpt.get("d", 4)
+
+    if config is None:
+        config = SCMConfig(d=d, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
+    if action_costs is None:
+        action_costs = np.array([1.0, 1.0])
+
+    if use_rnn:
+        def forward(obs, state):
+            return IPPORNNActor(d=d)(obs, state)
+    else:
+        def forward(obs):
+            return IPPOActor(d=d)(obs)
+
+    actor_trans = hk.without_apply_rng(hk.transform(forward))
+
+    return run_evaluation_suite(
+        actor=actor_trans,
+        actor_params=actor_params,
+        config=config,
+        action_costs=action_costs,
+        initial_budget=initial_budget,
+        use_rnn=use_rnn,
+        temperature=temperature,
+        seed=seed
+    )
+
