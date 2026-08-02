@@ -18,6 +18,8 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 
 ### Added
+- **Configurable Checkpoint & Output Directories (`src/train.py`)**: Added `--checkpoint_dir`, `--output_dir`, and `--eval_temperature` CLI flags, allowing flexible target directories for saving checkpoints (e.g. `/kaggle/working/checkpoints`) and metrics.
+- **Multi-Temperature Evaluation & Visualization Suite (`src/visualize_trace.py`, `src/evaluate.py`)**: Enhanced `parse_and_visualize_trace` to support temperature scale annotation and added `compare_temperatures_and_visualize` for side-by-side SHD trajectory comparison across multiple temperature values ($T \in [0.0, 0.2, 0.5, 1.0]$).
 - **Federated Problem Specification (`docs/FEDERATED_PROBLEM_SPEC.md`)**: Formally defined the mathematical Structural Causal Model, variable taxonomy ($Z$ for private local variables, $X$ for boundary variables), information boundaries, privacy constraints, hierarchical action space, and federated covariance aggregation.
 - **Disjoint IPPO Architecture (`src/train.py`, `src/evaluate.py`)**: Replaced shared parameter IPPO with completely independent actor and critic networks $(\theta_k, \phi_k)$ and optimizers per agent, enforcing federated autonomy and preventing symmetric logit evaluation collisions.
 - **Temperature-Controlled Evaluation Suite (`src/evaluate.py`)**: Added support for low-temperature stochastic policy sampling ($\tau$) in `run_evaluation_suite` alongside deterministic greedy evaluation.

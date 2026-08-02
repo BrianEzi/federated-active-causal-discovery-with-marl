@@ -136,11 +136,27 @@ def parse_args():
         "--fixed_graph", type=int, nargs='?', const=-1, default=None,
         help="Fix training to a specific topology index (0-7), or pass flag alone to fix a random topology; omit to train dynamically across all topologies"
     )
+    # Directory path where model checkpoints are saved
+    parser.add_argument(
+        "--checkpoint_dir", type=str, default="checkpoints",
+        help="Directory where best model checkpoints (.pkl) are saved (default: 'checkpoints')"
+    )
+    # Output directory where metrics CSV and evaluation traces are saved
+    parser.add_argument(
+        "--output_dir", type=str, default=".",
+        help="Directory where training_metrics.csv and evaluation_trace.json are saved (default: '.')"
+    )
+    # Sampling temperature for post-training evaluation across topologies
+    parser.add_argument(
+        "--eval_temperature", type=float, default=0.0,
+        help="Sampling temperature for post-training evaluation trace (0.0 for deterministic, >0.0 for stochastic) (default: 0.0)"
+    )
     # When enabled, saves trained model checkpoints (best_ippo_params.pkl), CSV metrics, and JSON evaluation traces to disk
     parser.add_argument(
         "--save_file", action="store_true",
         help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk"
     )
+
     
     # ---------------------------------------------------------
     # Experiment Tracking & Reproducibility
@@ -414,8 +430,9 @@ def main():
                 best_shd = current_shd
                 best_f1 = current_f1
                 import pickle
-                os.makedirs("checkpoints", exist_ok=True)
-                with open("checkpoints/best_ippo_params.pkl", "wb") as f:
+                os.makedirs(args.checkpoint_dir, exist_ok=True)
+                ckpt_file = os.path.join(args.checkpoint_dir, "best_ippo_params.pkl")
+                with open(ckpt_file, "wb") as f:
                     pickle.dump({
                         "actor_list": actor_params_list,
                         "critic_list": critic_params_list,
@@ -424,52 +441,49 @@ def main():
                     }, f)
 
     if args.save_file:
+        os.makedirs(args.output_dir, exist_ok=True)
+        metrics_file = os.path.join(args.output_dir, "training_metrics.csv")
         try:
             import pandas as pd
             df = pd.DataFrame(all_metrics_history)
-            df.to_csv("training_metrics.csv", index=False)
+            df.to_csv(metrics_file, index=False)
         except ImportError:
             import csv
             if all_metrics_history:
                 keys = list(all_metrics_history[0].keys())
-                with open("training_metrics.csv", "w", newline="") as f:
+                with open(metrics_file, "w", newline="") as f:
                     writer = csv.DictWriter(f, fieldnames=keys)
                     writer.writeheader()
                     writer.writerows(all_metrics_history)
-        print("Saved metrics to training_metrics.csv")
+        print(f"Saved metrics to {metrics_file}")
         
     if args.agent_type == "ippo":
         print("Running post-training evaluation suite on the BEST model...")
-        import pickle
-        try:
-            with open("checkpoints/best_ippo_params.pkl", "rb") as f:
-                ckpt = pickle.load(f)
-                if "actor_list" in ckpt:
-                    eval_actor_params = ckpt["actor_list"]
-                else:
-                    eval_actor_params = [ckpt["actor"] for _ in range(args.num_agents)]
-                print("Successfully loaded best_ippo_params.pkl for evaluation.")
-        except Exception as e:
-            print("Could not load checkpoint, evaluating final model instead.")
-            eval_actor_params = actor_params_list
-            
-        from src.evaluate import run_evaluation_suite
+        from src.evaluate import evaluate_checkpoint
         import json
-        trace = run_evaluation_suite(
-            actor=actor_trans,
-            actor_params=eval_actor_params,
-            config=config,
-            action_costs=action_costs,
-            initial_budget=args.initial_budget,
-            use_rnn=args.use_rnn
-        )
-        with open("evaluation_trace.json", "w") as f:
-            json.dump(trace, f, indent=2)
-        print("Saved evaluation trace to evaluation_trace.json")
         
-        if args.use_wandb and WANDB_AVAILABLE:
-            wandb.save("evaluation_trace.json")
-            print("Uploaded evaluation trace to WandB.")
+        ckpt_file = os.path.join(args.checkpoint_dir, "best_ippo_params.pkl")
+        os.makedirs(args.output_dir, exist_ok=True)
+        trace_file = os.path.join(args.output_dir, "evaluation_trace.json")
+        
+        try:
+            trace = evaluate_checkpoint(
+                ckpt_path=ckpt_file,
+                config=config,
+                action_costs=action_costs,
+                initial_budget=args.initial_budget,
+                temperature=args.eval_temperature,
+                seed=args.seed
+            )
+            with open(trace_file, "w") as f:
+                json.dump(trace, f, indent=2)
+            print(f"Saved evaluation trace to {trace_file}")
+            
+            if args.use_wandb and WANDB_AVAILABLE:
+                wandb.save(trace_file)
+                print("Uploaded evaluation trace to WandB.")
+        except Exception as e:
+            print(f"Post-training evaluation encountered an issue: {e}")
             
     if args.use_wandb and WANDB_AVAILABLE and wandb.run:
         wandb.finish()

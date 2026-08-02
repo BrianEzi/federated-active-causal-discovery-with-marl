@@ -23,7 +23,14 @@ def run_evaluation_suite(
     Supports both single and disjoint agent parameter lists, with optional low-temperature stochastic sampling.
     Returns a detailed execution trace.
     """
-    trace = {}
+    trace = {
+        "metadata": {
+            "temperature": float(temperature),
+            "seed": int(seed),
+            "initial_budget": float(initial_budget),
+            "use_rnn": bool(use_rnn)
+        }
+    }
     actor_apply = jax.jit(actor.apply)
     
     local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
