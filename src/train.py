@@ -56,10 +56,15 @@ def parse_args():
 def main():
     args = parse_args()
     
-    if args.use_wandb and WANDB_AVAILABLE:
-        is_fixed = args.fixed_graph is not None
-        name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
-        wandb.init(project=args.wandb_project, name=name, config=vars(args))
+    if args.use_wandb:
+        if not WANDB_AVAILABLE:
+            print("WARNING: --use_wandb was passed, but the wandb library is not installed! WandB metrics will not be logged.")
+        else:
+            is_fixed = args.fixed_graph is not None
+            name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
+            wandb.init(project=args.wandb_project, name=name, config=vars(args))
+            if wandb.run:
+                print(f"WandB successfully initialized! View live run at: {wandb.run.url}")
             
     print(f"=== Starting Training Session ===")
     print(f"Config: agent={args.agent_type}, d={args.num_variables}, Episodes={args.num_episodes}")
@@ -350,6 +355,9 @@ def main():
         if args.use_wandb and WANDB_AVAILABLE:
             wandb.save("evaluation_trace.json")
             print("Uploaded evaluation trace to WandB.")
+            
+    if args.use_wandb and WANDB_AVAILABLE and wandb.run:
+        wandb.finish()
 
 if __name__ == "__main__":
     main()
