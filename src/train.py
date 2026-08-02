@@ -22,35 +22,149 @@ except ImportError:
     WANDB_AVAILABLE = False
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Federated Active Causal Discovery IPPO Trainer")
-    parser.add_argument("--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin"])
+    parser = argparse.ArgumentParser(
+        description="Federated Active Causal Discovery IPPO Trainer: Multi-Agent RL for Decentralized SCM Reconstruction"
+    )
     
-    parser.add_argument("--num_variables", "-d", type=int, default=4)
-    parser.add_argument("--num_agents", "-K", type=int, default=2)
-    parser.add_argument("--max_steps", type=int, default=20)
-    parser.add_argument("--initial_budget", type=float, default=20.0)
-    parser.add_argument("--action_cost", type=float, default=1.0)
-    parser.add_argument("--sample_count", type=int, default=100)
-    parser.add_argument("--noise_scale", type=float, default=0.1)
-    parser.add_argument("--mechanism_type", type=str, default="LINEAR", choices=["LINEAR", "NONLINEAR_ANM"])
+    # ---------------------------------------------------------
+    # Agent & Architecture Configuration
+    # ---------------------------------------------------------
+    # Specifies the agent algorithm: Disjoint IPPO (RL) or heuristic baselines (Random / Round-Robin)
+    parser.add_argument(
+        "--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin"],
+        help="Algorithm type: 'ippo' (Independent PPO), 'random' (random uniform actions), or 'round_robin' (cyclic intervention)"
+    )
     
-    parser.add_argument("--num_episodes", type=int, default=5000)
-    parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--learning_rate", type=float, default=3e-4)
-    parser.add_argument("--actor_lr", type=float, default=3e-4)
-    parser.add_argument("--critic_lr", type=float, default=1e-3)
-    parser.add_argument("--entropy_coef", type=float, default=0.01)
-    parser.add_argument("--graph_coef", type=float, default=1.0)
-    parser.add_argument("--eval_freq", type=int, default=10)
+    # ---------------------------------------------------------
+    # Environment & SCM Parameters
+    # ---------------------------------------------------------
+    # Total number of causal variables d across all agent subdomains (e.g. 4 for [Z1, X1, X2, Z2])
+    parser.add_argument(
+        "--num_variables", "-d", type=int, default=4,
+        help="Total number of variables in the ground-truth SCM graph (default: 4)"
+    )
+    # Number of sovereign federated agents K partitioning the causal graph
+    parser.add_argument(
+        "--num_agents", "-K", type=int, default=2,
+        help="Number of independent federated agents (default: 2)"
+    )
+    # Maximum interaction steps (rollout horizon) allowed per episode
+    parser.add_argument(
+        "--max_steps", type=int, default=20,
+        help="Maximum rollout horizon / steps per training episode (default: 20)"
+    )
+    # Starting intervention / sampling budget allocated to each agent per episode
+    parser.add_argument(
+        "--initial_budget", type=float, default=20.0,
+        help="Initial budget allocated to each agent at the start of each episode (default: 20.0)"
+    )
+    # Budget cost deducted whenever an agent performs a local intervention or peer interventional request
+    parser.add_argument(
+        "--action_cost", type=float, default=1.0,
+        help="Budget cost deducted per active intervention or peer request (default: 1.0)"
+    )
+    # Number of observational / interventional data samples drawn from the SCM per environment step
+    parser.add_argument(
+        "--sample_count", type=int, default=100,
+        help="Number of SCM data points sampled per environment step for covariance estimation (default: 100)"
+    )
+    # Standard deviation sigma of additive Gaussian noise added to SCM structural equations
+    parser.add_argument(
+        "--noise_scale", type=float, default=0.1,
+        help="Standard deviation of exogenous Gaussian noise in SCM equations (default: 0.1)"
+    )
+    # Functional form of causal mechanisms: Linear Gaussian or Nonlinear Additive Noise Model
+    parser.add_argument(
+        "--mechanism_type", type=str, default="LINEAR", choices=["LINEAR", "NONLINEAR_ANM"],
+        help="SCM mechanism function type: 'LINEAR' or 'NONLINEAR_ANM' (default: LINEAR)"
+    )
     
-    parser.add_argument("--use_rnn", action="store_true")
-    parser.add_argument("--fixed_graph", type=int, nargs='?', const=-1, default=None, help="Pass an int (0-7) to fix to a specific topology, or pass without int to fix a random topology.")
-    parser.add_argument("--save_file", action="store_true")
+    # ---------------------------------------------------------
+    # PPO Reinforcement Learning Hyperparameters
+    # ---------------------------------------------------------
+    # Total number of training episodes for the multi-agent policy loop
+    parser.add_argument(
+        "--num_episodes", type=int, default=5000,
+        help="Total number of training episodes to run (default: 5000)"
+    )
+    # PPO mini-batch size / rollout buffer capacity for policy gradient updates
+    parser.add_argument(
+        "--batch_size", type=int, default=16,
+        help="Mini-batch size for PPO policy and value network updates (default: 16)"
+    )
+    # Global default learning rate fallback if specific actor/critic LRs are not set
+    parser.add_argument(
+        "--learning_rate", type=float, default=3e-4,
+        help="Default global Adam learning rate (default: 3e-4)"
+    )
+    # Learning rate specifically for the actor (policy) network optimization
+    parser.add_argument(
+        "--actor_lr", type=float, default=3e-4,
+        help="Adam learning rate for agent Actor policy heads (default: 3e-4)"
+    )
+    # Learning rate specifically for the critic (value function baseline) network optimization
+    parser.add_argument(
+        "--critic_lr", type=float, default=1e-3,
+        help="Adam learning rate for Critic value heads (default: 1e-3)"
+    )
+    # Entropy bonus coefficient (c_ent) added to loss to encourage action exploration and prevent premature policy collapse
+    parser.add_argument(
+        "--entropy_coef", type=float, default=0.01,
+        help="Entropy regularization bonus weight to encourage exploration (default: 0.01)"
+    )
+    # Coefficient for the auxiliary Binary Cross-Entropy loss on local causal edge prediction heads
+    parser.add_argument(
+        "--graph_coef", type=float, default=1.0,
+        help="Loss weight multiplier for auxiliary edge prediction BCE loss (default: 1.0)"
+    )
+    # Evaluation frequency: interval of episodes between computing full metrics, logging, and DAG visualizations
+    parser.add_argument(
+        "--eval_freq", type=int, default=10,
+        help="Frequency (in episodes) to evaluate stitched DAG, log metrics, and generate graph plots (default: 10)"
+    )
     
-    parser.add_argument("--use_wandb", action="store_true")
-    parser.add_argument("--wandb_project", type=str, default="federated-causal-ippo")
-    parser.add_argument("--run_name", type=str, default=None)
-    parser.add_argument("--seed", type=int, default=42)
+    # ---------------------------------------------------------
+    # Network Architecture & Graph Evaluation Mode
+    # ---------------------------------------------------------
+    # When set, equips actor and critic networks with GRU recurrent memory for tracking trajectory history
+    parser.add_argument(
+        "--use_rnn", action="store_true",
+        help="Enable recurrent GRU layers in Actor and Critic networks to handle partially observable histories"
+    )
+    # Fixes the ground truth DAG topology: pass int 0-7 for specific topology, flag without int for fixed random, or omit for dynamic multi-topology sampling
+    parser.add_argument(
+        "--fixed_graph", type=int, nargs='?', const=-1, default=None,
+        help="Fix training to a specific topology index (0-7), or pass flag alone to fix a random topology; omit to train dynamically across all topologies"
+    )
+    # When enabled, saves trained model checkpoints (best_ippo_params.pkl), CSV metrics, and JSON evaluation traces to disk
+    parser.add_argument(
+        "--save_file", action="store_true",
+        help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk"
+    )
+    
+    # ---------------------------------------------------------
+    # Experiment Tracking & Reproducibility
+    # ---------------------------------------------------------
+    # When enabled, logs live metric curves, evaluation traces, and DAG visual images to Weights & Biases
+    parser.add_argument(
+        "--use_wandb", action="store_true",
+        help="Enable live metrics, artifact tracking, and graph visualization uploads to Weights & Biases"
+    )
+    # Weights & Biases project name under which this run will be registered
+    parser.add_argument(
+        "--wandb_project", type=str, default="federated-causal-ippo",
+        help="Target Weights & Biases project name (default: 'federated-causal-ippo')"
+    )
+    # Custom display name for this run in WandB (if None, auto-generated based on hyperparameter config)
+    parser.add_argument(
+        "--run_name", type=str, default=None,
+        help="Custom run name for Weights & Biases logging (auto-generated if None)"
+    )
+    # Master pseudo-random number generator (PRNG) seed for JAX and NumPy reproducibility
+    parser.add_argument(
+        "--seed", type=int, default=42,
+        help="Random seed for JAX PRNG and environment initialization (default: 42)"
+    )
     
     return parser.parse_args()
 
