@@ -57,3 +57,8 @@ When working on this repository, you must adhere strictly to the following archi
 - **Mandatory Notebook Execution Verification**: Before declaring a notebook complete, you must execute the generation script, inspect the resulting notebook/JSON output, verify that every metric array is populated with valid numbers, and confirm that all plots render real data.
 - **Exhaustive Deep Dive**: High-effort analysis requires exhaustive detail: exact step-by-step action sequences, exact loss curve progressions, per-agent action distribution breakdowns, and detailed mathematical explanations of domain failure modes. Never settle for high-level summaries.
 
+## 12. Directness, Precision & Communication Standards
+- **Concise & Direct Responses**: Eliminate unnecessary preamble, pleasantries, and conversational fluff. Deliver direct, rigorous, and point-blank technical explanations.
+- **Meticulous Technical Accuracy**: Every diagnostic assertion, mathematical derivation, and architectural explanation must be precise, concrete, and empirically backed by codebase inspection or test outputs.
+- **Zero Ambiguity**: State exact variable names, mathematical formulas, tensor shapes, and file locations (`file:///path/to/file#L10`) when explaining failures or proposed remedies.
+
