@@ -12,10 +12,10 @@ When working on this repository, you must adhere strictly to the following archi
 - **GPU/TPU Operations:** Data generation (`sample_scm`), SCM mechanisms, and multi-agent budget transitions are highly batched and must remain in strict JAX.
 - **CPU Operations:** Graph interpretation logic, specifically the causal DAG stitching and cycle checking (`src/stitching.py`), must remain in pure NumPy on the CPU. Attempting to statically compile DFS cycle detection inside JAX will stall the compiler. The `FederatedCausalEnv` wrapper securely bridges this boundary.
 
-## 3. Independent MARL Paradigm (IPPO)
-- The reinforcement learning layer (`src/marl/`) strictly follows a decentralized independent Proximal Policy Optimization (IPPO) paradigm.
-- **Shared Parameters & Decentralized Execution:** Each agent acts completely independently during the rollout phase using local observations.
-- **Action Masking:** Forbidden actions (interventions on unobservable variables or those exceeding agent budgets) must be masked with `-1e9` prior to greedy action selection.
+## 3. Independent MARL Paradigm (Disjoint IPPO)
+- The reinforcement learning layer (`src/marl/`) strictly follows a decentralized independent Proximal Policy Optimization (Disjoint IPPO) paradigm.
+- **Disjoint Parameters & Sovereign Execution:** Each agent $\mathcal{A}_k$ maintains its own private actor parameters $\theta_k$ and critic parameters $\phi_k$. Parameter sharing across agents is strictly prohibited to guarantee federated privacy and prevent coordination collisions.
+- **Action Masking:** Forbidden actions (interventions on unobservable variables or those exceeding agent budgets) must be masked with `-1e9` prior to action selection.
 
 ## 4. Documentation & Style
 - Maintain clean, descriptive Docstrings for all functions.

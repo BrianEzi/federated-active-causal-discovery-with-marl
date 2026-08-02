@@ -14,19 +14,22 @@ def run_evaluation_suite(
     config: SCMConfig,
     action_costs: np.ndarray,
     initial_budget: float,
-    use_rnn: bool = False
+    use_rnn: bool = False,
+    temperature: float = 0.0,
+    seed: int = 42
 ) -> Dict[str, Any]:
     """
     Evaluates the trained agents on all 8 possible 4-node topologies.
+    Supports both single and disjoint agent parameter lists, with optional low-temperature stochastic sampling.
     Returns a detailed execution trace.
     """
     trace = {}
     
-    # Run evaluation on all 8 graphs deterministically
+    # Run evaluation on all 8 graphs
     for graph_idx in range(8):
         # We don't want fixed_graph to cache one, we want to force it per episode
         env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False)
-        key = jax.random.PRNGKey(42 + graph_idx)
+        key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
         true_adj = info["true_adjacency"]
@@ -60,12 +63,13 @@ def run_evaluation_suite(
             for k in range(config.K):
                 obs = jnp.expand_dims(obs_dict[f"agent_{k}"], axis=0)
                 agent_mask = env.agent_masks[k]
+                params_k = actor_params[k] if isinstance(actor_params, list) else actor_params
                 
                 if use_rnn:
-                    (cat_logits, target_logits, graph_logits), next_state = actor.apply(actor_params, obs, actor_states[f"agent_{k}"])
+                    (cat_logits, target_logits, graph_logits), next_state = actor.apply(params_k, obs, actor_states[f"agent_{k}"])
                     actor_states[f"agent_{k}"] = next_state
                 else:
-                    cat_logits, target_logits, graph_logits = actor.apply(actor_params, obs)
+                    cat_logits, target_logits, graph_logits = actor.apply(params_k, obs)
                 
                 # Mask targets
                 from src.marl.ppo_agent import mask_invalid_targets
@@ -76,10 +80,20 @@ def run_evaluation_suite(
                     local_mask = jnp.array([0.0, 0.0, 1.0, 1.0])
                 boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
                     
-                # Greedy action selection
-                cat_action = int(jnp.argmax(cat_logits, axis=-1)[0])
-                masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
-                target_action = int(jnp.argmax(masked_target_logits, axis=-1)[0])
+                # Action selection: Greedy deterministic or temperature-controlled stochastic
+                if temperature <= 0.0:
+                    cat_action = int(jnp.argmax(cat_logits, axis=-1)[0])
+                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
+                    target_action = int(jnp.argmax(masked_target_logits, axis=-1)[0])
+                else:
+                    cat_probs = np.array(jax.nn.softmax(cat_logits[0] / temperature))
+                    cat_action = int(np.random.choice(len(cat_probs), p=cat_probs))
+                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
+                    tgt_probs = np.array(jax.nn.softmax(masked_target_logits[0] / temperature))
+                    if np.isnan(tgt_probs).any():
+                        target_action = 0
+                    else:
+                        target_action = int(np.random.choice(len(tgt_probs), p=tgt_probs))
                 
                 graph_pred = jax.nn.sigmoid(graph_logits[0])
                 

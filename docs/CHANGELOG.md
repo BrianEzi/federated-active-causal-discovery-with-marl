@@ -4,6 +4,14 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+## [Unreleased] - 2026-08-02
+
+### Added
+- **Federated Problem Specification (`docs/FEDERATED_PROBLEM_SPEC.md`)**: Formally defined the mathematical Structural Causal Model, variable taxonomy ($Z$ for private local variables, $X$ for boundary variables), information boundaries, privacy constraints, hierarchical action space, and federated covariance aggregation.
+- **Disjoint IPPO Architecture (`src/train.py`, `src/evaluate.py`)**: Replaced shared parameter IPPO with completely independent actor and critic networks $(\theta_k, \phi_k)$ and optimizers per agent, enforcing federated autonomy and preventing symmetric logit evaluation collisions.
+- **Temperature-Controlled Evaluation Suite (`src/evaluate.py`)**: Added support for low-temperature stochastic policy sampling ($\tau$) in `run_evaluation_suite` alongside deterministic greedy evaluation.
+- **Project Rule 3 Update (`.agents/AGENTS.md`)**: Mandated Disjoint Parameters & Sovereign Execution across all agent policies and strictly prohibited parameter sharing.
+
 ## [Unreleased] - 2026-07-30
 
 ### Added

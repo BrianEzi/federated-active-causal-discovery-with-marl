@@ -104,20 +104,27 @@ def main():
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
                               entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn)
                               
-        # Init params
+        # Initialize Disjoint parameters and optimizers per agent
+        actor_params_list = []
+        critic_params_list = []
+        actor_opts = []
+        critic_opts = []
+        
         dummy_obs = jnp.zeros((1, args.num_variables * args.num_variables + 1))
-        k1, k2, key = jax.random.split(key, 3)
-        if args.use_rnn:
-            dummy_state_a = IPPORNNActor.initial_state(1)
-            dummy_state_c = IPPORNNCritic.initial_state(1)
-            actor_params = actor_trans.init(k1, dummy_obs, dummy_state_a)
-            critic_params = critic_trans.init(k2, dummy_obs, dummy_state_c)
-        else:
-            actor_params = actor_trans.init(k1, dummy_obs)
-            critic_params = critic_trans.init(k2, dummy_obs)
-            
-        actor_opt = trainer.actor_opt.init(actor_params)
-        critic_opt = trainer.critic_opt.init(critic_params)
+        for k in range(args.num_agents):
+            k1, k2, key = jax.random.split(key, 3)
+            if args.use_rnn:
+                dummy_state_a = IPPORNNActor.initial_state(1)
+                dummy_state_c = IPPORNNCritic.initial_state(1)
+                a_p = actor_trans.init(k1, dummy_obs, dummy_state_a)
+                c_p = critic_trans.init(k2, dummy_obs, dummy_state_c)
+            else:
+                a_p = actor_trans.init(k1, dummy_obs)
+                c_p = critic_trans.init(k2, dummy_obs)
+            actor_params_list.append(a_p)
+            critic_params_list.append(c_p)
+            actor_opts.append(trainer.actor_opt.init(a_p))
+            critic_opts.append(trainer.critic_opt.init(c_p))
         
         buffers = [RolloutBuffer() for _ in range(args.num_agents)]
     else:
@@ -145,16 +152,16 @@ def main():
             predicted_dags = {}
             
             if args.agent_type == "ippo":
-                # IPPO Act
+                # Disjoint IPPO Act
                 for k in range(args.num_agents):
                     obs_k = jnp.array([obs_dict[f"agent_{k}"]])
                     if args.use_rnn:
-                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_trans.apply(actor_params, obs_k, actor_states[k])
-                        val_batch, critic_states[k] = critic_trans.apply(critic_params, obs_k, critic_states[k])
+                        (cat_logits, target_logits, graph_logits), actor_states[k] = actor_trans.apply(actor_params_list[k], obs_k, actor_states[k])
+                        val_batch, critic_states[k] = critic_trans.apply(critic_params_list[k], obs_k, critic_states[k])
                         val = val_batch[0]
                     else:
-                        cat_logits, target_logits, graph_logits = actor_trans.apply(actor_params, obs_k)
-                        val = critic_trans.apply(critic_params, obs_k)[0]
+                        cat_logits, target_logits, graph_logits = actor_trans.apply(actor_params_list[k], obs_k)
+                        val = critic_trans.apply(critic_params_list[k], obs_k)[0]
                     
                     # Action selection
                     cat_dist = jax.nn.softmax(cat_logits[0])
@@ -230,10 +237,15 @@ def main():
                 else:
                     observed_mask = jnp.array([0.0, 1.0, 1.0, 1.0])
                 
-                # Update
-                actor_params, critic_params, actor_opt, critic_opt, metrics = trainer.update_step(
-                    actor_params, critic_params, actor_opt, critic_opt, b, true_adj, observed_mask
+                # Update agent k's private parameters strictly on its own buffer
+                a_p, c_p, a_opt, c_opt, metrics = trainer.update_step(
+                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, true_adj, observed_mask
                 )
+                actor_params_list[k] = a_p
+                critic_params_list[k] = c_p
+                actor_opts[k] = a_opt
+                critic_opts[k] = c_opt
+                
                 actor_loss += metrics["actor_loss"]
                 critic_loss += metrics["critic_loss"]
                 graph_loss += metrics["graph_loss"]
@@ -290,12 +302,21 @@ def main():
                 import pickle
                 os.makedirs("checkpoints", exist_ok=True)
                 with open("checkpoints/best_ippo_params.pkl", "wb") as f:
-                    pickle.dump({"actor": actor_params, "critic": critic_params}, f)
+                    pickle.dump({"actor_list": actor_params_list, "critic_list": critic_params_list}, f)
 
     if args.save_file:
-        import pandas as pd
-        df = pd.DataFrame(all_metrics_history)
-        df.to_csv("training_metrics.csv", index=False)
+        try:
+            import pandas as pd
+            df = pd.DataFrame(all_metrics_history)
+            df.to_csv("training_metrics.csv", index=False)
+        except ImportError:
+            import csv
+            if all_metrics_history:
+                keys = list(all_metrics_history[0].keys())
+                with open("training_metrics.csv", "w", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=keys)
+                    writer.writeheader()
+                    writer.writerows(all_metrics_history)
         print("Saved metrics to training_metrics.csv")
         
     if args.agent_type == "ippo":
@@ -304,17 +325,20 @@ def main():
         try:
             with open("checkpoints/best_ippo_params.pkl", "rb") as f:
                 ckpt = pickle.load(f)
-                actor_params = ckpt["actor"]
-                critic_params = ckpt["critic"]
+                if "actor_list" in ckpt:
+                    eval_actor_params = ckpt["actor_list"]
+                else:
+                    eval_actor_params = [ckpt["actor"] for _ in range(args.num_agents)]
                 print("Successfully loaded best_ippo_params.pkl for evaluation.")
         except Exception as e:
             print("Could not load checkpoint, evaluating final model instead.")
+            eval_actor_params = actor_params_list
             
         from src.evaluate import run_evaluation_suite
         import json
         trace = run_evaluation_suite(
             actor=actor_trans,
-            actor_params=actor_params,
+            actor_params=eval_actor_params,
             config=config,
             action_costs=action_costs,
             initial_budget=args.initial_budget,
