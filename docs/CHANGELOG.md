@@ -4,7 +4,11 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
-## [Unreleased] - 2026-08-02
+### Added & Fixed: Mechanical Training & Stitching Enhancements (Solutions 1 & 4)
+- **Time-Normalized Reward Scaling (`src/rewards.py`, `src/evaluator_env.py`, `src/train.py`)**: Normalized per-step SHD and cycle penalties by $T_{\max} = \text{max\_steps}$ ($20.0$), decoupling cumulative episode return scale from variable trajectory length $T \in [1, 20]$ and eliminating horizon-induced return variance.
+- **Differential Edge Orientation & Margin Thresholding (`src/stitching.py`, `src/evaluator_env.py`, `src/evaluate.py`, `src/train.py`)**: Replaced naive independent thresholding on boundary edges with competitive margin-based differential thresholding ($(P(i, j) > 0.5) \land (P(i, j) - P(j, i) > \delta)$ where $\delta=0.10$). Eliminates spurious 2-cycle conflicts ($X_1 \rightleftarrows X_2$) and cycle penalties (-20.0) caused by minor inter-agent boundary logit disagreements.
+- **CLI & Parameter Exposition (`src/train.py`, `src/evaluate.py`)**: Added `--boundary_margin` (default 0.10) and `--normalize_rewards`/`--no_normalize_rewards` CLI arguments, wired through training and post-training evaluation pipelines.
+- **Expanded Unit Test Suite (`tests/test_stitching.py`, `tests/test_rewards.py`)**: Added tests for conflict suppression, differential winner resolution, CPU/JAX stitch equivalence, and normalized reward scaling (25 tests passing 100%).
 
 ### Optimized & Full GPU Kernel Fusion Pipeline (>300x End-to-End Speedup)
 - **Zero-Sync GPU Action Sampling (`src/marl/ppo_agent.py`)**: Implemented `sample_actions_jitted` kernel using Gumbel-Max sampling (`-jnp.log(-jnp.log(u))`) and static JAX boolean masking, eliminating all CPU `np.random.choice` host-device transfer synchronizations during rollouts.

@@ -1,15 +1,17 @@
 import numpy as np
 
-def stitch_predicted_dags(predicted_probs: dict, d: int) -> tuple[np.ndarray, bool]:
+def stitch_predicted_dags(predicted_probs: dict, d: int, margin: float = 0.10) -> tuple[np.ndarray, bool]:
     """
-    Stitches the predicted edge probabilities into a single global DAG adjacency matrix (0 or 1).
+    Stitches predicted edge probabilities into a single global DAG adjacency matrix (0 or 1).
+    Applies competitive differential thresholding (prob_ij - prob_ji > margin) to mathematically
+    prevent bidirectional 2-cycles and resolve uncertain edge orientations.
     predicted_probs maps 'agent_k' -> [d, d] matrix of edge probabilities.
     Returns (stitched_dag, has_cycle).
     """
     prob_1 = predicted_probs["agent_0"]
     prob_2 = predicted_probs["agent_1"]
     
-    global_probs = np.zeros((d, d))
+    global_probs = np.zeros((d, d), dtype=np.float32)
     
     # Agent 1 predicts edges among {0, 1, 2}
     global_probs[0, 0:3] = prob_1[0, 0:3]
@@ -20,18 +22,18 @@ def stitch_predicted_dags(predicted_probs: dict, d: int) -> tuple[np.ndarray, bo
     global_probs[1:3, 3] = prob_2[1:3, 3]
     
     # Overlapping boundary nodes: {1, 2}
-    # Both agents predict edges between X1 (1) and X2 (2). Use maximum to avoid suppression.
+    # Both agents predict edges between X1 (1) and X2 (2). Use maximum to pool evidence.
     global_probs[1:3, 1:3] = np.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3])
     
     # Clear self-loops
     np.fill_diagonal(global_probs, 0.0)
     
-    # Threshold to discrete DAG
-    stitched_dag = (global_probs > 0.5).astype(np.float32)
+    # Pairwise competitive differential thresholding:
+    # An edge i -> j is activated iff P(i -> j) > 0.5 AND P(i -> j) - P(j -> i) > margin
+    diff = global_probs - global_probs.T
+    stitched_dag = ((global_probs > 0.5) & (diff > margin)).astype(np.float32)
     
-    # Enforce no bidirectional edges: if i -> j and j -> i, remove both or keep the stronger one?
-    # In continuous probabilities, one is usually stronger. But if thresholded, it might create a 2-cycle.
-    # We will let the cycle detector catch 2-cycles and penalize them.
+    # Cycle detection for higher-order cycles (k >= 3)
     has_cycle = detect_cycle(stitched_dag)
     
     return stitched_dag, has_cycle
@@ -85,9 +87,15 @@ def jitted_detect_cycle(adj: jax.Array) -> jax.Array:
         return (jnp.trace(a2, axis1=-2, axis2=-1) + jnp.trace(a3, axis1=-2, axis2=-1) + jnp.trace(a4, axis1=-2, axis2=-1)) > 0
 
 @functools.partial(jax.jit, static_argnames=("d",))
-def jitted_stitch_dags(prob_1: jax.Array, prob_2: jax.Array, d: int = 4) -> Tuple[jax.Array, jax.Array]:
+def jitted_stitch_dags(
+    prob_1: jax.Array, 
+    prob_2: jax.Array, 
+    d: int = 4, 
+    margin: float = 0.10
+) -> Tuple[jax.Array, jax.Array]:
     """
-    Stitches predicted edge probabilities in pure JAX and detects cycles.
+    Stitches predicted edge probabilities in pure JAX using pairwise differential thresholding
+    and detects cycles on device.
     prob_1: [d, d] or [B, d, d]
     prob_2: [d, d] or [B, d, d]
     Returns (stitched_dag, has_cycle).
@@ -100,7 +108,9 @@ def jitted_stitch_dags(prob_1: jax.Array, prob_2: jax.Array, d: int = 4) -> Tupl
         g0 = g0.at[1:3, 3].set(prob_2[1:3, 3])
         g0 = g0.at[1:3, 1:3].set(jnp.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3]))
         g0 = g0 * (1.0 - jnp.eye(d))
-        stitched_dag = (g0 > 0.5).astype(jnp.float32)
+        
+        diff = g0 - g0.T
+        stitched_dag = jnp.where((g0 > 0.5) & (diff > margin), 1.0, 0.0)
         has_cycle = jitted_detect_cycle(stitched_dag)
         return stitched_dag, has_cycle
     else:
@@ -112,7 +122,9 @@ def jitted_stitch_dags(prob_1: jax.Array, prob_2: jax.Array, d: int = 4) -> Tupl
         g0 = g0.at[:, 1:3, 3].set(prob_2[:, 1:3, 3])
         g0 = g0.at[:, 1:3, 1:3].set(jnp.maximum(prob_1[:, 1:3, 1:3], prob_2[:, 1:3, 1:3]))
         g0 = g0 * (1.0 - jnp.eye(d)[None, :, :])
-        stitched_dag = (g0 > 0.5).astype(jnp.float32)
+        
+        diff = g0 - jnp.swapaxes(g0, -1, -2)
+        stitched_dag = jnp.where((g0 > 0.5) & (diff > margin), 1.0, 0.0)
         has_cycle = jitted_detect_cycle(stitched_dag)
         return stitched_dag, has_cycle
 

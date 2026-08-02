@@ -154,12 +154,16 @@ def build_intervention_spec_jitted(
 
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
-                 initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False):
+                 initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False,
+                 max_steps: int = 20, boundary_margin: float = 0.10, normalize_rewards: bool = True):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
         self.sample_count = sample_count
         self.fixed_graph = fixed_graph
+        self.max_steps = max_steps
+        self.boundary_margin = boundary_margin
+        self.normalize_rewards = normalize_rewards
         
         # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
         self.agent_masks = jnp.array([
@@ -183,7 +187,6 @@ class FederatedCausalEnv:
         
         self.jax_state = None
         self._agent_observations = None
-        self.max_steps = 20
         self._fixed_topology_cache = None
 
         
@@ -270,9 +273,10 @@ class FederatedCausalEnv:
         from src.stitching import stitch_predicted_dags
         from src.rewards import compute_ippo_rewards
         
-        stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d)
+        stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
         true_dag = np.array(self.jax_state.true_adjacency)
-        rewards = compute_ippo_rewards(stitched_dag, true_dag, has_cycle)
+        norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
+        rewards = compute_ippo_rewards(stitched_dag, true_dag, has_cycle, max_steps=norm_factor)
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
             
@@ -304,8 +308,9 @@ class FederatedCausalEnv:
             int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
         )
         
-        stitched_dag, has_cycle = jitted_stitch_dags(graph_pred_0, graph_pred_1, int(self.config.d))
-        r0, r1 = jitted_compute_ippo_rewards(stitched_dag, self.jax_state.true_adjacency, has_cycle)
+        stitched_dag, has_cycle = jitted_stitch_dags(graph_pred_0, graph_pred_1, int(self.config.d), margin=self.boundary_margin)
+        norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
+        r0, r1 = jitted_compute_ippo_rewards(stitched_dag, self.jax_state.true_adjacency, has_cycle, max_steps=norm_factor)
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or (self.jax_state.budgets[0] <= 0 and self.jax_state.budgets[1] <= 0))
         return self._agent_observations, r0, r1, terminated, stitched_dag

@@ -146,6 +146,20 @@ def parse_args():
         "--output_dir", type=str, default=".",
         help="Directory where training_metrics.csv and evaluation_trace.json are saved (default: '.')"
     )
+    # Boundary margin: confidence difference threshold for resolving bidirectional edge predictions without cycles
+    parser.add_argument(
+        "--boundary_margin", type=float, default=0.10,
+        help="Confidence margin delta for pairwise differential edge orientation in DAG stitching (default: 0.10)"
+    )
+    # When enabled, normalizes step rewards by max_steps to decouple cumulative episode return from trajectory horizon
+    parser.add_argument(
+        "--normalize_rewards", action="store_true", default=True,
+        help="Normalize per-step rewards by max_steps to eliminate horizon-induced return variance (default: True)"
+    )
+    parser.add_argument(
+        "--no_normalize_rewards", action="store_false", dest="normalize_rewards",
+        help="Disable reward normalization and use raw unnormalized cumulative step penalties"
+    )
     # Sampling temperature for post-training evaluation across topologies
     parser.add_argument(
         "--eval_temperature", type=float, default=0.0,
@@ -216,8 +230,15 @@ def main():
     is_fixed = args.fixed_graph is not None
     fixed_idx = args.fixed_graph if (is_fixed and args.fixed_graph >= 0) else None
     
-    env = FederatedCausalEnv(config, action_costs, initial_budget=args.initial_budget, sample_count=args.sample_count, fixed_graph=is_fixed)
-    env.max_steps = args.max_steps
+    env = FederatedCausalEnv(
+        config, action_costs, 
+        initial_budget=args.initial_budget, 
+        sample_count=args.sample_count, 
+        fixed_graph=is_fixed,
+        max_steps=args.max_steps,
+        boundary_margin=args.boundary_margin,
+        normalize_rewards=args.normalize_rewards
+    )
     
     if args.agent_type == "ippo":
         if args.use_rnn:
@@ -473,6 +494,7 @@ def main():
                 action_costs=action_costs,
                 initial_budget=args.initial_budget,
                 temperature=args.eval_temperature,
+                boundary_margin=args.boundary_margin,
                 seed=args.seed
             )
             with open(trace_file, "w") as f:

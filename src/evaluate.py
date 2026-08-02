@@ -16,11 +16,13 @@ def run_evaluation_suite(
     initial_budget: float,
     use_rnn: bool = False,
     temperature: float = 0.0,
+    boundary_margin: float = 0.10,
     seed: int = 42
 ) -> Dict[str, Any]:
     """
     Evaluates the trained agents on all 8 possible 4-node topologies.
-    Supports both single and disjoint agent parameter lists, with optional low-temperature stochastic sampling.
+    Supports both single and disjoint agent parameter lists, with optional low-temperature stochastic sampling
+    and differential boundary margin thresholding.
     Returns a detailed execution trace.
     """
     trace = {
@@ -28,6 +30,7 @@ def run_evaluation_suite(
             "temperature": float(temperature),
             "seed": int(seed),
             "initial_budget": float(initial_budget),
+            "boundary_margin": float(boundary_margin),
             "use_rnn": bool(use_rnn)
         }
     }
@@ -47,7 +50,7 @@ def run_evaluation_suite(
     # Run evaluation on all 8 graphs
     for graph_idx in range(8):
         # We don't want fixed_graph to cache one, we want to force it per episode
-        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False)
+        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False, boundary_margin=boundary_margin)
         key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
@@ -118,7 +121,7 @@ def run_evaluation_suite(
             
             step_trace["rewards"] = {k: float(v) for k, v in rewards.items()}
             
-            stitched_dag, _ = stitch_predicted_dags(predicted_dags, config.d)
+            stitched_dag, _ = stitch_predicted_dags(predicted_dags, config.d, margin=boundary_margin)
             eval_metrics = evaluate_dag_against_true(stitched_dag, true_adj)
             
             step_trace["stitched_dag"] = stitched_dag.tolist()
@@ -138,6 +141,7 @@ def evaluate_checkpoint(
     action_costs: np.ndarray = None,
     initial_budget: float = 20.0,
     temperature: float = 0.0,
+    boundary_margin: float = 0.10,
     seed: int = 42
 ) -> Dict[str, Any]:
     """
@@ -192,6 +196,7 @@ def evaluate_checkpoint(
         initial_budget=initial_budget,
         use_rnn=use_rnn,
         temperature=temperature,
+        boundary_margin=boundary_margin,
         seed=seed
     )
 
