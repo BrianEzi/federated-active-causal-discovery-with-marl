@@ -4,6 +4,9 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+### Added: Statistical Heuristic Graph Estimation for Baselines (`src/baselines.py`)
+- **Statistical Graph Estimator (`src/baselines.py`)**: Equipped `RandomAgent` and `RoundRobinAgent` with `estimate_graph_from_obs` to construct local DAG predictions via empirical correlation thresholding and invariance asymmetry direction scoring. Replaced hardcoded empty graph predictions (`zeros((d, d))`) with legitimate statistical estimation, ensuring baselines reflect the empirical utility of their random and cyclic interventions.
+
 ### Added: Custom Topology Subset Training (`--allowed_topologies`)
 - **Arbitrary Graph Topology Subsets (`src/train.py`, `src/evaluator_env.py`, `src/generators.py`, `tests/test_topologies.py`)**: Added `--allowed_topologies` CLI parameter allowing training on any arbitrary subset of the 8 graph structures (e.g. `--allowed_topologies 0,1` or `0,2,6`). Added string parsing helper `parse_topology_list` and unit tests in `tests/test_topologies.py` (36/36 tests passing 100%).
 
