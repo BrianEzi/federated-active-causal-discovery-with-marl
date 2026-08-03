@@ -32,7 +32,8 @@ When working on this repository, you must adhere strictly to the following archi
 - **Run Unit & Integration Tests First:** Before committing or declaring success, ALWAYS run the full test suite (`pytest tests/ -v`) locally. If `pytest` is unavailable, you **MUST** run the relevant scripts directly (e.g., `python src/train.py`) to confirm that your code executes without crashing and behaves as expected. **Do not assume code works without executing it.**
 - **Equivalence Verification:** When refactoring algorithms for performance (e.g., vectorizing loops), verify that the optimized output matches the reference implementation 100% using `np.array_equal` or `np.allclose`.
 
-## 7. Workspace Hygiene & Git Standards
+## 7. Workspace Hygiene, Feature Isolation & Git Standards
+- **Feature & Experiment Isolation**: Major architectural changes or novel neural network heads MUST be developed on dedicated feature branches (`feat/<feature-name>` or `exp/<experiment-name>`) following `.agents/VERSIONING_AND_BRANCHING.md`. Merging into `main` occurs only after unit tests pass and training metrics are verified.
 - **Never Commit Scratch Files:** Temporary profiling scripts, benchmark harnesses, or scratch files (e.g., `scratch/`, temporary logs) MUST NEVER be committed to Git.
 - **Gitignore Enforcement:** Always ensure temporary folders (e.g., `scratch/`, `shelved/`, `.venv/`) are explicitly listed in `.gitignore`. Clean up or untrack any temporary files before committing work.
 - **Commit Messages:** Follow the detailed guidelines outlined in `.agents/COMMIT_CONVENTIONS.md`. Major changes **must** include a descriptive multi-line body explaining *what* changed and *why*.
