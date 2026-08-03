@@ -20,7 +20,7 @@ class IPPOActor(hk.Module):
             graph_logits: [batch_size, d, d]
         """
         # obs is flattened masked covariance (d*d) + budget (1)
-        cov_flat = obs[:, :-1]
+        cov_flat = obs[:, : self.d * self.d]
         cov = jnp.reshape(cov_flat, (-1, self.d, self.d))
         
         # 1. Node Embeddings
@@ -103,7 +103,7 @@ class IPPORNNActor(hk.Module):
         obs: [batch_size, obs_dim]
         state: [batch_size, hidden_dim]
         """
-        cov_flat = obs[:, :-1]
+        cov_flat = obs[:, : self.d * self.d]
         cov = jnp.reshape(cov_flat, (-1, self.d, self.d))
         node_features = cov
         

@@ -4,6 +4,10 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+### Added: Standardized 8-Experiment Benchmark Suite (`scripts/run_benchmark_suite.py`)
+- **Standardized Benchmark Suite Runner (`scripts/run_benchmark_suite.py`)**: Built an automated launcher and aggregator script executing 8 standardized benchmark experiments across 3 fixed random seeds (`42, 43, 44`). Generates consolidated mean ± std markdown & CSV reports at `benchmarks/<run_timestamp>/benchmark_summary.md`.
+- **Benchmark Specification Specification (`docs/BENCHMARK_SPECIFICATION.md`)**: Formally specified 8 benchmark experiments covering Single Topology Sanity Checks (EXP-1), Standard Multi-Topology Generalization (EXP-2), Architectural Inductive Bias Ablation (EXP-3), Intrinsic Curiosity Sweeps (EXP-4), Curriculum Schedule Ablation (EXP-5), Budget Scarcity Stress Tests (EXP-6), Nonlinear ANM Mechanisms (EXP-7), and Noise Sensitivity (EXP-8).
+
 ### Added: Skew-Symmetric Tournament Inductive Graph Head & Branching Standards (`feat/anti-symmetric-tournament-head`)
 - **Anti-Symmetric Tournament Graph Head (`src/marl/ppo_agent.py`)**: Designed and implemented `InductiveIPPOActor` and `InductiveIPPORNNActor` using a Skew-Symmetric Tournament Decomposition ($\text{Logit}_{i \to j} = S_{\theta}(e_i, e_j) + \frac{1}{2}(\mathcal{O}_{\phi}(i, j) - \mathcal{O}_{\phi}(j, i)) + \gamma \mathbf{A}_{ij}$). Algebraically guarantees zero 2-cycle conflicts ($X_1 \rightleftarrows X_2$) and eliminates static prior memorization by coupling edge logits to empirical interventional variance shifts.
 - **Dual-Stream Environment Causal Registers (`src/types.py`, `src/evaluator_env.py`)**: Extended `EnvState` to track baseline observational covariance $\Sigma_{\text{obs}}$ separately from interventional covariance tensor $\Sigma_{\text{int}}[k, :, :]$. Implemented `@jax.jit` kernel `compute_invariance_asymmetry_matrix` to calculate the $d \times d$ interventional directional asymmetry tensor $\mathbf{A}$.

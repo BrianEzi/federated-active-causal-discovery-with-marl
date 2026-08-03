@@ -348,7 +348,7 @@ def main():
         actor_opts = []
         critic_opts = []
         
-        obs_dim = (3 * args.num_variables * args.num_variables + 1) if args.use_inductive_graph_head else (args.num_variables * args.num_variables + 1)
+        obs_dim = 3 * args.num_variables * args.num_variables + 1
         dummy_obs = jnp.zeros((1, obs_dim))
         for k in range(args.num_agents):
             k1, k2, key = jax.random.split(key, 3)
