@@ -128,10 +128,11 @@ backend_type = setup_environment()""")
         
     print(f"✓ Current Working Directory: {os.getcwd()}")
     
-    # Fetch and pull latest changes
+    # Fetch and pull latest changes from remote
     try:
         subprocess.call(["git", "fetch", "origin"])
         subprocess.call(["git", "checkout", branch])
+        subprocess.call(["git", "reset", "--hard", f"origin/{branch}"])
         subprocess.call(["git", "pull", "origin", branch])
     except Exception as e:
         print(f"Git sync warning: {e}")
@@ -140,7 +141,8 @@ backend_type = setup_environment()""")
         sys.path.insert(0, os.getcwd())
         
     active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
-    print(f"✓ Active Git Branch: {active_branch}")
+    latest_commit = subprocess.check_output(["git", "log", "-n", "1", "--oneline"]).decode().strip()
+    print(f"✓ Active Git Branch: {active_branch} ({latest_commit})")
     return os.getcwd()
 
 repo_root = setup_repository()""")
@@ -190,7 +192,8 @@ def run_single_experiment(
     \"\"\"
     Executes a single experimental trial and loads the resulting training_metrics.csv.
     \"\"\"
-    os.makedirs(output_subdir, exist_ok=True)
+    output_subdir_abs = os.path.abspath(output_subdir)
+    os.makedirs(output_subdir_abs, exist_ok=True)
     
     cmd = [
         sys.executable, "-m", "src.train",
@@ -205,7 +208,8 @@ def run_single_experiment(
         "--seed", str(seed),
         "--intrinsic_coef", str(intrinsic_coef),
         "--boundary_margin", str(boundary_margin),
-        "--output_dir", output_subdir
+        "--output_dir", output_subdir_abs,
+        "--save_file"
     ]
     
     if fixed_graph is not None:
@@ -218,14 +222,15 @@ def run_single_experiment(
         cmd.append("--no_inductive_graph_head")
         
     print(f"\\n🚀 Launching [{agent_type.upper()}] | Topology: {fixed_graph if fixed_graph is not None else 'Multi'} | Episodes: {num_episodes}...")
-    subprocess.check_call(cmd)
+    subprocess.check_call(cmd, cwd=os.getcwd())
     
-    csv_path = os.path.join(output_subdir, "training_metrics.csv")
+    csv_path = os.path.join(output_subdir_abs, "training_metrics.csv")
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
         df["agent_type"] = agent_type
         df["topology_tested"] = f"Topology {fixed_graph}" if fixed_graph is not None else "Multi-Topology"
         df["seed"] = seed
+        print(f"✓ Successfully loaded {len(df)} rows from {csv_path}")
         return df
     else:
         raise FileNotFoundError(f"Expected metrics CSV not found at {csv_path}")

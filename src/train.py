@@ -191,8 +191,12 @@ def parse_args():
     )
     # When enabled, saves trained model checkpoints (best_ippo_params.pkl), CSV metrics, and JSON evaluation traces to disk
     parser.add_argument(
-        "--save_file", action="store_true",
-        help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk"
+        "--save_file", action="store_true", default=True,
+        help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk (default: True)"
+    )
+    parser.add_argument(
+        "--no_save_file", action="store_false", dest="save_file",
+        help="Disable saving model weights, metrics CSV, and evaluation trace to disk"
     )
     # Custom subset of topologies to sample during training (e.g. --allowed_topologies 0,1 or 0,2,6)
     parser.add_argument(
