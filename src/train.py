@@ -21,6 +21,16 @@ try:
 except ImportError:
     WANDB_AVAILABLE = False
 
+def parse_topology_list(val):
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple)):
+        return tuple(int(x) for x in val)
+    cleaned = str(val).replace("[", "").replace("]", "").replace(",", " ").strip()
+    if not cleaned:
+        return None
+    return tuple(int(x) for x in cleaned.split())
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Federated Active Causal Discovery IPPO Trainer: Multi-Agent RL for Decentralized SCM Reconstruction"
@@ -183,6 +193,11 @@ def parse_args():
     parser.add_argument(
         "--save_file", action="store_true",
         help="Save best model weights (.pkl), training history (.csv), and post-training evaluation trace (.json) to disk"
+    )
+    # Custom subset of topologies to sample during training (e.g. --allowed_topologies 0,1 or 0,2,6)
+    parser.add_argument(
+        "--allowed_topologies", type=parse_topology_list, default=None,
+        help="Comma or space separated subset of topology indices (0-7) to train on (e.g., '0,1' or '0,2,6'). Default: all topologies."
     )
     # ---------------------------------------------------------
     # Curriculum Learning (Solution 3)
@@ -381,6 +396,9 @@ def main():
             allowed_topos, curr_stage = get_curriculum_topologies(
                 episode, args.num_episodes, args.curriculum_stage1_ratio, args.curriculum_stage2_ratio
             )
+        elif args.allowed_topologies is not None and fixed_idx is None:
+            allowed_topos = args.allowed_topologies
+            curr_stage = 0
         else:
             allowed_topos = None
             curr_stage = 0

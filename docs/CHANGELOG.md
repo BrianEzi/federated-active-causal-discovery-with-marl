@@ -4,6 +4,9 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+### Added: Custom Topology Subset Training (`--allowed_topologies`)
+- **Arbitrary Graph Topology Subsets (`src/train.py`, `src/evaluator_env.py`, `src/generators.py`, `tests/test_topologies.py`)**: Added `--allowed_topologies` CLI parameter allowing training on any arbitrary subset of the 8 graph structures (e.g. `--allowed_topologies 0,1` or `0,2,6`). Added string parsing helper `parse_topology_list` and unit tests in `tests/test_topologies.py` (36/36 tests passing 100%).
+
 ### Added: Standardized 8-Experiment Benchmark Suite (`scripts/run_benchmark_suite.py`)
 - **Standardized Benchmark Suite Runner (`scripts/run_benchmark_suite.py`)**: Built an automated launcher and aggregator script executing 8 standardized benchmark experiments across 3 fixed random seeds (`42, 43, 44`). Generates consolidated mean ± std markdown & CSV reports at `benchmarks/<run_timestamp>/benchmark_summary.md`.
 - **Benchmark Specification Specification (`docs/BENCHMARK_SPECIFICATION.md`)**: Formally specified 8 benchmark experiments covering Single Topology Sanity Checks (EXP-1), Standard Multi-Topology Generalization (EXP-2), Architectural Inductive Bias Ablation (EXP-3), Intrinsic Curiosity Sweeps (EXP-4), Curriculum Schedule Ablation (EXP-5), Budget Scarcity Stress Tests (EXP-6), Nonlinear ANM Mechanisms (EXP-7), and Noise Sensitivity (EXP-8).
