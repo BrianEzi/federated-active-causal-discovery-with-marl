@@ -9,7 +9,7 @@ import haiku as hk
 
 from src.types import SCMConfig, MechanismType, NoiseType
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, mask_invalid_targets, sample_actions_jitted
+from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent
 from src.metrics import evaluate_dag_against_true
@@ -165,6 +165,15 @@ def parse_args():
         "--no_normalize_rewards", action="store_false", dest="normalize_rewards",
         help="Disable reward normalization and use raw unnormalized cumulative step penalties"
     )
+    # When enabled, uses the Anti-Symmetric Tournament Inductive Graph Head (Skew-Symmetric decomposition + empirical invariance bypass)
+    parser.add_argument(
+        "--use_inductive_graph_head", action="store_true", default=True,
+        help="Use Skew-Symmetric Tournament Inductive Graph Head for 2-cycle free empirical invariance testing (default: True)"
+    )
+    parser.add_argument(
+        "--no_inductive_graph_head", action="store_false", dest="use_inductive_graph_head",
+        help="Disable Inductive Graph Head and use baseline unconstrained MLP Graph Head"
+    )
     # Sampling temperature for post-training evaluation across topologies
     parser.add_argument(
         "--eval_temperature", type=float, default=0.0,
@@ -285,19 +294,30 @@ def main():
     )
     
     if args.agent_type == "ippo":
-        if args.use_rnn:
-            def make_actor():
-                def forward(obs, state): return IPPORNNActor(d=args.num_variables)(obs, state)
-                return hk.without_apply_rng(hk.transform(forward))
+        if args.use_inductive_graph_head:
+            if args.use_rnn:
+                def make_actor():
+                    def forward(obs, state): return InductiveIPPORNNActor(d=args.num_variables)(obs, state)
+                    return hk.without_apply_rng(hk.transform(forward))
+            else:
+                def make_actor():
+                    def forward(obs): return InductiveIPPOActor(d=args.num_variables)(obs)
+                    return hk.without_apply_rng(hk.transform(forward))
+        else:
+            if args.use_rnn:
+                def make_actor():
+                    def forward(obs, state): return IPPORNNActor(d=args.num_variables)(obs, state)
+                    return hk.without_apply_rng(hk.transform(forward))
+            else:
+                def make_actor():
+                    def forward(obs): return IPPOActor(d=args.num_variables)(obs)
+                    return hk.without_apply_rng(hk.transform(forward))
                 
+        if args.use_rnn:
             def make_critic():
                 def forward(obs, state): return IPPORNNCritic()(obs, state)
                 return hk.without_apply_rng(hk.transform(forward))
         else:
-            def make_actor():
-                def forward(obs): return IPPOActor(d=args.num_variables)(obs)
-                return hk.without_apply_rng(hk.transform(forward))
-                
             def make_critic():
                 def forward(obs): return IPPOCritic()(obs)
                 return hk.without_apply_rng(hk.transform(forward))
@@ -328,7 +348,8 @@ def main():
         actor_opts = []
         critic_opts = []
         
-        dummy_obs = jnp.zeros((1, args.num_variables * args.num_variables + 1))
+        obs_dim = (3 * args.num_variables * args.num_variables + 1) if args.use_inductive_graph_head else (args.num_variables * args.num_variables + 1)
+        dummy_obs = jnp.zeros((1, obs_dim))
         for k in range(args.num_agents):
             k1, k2, key = jax.random.split(key, 3)
             if args.use_rnn:
@@ -524,6 +545,7 @@ def main():
                         "actor_list": actor_params_list,
                         "critic_list": critic_params_list,
                         "use_rnn": args.use_rnn,
+                        "use_inductive_graph_head": args.use_inductive_graph_head,
                         "d": args.num_variables
                     }, f)
 

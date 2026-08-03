@@ -174,6 +174,186 @@ class IPPORNNCritic(hk.Module):
         return jnp.zeros((batch_size, hidden_dim))
 
 
+class InductiveIPPOActor(hk.Module):
+    """
+    Inductive Graph Head Actor with Skew-Symmetric Tournament Decomposition:
+    Logit(i -> j) = Skeleton_sym(e_i, e_j) + 0.5 * (Orient_phi(e_i, e_j, A_ij) - Orient_phi(e_j, e_i, -A_ij)) + gamma * A_ij
+    Guarantees: Logit(i -> j) - Logit(j -> i) == 2 * Orient_phi + 2 * gamma * A_ij (Zero 2-cycles).
+    """
+    def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, gamma: float = 2.0, name: str = None):
+        super().__init__(name=name)
+        self.d = d
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.gamma = gamma
+
+    def __call__(self, obs: jax.Array) -> Tuple[jax.Array, jax.Array, jax.Array]:
+        d2 = self.d * self.d
+        if obs.shape[-1] >= 3 * d2 + 1:
+            cov_obs_flat = obs[:, :d2]
+            cov_run_flat = obs[:, d2:2*d2]
+            asym_flat    = obs[:, 2*d2:3*d2]
+        else:
+            cov_obs_flat = obs[:, :d2]
+            cov_run_flat = obs[:, :d2]
+            asym_flat    = jnp.zeros_like(cov_obs_flat)
+
+        cov_obs = jnp.reshape(cov_obs_flat, (-1, self.d, self.d))
+        cov_run = jnp.reshape(cov_run_flat, (-1, self.d, self.d))
+        asym    = jnp.reshape(asym_flat, (-1, self.d, self.d))
+
+        node_embeddings = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(self.embed_dim)
+        ])(cov_obs)
+
+        global_rep = hk.Flatten()(node_embeddings)
+        action_hidden = hk.Sequential([
+            hk.Linear(self.hidden_dim), jax.nn.relu,
+            hk.Linear(self.hidden_dim), jax.nn.relu
+        ])(global_rep)
+        
+        cat_logits = hk.Linear(3)(action_hidden)
+        target_logits = hk.Linear(self.d)(action_hidden)
+
+        emb_i = jnp.expand_dims(node_embeddings, axis=2)
+        emb_j = jnp.expand_dims(node_embeddings, axis=1)
+        emb_i = jnp.tile(emb_i, (1, 1, self.d, 1))
+        emb_j = jnp.tile(emb_j, (1, self.d, 1, 1))
+
+        # --- STREAM A: Symmetric Skeleton Network (S_ij == S_ji) ---
+        sym_features = jnp.concatenate([
+            emb_i + emb_j,
+            jnp.abs(emb_i - emb_j)
+        ], axis=-1)
+
+        skeleton_logits = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])(sym_features)
+
+        # --- STREAM B: Anti-Symmetric Tournament Network (O_ij == -O_ji) ---
+        asym_ext = jnp.expand_dims(asym, axis=-1)
+        orient_input_ij = jnp.concatenate([emb_i, emb_j, asym_ext], axis=-1)
+        orient_input_ji = jnp.concatenate([emb_j, emb_i, -asym_ext], axis=-1)
+
+        orient_mlp = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])
+
+        orient_logits = 0.5 * (orient_mlp(orient_input_ij) - orient_mlp(orient_input_ji))
+
+        # --- STREAM C: Combined Logits with Direct Invariance Skip Connection ---
+        graph_logits = jnp.squeeze(
+            skeleton_logits + orient_logits + self.gamma * asym_ext,
+            axis=-1
+        )
+
+        diag_mask = 1.0 - jnp.eye(self.d)[None, :, :]
+        graph_logits = graph_logits * diag_mask - (1.0 - diag_mask) * 1e9
+
+        return cat_logits, target_logits, graph_logits
+
+
+class InductiveIPPORNNActor(hk.Module):
+    """
+    Recurrent Inductive Graph Head Actor with Skew-Symmetric Tournament Decomposition.
+    """
+    def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, gamma: float = 2.0, name: str = None):
+        super().__init__(name=name)
+        self.d = d
+        self.embed_dim = embed_dim
+        self.hidden_dim = hidden_dim
+        self.gamma = gamma
+
+    def __call__(self, obs: jax.Array, state: jax.Array) -> Tuple[Tuple[jax.Array, jax.Array, jax.Array], jax.Array]:
+        d2 = self.d * self.d
+        if obs.shape[-1] >= 3 * d2 + 1:
+            cov_obs_flat = obs[:, :d2]
+            cov_run_flat = obs[:, d2:2*d2]
+            asym_flat    = obs[:, 2*d2:3*d2]
+        else:
+            cov_obs_flat = obs[:, :d2]
+            cov_run_flat = obs[:, :d2]
+            asym_flat    = jnp.zeros_like(cov_obs_flat)
+
+        cov_obs = jnp.reshape(cov_obs_flat, (-1, self.d, self.d))
+        cov_run = jnp.reshape(cov_run_flat, (-1, self.d, self.d))
+        asym    = jnp.reshape(asym_flat, (-1, self.d, self.d))
+
+        node_embeddings = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(self.embed_dim)
+        ])(cov_obs)
+
+        global_rep = hk.Flatten()(node_embeddings)
+        
+        gru = hk.GRU(self.hidden_dim)
+        rnn_out, next_state = gru(global_rep, state)
+        
+        action_hidden = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu
+        ])(rnn_out)
+        
+        cat_logits = hk.Linear(3)(action_hidden)
+        target_logits = hk.Linear(self.d)(action_hidden)
+
+        emb_i = jnp.expand_dims(node_embeddings, axis=2)
+        emb_j = jnp.expand_dims(node_embeddings, axis=1)
+        emb_i = jnp.tile(emb_i, (1, 1, self.d, 1))
+        emb_j = jnp.tile(emb_j, (1, self.d, 1, 1))
+
+        rnn_expand = jnp.expand_dims(jnp.expand_dims(rnn_out, axis=1), axis=1)
+        rnn_expand = jnp.tile(rnn_expand, (1, self.d, self.d, 1))
+
+        # --- STREAM A: Symmetric Skeleton Network (S_ij == S_ji) ---
+        sym_features = jnp.concatenate([
+            emb_i + emb_j,
+            jnp.abs(emb_i - emb_j),
+            rnn_expand
+        ], axis=-1)
+
+        skeleton_logits = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])(sym_features)
+
+        # --- STREAM B: Anti-Symmetric Tournament Network (O_ij == -O_ji) ---
+        asym_ext = jnp.expand_dims(asym, axis=-1)
+        orient_input_ij = jnp.concatenate([emb_i, emb_j, rnn_expand, asym_ext], axis=-1)
+        orient_input_ji = jnp.concatenate([emb_j, emb_i, rnn_expand, -asym_ext], axis=-1)
+
+        orient_mlp = hk.Sequential([
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu,
+            hk.Linear(1)
+        ])
+
+        orient_logits = 0.5 * (orient_mlp(orient_input_ij) - orient_mlp(orient_input_ji))
+
+        # --- STREAM C: Combined Logits with Direct Invariance Skip Connection ---
+        graph_logits = jnp.squeeze(
+            skeleton_logits + orient_logits + self.gamma * asym_ext,
+            axis=-1
+        )
+
+        diag_mask = 1.0 - jnp.eye(self.d)[None, :, :]
+        graph_logits = graph_logits * diag_mask - (1.0 - diag_mask) * 1e9
+
+        return (cat_logits, target_logits, graph_logits), next_state
+
+    @staticmethod
+    def initial_state(batch_size: int, hidden_dim: int = 64) -> jax.Array:
+        return jnp.zeros((batch_size, hidden_dim))
+
+
 def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, local_ownership_mask: jax.Array, peer_boundary_mask: jax.Array = None) -> jax.Array:
     """
     Masks out invalid target logits based on the chosen category action.

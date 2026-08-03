@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from src.types import SCMConfig
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPORNNActor
+from src.marl.ppo_agent import IPPOActor, IPPORNNActor, InductiveIPPOActor, InductiveIPPORNNActor
 
 def run_evaluation_suite(
     actor: Any,
@@ -117,6 +117,8 @@ def run_evaluation_suite(
                 step_trace["actions"][f"agent_{k}"] = {"cat": cat_action, "target": target_action}
                 step_trace["graph_preds"][f"agent_{k}"] = np.array(graph_pred).tolist()
                 
+                step_trace["rewards"] = {k: float(v) for k, v in rewards.items()} if 'rewards' in locals() else {}
+                
             next_obs, rewards, done, info = env.step(joint_actions, predicted_dags, key)
             
             step_trace["rewards"] = {k: float(v) for k, v in rewards.items()}
@@ -145,7 +147,7 @@ def evaluate_checkpoint(
     seed: int = 42
 ) -> Dict[str, Any]:
     """
-    Loads checkpoint, dynamically detects architecture (Feedforward vs RNN),
+    Loads checkpoint, dynamically detects architecture (Feedforward vs RNN, Baseline vs Inductive),
     and executes evaluation across all 8 graph topologies.
     """
     import os
@@ -169,9 +171,10 @@ def evaluate_checkpoint(
     else:
         raise KeyError(f"Unexpected checkpoint format in {ckpt_path}. Keys: {list(ckpt.keys())}")
 
-    # Inspect first parameter key to detect RNN vs Feedforward if not in metadata
+    # Inspect first parameter key to detect RNN vs Feedforward vs Inductive
     first_param_key = list(actor_params[0].keys())[0] if len(actor_params) > 0 and len(actor_params[0]) > 0 else ""
     use_rnn = ckpt.get("use_rnn", "ippornn" in first_param_key.lower() or "rnn" in first_param_key.lower())
+    use_inductive = ckpt.get("use_inductive_graph_head", "inductive" in first_param_key.lower())
     d = ckpt.get("d", 4)
 
     if config is None:
@@ -179,12 +182,20 @@ def evaluate_checkpoint(
     if action_costs is None:
         action_costs = np.array([1.0, 1.0])
 
-    if use_rnn:
-        def forward(obs, state):
-            return IPPORNNActor(d=d)(obs, state)
+    if use_inductive:
+        if use_rnn:
+            def forward(obs, state):
+                return InductiveIPPORNNActor(d=d)(obs, state)
+        else:
+            def forward(obs):
+                return InductiveIPPOActor(d=d)(obs)
     else:
-        def forward(obs):
-            return IPPOActor(d=d)(obs)
+        if use_rnn:
+            def forward(obs, state):
+                return IPPORNNActor(d=d)(obs, state)
+        else:
+            def forward(obs):
+                return IPPOActor(d=d)(obs)
 
     actor_trans = hk.without_apply_rng(hk.transform(forward))
 
