@@ -204,8 +204,12 @@ def parse_args():
     # ---------------------------------------------------------
     # When enabled, trains agents progressively through 3 stages of MEC graph complexity
     parser.add_argument(
-        "--curriculum", action="store_true", default=False,
-        help="Enable 3-stage topology curriculum learning across training episodes (default: False)"
+        "--curriculum", action="store_true", default=True,
+        help="Enable 3-stage topology curriculum learning across training episodes (default: True)"
+    )
+    parser.add_argument(
+        "--no_curriculum", action="store_false", dest="curriculum",
+        help="Disable 3-stage topology curriculum learning"
     )
     parser.add_argument(
         "--curriculum_stage1_ratio", type=float, default=0.20,
@@ -355,7 +359,8 @@ def main():
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
-                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn)
+                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn,
+                              total_episodes=args.num_episodes, normalize_rewards=args.normalize_rewards, max_steps=float(args.max_steps))
                               
         # Initialize Disjoint parameters and optimizers per agent
         actor_params_list = []
