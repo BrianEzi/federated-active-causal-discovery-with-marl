@@ -22,7 +22,10 @@ def init_env(key: jax.Array,
         budgets=initial_budgets,
         step_count=0,
         running_covariance=jnp.zeros((config.d, config.d)),
-        total_samples=jnp.array([0.0])
+        total_samples=jnp.array([0.0]),
+        obs_covariance=jnp.zeros((config.d, config.d)),
+        int_covariance=jnp.zeros((config.d, config.d, config.d)),
+        int_mask=jnp.zeros(config.d)
     )
 
 def get_observations(state: EnvState, 

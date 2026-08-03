@@ -20,6 +20,24 @@ def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax
         return cov
     return jax.vmap(_compute_single_agent)(agent_masks)
 
+@jax.jit
+def compute_invariance_asymmetry_matrix(
+    obs_cov: jax.Array,    # [d, d]
+    int_cov: jax.Array,    # [d, d, d]
+    int_mask: jax.Array,   # [d]
+    eps: float = 1e-5
+) -> jax.Array:
+    """
+    Computes A_{i, j} = |1 - Var(X_j | do(X_i)) / Var_obs(X_j)| - |1 - Var(X_i | do(X_j)) / Var_obs(X_i)|
+    Returns: [d, d] matrix where A[i, j] > 0 indicates empirical evidence for i -> j.
+    """
+    var_obs = jnp.diag(obs_cov) + eps
+    var_int = jnp.diagonal(int_cov, axis1=1, axis2=2) # [d, d]
+    ratio = var_int / var_obs[None, :]
+    shift = jnp.abs(1.0 - ratio) * int_mask[:, None]
+    asymmetry = shift - shift.T
+    return asymmetry
+
 @functools.partial(jax.jit, static_argnames=("sample_count", "d", "mech_type", "noise_type", "noise_scale"))
 def jitted_initial_obs_kernel(
     key: jax.Array,
@@ -53,13 +71,25 @@ def jitted_initial_obs_kernel(
     n_total = float(sample_count)
     final_state = state.replace(
         running_covariance=stitched_cov,
+        obs_covariance=stitched_cov,
+        int_covariance=jnp.zeros((d, d, d)),
+        int_mask=jnp.zeros(d),
         total_samples=jnp.array([n_total])
     )
     
+    asymmetry = compute_invariance_asymmetry_matrix(final_state.obs_covariance, final_state.int_covariance, final_state.int_mask)
+    
     def _get_agent_obs(k):
         m = obs_masks[k]
-        m_cov = stitched_cov * m[:, None] * m[None, :]
-        return jnp.concatenate([m_cov.flatten(), jnp.array([final_state.budgets[k]])])
+        m_cov_obs = final_state.obs_covariance * m[:, None] * m[None, :]
+        m_cov_run = stitched_cov * m[:, None] * m[None, :]
+        m_asym = asymmetry * m[:, None] * m[None, :]
+        return jnp.concatenate([
+            m_cov_obs.flatten(),
+            m_cov_run.flatten(),
+            m_asym.flatten(),
+            jnp.array([final_state.budgets[k]])
+        ])
     agent_observations = jax.vmap(_get_agent_obs)(jnp.arange(agent_masks.shape[0]))
     
     return final_state, agent_observations
@@ -114,15 +144,30 @@ def jitted_env_step_kernel(
     n_total = n_old + n_new
     updated_cov = (new_state.running_covariance * n_old + stitched_cov * n_new) / n_total
     
+    is_intervened = mask > 0.5
+    updated_int_cov = jnp.where(is_intervened[:, None, None], stitched_cov[None, :, :], new_state.int_covariance)
+    updated_int_mask = jnp.maximum(new_state.int_mask, is_intervened.astype(float))
+    
     final_state = new_state.replace(
         running_covariance=updated_cov,
+        int_covariance=updated_int_cov,
+        int_mask=updated_int_mask,
         total_samples=jnp.array([n_total])
     )
     
+    asymmetry = compute_invariance_asymmetry_matrix(final_state.obs_covariance, final_state.int_covariance, final_state.int_mask)
+    
     def _get_agent_obs(k):
         m = obs_masks[k]
-        m_cov = updated_cov * m[:, None] * m[None, :]
-        return jnp.concatenate([m_cov.flatten(), jnp.array([final_state.budgets[k]])])
+        m_cov_obs = final_state.obs_covariance * m[:, None] * m[None, :]
+        m_cov_run = updated_cov * m[:, None] * m[None, :]
+        m_asym = asymmetry * m[:, None] * m[None, :]
+        return jnp.concatenate([
+            m_cov_obs.flatten(),
+            m_cov_run.flatten(),
+            m_asym.flatten(),
+            jnp.array([final_state.budgets[k]])
+        ])
     agent_observations = jax.vmap(_get_agent_obs)(jnp.arange(agent_masks.shape[0]))
     
     return final_state, agent_observations, info_gains

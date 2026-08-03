@@ -41,6 +41,11 @@ class EnvState:
     step_count: int
     running_covariance: chex.Array # [d, d] (For algorithmic aggregation)
     total_samples: chex.Array      # [1] (To keep track of N for running average)
+    
+    # Dual-stream registers for empirical invariance testing
+    obs_covariance: chex.Array    # [d, d] Baseline observational covariance (at NOOP / reset)
+    int_covariance: chex.Array    # [d, d, d] Slice [k, :, :] is covariance measured under do(X_k)
+    int_mask: chex.Array          # [d] Indicator of nodes intervened upon
 
 class ActionCategory(enum.IntEnum):
     LOCAL_INTERVENTION = 0

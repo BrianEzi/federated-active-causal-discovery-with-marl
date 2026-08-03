@@ -68,18 +68,40 @@ class IPPOTrainer:
     def __init__(self, actor_transform, critic_transform, 
                  actor_lr: float = 3e-4, critic_lr: float = 1e-3, 
                  clip_eps: float = 0.2, entropy_coef: float = 0.01, graph_coef: float = 0.5,
-                 use_rnn: bool = False):
+                 use_rnn: bool = False, total_episodes: int = 5000, 
+                 normalize_rewards: bool = True, max_steps: float = 20.0):
         self.actor = actor_transform
         self.critic = critic_transform
         self.use_rnn = use_rnn
+        self.total_episodes = total_episodes
+        self.normalize_rewards = normalize_rewards
+        self.max_steps = max_steps
+        
+        warmup_steps = int(total_episodes * 0.05)
+        decay_steps = max(1, total_episodes - warmup_steps)
+        
+        actor_schedule = optax.warmup_cosine_decay_schedule(
+            init_value=1e-6,
+            peak_value=actor_lr,
+            warmup_steps=warmup_steps,
+            decay_steps=decay_steps,
+            end_value=actor_lr * 0.1
+        )
+        critic_schedule = optax.warmup_cosine_decay_schedule(
+            init_value=1e-6,
+            peak_value=critic_lr,
+            warmup_steps=warmup_steps,
+            decay_steps=decay_steps,
+            end_value=critic_lr * 0.1
+        )
         
         self.actor_opt = optax.chain(
             optax.clip_by_global_norm(0.5),
-            optax.adam(learning_rate=actor_lr)
+            optax.adam(learning_rate=actor_schedule)
         )
         self.critic_opt = optax.chain(
             optax.clip_by_global_norm(0.5),
-            optax.adam(learning_rate=critic_lr)
+            optax.adam(learning_rate=critic_schedule)
         )
         
         self.clip_eps = clip_eps
@@ -117,7 +139,8 @@ class IPPOTrainer:
         else:
             v_preds = self.critic.apply(critic_params, obs)
             
-        critic_loss = jnp.sum(((v_preds - returns) ** 2) * valid_mask) / valid_count
+        value_scale = (self.max_steps ** 2) if self.normalize_rewards else 1.0
+        critic_loss = (jnp.sum(((v_preds - returns) ** 2) * valid_mask) / valid_count) * value_scale
         
         # 2. Actor Loss
         if self.use_rnn:
@@ -177,7 +200,8 @@ class IPPOTrainer:
         valid_edge_count = jnp.sum(edge_mask)
         graph_loss = jnp.sum(masked_bce) / (valid_count * jnp.maximum(1.0, valid_edge_count))
         
-        total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * graph_loss
+        # Decouple graph loss gradient from pulling actor policy representation
+        total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * jax.lax.stop_gradient(graph_loss)
         total_loss = total_actor_loss + critic_loss
         return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
         
