@@ -87,3 +87,33 @@ class RoundRobinAgent:
             
         graph_pred = estimate_graph_from_obs(obs, self.d, self.agent_id, self.threshold)
         return (int(cat), int(target)), graph_pred
+
+class VanillaAgent:
+    """
+    Vanilla minimal 4-action discrete baseline agent with statistical graph estimation.
+    Action 0: Intervene on private Z node (Z1 for agent 0, Z2 for agent 1)
+    Action 1: Intervene on local X node (X1 for agent 0, X2 for agent 1)
+    Action 2: Request peer intervention on boundary X node (X2 for agent 0, X1 for agent 1)
+    Action 3: NO-OP (do nothing)
+    """
+    def __init__(self, agent_id: int, d: int = 4, threshold: float = 0.25):
+        self.agent_id = agent_id
+        self.d = d
+        self.threshold = threshold
+        self.z_node = 0 if agent_id == 0 else 3
+        self.x_node = 1 if agent_id == 0 else 2
+        self.peer_node = 2 if agent_id == 0 else 1
+        
+    def act(self, obs, avail_actions=None):
+        act_idx = int(np.random.choice([0, 1, 2, 3]))
+        if act_idx == 0:
+            cat, target = ActionCategory.LOCAL_INTERVENTION, self.z_node
+        elif act_idx == 1:
+            cat, target = ActionCategory.LOCAL_INTERVENTION, self.x_node
+        elif act_idx == 2:
+            cat, target = ActionCategory.PEER_REQUEST, self.peer_node
+        else:
+            cat, target = ActionCategory.NOOP, 0
+            
+        graph_pred = estimate_graph_from_obs(obs, self.d, self.agent_id, self.threshold)
+        return (int(cat), int(target)), graph_pred

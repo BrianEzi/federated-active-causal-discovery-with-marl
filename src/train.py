@@ -11,7 +11,7 @@ from src.types import SCMConfig, MechanismType, NoiseType
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
-from src.baselines import RandomAgent, RoundRobinAgent
+from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
 from src.metrics import evaluate_dag_against_true
 
 
@@ -39,10 +39,10 @@ def parse_args():
     # ---------------------------------------------------------
     # Agent & Architecture Configuration
     # ---------------------------------------------------------
-    # Specifies the agent algorithm: Disjoint IPPO (RL) or heuristic baselines (Random / Round-Robin)
+    # Specifies the agent algorithm: Disjoint IPPO (RL) or heuristic baselines (Random / Round-Robin / Vanilla)
     parser.add_argument(
-        "--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin"],
-        help="Algorithm type: 'ippo' (Independent PPO), 'random' (random uniform actions), or 'round_robin' (cyclic intervention)"
+        "--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin", "vanilla"],
+        help="Algorithm type: 'ippo' (Independent PPO), 'random' (random uniform actions), 'round_robin' (cyclic), or 'vanilla' (flat 4-action discrete baseline)"
     )
     
     # ---------------------------------------------------------
@@ -387,11 +387,14 @@ def main():
             actor_params_list.append(a_p)
             critic_params_list.append(c_p)
             actor_opts.append(trainer.actor_opt.init(a_p))
-            critic_opts.append(trainer.critic_opt.init(c_p))
-        
         buffers = [RolloutBuffer() for _ in range(args.num_agents)]
     else:
-        agents = [RandomAgent(i, args.num_variables) if args.agent_type == "random" else RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
+        if args.agent_type == "random":
+            agents = [RandomAgent(i, args.num_variables) for i in range(args.num_agents)]
+        elif args.agent_type == "vanilla":
+            agents = [VanillaAgent(i, args.num_variables) for i in range(args.num_agents)]
+        else:
+            agents = [RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
     
     best_shd = 999.0
     best_f1 = -1.0
