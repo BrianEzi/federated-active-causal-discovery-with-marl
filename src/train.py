@@ -226,6 +226,38 @@ def parse_args():
 
     
     # ---------------------------------------------------------
+    # Ablation Study Suite Flags
+    # ---------------------------------------------------------
+    parser.add_argument(
+        "--estimator_type", type=str, default="analytic", choices=["analytic", "avici"],
+        help="Stage 2 graph prediction engine: 'analytic' (Analytic Invariance Scorer) or 'avici' (Pre-trained AVICI scm-v0 checkpoint)"
+    )
+    parser.add_argument(
+        "--intervention_type", type=str, default="soft_shift", choices=["soft_shift", "hard"],
+        help="Intervention mechanism: 'soft_shift' (do(X_i := f_i + e_i + delta_i)) or 'hard' (do(X_i = c))"
+    )
+    parser.add_argument(
+        "--soft_shift_val", type=float, default=2.0,
+        help="Shift mean magnitude mu_delta for soft shift interventions (default: 2.0)"
+    )
+    parser.add_argument(
+        "--freeze_graph_estimator", type=str, default="true", choices=["true", "false"],
+        help="Whether to freeze Stage 2 graph estimator weights (default: 'true')"
+    )
+    parser.add_argument(
+        "--obs_feedback", type=str, default="true", choices=["true", "false"],
+        help="Whether to feed local predicted DAG slice back into agent observations (default: 'true')"
+    )
+    parser.add_argument(
+        "--impact_coef", type=float, default=0.0,
+        help="Scaling factor for downstream interventional impact bonus (default: 0.0)"
+    )
+    parser.add_argument(
+        "--reward_density", type=str, default="dense", choices=["dense", "sparse"],
+        help="Reward density: 'dense' (step-wise SHD reduction) or 'sparse' (terminal episode-end SHD penalty)"
+    )
+    
+    # ---------------------------------------------------------
     # Experiment Tracking & Reproducibility
     # ---------------------------------------------------------
     # When enabled, logs live metric curves, evaluation traces, and DAG visual images to Weights & Biases
@@ -305,6 +337,9 @@ def main():
     is_fixed = args.fixed_graph is not None
     fixed_idx = args.fixed_graph if (is_fixed and args.fixed_graph >= 0) else None
     
+    freeze_estimator = args.freeze_graph_estimator.lower() == "true"
+    enable_obs_feedback = args.obs_feedback.lower() == "true"
+    
     env = FederatedCausalEnv(
         config, action_costs, 
         initial_budget=args.initial_budget, 
@@ -313,7 +348,14 @@ def main():
         max_steps=args.max_steps,
         boundary_margin=args.boundary_margin,
         normalize_rewards=args.normalize_rewards,
-        intrinsic_coef=args.intrinsic_coef
+        intrinsic_coef=args.intrinsic_coef,
+        intervention_type=args.intervention_type,
+        shift_val=args.soft_shift_val,
+        estimator_type=args.estimator_type,
+        freeze_graph_estimator=freeze_estimator,
+        obs_feedback=enable_obs_feedback,
+        impact_coef=args.impact_coef,
+        reward_density=args.reward_density
     )
     
     if args.agent_type == "ippo":
@@ -372,7 +414,7 @@ def main():
         actor_opts = []
         critic_opts = []
         
-        obs_dim = 3 * args.num_variables * args.num_variables + 1
+        obs_dim = env.obs_dim
         dummy_obs = jnp.zeros((1, obs_dim))
         for k in range(args.num_agents):
             k1, k2, key = jax.random.split(key, 3)
@@ -387,6 +429,7 @@ def main():
             actor_params_list.append(a_p)
             critic_params_list.append(c_p)
             actor_opts.append(trainer.actor_opt.init(a_p))
+            critic_opts.append(trainer.critic_opt.init(c_p))
         buffers = [RolloutBuffer() for _ in range(args.num_agents)]
     else:
         if args.agent_type == "random":
@@ -433,7 +476,7 @@ def main():
             if args.agent_type == "ippo":
                 # Agent 0
                 k0_act, key = jax.random.split(key)
-                obs_0 = jnp.expand_dims(env._agent_observations[0], 0)
+                obs_0 = jnp.expand_dims(obs_dict["agent_0"], 0)
                 if args.use_rnn:
                     (cat_l0, tgt_l0, gr_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
                     v0, critic_states[0] = critic_apply(critic_params_list[0], obs_0, critic_states[0])
@@ -445,7 +488,7 @@ def main():
                 
                 # Agent 1
                 k1_act, key = jax.random.split(key)
-                obs_1 = jnp.expand_dims(env._agent_observations[1], 0)
+                obs_1 = jnp.expand_dims(obs_dict["agent_1"], 0)
                 if args.use_rnn:
                     (cat_l1, tgt_l1, gr_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
                     v1, critic_states[1] = critic_apply(critic_params_list[1], obs_1, critic_states[1])
@@ -455,14 +498,25 @@ def main():
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
                 c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, edge_masks[1], k1_act)
                 
+                joint_actions = {
+                    "agent_0": (int(c0), int(t0)),
+                    "agent_1": (int(c1), int(t1))
+                }
+                
                 k_step, key = jax.random.split(key)
-                agent_obs, r0, r1, done, final_dag, info_gains = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
+                next_obs_dict, rewards, done, step_info = env.step(joint_actions, predicted_dags=None, key=k_step)
+                
+                r0 = rewards["agent_0"]
+                r1 = rewards["agent_1"]
+                final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
+                info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
                 
                 buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, graph_preds=gp0, rewards=r0, dones=done)
                 buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, graph_preds=gp1, rewards=r1, dones=done)
+                obs_dict = next_obs_dict
                 ep_reward += float(r0 + r1)
-                ep_info_gain_0 += float(info_gains[0])
-                ep_info_gain_1 += float(info_gains[1])
+                ep_info_gain_0 += float(info_gains["agent_0"])
+                ep_info_gain_1 += float(info_gains["agent_1"])
                 ep_steps += 1
             else:
                 joint_actions = {}

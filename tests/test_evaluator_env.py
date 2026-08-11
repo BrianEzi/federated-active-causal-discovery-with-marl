@@ -31,7 +31,7 @@ def test_env_reset(base_config):
     
     assert "agent_0" in obs
     assert "agent_1" in obs
-    assert obs["agent_0"].shape == (49,) # 16 obs_cov + 16 run_cov + 16 asym + 1 budget
+    assert obs["agent_0"].shape == (env.obs_dim,) # Dynamic obs_dim (65 with obs_feedback=True)
     assert "true_adjacency" in info
 
 def test_env_step(base_config):

@@ -4,6 +4,20 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+### Added & Refactored: Two-Stage Active Causal Discovery & Ablation Suite
+- **Two-Stage Action Loop Architecture (`src/evaluator_env.py`, `src/marl/ppo_agent.py`, `src/train.py`)**: Decoupled RL target selection policy ($\mathbf{a}^{\text{exp}}_t$) from graph hypothesis estimation ($\widehat{\mathbf{W}}_t$). Integrated per-step AVICI amortized transformer estimator (`avici` version `1.0.7`) with Analytic Invariance Scorer fallback.
+- **Soft-Shift Interventions (`src/scm.py`, `src/evaluator_env.py`)**: Implemented variance-preserving soft shift interventions ($X_i := f_i + \epsilon_i + \delta_i, \mu_\delta = 2.0$), preventing complete variance collapse on boundary nodes ($X_1, X_2$) associated with hard clamping.
+- **Personal Local & Shared Boundary Reward Engine (`src/rewards.py`, `src/evaluator_env.py`)**: Updated `compute_ippo_rewards` and `step()` to track personal local error penalties ($Z_1$ for Agent 0, $Z_2$ for Agent 1) and shared boundary error penalties ($X_1 \leftrightarrow X_2$).
+- **Observation Feedback Loop (`src/evaluator_env.py`)**: Added `--obs_feedback true` toggle concatenating local predicted DAG slices $\widehat{\mathbf{W}}_{k, t-1}$ into agent observations $o_{k, t+1}$ for belief awareness.
+- **6-Dimension Ablation Study Suite (`scripts/run_ablation_matrix.py`, `tests/test_two_stage_loop.py`)**: Implemented CLI toggles and automated benchmark runner (`run_ablation_matrix.py`) for all 6 ablation dimensions: Hard vs Soft shift, Frozen vs Unfrozen estimators, Dense vs Sparse rewards, Curiosity bonus, Interventional impact bonus, and Observation feedback (39/39 tests passing 100%).
+
+---
+
+### Added: UCL Myriad HPC & GPU Operational Skill & Documentation (`.agents/skills/ucl_myriad_hpc/SKILL.md`, `docs/MYRIAD_HPC_GUIDE.md`, `docs/GIT_AND_CLUSTER_SYNC_GUIDE.md`)
+- **Git & Cluster Synchronization Guide (`docs/GIT_AND_CLUSTER_SYNC_GUIDE.md`)**: Created comprehensive synchronization protocol defining a Decision Matrix across 4 development strategies: Standard Git Pipeline (Strategy 1), 1-Liner Automated Deployment (Strategy 2), Direct `rsync`/`scp` Mirroring for print debugging (Strategy 3), and Remote Artifact Extraction for metrics and checkpoints (Strategy 4).
+- **UCL Myriad HPC Skill (`.agents/skills/ucl_myriad_hpc/SKILL.md`)**: Created a dedicated skill for future AI agents and human researchers detailing passwordless SSH jump host configuration (`knuckles`), Python 3.11 module loading, pre-compiled JAX/CUDA wheel discipline, SGE job submission (`submit_job.sh`), and real-time WandB / SGE log monitoring.
+- **UCL Myriad Documentation (`docs/MYRIAD_HPC_GUIDE.md`)**: Created exhaustive cluster user guide documenting exact SGE flags (`#$ -pe smp 4`, `#$ -o logs/`), queue capacity monitoring (`qstat -g c`), process tracking (`qstat -u ucabbse`), and module resolution rules (`python -m src.train`). Verified end-to-end execution on Myriad with 36/36 passing unit tests and 1,000-episode MARL training run.
+
 ### Added: Statistical Heuristic Graph Estimation for Baselines (`src/baselines.py`)
 - **Statistical Graph Estimator (`src/baselines.py`)**: Equipped `RandomAgent` and `RoundRobinAgent` with `estimate_graph_from_obs` to construct local DAG predictions via empirical correlation thresholding and invariance asymmetry direction scoring. Replaced hardcoded empty graph predictions (`zeros((d, d))`) with legitimate statistical estimation, ensuring baselines reflect the empirical utility of their random and cyclic interventions.
 

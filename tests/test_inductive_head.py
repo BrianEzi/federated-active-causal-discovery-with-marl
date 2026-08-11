@@ -94,5 +94,5 @@ def test_env_integration_inductive():
     
     assert "agent_0" in obs_dict
     assert "agent_1" in obs_dict
-    assert obs_dict["agent_0"].shape == (49,)
-    assert obs_dict["agent_1"].shape == (49,)
+    assert obs_dict["agent_0"].shape == (env.obs_dim,)
+    assert obs_dict["agent_1"].shape == (env.obs_dim,)

@@ -172,17 +172,19 @@ def jitted_env_step_kernel(
     
     return final_state, agent_observations, info_gains
 
-@functools.partial(jax.jit, static_argnames=("d",))
+@functools.partial(jax.jit, static_argnames=("d", "intervention_type"))
 def build_intervention_spec_jitted(
     cat_0: jax.Array, target_0: jax.Array,
     cat_1: jax.Array, target_1: jax.Array,
     budgets: jax.Array,
     action_costs: jax.Array,
     agent_masks: jax.Array,
-    d: int = 4
+    d: int = 4,
+    intervention_type: int = int(InterventionType.SOFT_SHIFT),
+    shift_val: float = 2.0
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     mask = jnp.zeros(d)
-    types = jnp.full(d, int(InterventionType.HARD), dtype=jnp.int32)
+    types = jnp.full(d, intervention_type, dtype=jnp.int32)
     values = jnp.zeros(d)
     costs = jnp.zeros(2)
     
@@ -192,7 +194,7 @@ def build_intervention_spec_jitted(
     apply_0 = valid_a0_local | valid_a0_peer
     
     mask = jnp.where(apply_0, mask.at[target_0].set(1.0), mask)
-    values = jnp.where(apply_0, values.at[target_0].set(5.0), values)
+    values = jnp.where(apply_0, values.at[target_0].set(shift_val), values)
     costs = jnp.where(apply_0, costs.at[0].set(action_costs[0]), costs)
     
     # Agent 1
@@ -201,7 +203,7 @@ def build_intervention_spec_jitted(
     apply_1 = valid_a1_local | valid_a1_peer
     
     mask = jnp.where(apply_1, mask.at[target_1].set(1.0), mask)
-    values = jnp.where(apply_1, values.at[target_1].set(5.0), values)
+    values = jnp.where(apply_1, values.at[target_1].set(shift_val), values)
     costs = jnp.where(apply_1, costs.at[1].set(action_costs[1]), costs)
     
     return mask, types, values, costs
@@ -210,7 +212,10 @@ class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
                  initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False,
                  max_steps: int = 20, boundary_margin: float = 0.10, normalize_rewards: bool = True,
-                 intrinsic_coef: float = 0.05):
+                 intrinsic_coef: float = 0.05, intervention_type: str = "soft_shift",
+                 shift_val: float = 2.0, estimator_type: str = "analytic",
+                 freeze_graph_estimator: bool = True, obs_feedback: bool = True,
+                 impact_coef: float = 0.0, reward_density: str = "dense"):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
@@ -220,6 +225,15 @@ class FederatedCausalEnv:
         self.boundary_margin = boundary_margin
         self.normalize_rewards = normalize_rewards
         self.intrinsic_coef = intrinsic_coef
+        self.intervention_type = intervention_type
+        self.shift_val = shift_val
+        self.estimator_type = estimator_type
+        self.freeze_graph_estimator = freeze_graph_estimator
+        self.obs_feedback = obs_feedback
+        self.impact_coef = impact_coef
+        self.reward_density = reward_density
+        
+        self.int_type_code = int(InterventionType.HARD if intervention_type == "hard" else InterventionType.SOFT_SHIFT)
         
         # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
         self.agent_masks = jnp.array([
@@ -239,28 +253,77 @@ class FederatedCausalEnv:
             jnp.array([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 0, 0, 0]], dtype=jnp.float32),
             jnp.array([[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 1, 1]], dtype=jnp.float32)
         ]
-        self.obs_dim = self.config.d * self.config.d + 1
+        
+        self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)
+        np.fill_diagonal(self.last_predicted_dag, 0.0)
+        self.prev_shd = None
+        
+        # Attempt to load AVICI if requested
+        self.avici_model = None
+        if self.estimator_type == "avici":
+            try:
+                import avici
+                self.avici_model = avici.load_pretrained(download="scm-v0")
+            except Exception as e:
+                print(f"Notice: AVICI model unavailable ({e}), falling back to Analytic Invariance Scorer.")
+                self.estimator_type = "analytic"
+        
+        # Calculate dynamic obs_dim:
+        # Base: 3 * d * d + 1 (obs_cov + run_cov + asym + budget)
+        # If obs_feedback: + d * d (predicted local DAG slice flattened)
+        self.obs_dim = 3 * self.config.d * self.config.d + 1 + (self.config.d * self.config.d if obs_feedback else 0)
         
         self.jax_state = None
         self._agent_observations = None
         self._fixed_topology_cache = None
 
-        
+    def predict_graph_hypothesis(self, obs_cov: np.ndarray, run_cov: np.ndarray, asym: np.ndarray) -> np.ndarray:
+        """
+        Stage 2 Inference Engine: Predicts continuous edge probability matrix [d, d].
+        """
+        d = self.config.d
+        if self.avici_model is not None and self.estimator_type == "avici":
+            try:
+                # Synthesize dataset summary or pass running covariance
+                prob = np.array(self.avici_model(x=run_cov))
+                np.fill_diagonal(prob, 0.0)
+                return prob
+            except Exception:
+                pass
+                
+        # Fast Analytic Invariance Estimator
+        # Skeleton: S_ij = 0.5 * (|run_cov_ij| + |obs_cov_ij|)
+        # Orientation: O_ij = 2.0 * asym_ij
+        S = 0.5 * (np.abs(run_cov) + np.abs(obs_cov))
+        O = 2.0 * asym
+        logits = S + O
+        prob = 1.0 / (1.0 + np.exp(-np.clip(logits, -10.0, 10.0)))
+        np.fill_diagonal(prob, 0.0)
+        return prob.astype(np.float32)
+
     def _get_obs_dict(self):
-        """Constructs IPPO observations."""
-        if self._agent_observations is not None:
-            return {
-                f"agent_{k}": np.array(self._agent_observations[k])
-                for k in range(self.config.K)
-            }
+        """Constructs IPPO observations with optional DAG observation feedback."""
         obs_dict = {}
+        asymmetry = np.array(compute_invariance_asymmetry_matrix(
+            self.jax_state.obs_covariance, self.jax_state.int_covariance, self.jax_state.int_mask
+        ))
+        obs_cov = np.array(self.jax_state.obs_covariance)
+        run_cov = np.array(self.jax_state.running_covariance)
+        
         for k in range(self.config.K):
-            obs_mask = np.array(self.obs_masks[k])
-            cov = np.array(self.jax_state.running_covariance)
-            masked_cov = cov * obs_mask[:, None] * obs_mask[None, :]
-            budget = np.array([self.jax_state.budgets[k]])
-            obs = np.concatenate([masked_cov.flatten(), budget])
-            obs_dict[f"agent_{k}"] = obs
+            m = np.array(self.obs_masks[k])
+            m_obs_cov = obs_cov * m[:, None] * m[None, :]
+            m_run_cov = run_cov * m[:, None] * m[None, :]
+            m_asym = asymmetry * m[:, None] * m[None, :]
+            budget = np.array([float(self.jax_state.budgets[k])])
+            
+            parts = [m_obs_cov.flatten(), m_run_cov.flatten(), m_asym.flatten()]
+            if self.obs_feedback:
+                m_pred_dag = self.last_predicted_dag * m[:, None] * m[None, :]
+                parts.append(m_pred_dag.flatten())
+            parts.append(budget)
+            
+            obs_dict[f"agent_{k}"] = np.concatenate(parts).astype(np.float32)
         return obs_dict
         
     def reset(self, key: jax.Array, force_idx: int = None, allowed_topologies = None) -> Tuple[Dict[str, np.ndarray], Dict]:
@@ -281,11 +344,24 @@ class FederatedCausalEnv:
         budgets = jnp.full(self.config.K, self.initial_budget)
         self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets)
         
+        # Reset graph hypothesis and SHD tracking
+        self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)
+        np.fill_diagonal(self.last_predicted_dag, 0.0)
+        self.prev_shd = None
+        
         # Get initial observational data using fast JIT kernel
         obs_key, key = jax.random.split(key)
         self.jax_state, self._agent_observations = jitted_initial_obs_kernel(
             obs_key, self.jax_state, self.sample_count, self.agent_masks, self.obs_masks,
             int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
+        )
+        
+        # Initial Stage 2 Prediction
+        asym = np.array(compute_invariance_asymmetry_matrix(
+            self.jax_state.obs_covariance, self.jax_state.int_covariance, self.jax_state.int_mask
+        ))
+        self.last_predicted_dag = self.predict_graph_hypothesis(
+            np.array(self.jax_state.obs_covariance), np.array(self.jax_state.running_covariance), asym
         )
         
         obs_dict = self._get_obs_dict()
@@ -294,10 +370,10 @@ class FederatedCausalEnv:
     def step(self, joint_actions: Dict[str, Tuple[int, int]], predicted_dags: Dict[str, np.ndarray], key: jax.Array) -> Tuple[Dict[str, np.ndarray], Dict[str, float], bool, Dict]:
         """
         joint_actions: Dictionary mapping agent id to (Category, Target Node).
-        predicted_dags: Dictionary mapping agent id to its predicted local DAG [d, d].
+        predicted_dags: Optional Dictionary mapping agent id to predicted local DAG [d, d].
         """
         mask = np.zeros(self.config.d)
-        types = np.full(self.config.d, int(InterventionType.HARD), dtype=np.int32)
+        types = np.full(self.config.d, self.int_type_code, dtype=np.int32)
         values = np.zeros(self.config.d) 
         costs = np.zeros(self.config.K)
         
@@ -308,17 +384,15 @@ class FederatedCausalEnv:
             # Only process if agent has budget and didn't NO-OP
             if budget_k >= self.action_costs[k] and cat != ActionCategory.NOOP:
                 if cat == ActionCategory.LOCAL_INTERVENTION:
-                    # Verify target is local
                     if self.agent_masks[k, target] == 1.0:
                         mask[target] = 1.0
-                        values[target] = 5.0
+                        values[target] = self.shift_val
                         costs[k] = self.action_costs[k]
                 elif cat == ActionCategory.PEER_REQUEST:
-                    # Peer request targets boundary nodes
-                    if target in [1, 2]: # Node 1 (X1) or 2 (X2)
+                    if target in [1, 2]:
                         mask[target] = 1.0
-                        values[target] = 5.0
-                        costs[k] = self.action_costs[k] # Cost deducted from requester
+                        values[target] = self.shift_val
+                        costs[k] = self.action_costs[k]
                         
         self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             key, self.jax_state, jnp.array(mask), jnp.array(types), jnp.array(values), jnp.array(costs),
@@ -326,24 +400,57 @@ class FederatedCausalEnv:
             int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
         )
         
-        from src.stitching import stitch_predicted_dags
-        from src.rewards import compute_ippo_rewards
+        asym = np.array(compute_invariance_asymmetry_matrix(
+            self.jax_state.obs_covariance, self.jax_state.int_covariance, self.jax_state.int_mask
+        ))
         
-        stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
+        # Stage 2 Per-Step Graph Prediction
+        if predicted_dags is not None and len(predicted_dags) > 0:
+            from src.stitching import stitch_predicted_dags
+            stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
+            self.last_predicted_dag = stitched_dag
+        else:
+            self.last_predicted_dag = self.predict_graph_hypothesis(
+                np.array(self.jax_state.obs_covariance), np.array(self.jax_state.running_covariance), asym
+            )
+            has_cycle = False
+            stitched_dag = (self.last_predicted_dag > 0.5).astype(np.float32)
+
         true_dag = np.array(self.jax_state.true_adjacency)
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
         ig_dict = {"agent_0": float(info_gains[0]), "agent_1": float(info_gains[1])}
+        
+        # Compute interventional impact scores (number of non-zero variance shift entries)
+        impact_a0 = float(np.sum(np.abs(asym[0:3, 0:3]) > 0.1))
+        impact_a1 = float(np.sum(np.abs(asym[1:4, 1:4]) > 0.1))
+        impact_dict = {"agent_0": impact_a0, "agent_1": impact_a1}
+        
+        from src.metrics import evaluate_dag_against_true
+        eval_metrics = evaluate_dag_against_true(stitched_dag, true_dag)
+        curr_shd = float(eval_metrics["shd"])
+        
+        terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
+        
+        from src.rewards import compute_ippo_rewards
         rewards = compute_ippo_rewards(
             stitched_dag, true_dag, has_cycle, 
             max_steps=norm_factor, 
             info_gains=ig_dict, 
-            intrinsic_coef=self.intrinsic_coef
+            intrinsic_coef=self.intrinsic_coef,
+            impact_scores=impact_dict,
+            impact_coef=self.impact_coef,
+            reward_density=self.reward_density,
+            is_terminal=terminated,
+            prev_shd=self.prev_shd
         )
-        
-        terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
+        self.prev_shd = rewards.get("_errors", curr_shd)
             
         obs_dict = self._get_obs_dict()
-        return obs_dict, rewards, terminated, {"true_adjacency": true_dag, "info_gains": ig_dict}
+        return obs_dict, rewards, terminated, {
+            "true_adjacency": true_dag, "info_gains": ig_dict,
+            "impact_scores": impact_dict, "shd": curr_shd,
+            "predicted_dag": self.last_predicted_dag
+        }
 
     def step_jitted(
         self,
@@ -361,7 +468,8 @@ class FederatedCausalEnv:
         
         costs_vec = jnp.array(self.action_costs)
         mask, types, values, costs = build_intervention_spec_jitted(
-            cat_0, target_0, cat_1, target_1, self.jax_state.budgets, costs_vec, self.agent_masks, int(self.config.d)
+            cat_0, target_0, cat_1, target_1, self.jax_state.budgets, costs_vec, self.agent_masks, int(self.config.d),
+            self.int_type_code, self.shift_val
         )
         
         k_step, key = jax.random.split(key)

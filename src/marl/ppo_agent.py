@@ -19,57 +19,17 @@ class IPPOActor(hk.Module):
             target_logits: [batch_size, d]
             graph_logits: [batch_size, d, d]
         """
-        # obs is flattened masked covariance (d*d) + budget (1)
-        cov_flat = obs[:, : self.d * self.d]
-        cov = jnp.reshape(cov_flat, (-1, self.d, self.d))
-        
-        # 1. Node Embeddings
-        # For each node i, its features could be its row and column in the covariance matrix
-        # cov is symmetric, so row is enough.
-        node_features = cov # [batch, d, d], where node i's features is cov[:, i, :]
-        
-        # We apply a shared MLP to each node's features to get its embedding
-        # hk.Linear applied to [batch, d, d] broadcasts over the first two dims
-        node_embeddings = hk.Sequential([
-            hk.Linear(self.hidden_dim),
-            jax.nn.relu,
-            hk.Linear(self.embed_dim)
-        ])(node_features) # [batch, d, embed_dim]
-        
-        # 2. Action Head (Macro + Micro)
-        # Flatten embeddings to get a global representation for action selection
-        global_rep = hk.Flatten()(node_embeddings)
-        
         action_hidden = hk.Sequential([
             hk.Linear(self.hidden_dim),
             jax.nn.relu,
             hk.Linear(self.hidden_dim),
             jax.nn.relu
-        ])(global_rep)
+        ])(obs)
         
         cat_logits = hk.Linear(3)(action_hidden) # [batch, 3]
         target_logits = hk.Linear(self.d)(action_hidden) # [batch, d]
         
-        # 3. Graph Head (Shared Edge Scorer)
-        # We want to score every directed pair (i, j)
-        # Expand embeddings to form all pairs: [batch, d, d, 2 * embed_dim]
-        emb_expand_i = jnp.expand_dims(node_embeddings, axis=2) # [batch, d, 1, embed_dim]
-        emb_expand_j = jnp.expand_dims(node_embeddings, axis=1) # [batch, 1, d, embed_dim]
-        
-        emb_expand_i = jnp.tile(emb_expand_i, (1, 1, self.d, 1))
-        emb_expand_j = jnp.tile(emb_expand_j, (1, self.d, 1, 1))
-        
-        pairs = jnp.concatenate([emb_expand_i, emb_expand_j], axis=-1) # [batch, d, d, 2*embed_dim]
-        
-        edge_scorer = hk.Sequential([
-            hk.Linear(self.hidden_dim),
-            jax.nn.relu,
-            hk.Linear(1)
-        ])
-        
-        graph_logits = edge_scorer(pairs) # [batch, d, d, 1]
-        graph_logits = jnp.squeeze(graph_logits, axis=-1) # [batch, d, d]
-        
+        graph_logits = jnp.zeros((obs.shape[0], self.d, self.d))
         return cat_logits, target_logits, graph_logits
 
 class IPPOCritic(hk.Module):
