@@ -10,11 +10,14 @@
 #$ -e logs/
 
 mkdir -p logs
+mkdir -p ~/.tmp
 source /home/ucabbse/envs/marl_env/bin/activate
 cd /home/ucabbse/marl_causal
 
-# WandB Telemetry Mode
-export WANDB_MODE=online
+# HPC Temp directory & WandB settings for node stability
+export TMPDIR=~/.tmp
+export WANDB_DISABLE_SERVICE=true
+export WANDB_MODE=offline
 
 # Execute MARL Causal Discovery base training pipeline on GPU
 python -m src.train \

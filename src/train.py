@@ -312,11 +312,15 @@ def main():
         if not WANDB_AVAILABLE:
             print("WARNING: --use_wandb was passed, but the wandb library is not installed! WandB metrics will not be logged.")
         else:
-            is_fixed = args.fixed_graph is not None
-            name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
-            wandb.init(project=args.wandb_project, name=name, config=vars(args))
-            if wandb.run:
-                print(f"WandB successfully initialized! View live run at: {wandb.run.url}")
+            try:
+                is_fixed = args.fixed_graph is not None
+                name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
+                wandb.init(project=args.wandb_project, name=name, config=vars(args))
+                if wandb.run:
+                    print(f"WandB successfully initialized! View live run at: {wandb.run.url}")
+            except Exception as e:
+                print(f"WARNING: WandB initialization failed ({e}). Continuing training locally.")
+                args.use_wandb = False
             
     print(f"=== Starting Training Session ===")
     print(f"Config: agent={args.agent_type}, d={args.num_variables}, Episodes={args.num_episodes}")

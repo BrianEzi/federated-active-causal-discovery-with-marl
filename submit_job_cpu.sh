@@ -13,7 +13,7 @@ source /home/ucabbse/envs/marl_env/bin/activate
 cd /home/ucabbse/marl_causal
 
 # WandB Telemetry Mode
-export WANDB_MODE=online
+export WANDB_MODE=offline
 
 # Execute MARL Causal Discovery base training pipeline on High-Speed CPU
 python -m src.train \
