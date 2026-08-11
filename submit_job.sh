@@ -3,8 +3,8 @@
 # SGE Directives
 #$ -N marl_causal_train
 #$ -cwd
-#$ -l h_rt=04:00:00
-#$ -pe smp 4
+#$ -l h_rt=01:30:00
+#$ -pe smp 2
 #$ -l gpu=1
 #$ -o logs/
 #$ -e logs/
