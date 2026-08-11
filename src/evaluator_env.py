@@ -431,6 +431,10 @@ class FederatedCausalEnv:
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
         
+        diff = np.abs(stitched_dag - true_dag)
+        e1 = float(np.sum(diff[0, :]) + np.sum(diff[:, 0]) + diff[1, 2] + diff[2, 1])
+        e2 = float(np.sum(diff[3, :]) + np.sum(diff[:, 3]) + diff[1, 2] + diff[2, 1])
+        
         from src.rewards import compute_ippo_rewards
         rewards = compute_ippo_rewards(
             stitched_dag, true_dag, has_cycle, 
@@ -443,7 +447,7 @@ class FederatedCausalEnv:
             is_terminal=terminated,
             prev_shd=self.prev_shd
         )
-        self.prev_shd = rewards.get("_errors", curr_shd)
+        self.prev_shd = (e1, e2)
             
         obs_dict = self._get_obs_dict()
         return obs_dict, rewards, terminated, {

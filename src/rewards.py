@@ -76,8 +76,7 @@ def compute_ippo_rewards(
         
     return {
         "agent_0": float(r1),
-        "agent_1": float(r2),
-        "_errors": (float(current_e1), float(current_e2))
+        "agent_1": float(r2)
     }
 
 
