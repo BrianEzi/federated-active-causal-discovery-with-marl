@@ -327,7 +327,16 @@ class FederatedCausalEnv:
             
             parts = [m_obs_cov.flatten(), m_run_cov.flatten(), m_asym.flatten()]
             if self.obs_feedback:
-                m_pred_dag = self.last_predicted_dag * m[:, None] * m[None, :]
+                # Use the narrower edge-authority mask here, not the observation mask: an
+                # agent may *observe* a peer's boundary node's covariance (for computing the
+                # shared boundary edge), but its own predicted-DAG feedback should only ever
+                # reflect edges within its own local domain or the shared boundary pair --
+                # never a cross-domain edge like Z1<->X2, even though both Z1 and X2 fall
+                # within Agent 0's observation mask. self.last_predicted_dag is already
+                # zeroed at those cells by self.structural_mask upstream (predict_graph_hypothesis),
+                # so this mask is currently redundant in practice -- but it must not silently
+                # rely on that; this is the layer that's actually responsible for it here.
+                m_pred_dag = self.last_predicted_dag * np.array(self.edge_masks[k])
                 parts.append(m_pred_dag.flatten())
             parts.append(budget)
             
