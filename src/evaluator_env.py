@@ -190,18 +190,16 @@ def build_intervention_spec_jitted(
     costs = jnp.zeros(2)
     
     # Agent 0
-    valid_a0_local = (budgets[0] >= action_costs[0]) & (cat_0 == int(ActionCategory.LOCAL_INTERVENTION)) & (agent_masks[0, target_0] == 1.0)
-    valid_a0_peer = (budgets[0] >= action_costs[0]) & (cat_0 == int(ActionCategory.PEER_REQUEST)) & ((target_0 == 1) | (target_0 == 2))
-    apply_0 = valid_a0_local | valid_a0_peer
+    valid_a0_local = (budgets[0] >= action_costs[0]) & (cat_0 == int(ActionCategory.INTERVENE)) & ((agent_masks[0, target_0] == 1.0) | (target_0 == 1) | (target_0 == 2))
+    apply_0 = valid_a0_local
     
     mask = jnp.where(apply_0, mask.at[target_0].set(1.0), mask)
     values = jnp.where(apply_0, values.at[target_0].set(shift_val), values)
     costs = jnp.where(apply_0, costs.at[0].set(action_costs[0]), costs)
     
     # Agent 1
-    valid_a1_local = (budgets[1] >= action_costs[1]) & (cat_1 == int(ActionCategory.LOCAL_INTERVENTION)) & (agent_masks[1, target_1] == 1.0)
-    valid_a1_peer = (budgets[1] >= action_costs[1]) & (cat_1 == int(ActionCategory.PEER_REQUEST)) & ((target_1 == 1) | (target_1 == 2))
-    apply_1 = valid_a1_local | valid_a1_peer
+    valid_a1_local = (budgets[1] >= action_costs[1]) & (cat_1 == int(ActionCategory.INTERVENE)) & ((agent_masks[1, target_1] == 1.0) | (target_1 == 1) | (target_1 == 2))
+    apply_1 = valid_a1_local
     
     mask = jnp.where(apply_1, mask.at[target_1].set(1.0), mask)
     values = jnp.where(apply_1, values.at[target_1].set(shift_val), values)
@@ -380,17 +378,11 @@ class FederatedCausalEnv:
             budget_k = self.jax_state.budgets[k]
             
             # Only process if agent has budget and didn't NO-OP
-            if budget_k >= self.action_costs[k] and cat != ActionCategory.NOOP:
-                if cat == ActionCategory.LOCAL_INTERVENTION:
-                    if self.agent_masks[k, target] == 1.0:
-                        mask[target] = 1.0
-                        values[target] = self.shift_val
-                        costs[k] = self.action_costs[k]
-                elif cat == ActionCategory.PEER_REQUEST:
-                    if target in [1, 2]:
-                        mask[target] = 1.0
-                        values[target] = self.shift_val
-                        costs[k] = self.action_costs[k]
+            if budget_k >= self.action_costs[k] and cat == ActionCategory.INTERVENE:
+                if self.agent_masks[k, target] == 1.0 or target in [1, 2]:
+                    mask[target] = 1.0
+                    values[target] = self.shift_val
+                    costs[k] = self.action_costs[k]
                         
         self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             key, self.jax_state, jnp.array(mask), jnp.array(types), jnp.array(values), jnp.array(costs),

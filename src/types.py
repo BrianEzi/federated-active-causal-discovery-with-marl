@@ -48,9 +48,8 @@ class EnvState:
     int_mask: chex.Array          # [d] Indicator of nodes intervened upon
 
 class ActionCategory(enum.IntEnum):
-    LOCAL_INTERVENTION = 0
-    PEER_REQUEST = 1
-    NOOP = 2
+    INTERVENE = 0
+    NOOP = 1
 
 @chex.dataclass
 class AgentObservation:

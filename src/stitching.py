@@ -13,13 +13,13 @@ def stitch_predicted_dags(predicted_probs: dict, d: int, margin: float = 0.10) -
     
     global_probs = np.zeros((d, d), dtype=np.float32)
     
-    # Agent 1 predicts edges among {0, 1, 2}
-    global_probs[0, 0:3] = prob_1[0, 0:3]
-    global_probs[1:3, 0] = prob_1[1:3, 0]
+    # Agent 1 predicts edges among its local domain (Z1, X1) and mutual boundaries
+    global_probs[0, 0:2] = prob_1[0, 0:2]
+    global_probs[1, 0] = prob_1[1, 0]
     
-    # Agent 2 predicts edges among {1, 2, 3}
-    global_probs[3, 1:4] = prob_2[3, 1:4]
-    global_probs[1:3, 3] = prob_2[1:3, 3]
+    # Agent 2 predicts edges among its local domain (Z2, X2) and mutual boundaries
+    global_probs[3, 2:4] = prob_2[3, 2:4]
+    global_probs[2, 3] = prob_2[2, 3]
     
     # Overlapping boundary nodes: {1, 2}
     # Both agents predict edges between X1 (1) and X2 (2). Use maximum to pool evidence.
@@ -102,10 +102,10 @@ def jitted_stitch_dags(
     """
     if prob_1.ndim == 2:
         g0 = jnp.zeros((d, d))
-        g0 = g0.at[0, 0:3].set(prob_1[0, 0:3])
-        g0 = g0.at[1:3, 0].set(prob_1[1:3, 0])
-        g0 = g0.at[3, 1:4].set(prob_2[3, 1:4])
-        g0 = g0.at[1:3, 3].set(prob_2[1:3, 3])
+        g0 = g0.at[0, 0:2].set(prob_1[0, 0:2])
+        g0 = g0.at[1, 0].set(prob_1[1, 0])
+        g0 = g0.at[3, 2:4].set(prob_2[3, 2:4])
+        g0 = g0.at[2, 3].set(prob_2[2, 3])
         g0 = g0.at[1:3, 1:3].set(jnp.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3]))
         g0 = g0 * (1.0 - jnp.eye(d))
         
@@ -116,10 +116,10 @@ def jitted_stitch_dags(
     else:
         B = prob_1.shape[0]
         g0 = jnp.zeros((B, d, d))
-        g0 = g0.at[:, 0, 0:3].set(prob_1[:, 0, 0:3])
-        g0 = g0.at[:, 1:3, 0].set(prob_1[:, 1:3, 0])
-        g0 = g0.at[:, 3, 1:4].set(prob_2[:, 3, 1:4])
-        g0 = g0.at[:, 1:3, 3].set(prob_2[:, 1:3, 3])
+        g0 = g0.at[:, 0, 0:2].set(prob_1[:, 0, 0:2])
+        g0 = g0.at[:, 1, 0].set(prob_1[:, 1, 0])
+        g0 = g0.at[:, 3, 2:4].set(prob_2[:, 3, 2:4])
+        g0 = g0.at[:, 2, 3].set(prob_2[:, 2, 3])
         g0 = g0.at[:, 1:3, 1:3].set(jnp.maximum(prob_1[:, 1:3, 1:3], prob_2[:, 1:3, 1:3]))
         g0 = g0 * (1.0 - jnp.eye(d)[None, :, :])
         

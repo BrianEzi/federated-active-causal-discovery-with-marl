@@ -478,25 +478,25 @@ def main():
                 k0_act, key = jax.random.split(key)
                 obs_0 = jnp.expand_dims(obs_dict["agent_0"], 0)
                 if args.use_rnn:
-                    (cat_l0, tgt_l0, gr_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
+                    (cat_l0, tgt_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
                     v0, critic_states[0] = critic_apply(critic_params_list[0], obs_0, critic_states[0])
                     val_0 = v0[0]
                 else:
-                    cat_l0, tgt_l0, gr_l0 = actor_apply(actor_params_list[0], obs_0)
+                    cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                c0, t0, lp0, gp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], gr_l0[0], local_masks[0], boundary_mask, k0_act)
+                c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], jnp.maximum(local_masks[0], boundary_mask), k0_act)
                 
                 # Agent 1
                 k1_act, key = jax.random.split(key)
                 obs_1 = jnp.expand_dims(obs_dict["agent_1"], 0)
                 if args.use_rnn:
-                    (cat_l1, tgt_l1, gr_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
+                    (cat_l1, tgt_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
                     v1, critic_states[1] = critic_apply(critic_params_list[1], obs_1, critic_states[1])
                     val_1 = v1[0]
                 else:
-                    cat_l1, tgt_l1, gr_l1 = actor_apply(actor_params_list[1], obs_1)
+                    cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, k1_act)
+                c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], jnp.maximum(local_masks[1], boundary_mask), k1_act)
                 
                 joint_actions = {
                     "agent_0": (int(c0), int(t0)),
@@ -511,8 +511,8 @@ def main():
                 final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
                 info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
                 
-                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, graph_preds=gp0, rewards=r0, dones=done)
-                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, graph_preds=gp1, rewards=r1, dones=done)
+                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done)
+                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done)
                 obs_dict = next_obs_dict
                 ep_reward += float(r0 + r1)
                 ep_info_gain_0 += float(info_gains["agent_0"])
@@ -542,7 +542,6 @@ def main():
         if args.agent_type == "ippo":
             actor_loss = 0.0
             critic_loss = 0.0
-            graph_loss = 0.0
             entropy = 0.0
             per_agent_metrics = {}
             for k in range(args.num_agents):
@@ -554,7 +553,7 @@ def main():
                 
                 # Update agent k's private parameters strictly on its own buffer
                 a_p, c_p, a_opt, c_opt, metrics = trainer.update_step(
-                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, true_adj, observed_masks[k]
+                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b
                 )
                 actor_params_list[k] = a_p
                 critic_params_list[k] = c_p
@@ -564,7 +563,6 @@ def main():
                 per_agent_metrics[k] = metrics
                 actor_loss += float(metrics["actor_loss"])
                 critic_loss += float(metrics["critic_loss"])
-                graph_loss += float(metrics["graph_loss"])
                 entropy += float(metrics["entropy"])
                 buffers[k].reset()
                 
@@ -586,12 +584,10 @@ def main():
         if args.agent_type == "ippo":
             log_data["train/actor_loss"] = float(actor_loss / args.num_agents)
             log_data["train/critic_loss"] = float(critic_loss / args.num_agents)
-            log_data["train/graph_loss"] = float(graph_loss / args.num_agents)
             log_data["train/entropy"] = float(entropy / args.num_agents)
             for k in range(args.num_agents):
                 log_data[f"train/agent_{k}_actor_loss"] = float(per_agent_metrics[k]["actor_loss"])
                 log_data[f"train/agent_{k}_critic_loss"] = float(per_agent_metrics[k]["critic_loss"])
-                log_data[f"train/agent_{k}_graph_loss"] = float(per_agent_metrics[k]["graph_loss"])
                 log_data[f"train/agent_{k}_entropy"] = float(per_agent_metrics[k]["entropy"])
             
         all_metrics_history.append(log_data.copy())

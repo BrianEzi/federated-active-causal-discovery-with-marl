@@ -14,7 +14,7 @@ class RolloutBuffer:
         self.data = {
             "obs": [], "cat_actions": [], "target_actions": [], 
             "rewards": [], "dones": [], "values": [], 
-            "log_probs": [], "graph_preds": []
+            "log_probs": []
         }
         
     def add(self, **kwargs):
@@ -68,7 +68,7 @@ def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: 
 class IPPOTrainer:
     def __init__(self, actor_transform, critic_transform, 
                  actor_lr: float = 3e-4, critic_lr: float = 1e-3, 
-                 clip_eps: float = 0.2, entropy_coef: float = 0.01, graph_coef: float = 0.5,
+                 clip_eps: float = 0.2, entropy_coef: float = 0.01,
                  use_rnn: bool = False, total_episodes: int = 5000, 
                  normalize_rewards: bool = True, max_steps: float = 20.0):
         self.actor = actor_transform
@@ -107,12 +107,9 @@ class IPPOTrainer:
         
         self.clip_eps = clip_eps
         self.entropy_coef = entropy_coef
-        self.graph_coef = graph_coef
         
-    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array], true_adj: jax.Array, observed_mask: jax.Array):
-        """Computes the PPO loss for a single agent.
-        observed_mask: [d] boolean or float mask indicating which nodes the agent can observe.
-        """
+    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array]):
+        """Computes the PPO loss for a single agent."""
         obs = batch["obs"]
         cat_acts = batch["cat_actions"]
         tgt_acts = batch["target_actions"]
@@ -151,12 +148,11 @@ class IPPOTrainer:
             obs_t = jnp.expand_dims(obs, axis=1)
             h0 = jnp.zeros((1, 64))
             _, outs = jax.lax.scan(scan_actor, h0, obs_t)
-            cat_logits, target_logits, graph_logits = outs
+            cat_logits, target_logits = outs
             cat_logits = jnp.squeeze(cat_logits, axis=1)
             target_logits = jnp.squeeze(target_logits, axis=1)
-            graph_logits = jnp.squeeze(graph_logits, axis=1)
         else:
-            cat_logits, target_logits, graph_logits = self.actor.apply(actor_params, obs)
+            cat_logits, target_logits = self.actor.apply(actor_params, obs)
         
         # Action log probs
         cat_dist = jax.nn.log_softmax(cat_logits)
@@ -179,40 +175,15 @@ class IPPOTrainer:
         entropy = -jnp.sum((jnp.sum(jnp.exp(cat_dist) * cat_dist, axis=-1) + 
                             jnp.sum(jnp.exp(tgt_dist) * tgt_dist, axis=-1)) * valid_mask) / valid_count
         
-        # 4. Graph Supervised Loss (BCE against true DAG for fast convergence)
-        # Using optax.sigmoid_binary_cross_entropy
-        true_adj_batch = jnp.tile(true_adj[None, :, :], (obs.shape[0], 1, 1))
-        bce = optax.sigmoid_binary_cross_entropy(graph_logits, true_adj_batch)
-        
-        # Apply pos_weight to balance sparse edges (assume ~3 edges out of 12 possible = weight of 4.0)
-        pos_weight = 4.0
-        weight_mask = jnp.where(true_adj_batch == 1.0, pos_weight, 1.0)
-        bce = bce * weight_mask
-        
-        # Mask out edges involving unobserved nodes and cross-domain edges (single source of
-        # truth: src.types.compute_edge_authority_mask). An agent may only assert edges within
-        # its own local domain or on the shared boundary pair -- never directly from its private
-        # node into the peer's domain.
-        domain_mask = jnp.where(observed_mask[0] == 1.0, STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1])
-        edge_mask = compute_edge_authority_mask(domain_mask, STANDARD_BOUNDARY_MASK)
-        
-        edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))
-        
-        # Apply mask and compute mean over valid edges and valid timesteps
-        masked_bce = bce * edge_mask_batch * valid_mask[:, None, None]
-        valid_edge_count = jnp.sum(edge_mask)
-        graph_loss = jnp.sum(masked_bce) / (valid_count * jnp.maximum(1.0, valid_edge_count))
-        
-        # Decouple graph loss gradient from pulling actor policy representation
-        total_actor_loss = actor_loss - self.entropy_coef * entropy + self.graph_coef * jax.lax.stop_gradient(graph_loss)
+        total_actor_loss = actor_loss - self.entropy_coef * entropy
         total_loss = total_actor_loss + critic_loss
-        return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "graph_loss": graph_loss, "critic_loss": critic_loss}
+        return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "critic_loss": critic_loss}
         
     @functools.partial(jax.jit, static_argnums=(0,))
-    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, true_adj, observed_mask):
+    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch):
         # Compute losses and gradients
         (total_loss, metrics), (a_grads, c_grads) = jax.value_and_grad(self.loss_fn, argnums=(0, 1), has_aux=True)(
-            actor_params, critic_params, batch, true_adj, observed_mask
+            actor_params, critic_params, batch
         )
         
         # Apply updates
@@ -223,4 +194,3 @@ class IPPOTrainer:
         new_critic_params = optax.apply_updates(critic_params, c_updates)
         
         return new_actor_params, new_critic_params, new_actor_opt, new_critic_opt, metrics
-

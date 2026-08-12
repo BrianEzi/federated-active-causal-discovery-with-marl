@@ -44,7 +44,7 @@ def test_env_step(base_config):
     # Agent 0 does Local Intervention on node 0
     # Agent 1 does NOOP on node 0
     joint_actions = {
-        "agent_0": (int(ActionCategory.LOCAL_INTERVENTION), 0),
+        "agent_0": (int(ActionCategory.INTERVENE), 0),
         "agent_1": (int(ActionCategory.NOOP), 0)
     }
     
