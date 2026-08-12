@@ -447,14 +447,18 @@ where the analytic one plateaus.
   above already imported the newer jax into this kernel, and Python caches modules by name, so a plain
   `pip install jax==0.4.30` in this cell would change what's on disk without changing what's already
   loaded -- it would **not** fix the import on its own. So the AVICI comparison run below installs its
-  own self-contained `jax==0.4.30`/`jaxlib==0.4.30` into an isolated directory and runs as a genuinely
-  separate subprocess (via `python -m src.train`, the same CLI entry point used for the analytic run
-  above) with that directory first on `PYTHONPATH`. This never touches the jax already loaded in this
-  kernel, so Steps 1-9 are unaffected either way. Trade-off: the isolated `jaxlib==0.4.30` here is
-  CPU-only (no CUDA wheel requested), so combined with AVICI's own transformer forward pass running on
-  every environment step, this comparison run will likely be noticeably slower than the GPU-accelerated
-  run above -- if it's taking too long, interrupt and re-run with a smaller `num_episodes` first to
-  gauge speed before committing to the full comparison.""")
+  own self-contained jax-ecosystem stack (`jax==0.4.30`/`jaxlib==0.4.30` plus matching pinned
+  `dm-haiku`/`optax`/`chex`/`numpy`/`scipy`, from this project's own `requirements.txt` -- confirmed
+  empirically that isolating jax/jaxlib alone isn't enough, since `haiku` would still resolve from Step
+  1's newer, unpinned install and itself need JAX APIs that don't exist in 0.4.30) into an isolated
+  directory, and runs the comparison as a genuinely separate subprocess (via `python -m src.train`, the
+  same CLI entry point used for the analytic run above) with that directory first on `PYTHONPATH`. This
+  never touches the jax already loaded in this kernel, so Steps 1-9 are unaffected either way.
+  Trade-off: the isolated `jaxlib==0.4.30` here is CPU-only (no CUDA wheel requested), so combined with
+  AVICI's own transformer forward pass running on every environment step, this comparison run will
+  likely be noticeably slower than the GPU-accelerated run above -- if it's taking too long, interrupt
+  and re-run with a smaller `num_episodes` first to gauge speed before committing to the full
+  comparison.""")
     add_code(r"""def install_avici():
     import subprocess
     import sys
@@ -501,14 +505,28 @@ where the analytic one plateaus.
         # base-image JAX has removed -- confirmed empirically on a real Kaggle run. This
         # kernel already imported that newer jax during Step 1, and Python caches modules
         # by name, so installing an older jax here wouldn't change what THIS process has
-        # already loaded. Instead: install a self-contained jax==0.4.30/jaxlib==0.4.30
-        # (confirmed to still have PositionalSharding, and it's this project's own pinned
-        # version) into an isolated directory, and verify + later run AVICI in genuinely
-        # separate subprocesses with that directory first on PYTHONPATH -- never touching
-        # the jax already loaded here, so Steps 1-9 stay unaffected regardless of outcome.
+        # already loaded. Instead: install a self-contained jax-ecosystem stack into an
+        # isolated directory, and verify + later run AVICI in genuinely separate
+        # subprocesses with that directory first on PYTHONPATH -- never touching the jax
+        # already loaded here, so Steps 1-9 stay unaffected regardless of outcome.
+        #
+        # This isolated stack must be jax==0.4.30/jaxlib==0.4.30 (this project's own pinned
+        # version, per requirements.txt; confirmed to still have PositionalSharding) PLUS
+        # matching pinned dm-haiku/optax/chex/numpy/scipy from that same requirements.txt --
+        # NOT the unpinned dm-haiku etc. Step 1 installed into the main environment. Confirmed
+        # empirically: the isolated jax==0.4.30 alone still resolved `import haiku` from the
+        # main environment's newer, unpinned dm-haiku, which needs a jax.core API
+        # (take_current_trace) that doesn't exist in 0.4.30, and crashed. requirements.txt's
+        # jax/jaxlib/dm-haiku/optax/chex/numpy/scipy pins are a set already validated together
+        # for this project's own training code, so isolating that whole set (not just
+        # jax/jaxlib) keeps everything mutually compatible.
         isolated_dir = "/kaggle/working/_avici_jax_env" if os.path.exists("/kaggle/working") else "_avici_jax_env"
         os.makedirs(isolated_dir, exist_ok=True)
-        pip_install(["--target", isolated_dir, "jax==0.4.30", "jaxlib==0.4.30"], "isolated jax==0.4.30")
+        pip_install([
+            "--target", isolated_dir,
+            "jax==0.4.30", "jaxlib==0.4.30", "dm-haiku==0.0.12", "optax==0.2.2",
+            "chex==0.1.86", "numpy==1.26.4", "scipy==1.13.1",
+        ], "isolated jax-ecosystem stack")
 
         isolated_env = os.environ.copy()
         isolated_env["PYTHONPATH"] = isolated_dir + os.pathsep + isolated_env.get("PYTHONPATH", "")
