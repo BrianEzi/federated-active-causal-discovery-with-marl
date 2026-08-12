@@ -6,8 +6,8 @@ from typing import Dict, Tuple
 from src.scm import sample_scm, _sample_scm_jitted
 
 from src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
-                       STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, compute_edge_authority_mask,
-                       compute_global_structural_mask)
+                       MechanismType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS,
+                       compute_edge_authority_mask, compute_global_structural_mask)
 from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
 from src.generators import generate_4node_topologies, generate_scm_params
 
@@ -291,12 +291,44 @@ class FederatedCausalEnv:
         d = self.config.d
         if self.avici_model is not None and self.estimator_type == "avici":
             try:
-                # Synthesize dataset summary or pass running covariance
-                prob = np.array(self.avici_model(x=run_cov))
+                # AVICI's model expects `x: [n, d]` raw observation samples (asserted
+                # internally), not a [d, d] covariance matrix -- passing run_cov directly
+                # (the previous implementation) fed it a matrix shaped like data but
+                # containing covariances, silently producing meaningless predictions
+                # rather than erroring, since a [d, d] array happens to satisfy `ndim==2`.
+                #
+                # We don't retain raw per-step samples (EnvState only keeps their
+                # aggregated covariance), so we synthesize statistically faithful ones
+                # from the tracked running covariance. This is exact (not an
+                # approximation) for MechanismType.LINEAR with Gaussian noise: the SCM's
+                # stationary joint distribution is then precisely N(0, run_cov), since
+                # the linear structural equations have no bias terms -- covariance is a
+                # complete sufficient statistic. For NONLINEAR_ANM / POST_NONLINEAR this
+                # is NOT faithful (covariance loses higher-order structure); warn rather
+                # than silently pretend it's fine.
+                if int(self.config.mechanism_type) != int(MechanismType.LINEAR):
+                    print(f"WARNING: AVICI sample synthesis from covariance is only exact for "
+                          f"MechanismType.LINEAR (current: {int(self.config.mechanism_type)}); "
+                          f"results may not faithfully represent the true SCM.")
+
+                cov = np.array(run_cov, dtype=np.float64)
+                cov = (cov + cov.T) / 2.0          # defensive symmetrization (float roundoff)
+                cov = cov + np.eye(d) * 1e-6       # defensive PSD floor
+                rng = np.random.default_rng()
+                x = rng.multivariate_normal(mean=np.zeros(d), cov=cov, size=self.sample_count).astype(np.float32)
+
+                # interv=None: running_covariance pools observational + interventional
+                # samples together, so per-sample intervention identity isn't retained
+                # at this point -- AVICI is given a purely observational-looking batch.
+                # This forfeits some of AVICI's interventional-data capability; properly
+                # threading real per-step samples + intervention masks through would be
+                # a further improvement, not attempted here.
+                prob = np.array(self.avici_model(x=x))
                 np.fill_diagonal(prob, 0.0)
                 return prob * self.structural_mask
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"WARNING: AVICI inference failed ({type(e).__name__}: {e}); "
+                      f"falling back to the analytic estimator for this step.")
 
         # Fast Analytic Invariance Estimator
         # Skeleton: S_ij = 0.5 * (|run_cov_ij| + |obs_cov_ij|)

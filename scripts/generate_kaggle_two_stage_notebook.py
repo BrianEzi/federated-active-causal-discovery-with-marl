@@ -51,7 +51,9 @@ This notebook trains the current full-featured Disjoint IPPO architecture:
 - **Observation Feedback & 3-Stage Curriculum**: Agents observe their own previous predicted DAG slice, and topology sampling ramps from Graph 0 -> Chain MEC pair -> all 8 topologies.
 - **Graph Structure Estimation**: The predicted causal DAG (used for SHD/F1 evaluation) comes from the fixed analytic invariance scorer over the server-stitched covariance, not from a learned graph head -- the actor networks now only learn intervention targeting. `--use_inductive_graph_head` is still accepted for checkpoint/CLI compatibility but is currently architecturally a no-op (the graph-head auxiliary network was removed).
 
-This mirrors the configuration used for the 1000-episode empirical run on the UCL Myriad HPC cluster, so results here are directly comparable to that baseline.""")
+This mirrors the configuration used for the 1000-episode empirical run on the UCL Myriad HPC cluster, so results here are directly comparable to that baseline.
+
+**Optional (Steps 10-12)**: trains a second comparison run using AVICI, a pretrained learned graph estimator, instead of the analytic formula -- useful for checking whether the analytic estimator's plateauing SHD is a limitation of the heuristic itself, or something deeper in the training loop. See Step 10 for honestly-stated caveats about this integration (sample reconstruction from covariance, no interventional labels yet, heavier optional dependencies).""")
 
     # CELL: Setup
     add_md(r"""## Step 1: Install Dependencies & Verify Accelerator""")
@@ -414,6 +416,132 @@ Evaluates the trained model under stochastic policy sampling ($T \in [0.0, 0.2, 
         display(Image(filename=mean_plot))
 
 evaluate_and_compare_temperatures(temperatures=[0.0, 0.2, 0.5, 1.0])""")
+
+    # CELL: AVICI install (optional, isolated)
+    add_md(r"""## Step 10 (Optional): Install AVICI for a Learned-Estimator Comparison
+The run above used the fast closed-form "analytic invariance" graph estimator (`--estimator_type analytic`).
+AVICI ([Lorch et al.](https://github.com/larslorch/avici), Amortized Variational Inference for Causal Discovery)
+is a pretrained transformer that predicts causal structure directly from data, rather than a hand-derived
+formula -- this section trains a second run using it, so you can see whether a learned estimator does better
+where the analytic one plateaus.
+
+**Known caveats, stated honestly rather than glossed over:**
+- AVICI's model expects `[n, d]` raw observation samples. This environment only tracks *aggregated covariance*
+  (not raw per-step samples), so samples are synthesized from `N(0, running_covariance)` before being passed in.
+  This is exact for the default `LINEAR` mechanism (covariance is then a complete sufficient statistic of the
+  SCM's stationary distribution) -- it is **not** faithful for `NONLINEAR_ANM` / `POST_NONLINEAR`.
+- Per-sample intervention labels aren't reconstructed (`interv=None` is passed) -- AVICI currently sees a
+  purely observational-looking batch, so it isn't using its full interventional-data capability yet.
+- AVICI pulls in a much heavier dependency chain than the rest of this notebook (`tensorflow`,
+  `tensorflow-datasets`, `pyarrow==10.0.1`, `igraph`, `deepdiff`, `huggingface-hub`). The install is isolated
+  to this cell specifically so a failure here can't affect the Step 5 run above. `pyarrow==10.0.1` is an old
+  pin and may need a source build on some Python versions.
+- **Confirmed, not hypothetical**: AVICI's own code (`avici/pretrain.py`) does
+  `from jax.sharding import PositionalSharding` unconditionally -- an API removed in newer JAX releases.
+  AVICI declares only `jax>=0.3.17` with no upper bound, so it can silently break against whatever JAX
+  version Kaggle's base image ships. If this happens, Step 10 below will say so explicitly and Steps 1-9
+  are entirely unaffected -- it just means this specific comparison isn't available in this environment.""")
+    add_code(r"""def install_avici():
+    import subprocess
+    import sys
+    import os
+
+    print("Installing AVICI (heavier dependency set: tensorflow, pyarrow, igraph, huggingface_hub)...")
+    env = os.environ.copy()
+    # avici's sdist chain pulls in the deprecated 'sklearn' PyPI shim, which modern pip
+    # refuses to build without this explicit opt-in.
+    env["SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL"] = "True"
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "avici"], env=env)
+        import avici  # noqa: F401 -- import check only
+        print("AVICI installed and importable.")
+        return True
+    except ImportError as e:
+        if "PositionalSharding" in str(e):
+            # Confirmed empirically: avici's own code (avici/pretrain.py) does
+            # `from jax.sharding import PositionalSharding` unconditionally. That API was
+            # removed in newer JAX releases (avici declares only jax>=0.3.17, no upper
+            # bound, so it silently breaks against whatever JAX Kaggle's base image ships).
+            print(f"AVICI install failed: its own code uses jax.sharding.PositionalSharding, "
+                  f"which your installed JAX version has removed. This is a known AVICI/JAX "
+                  f"version-compatibility issue, not a problem with this environment's setup.")
+        else:
+            print(f"AVICI install failed ({type(e).__name__}: {e}).")
+        print("Skipping the AVICI comparison run -- Steps 1-9 above are unaffected.")
+        return False
+    except Exception as e:
+        print(f"AVICI install failed ({type(e).__name__}: {e}).")
+        print("Skipping the AVICI comparison run -- Steps 1-9 above are unaffected.")
+        return False
+
+avici_available = install_avici()""")
+
+    # CELL: AVICI comparison training run
+    add_md(r"""## Step 11 (Optional): Train with the AVICI Estimator""")
+    add_code(r"""def train_avici_comparison(num_episodes: int = 1000):
+    import os
+
+    if not avici_available:
+        print("AVICI is not available in this environment -- skipping comparison run.")
+        return None
+
+    out_dir = "/kaggle/working" if os.path.exists("/kaggle/working") else "."
+    return train_two_stage_ippo(
+        num_episodes=num_episodes,
+        estimator_type="avici",
+        checkpoint_dir=os.path.join(out_dir, "checkpoints_avici"),
+        output_dir=os.path.join(out_dir, "avici_run"),
+        use_wandb=True,
+        wandb_project="federated-causal-marl-two-stage",
+    )
+
+avici_results = train_avici_comparison(num_episodes=1000)""")
+
+    # CELL: Comparison plot
+    add_md(r"""## Step 12 (Optional): Compare Analytic vs AVICI SHD/F1 Trajectories""")
+    add_code(r"""def plot_analytic_vs_avici_comparison():
+    import os
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
+    out_dir = "/kaggle/working" if os.path.exists("/kaggle/working") else "."
+    analytic_path = os.path.join(out_dir, "training_metrics.csv")
+    avici_path = os.path.join(out_dir, "avici_run", "training_metrics.csv")
+
+    if not os.path.exists(analytic_path) or not os.path.exists(avici_path):
+        print("Need both the Step 5 (analytic) and Step 11 (AVICI) runs to compare.")
+        print(f"  analytic: {analytic_path} (exists={os.path.exists(analytic_path)})")
+        print(f"  avici:    {avici_path} (exists={os.path.exists(avici_path)})")
+        return
+
+    df_analytic = pd.read_csv(analytic_path)
+    df_avici = pd.read_csv(avici_path)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    axes[0].plot(df_analytic["train/episode"], df_analytic["eval/shd"], label="Analytic", color="#e74c3c", alpha=0.8)
+    axes[0].plot(df_avici["train/episode"], df_avici["eval/shd"], label="AVICI", color="#3498db", alpha=0.8)
+    axes[0].set_title("SHD: Analytic vs AVICI Estimator", fontweight="bold")
+    axes[0].set_xlabel("Episode")
+    axes[0].set_ylabel("SHD")
+    axes[0].legend()
+
+    axes[1].plot(df_analytic["train/episode"], df_analytic["eval/f1"], label="Analytic", color="#e74c3c", alpha=0.8)
+    axes[1].plot(df_avici["train/episode"], df_avici["eval/f1"], label="AVICI", color="#3498db", alpha=0.8)
+    axes[1].set_title("F1: Analytic vs AVICI Estimator", fontweight="bold")
+    axes[1].set_xlabel("Episode")
+    axes[1].set_ylabel("F1 Score")
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+    tail_analytic = df_analytic.tail(max(1, len(df_analytic) // 10))
+    tail_avici = df_avici.tail(max(1, len(df_avici) // 10))
+    print("\n--- Final-Decile Mean SHD (lower is better) ---")
+    print(f"Analytic: {tail_analytic['eval/shd'].mean():.2f} +/- {tail_analytic['eval/shd'].std():.2f}")
+    print(f"AVICI:    {tail_avici['eval/shd'].mean():.2f} +/- {tail_avici['eval/shd'].std():.2f}")
+
+plot_analytic_vs_avici_comparison()""")
 
     out_path = os.path.join("notebooks", "kaggle_two_stage_ippo.ipynb")
     os.makedirs("notebooks", exist_ok=True)

@@ -241,3 +241,67 @@ def test_predict_graph_hypothesis_forbids_cross_domain_and_private_edges():
     allowed = [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)]
     for i, j in allowed:
         assert prob[i, j] > 0.0, f"legitimate edge ({i},{j}) was incorrectly zeroed"
+
+
+def test_predict_graph_hypothesis_avici_receives_correctly_shaped_samples():
+    """
+    Regression test: the AVICI branch of predict_graph_hypothesis previously called
+    self.avici_model(x=run_cov), passing a [d, d] covariance matrix where AVICI's real
+    API (confirmed directly from the avici package source, avici/pretrain.py
+    AVICIModel.__call__) requires x: [n, d] raw observation samples (asserts x.ndim==2,
+    which a [d,d] covariance matrix would satisfy without erroring -- so the bug produced
+    silently-wrong predictions, not a crash). A mock avici_model captures exactly what
+    shape it's called with.
+    """
+    config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
+    env = FederatedCausalEnv(config, action_costs=np.array([1.0, 1.0]), initial_budget=10.0,
+                              sample_count=64, estimator_type="analytic")
+    env.reset(jax.random.PRNGKey(0))
+
+    captured = {}
+    def mock_avici(x, interv=None):
+        captured["x_shape"] = x.shape
+        prob = np.random.RandomState(0).rand(4, 4).astype(np.float32)
+        np.fill_diagonal(prob, 0.0)
+        return prob
+
+    env.avici_model = mock_avici
+    env.estimator_type = "avici"
+
+    obs_cov = np.array(env.jax_state.obs_covariance)
+    run_cov = np.array(env.jax_state.running_covariance)
+    asym = np.zeros((4, 4), dtype=np.float32)
+    result = env.predict_graph_hypothesis(obs_cov, run_cov, asym)
+
+    assert captured["x_shape"] == (64, 4), (
+        f"AVICI must receive [n, d]=(64, 4) samples, got {captured['x_shape']} "
+        "-- looks like the [d,d] covariance is being passed directly again."
+    )
+    # AVICI's raw output must still go through the structural mask, same as the analytic branch.
+    assert np.allclose(result, result * env.structural_mask)
+    assert result[0, 2] == 0.0 and result[2, 0] == 0.0  # forbidden Z1<->X2
+
+
+def test_predict_graph_hypothesis_avici_failure_falls_back_loudly(capsys):
+    """AVICI errors must not be silently swallowed -- must print a visible warning and
+    still return a valid analytic-estimator fallback rather than crashing the episode."""
+    config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
+    env = FederatedCausalEnv(config, action_costs=np.array([1.0, 1.0]), initial_budget=10.0,
+                              sample_count=64, estimator_type="analytic")
+    env.reset(jax.random.PRNGKey(0))
+
+    def failing_avici(x, interv=None):
+        raise RuntimeError("simulated AVICI failure")
+
+    env.avici_model = failing_avici
+    env.estimator_type = "avici"
+
+    obs_cov = np.array(env.jax_state.obs_covariance)
+    run_cov = np.array(env.jax_state.running_covariance)
+    asym = np.zeros((4, 4), dtype=np.float32)
+    result = env.predict_graph_hypothesis(obs_cov, run_cov, asym)
+
+    assert result.shape == (4, 4)
+    assert not np.isnan(result).any()
+    captured_output = capsys.readouterr()
+    assert "AVICI inference failed" in captured_output.out
