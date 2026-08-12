@@ -192,7 +192,8 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     output_dir: str = None,
     eval_temperature: float = 0.0,
     use_wandb: bool = True,
-    wandb_project: str = "federated-causal-marl-kaggle"
+    wandb_project: str = "federated-causal-marl-kaggle",
+    env_overrides: dict = None
 ) -> dict:
     # Launches src.train with the two-stage action loop / soft-shift / personal-shared-reward architecture.
     import os
@@ -256,6 +257,8 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     # allocate its own share on top of that OOMs immediately. Force dynamic allocation.
     env = os.environ.copy()
     env["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    if env_overrides:
+        env.update(env_overrides)
     result = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if result.returncode != 0:
         print("\n=== SUBPROCESS ERROR LOG ===")
@@ -438,9 +441,20 @@ where the analytic one plateaus.
   pin and may need a source build on some Python versions.
 - **Confirmed, not hypothetical**: AVICI's own code (`avici/pretrain.py`) does
   `from jax.sharding import PositionalSharding` unconditionally -- an API removed in newer JAX releases.
-  AVICI declares only `jax>=0.3.17` with no upper bound, so it can silently break against whatever JAX
-  version Kaggle's base image ships. If this happens, Step 10 below will say so explicitly and Steps 1-9
-  are entirely unaffected -- it just means this specific comparison isn't available in this environment.""")
+  AVICI declares only `jax>=0.3.17` with no upper bound, so it breaks against whatever (newer) JAX
+  Kaggle's base image ships. `jax==0.4.30` (this project's own pinned version, per `requirements.txt`)
+  still has `PositionalSharding` -- confirmed by downloading its real wheel and checking. But Step 1
+  above already imported the newer jax into this kernel, and Python caches modules by name, so a plain
+  `pip install jax==0.4.30` in this cell would change what's on disk without changing what's already
+  loaded -- it would **not** fix the import on its own. So the AVICI comparison run below installs its
+  own self-contained `jax==0.4.30`/`jaxlib==0.4.30` into an isolated directory and runs as a genuinely
+  separate subprocess (via `python -m src.train`, the same CLI entry point used for the analytic run
+  above) with that directory first on `PYTHONPATH`. This never touches the jax already loaded in this
+  kernel, so Steps 1-9 are unaffected either way. Trade-off: the isolated `jaxlib==0.4.30` here is
+  CPU-only (no CUDA wheel requested), so combined with AVICI's own transformer forward pass running on
+  every environment step, this comparison run will likely be noticeably slower than the GPU-accelerated
+  run above -- if it's taking too long, interrupt and re-run with a smaller `num_episodes` first to
+  gauge speed before committing to the full comparison.""")
     add_code(r"""def install_avici():
     import subprocess
     import sys
@@ -452,10 +466,10 @@ where the analytic one plateaus.
     # refuses to build without this explicit opt-in.
     env["SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL"] = "True"
 
-    def pip_install(args, label):
+    def pip_install(args, label, target_env=None):
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-q"] + args,
-            env=env, capture_output=True, text=True,
+            env=target_env if target_env is not None else env, capture_output=True, text=True,
         )
         if result.returncode != 0:
             print(f"--- pip stdout (tail, {label}) ---")
@@ -482,28 +496,45 @@ where the analytic one plateaus.
             "pandas", "igraph", "scikit-learn", "tqdm", "psutil", "deepdiff", "huggingface-hub",
         ], "avici runtime deps")
         pip_install(["--no-deps", "avici"], "avici")
-        import avici  # noqa: F401 -- import check only
-        print("AVICI installed and importable.")
-        return True
-    except ImportError as e:
-        if "PositionalSharding" in str(e):
-            # Confirmed empirically: avici's own code (avici/pretrain.py) does
-            # `from jax.sharding import PositionalSharding` unconditionally. That API was
-            # removed in newer JAX releases (avici declares only jax>=0.3.17, no upper
-            # bound, so it silently breaks against whatever JAX Kaggle's base image ships).
-            print(f"AVICI install failed: its own code uses jax.sharding.PositionalSharding, "
-                  f"which your installed JAX version has removed. This is a known AVICI/JAX "
-                  f"version-compatibility issue, not a problem with this environment's setup.")
-        else:
-            print(f"AVICI install failed ({type(e).__name__}: {e}).")
-        print("Skipping the AVICI comparison run -- Steps 1-9 above are unaffected.")
-        return False
+
+        # avici's own code needs jax.sharding.PositionalSharding, which Kaggle's (newer)
+        # base-image JAX has removed -- confirmed empirically on a real Kaggle run. This
+        # kernel already imported that newer jax during Step 1, and Python caches modules
+        # by name, so installing an older jax here wouldn't change what THIS process has
+        # already loaded. Instead: install a self-contained jax==0.4.30/jaxlib==0.4.30
+        # (confirmed to still have PositionalSharding, and it's this project's own pinned
+        # version) into an isolated directory, and verify + later run AVICI in genuinely
+        # separate subprocesses with that directory first on PYTHONPATH -- never touching
+        # the jax already loaded here, so Steps 1-9 stay unaffected regardless of outcome.
+        isolated_dir = "/kaggle/working/_avici_jax_env" if os.path.exists("/kaggle/working") else "_avici_jax_env"
+        os.makedirs(isolated_dir, exist_ok=True)
+        pip_install(["--target", isolated_dir, "jax==0.4.30", "jaxlib==0.4.30"], "isolated jax==0.4.30")
+
+        isolated_env = os.environ.copy()
+        isolated_env["PYTHONPATH"] = isolated_dir + os.pathsep + isolated_env.get("PYTHONPATH", "")
+        check = subprocess.run(
+            [sys.executable, "-c", "import avici; print('AVICI_IMPORT_OK')"],
+            env=isolated_env, capture_output=True, text=True,
+        )
+        if "AVICI_IMPORT_OK" not in check.stdout:
+            print("--- AVICI isolated import check stdout ---")
+            print(check.stdout[-3000:])
+            print("--- AVICI isolated import check stderr ---")
+            print(check.stderr[-3000:])
+            if "PositionalSharding" in check.stderr:
+                print("Still hit the PositionalSharding issue even inside the isolated jax==0.4.30 "
+                      "environment -- something didn't isolate cleanly (e.g. a stray system jaxlib "
+                      "shadowing the isolated one). See the raw output above.")
+            raise RuntimeError("avici import check failed inside the isolated jax==0.4.30 subprocess")
+
+        print("AVICI installed and importable (verified in an isolated jax==0.4.30 subprocess).")
+        return True, {"PYTHONPATH": isolated_env["PYTHONPATH"]}
     except Exception as e:
         print(f"AVICI install failed ({type(e).__name__}: {e}).")
         print("Skipping the AVICI comparison run -- Steps 1-9 above are unaffected.")
-        return False
+        return False, None
 
-avici_available = install_avici()""")
+avici_available, avici_env_overrides = install_avici()""")
 
     # CELL: AVICI comparison training run
     add_md(r"""## Step 11 (Optional): Train with the AVICI Estimator""")
@@ -515,6 +546,11 @@ avici_available = install_avici()""")
         return None
 
     out_dir = "/kaggle/working" if os.path.exists("/kaggle/working") else "."
+    print(f"[AVICI] Training for {num_episodes} episodes as an isolated subprocess (jax==0.4.30, "
+          f"CPU-only jaxlib) via 'python -m src.train --estimator_type avici' -- AVICI's transformer "
+          f"forward pass runs every environment step, so expect this to be noticeably slower than the "
+          f"GPU-accelerated analytic run above. If it's taking too long, interrupt and re-run with a "
+          f"smaller num_episodes first to gauge speed.")
     return train_two_stage_ippo(
         num_episodes=num_episodes,
         estimator_type="avici",
@@ -522,6 +558,7 @@ avici_available = install_avici()""")
         output_dir=os.path.join(out_dir, "avici_run"),
         use_wandb=True,
         wandb_project="federated-causal-marl-two-stage",
+        env_overrides=avici_env_overrides,
     )
 
 avici_results = train_avici_comparison(num_episodes=1000)""")
