@@ -96,6 +96,12 @@ class IPPORNNCritic(hk.Module):
         return jnp.zeros((batch_size, hidden_dim))
 
 class InductiveIPPOActor(hk.Module):
+    """
+    NOTE: The Skew-Symmetric Tournament graph head this class was originally built around
+    was removed when the action space collapsed to INTERVENE/NOOP (graph_logits output
+    dropped entirely). This class is currently architecturally identical to IPPOActor;
+    kept as a distinct name only for CLI/checkpoint backward compatibility.
+    """
     def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, gamma: float = 2.0, name: str = None):
         super().__init__(name=name)
         self.d = d
@@ -129,6 +135,7 @@ class InductiveIPPOActor(hk.Module):
         return cat_logits, target_logits
 
 class InductiveIPPORNNActor(hk.Module):
+    """NOTE: see InductiveIPPOActor -- the graph head is likewise removed here."""
     def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, gamma: float = 2.0, name: str = None):
         super().__init__(name=name)
         self.d = d

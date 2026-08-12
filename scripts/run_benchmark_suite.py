@@ -21,14 +21,21 @@ EXPERIMENT_DEFINITIONS = {
         "description": "Standard multi-agent benchmark across all 8 topologies with Inductive Graph Head",
         "flags": ["--initial_budget", "20.0", "--use_inductive_graph_head"]
     },
+    # NOTE: EXP-3A/EXP-3B were designed to compare the Skew-Symmetric Tournament graph head
+    # against a baseline unconstrained MLP graph head. That graph head was removed from the
+    # actor networks in the ActionCategory INTERVENE/NOOP collapse refactor, so
+    # --use_inductive_graph_head / --no_inductive_graph_head now select architecturally
+    # identical actor classes -- running this pair currently only measures training-run
+    # seed variance, not an architectural difference. Left in place for reference; do not
+    # spend compute expecting a real distinction until the graph head is restored.
     "EXP-3A": {
         "name": "EXP-3A (Inductive Head Probe)",
-        "description": "Architectural Inductive Bias Probe with Skew-Symmetric Head",
+        "description": "[Currently a no-op vs EXP-3B -- graph head removed] Architectural Inductive Bias Probe",
         "flags": ["--initial_budget", "20.0", "--use_inductive_graph_head"]
     },
     "EXP-3B": {
         "name": "EXP-3B (Baseline MLP Probe)",
-        "description": "Architectural Inductive Bias Probe with Baseline unconstrained MLP",
+        "description": "[Currently a no-op vs EXP-3A -- graph head removed] Architectural Inductive Bias Probe",
         "flags": ["--initial_budget", "20.0", "--no_inductive_graph_head"]
     },
     "EXP-4A": {

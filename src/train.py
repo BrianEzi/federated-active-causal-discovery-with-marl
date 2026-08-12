@@ -122,11 +122,6 @@ def parse_args():
         "--entropy_coef", type=float, default=0.01,
         help="Entropy regularization bonus weight to encourage exploration (default: 0.01)"
     )
-    # Coefficient for the auxiliary Binary Cross-Entropy loss on local causal edge prediction heads
-    parser.add_argument(
-        "--graph_coef", type=float, default=1.0,
-        help="Loss weight multiplier for auxiliary edge prediction BCE loss (default: 1.0)"
-    )
     # Evaluation frequency: interval of episodes between computing full metrics, logging, and DAG visualizations
     parser.add_argument(
         "--eval_freq", type=int, default=10,
@@ -175,14 +170,18 @@ def parse_args():
         "--no_normalize_rewards", action="store_false", dest="normalize_rewards",
         help="Disable reward normalization and use raw unnormalized cumulative step penalties"
     )
-    # When enabled, uses the Anti-Symmetric Tournament Inductive Graph Head (Skew-Symmetric decomposition + empirical invariance bypass)
+    # NOTE: the Anti-Symmetric Tournament Inductive Graph Head was removed from the actor
+    # networks in the ActionCategory INTERVENE/NOOP collapse refactor -- InductiveIPPOActor
+    # is now architecturally equivalent to IPPOActor. This flag is currently a no-op, kept
+    # only so existing scripts/notebooks and saved checkpoints (which store this flag's
+    # value in their metadata) keep working.
     parser.add_argument(
         "--use_inductive_graph_head", action="store_true", default=True,
-        help="Use Skew-Symmetric Tournament Inductive Graph Head for 2-cycle free empirical invariance testing (default: True)"
+        help="[Currently a no-op -- graph head removed] Selects InductiveIPPOActor, which is architecturally identical to IPPOActor (default: True)"
     )
     parser.add_argument(
         "--no_inductive_graph_head", action="store_false", dest="use_inductive_graph_head",
-        help="Disable Inductive Graph Head and use baseline unconstrained MLP Graph Head"
+        help="[Currently a no-op -- graph head removed] Selects the plain IPPOActor class"
     )
     # Sampling temperature for post-training evaluation across topologies
     parser.add_argument(
@@ -405,7 +404,7 @@ def main():
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
-                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn,
+                              entropy_coef=args.entropy_coef, use_rnn=args.use_rnn,
                               total_episodes=args.num_episodes, normalize_rewards=args.normalize_rewards, max_steps=float(args.max_steps))
                               
         # Initialize Disjoint parameters and optimizers per agent

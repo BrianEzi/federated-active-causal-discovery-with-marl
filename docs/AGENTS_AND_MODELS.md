@@ -6,6 +6,8 @@ This document details the Multi-Agent Reinforcement Learning (MARL) control laye
 
 ## 1. Decentralized IPPO Architecture (`src/marl/ppo_agent.py`)
 
+> **⚠️ Architectural note (see `docs/CHANGELOG.md`, "Collapsed ActionCategory to INTERVENE/NOOP"):** the Graph Head described in Section A.3 below was removed from the actor networks. `IPPOActor`/`InductiveIPPOActor` now only return `(cat_logits, target_logits)` -- the action head is a single-stage `[INTERVENE, NOOP]` category plus target, not the dual-head architecture described here. Predicted DAG structure comes entirely from the fixed analytic invariance scorer in `FederatedCausalEnv`, not a learned network. Sections A.1/A.2 (node embeddings, action head) still broadly apply, modulo the category count.
+
 Unlike value-based methods (like QMIX) which rely on a centralized mixing network, IPPO trains a completely decentralized Actor and Critic for each agent. This ensures strict privacy boundaries, as agents learn entirely from their local observation states.
 
 ### A. Dual-Head `IPPOActor`

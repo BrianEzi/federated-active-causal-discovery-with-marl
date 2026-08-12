@@ -45,11 +45,11 @@ def create_kaggle_two_stage_notebook():
 
 ### Overview & Purpose
 This notebook trains the current full-featured Disjoint IPPO architecture:
-- **Two-Stage Action Loop**: The RL target-selection policy ($\mathbf{a}^{\text{exp}}_t$) is decoupled from the per-step graph hypothesis estimator ($\widehat{\mathbf{W}}_t$).
+- **Unified Intervention Action Space**: Agents select `INTERVENE` (on any node within their local domain or the shared boundary) or `NOOP`, replacing the earlier local/peer-request split.
 - **Soft-Shift Interventions**: $X_i := f_i(\mathbf{Pa}_i) + \epsilon_i + \delta_i$ with $\mu_\delta = 2.0$, preserving variance instead of hard-clamping boundary nodes.
 - **Personal Local & Shared Boundary Rewards**: Each agent is penalized for its own private-node SHD errors plus a shared penalty on boundary ($X_1 \leftrightarrow X_2$) errors.
-- **Anti-Symmetric Tournament Inductive Graph Head**: Skew-symmetric decomposition guarantees zero 2-cycle conflicts by algebraic construction.
 - **Observation Feedback & 3-Stage Curriculum**: Agents observe their own previous predicted DAG slice, and topology sampling ramps from Graph 0 -> Chain MEC pair -> all 8 topologies.
+- **Graph Structure Estimation**: The predicted causal DAG (used for SHD/F1 evaluation) comes from the fixed analytic invariance scorer over the server-stitched covariance, not from a learned graph head -- the actor networks now only learn intervention targeting. `--use_inductive_graph_head` is still accepted for checkpoint/CLI compatibility but is currently architecturally a no-op (the graph-head auxiliary network was removed).
 
 This mirrors the configuration used for the 1000-episode empirical run on the UCL Myriad HPC cluster, so results here are directly comparable to that baseline.""")
 
@@ -175,7 +175,7 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     learning_rate: float = 3e-4,
     eval_freq: int = 10,
     allowed_topologies: str = None,       # e.g. "0,1" or "0,2,6"; leave None to use the curriculum schedule
-    use_inductive_graph_head: bool = True,
+    use_inductive_graph_head: bool = True, # currently a no-op: the graph-head network was removed from the actor; kept for CLI/checkpoint compatibility
     intervention_type: str = "soft_shift", # "soft_shift" or "hard"
     soft_shift_val: float = 2.0,
     estimator_type: str = "analytic",      # "analytic" or "avici"
@@ -281,7 +281,7 @@ train_results = train_two_stage_ippo(num_episodes=1000)""")
     print(f"  BEST IPPO MODEL CHECKPOINT: {checkpoint_path}")
     print(f"==================================================")
     print(f"- Keys in Checkpoint: {list(ckpt.keys())}")
-    head_type = "Anti-Symmetric Tournament (InductiveIPPOActor)" if ckpt.get("use_inductive_graph_head") else "Standard MLP (IPPOActor)"
+    head_type = "InductiveIPPOActor class (architecturally identical to IPPOActor -- graph head removed)" if ckpt.get("use_inductive_graph_head") else "IPPOActor"
     arch_type = "Recurrent GRU (IPPORNNActor)" if ckpt.get("use_rnn") else "Feedforward"
     print(f"- Graph Head Architecture: {head_type}")
     print(f"- Sequence Model: {arch_type}")
