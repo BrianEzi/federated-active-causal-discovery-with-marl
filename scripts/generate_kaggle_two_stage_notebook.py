@@ -452,7 +452,24 @@ where the analytic one plateaus.
     # refuses to build without this explicit opt-in.
     env["SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL"] = "True"
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "avici"], env=env)
+        # avici's old pyarrow==10.0.1 pin has no prebuilt wheel for many interpreters, so pip
+        # falls back to a source build ("Getting requirements to build wheel"). That build
+        # invokes pkg_resources but pyarrow's sdist doesn't declare setuptools as a PEP 517
+        # build dependency, so pip's isolated build venv doesn't have it and the build fails
+        # before pyarrow's own code ever runs. --no-build-isolation makes the build reuse this
+        # outer environment's setuptools instead of a bare isolated one -- so it must be
+        # up to date here first.
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "setuptools", "wheel"], env=env)
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "--no-build-isolation", "avici"],
+            env=env, capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            print("--- pip stdout (tail) ---")
+            print(result.stdout[-3000:])
+            print("--- pip stderr (tail) ---")
+            print(result.stderr[-3000:])
+            raise subprocess.CalledProcessError(result.returncode, result.args)
         import avici  # noqa: F401 -- import check only
         print("AVICI installed and importable.")
         return True
