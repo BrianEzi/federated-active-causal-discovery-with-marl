@@ -99,3 +99,17 @@ def compute_edge_authority_masks(local_masks: chex.Array = STANDARD_LOCAL_MASKS,
                                   boundary_mask: chex.Array = STANDARD_BOUNDARY_MASK) -> chex.Array:
     """Returns [K, d, d] stacked edge-authority masks, one per agent."""
     return jnp.stack([compute_edge_authority_mask(local_masks[k], boundary_mask) for k in range(local_masks.shape[0])])
+
+def compute_global_structural_mask(local_masks: chex.Array = STANDARD_LOCAL_MASKS,
+                                    boundary_mask: chex.Array = STANDARD_BOUNDARY_MASK) -> chex.Array:
+    """
+    Union of every agent's edge-authority mask -- the full set of edges the true causal
+    structure could ever contain (each agent's own local pair, plus the shared boundary
+    pair), and nothing else. Unlike compute_edge_authority_mask (which restricts a single
+    agent), this is for *centralized/server-side* graph hypotheses that combine
+    information from all agents (e.g. FederatedCausalEnv.predict_graph_hypothesis) --
+    those aren't a privacy violation the way one agent unilaterally asserting a
+    cross-domain edge would be, but they must still respect the topology's actual
+    structural constraints (e.g. no direct Z1 <-> Z2 edge, no direct Z1 <-> X2 edge).
+    """
+    return jnp.max(compute_edge_authority_masks(local_masks, boundary_mask), axis=0)

@@ -6,7 +6,8 @@ from typing import Dict, Tuple
 from src.scm import sample_scm, _sample_scm_jitted
 
 from src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
-                       STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, compute_edge_authority_mask)
+                       STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, compute_edge_authority_mask,
+                       compute_global_structural_mask)
 from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
 from src.generators import generate_4node_topologies, generate_scm_params
 
@@ -249,6 +250,13 @@ class FederatedCausalEnv:
             compute_edge_authority_mask(self.local_masks[k], self.boundary_mask)
             for k in range(self.config.K)
         ]
+        # Structural mask for the centralized graph hypothesis (predict_graph_hypothesis):
+        # union of every agent's edge-authority mask. Not a privacy restriction (this is
+        # server-side, combining both agents' covariance already) but the true topology
+        # never has a direct private-to-peer-domain edge (e.g. Z1 <-> X2) or a direct
+        # private-to-private edge (Z1 <-> Z2), so the hypothesis shouldn't be able to
+        # predict one either.
+        self.structural_mask = np.array(compute_global_structural_mask(self.agent_masks, self.boundary_mask))
 
         self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)
         np.fill_diagonal(self.last_predicted_dag, 0.0)
@@ -276,6 +284,9 @@ class FederatedCausalEnv:
     def predict_graph_hypothesis(self, obs_cov: np.ndarray, run_cov: np.ndarray, asym: np.ndarray) -> np.ndarray:
         """
         Stage 2 Inference Engine: Predicts continuous edge probability matrix [d, d].
+        Output is masked by self.structural_mask -- the true topology never contains a
+        direct private-to-peer-domain edge (e.g. Z1 <-> X2) or a direct private-to-private
+        edge (Z1 <-> Z2), so neither estimator below is allowed to predict one.
         """
         d = self.config.d
         if self.avici_model is not None and self.estimator_type == "avici":
@@ -283,10 +294,10 @@ class FederatedCausalEnv:
                 # Synthesize dataset summary or pass running covariance
                 prob = np.array(self.avici_model(x=run_cov))
                 np.fill_diagonal(prob, 0.0)
-                return prob
+                return prob * self.structural_mask
             except Exception:
                 pass
-                
+
         # Fast Analytic Invariance Estimator
         # Skeleton: S_ij = 0.5 * (|run_cov_ij| + |obs_cov_ij|)
         # Orientation: O_ij = 2.0 * asym_ij
@@ -294,6 +305,7 @@ class FederatedCausalEnv:
         O = 2.0 * asym
         logits = S + O
         prob = 1.0 / (1.0 + np.exp(-np.clip(logits, -10.0, 10.0)))
+        prob = prob * self.structural_mask
         np.fill_diagonal(prob, 0.0)
         return prob.astype(np.float32)
 

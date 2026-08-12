@@ -201,3 +201,43 @@ def test_evaluator_env_step_applies_cycle_penalty_in_analytic_hypothesis_path():
         "env.step()'s reward must match the has_cycle=True computation -- got a reward "
         "matching has_cycle=False, meaning the cycle penalty is still not being applied."
     )
+
+
+def test_predict_graph_hypothesis_forbids_cross_domain_and_private_edges():
+    """
+    Regression test: FederatedCausalEnv.predict_graph_hypothesis (the centralized analytic
+    estimator that drives the predicted_dag shown in WandB visualizations, and the reward
+    for real IPPO training via predicted_dags=None) must never assign nonzero probability
+    to a structurally-impossible edge: Z1<->X2 (private-to-peer-domain), Z1<->Z2 or
+    X1<->Z2 (private-to-private / cross-domain). Constructed with strong, non-degenerate
+    covariance and asymmetry signal on exactly those forbidden pairs, to make sure the
+    fix is a hard structural mask and not just "usually zero because signal is weak".
+    """
+    config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
+    env = FederatedCausalEnv(config, action_costs=np.array([1.0, 1.0]), initial_budget=10.0, sample_count=20, fixed_graph=True)
+    env.reset(jax.random.PRNGKey(0))
+
+    d = 4
+    obs_cov = np.eye(d, dtype=np.float32)
+    run_cov = np.eye(d, dtype=np.float32)
+    asym = np.zeros((d, d), dtype=np.float32)
+    # Force maximal (saturating) signal on every off-diagonal pair, including the
+    # forbidden ones -- if masking weren't applied, all of these would show as edges.
+    for i in range(d):
+        for j in range(d):
+            if i != j:
+                obs_cov[i, j] = run_cov[i, j] = 5.0
+    asym[0, 2], asym[2, 0] = 5.0, -5.0  # strong (fake) Z1<->X2 directional signal
+    asym[0, 3], asym[3, 0] = 5.0, -5.0  # strong (fake) Z1<->Z2 directional signal
+    asym[1, 3], asym[3, 1] = 5.0, -5.0  # strong (fake) X1<->Z2 directional signal
+
+    prob = env.predict_graph_hypothesis(obs_cov, run_cov, asym)
+
+    forbidden = [(0, 2), (2, 0), (0, 3), (3, 0), (1, 3), (3, 1)]
+    for i, j in forbidden:
+        assert prob[i, j] == 0.0, f"forbidden edge ({i},{j}) got nonzero probability {prob[i, j]}"
+
+    # Legitimate edges (adjacent in the [Z1, X1, X2, Z2] chain) must still be predictable.
+    allowed = [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)]
+    for i, j in allowed:
+        assert prob[i, j] > 0.0, f"legitimate edge ({i},{j}) was incorrectly zeroed"
