@@ -5,7 +5,8 @@ import numpy as np
 from typing import Dict, Tuple
 from src.scm import sample_scm, _sample_scm_jitted
 
-from src.types import SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory
+from src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
+                       STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, compute_edge_authority_mask)
 from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
 from src.generators import generate_4node_topologies, generate_scm_params
 
@@ -236,24 +237,21 @@ class FederatedCausalEnv:
         self.int_type_code = int(InterventionType.HARD if intervention_type == "hard" else InterventionType.SOFT_SHIFT)
         
         # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
-        self.agent_masks = jnp.array([
-            [1.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 1.0]
-        ])
-        
+        self.agent_masks = STANDARD_LOCAL_MASKS
+
         # Observation masks for Agent 1 (observes 0, 1, 2) and Agent 2 (observes 1, 2, 3)
-        self.obs_masks = jnp.array([
-            [1.0, 1.0, 1.0, 0.0],
-            [0.0, 1.0, 1.0, 1.0]
-        ])
-        
+        self.obs_masks = STANDARD_OBS_MASKS
+
         self.local_masks = [self.agent_masks[k] for k in range(self.config.K)]
-        self.boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
+        self.boundary_mask = STANDARD_BOUNDARY_MASK
+        # Edge-authority masks (single source of truth: src.types.compute_edge_authority_mask):
+        # an agent may only assert edges within its own local domain or on the shared boundary
+        # pair, never directly from its private node into the peer's domain.
         self.edge_masks = [
-            jnp.array([[1, 1, 1, 0], [1, 1, 1, 0], [1, 1, 1, 0], [0, 0, 0, 0]], dtype=jnp.float32),
-            jnp.array([[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 1, 1], [0, 1, 1, 1]], dtype=jnp.float32)
+            compute_edge_authority_mask(self.local_masks[k], self.boundary_mask)
+            for k in range(self.config.K)
         ]
-        
+
         self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)
         np.fill_diagonal(self.last_predicted_dag, 0.0)
         self.prev_shd = None

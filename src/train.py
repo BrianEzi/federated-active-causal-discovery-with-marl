@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from src.types import SCMConfig, MechanismType, NoiseType
+from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
@@ -398,14 +398,10 @@ def main():
         critic_apply = jax.jit(critic_trans.apply)
 
         
-        local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
-        boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-        observed_masks = [jnp.array([1.0, 1.0, 1.0, 0.0]), jnp.array([0.0, 1.0, 1.0, 1.0])]
-        edge_masks = [
-            jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
-            jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
-        ]
-        
+        local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
+        boundary_mask = STANDARD_BOUNDARY_MASK
+        observed_masks = [STANDARD_OBS_MASKS[0], STANDARD_OBS_MASKS[1]]
+
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
@@ -488,7 +484,7 @@ def main():
                 else:
                     cat_l0, tgt_l0, gr_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                c0, t0, lp0, gp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], gr_l0[0], local_masks[0], boundary_mask, edge_masks[0], k0_act)
+                c0, t0, lp0, gp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], gr_l0[0], local_masks[0], boundary_mask, k0_act)
                 
                 # Agent 1
                 k1_act, key = jax.random.split(key)
@@ -500,7 +496,7 @@ def main():
                 else:
                     cat_l1, tgt_l1, gr_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, edge_masks[1], k1_act)
+                c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, k1_act)
                 
                 joint_actions = {
                     "agent_0": (int(c0), int(t0)),

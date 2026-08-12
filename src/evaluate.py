@@ -4,7 +4,7 @@ import numpy as np
 import json
 from typing import Dict, Any
 
-from src.types import SCMConfig
+from src.types import SCMConfig, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_masks
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPORNNActor, InductiveIPPOActor, InductiveIPPORNNActor
 
@@ -36,12 +36,9 @@ def run_evaluation_suite(
     }
     actor_apply = jax.jit(actor.apply)
     
-    local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
-    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-    edge_masks = [
-        jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
-        jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
-    ]
+    local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
+    boundary_mask = STANDARD_BOUNDARY_MASK
+    edge_masks = compute_edge_authority_masks(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
     
     from src.marl.ppo_agent import mask_invalid_targets
     from src.stitching import stitch_predicted_dags

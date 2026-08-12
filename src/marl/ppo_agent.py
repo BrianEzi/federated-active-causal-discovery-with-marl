@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 from typing import Tuple, Dict
-from src.types import ActionCategory
+from src.types import ActionCategory, compute_edge_authority_mask
 
 class IPPOActor(hk.Module):
     def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, name: str = None):
@@ -345,16 +345,20 @@ def sample_actions_jitted(
     graph_logits: jax.Array,
     local_ownership_mask: jax.Array,
     peer_boundary_mask: jax.Array,
-    edge_mask: jax.Array,
     key: jax.Array
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     """
     Samples category and target actions directly on GPU without host-device synchronization.
     Supports single observation [3], [d], [d, d] or batched [B, 3], [B, d], [B, d, d].
+    The graph edge-authority mask is derived internally from local_ownership_mask and
+    peer_boundary_mask (both already required for target masking) via
+    compute_edge_authority_mask, rather than accepted as a separate argument -- this makes
+    it structurally impossible for a caller to pass an inconsistent/incorrect edge mask.
     """
     is_batched = (cat_logits.ndim > 1)
     k1, k2 = jax.random.split(key)
-    
+    edge_mask = compute_edge_authority_mask(local_ownership_mask, peer_boundary_mask)
+
     if is_batched:
         B = cat_logits.shape[0]
         cat = jax.random.categorical(k1, cat_logits) # [B]

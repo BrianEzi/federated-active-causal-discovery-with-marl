@@ -1,5 +1,5 @@
 import numpy as np
-from src.types import ActionCategory
+from src.types import ActionCategory, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
 
 def estimate_graph_from_obs(obs: np.ndarray, d: int, agent_id: int, threshold: float = 0.25) -> np.ndarray:
     """
@@ -7,6 +7,9 @@ def estimate_graph_from_obs(obs: np.ndarray, d: int, agent_id: int, threshold: f
     1. Extracts cov_obs, cov_run, and invariance asymmetry from observation.
     2. Identifies edges via correlation thresholding.
     3. Directs edges using empirical invariance asymmetry from interventions.
+    Edges are restricted to the agent's edge-authority domain (its own local pair, or the
+    shared boundary pair): an agent may observe a peer's boundary node for covariance purposes,
+    but may never assert an edge directly from its own private node into the peer's domain.
     """
     d2 = d * d
     obs_arr = np.asarray(obs).flatten()
@@ -36,7 +39,11 @@ def estimate_graph_from_obs(obs: np.ndarray, d: int, agent_id: int, threshold: f
                 else:
                     # Fallback to upper triangular orientation
                     graph_pred[i, j] = 1.0
-                    
+
+    if d == 4:
+        edge_mask = np.array(compute_edge_authority_mask(STANDARD_LOCAL_MASKS[agent_id], STANDARD_BOUNDARY_MASK))
+        graph_pred = graph_pred * edge_mask
+
     return graph_pred
 
 class RandomAgent:

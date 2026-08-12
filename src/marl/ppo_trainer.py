@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import optax
 import haiku as hk
 from typing import Dict, Any, Tuple
+from src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
 
 class RolloutBuffer:
     def __init__(self):
@@ -188,10 +189,12 @@ class IPPOTrainer:
         weight_mask = jnp.where(true_adj_batch == 1.0, pos_weight, 1.0)
         bce = bce * weight_mask
         
-        # Mask out edges involving unobserved nodes and cross-domain edges
-        domain_mask = jnp.where(observed_mask[0] == 1.0, jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0]))
-        boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-        edge_mask = jnp.maximum(jnp.outer(domain_mask, domain_mask), jnp.outer(boundary_mask, boundary_mask))
+        # Mask out edges involving unobserved nodes and cross-domain edges (single source of
+        # truth: src.types.compute_edge_authority_mask). An agent may only assert edges within
+        # its own local domain or on the shared boundary pair -- never directly from its private
+        # node into the peer's domain.
+        domain_mask = jnp.where(observed_mask[0] == 1.0, STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1])
+        edge_mask = compute_edge_authority_mask(domain_mask, STANDARD_BOUNDARY_MASK)
         
         edge_mask_batch = jnp.tile(edge_mask[None, :, :], (obs.shape[0], 1, 1))
         

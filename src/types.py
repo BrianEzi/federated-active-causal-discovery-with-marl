@@ -71,3 +71,32 @@ class InterventionSpec:
     type: chex.Array
     # d-dimensional array of intervention values (shift, scale, or hard replacement value)
     value: chex.Array
+
+# Standard 4-node federated topology: [Z1, X1, X2, Z2].
+# Z1 (idx 0) and Z2 (idx 3) are private nodes, exclusive to Agent 0 and Agent 1 respectively.
+# X1 (idx 1) and X2 (idx 2) are the shared boundary nodes.
+STANDARD_LOCAL_MASKS = jnp.array([
+    [1.0, 1.0, 0.0, 0.0],  # Agent 0 owns Z1, X1
+    [0.0, 0.0, 1.0, 1.0]   # Agent 1 owns X2, Z2
+])
+STANDARD_BOUNDARY_MASK = jnp.array([0.0, 1.0, 1.0, 0.0])  # X1, X2
+STANDARD_OBS_MASKS = jnp.array([
+    [1.0, 1.0, 1.0, 0.0],  # Agent 0 observes Z1, X1, X2 (not Z2)
+    [0.0, 1.0, 1.0, 1.0]   # Agent 1 observes X1, X2, Z2 (not Z1)
+])
+
+def compute_edge_authority_mask(local_mask: chex.Array, boundary_mask: chex.Array) -> chex.Array:
+    """
+    Canonical per-agent edge-authority mask (single source of truth).
+    An agent may only assert a predicted edge (i, j) if BOTH i and j lie within its own
+    local domain (its private node + its own boundary node), OR both lie on the shared
+    boundary pair. This structurally forbids an agent from asserting an edge directly
+    between its private node and the peer's domain (e.g. Z1 <-> X2) -- only the mutual
+    boundary nodes (X1 <-> X2) may ever be jointly predicted by both agents.
+    """
+    return jnp.maximum(jnp.outer(local_mask, local_mask), jnp.outer(boundary_mask, boundary_mask))
+
+def compute_edge_authority_masks(local_masks: chex.Array = STANDARD_LOCAL_MASKS,
+                                  boundary_mask: chex.Array = STANDARD_BOUNDARY_MASK) -> chex.Array:
+    """Returns [K, d, d] stacked edge-authority masks, one per agent."""
+    return jnp.stack([compute_edge_authority_mask(local_masks[k], boundary_mask) for k in range(local_masks.shape[0])])
