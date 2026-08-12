@@ -451,25 +451,37 @@ where the analytic one plateaus.
     # avici's sdist chain pulls in the deprecated 'sklearn' PyPI shim, which modern pip
     # refuses to build without this explicit opt-in.
     env["SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL"] = "True"
-    try:
-        # avici's old pyarrow==10.0.1 pin has no prebuilt wheel for many interpreters, so pip
-        # falls back to a source build ("Getting requirements to build wheel"). That build
-        # invokes pkg_resources but pyarrow's sdist doesn't declare setuptools as a PEP 517
-        # build dependency, so pip's isolated build venv doesn't have it and the build fails
-        # before pyarrow's own code ever runs. --no-build-isolation makes the build reuse this
-        # outer environment's setuptools instead of a bare isolated one -- so it must be
-        # up to date here first.
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "setuptools", "wheel"], env=env)
+
+    def pip_install(args, label):
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-q", "--no-build-isolation", "avici"],
+            [sys.executable, "-m", "pip", "install", "-q"] + args,
             env=env, capture_output=True, text=True,
         )
         if result.returncode != 0:
-            print("--- pip stdout (tail) ---")
+            print(f"--- pip stdout (tail, {label}) ---")
             print(result.stdout[-3000:])
-            print("--- pip stderr (tail) ---")
+            print(f"--- pip stderr (tail, {label}) ---")
             print(result.stderr[-3000:])
-            raise subprocess.CalledProcessError(result.returncode, result.args)
+            raise subprocess.CalledProcessError(result.returncode, [sys.executable, "-m", "pip", "install"] + args)
+
+    try:
+        # avici (confirmed from its real PyPI metadata) pins pyarrow==10.0.1 exactly. That
+        # version has no prebuilt wheel for Kaggle's Python, so a normal `pip install avici`
+        # forces a source build that fails at "Preparing metadata (pyproject.toml)" -- it
+        # needs the Arrow C++ toolchain, which no pip flag alone provides (confirmed on a
+        # real Kaggle run). avici itself ships as a pure-Python wheel with no C extensions,
+        # so instead of fighting that pin: install every OTHER dependency avici actually
+        # imports at runtime, deliberately skipping jax/jaxlib/dm-haiku/optax (this
+        # notebook's Step 1 already installs those at versions avici's own, looser
+        # constraints are satisfied by -- touching them here risks upgrading jax underneath
+        # the training that already ran in Steps 1-9), then install avici itself with
+        # --no-deps so pip never resolves or builds pyarrow==10.0.1 at all.
+        pip_install(["--upgrade", "pyarrow"], "pyarrow")
+        pip_install([
+            "tensorflow", "tensorflow-datasets~=4.3.0", "imageio", "jupyter", "matplotlib",
+            "pandas", "igraph", "scikit-learn", "tqdm", "psutil", "deepdiff", "huggingface-hub",
+        ], "avici runtime deps")
+        pip_install(["--no-deps", "avici"], "avici")
         import avici  # noqa: F401 -- import check only
         print("AVICI installed and importable.")
         return True
