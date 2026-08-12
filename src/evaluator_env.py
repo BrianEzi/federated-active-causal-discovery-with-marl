@@ -400,11 +400,12 @@ class FederatedCausalEnv:
             stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
             self.last_predicted_dag = stitched_dag
         else:
+            from src.stitching import detect_cycle
             self.last_predicted_dag = self.predict_graph_hypothesis(
                 np.array(self.jax_state.obs_covariance), np.array(self.jax_state.running_covariance), asym
             )
-            has_cycle = False
             stitched_dag = (self.last_predicted_dag > 0.5).astype(np.float32)
+            has_cycle = detect_cycle(stitched_dag)
 
         true_dag = np.array(self.jax_state.true_adjacency)
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0

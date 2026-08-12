@@ -400,6 +400,7 @@ def main():
         local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
         boundary_mask = STANDARD_BOUNDARY_MASK
         observed_masks = [STANDARD_OBS_MASKS[0], STANDARD_OBS_MASKS[1]]
+        valid_intervention_masks = [jnp.maximum(local_masks[0], boundary_mask), jnp.maximum(local_masks[1], boundary_mask)]
 
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
@@ -483,7 +484,7 @@ def main():
                 else:
                     cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], jnp.maximum(local_masks[0], boundary_mask), k0_act)
+                c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], valid_intervention_masks[0], k0_act)
                 
                 # Agent 1
                 k1_act, key = jax.random.split(key)
@@ -495,7 +496,7 @@ def main():
                 else:
                     cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], jnp.maximum(local_masks[1], boundary_mask), k1_act)
+                c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], valid_intervention_masks[1], k1_act)
                 
                 joint_actions = {
                     "agent_0": (int(c0), int(t0)),
@@ -552,7 +553,7 @@ def main():
                 
                 # Update agent k's private parameters strictly on its own buffer
                 a_p, c_p, a_opt, c_opt, metrics = trainer.update_step(
-                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b
+                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, valid_intervention_masks[k]
                 )
                 actor_params_list[k] = a_p
                 critic_params_list[k] = c_p

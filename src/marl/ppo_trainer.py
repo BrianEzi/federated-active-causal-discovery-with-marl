@@ -5,6 +5,7 @@ import optax
 import haiku as hk
 from typing import Dict, Any, Tuple
 from src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
+from src.marl.ppo_agent import mask_invalid_targets
 
 class RolloutBuffer:
     def __init__(self):
@@ -43,25 +44,30 @@ class RolloutBuffer:
 
 @jax.jit
 def compute_gae(rewards: jax.Array, values: jax.Array, dones: jax.Array, gamma: float = 0.99, lam: float = 0.95):
-    """Computes Generalized Advantage Estimation."""
-    advs = jnp.zeros_like(rewards)
-    
+    """
+    Computes Generalized Advantage Estimation.
+    Returns RAW (unnormalized) advantages and returns. Advantages must only be normalized
+    downstream over the *valid* (unpadded) transitions -- see IPPOTrainer.loss_fn, which
+    already does this correctly for the policy-gradient ratio. Normalizing here (before
+    returns = advs + values is computed) would make the critic's regression target contain
+    an artificially unit-variance term independent of critic quality, putting a hard floor
+    under critic_loss that no amount of training can cross; it would also let zero-padded
+    trailing transitions (from RolloutBuffer.get_batches's static-shape padding) skew the
+    normalization statistics for real transitions in early-terminated episodes.
+    """
     def scan_fn(carry, transition):
         r, v, nv, d = transition
         gae = carry
         delta = r + gamma * nv * (1.0 - d) - v
         gae = delta + gamma * lam * (1.0 - d) * gae
         return gae, gae
-        
+
     next_values = jnp.append(values[1:], 0.0)
     transitions = (rewards[::-1], values[::-1], next_values[::-1], dones[::-1])
-    
+
     _, advs_rev = jax.lax.scan(scan_fn, 0.0, transitions)
     advs = advs_rev[::-1]
-    
-    # Normalize advantages
-    advs = (advs - jnp.mean(advs)) / (jnp.std(advs) + 1e-8)
-    
+
     returns = advs + values
     return advs, returns
 
@@ -108,8 +114,15 @@ class IPPOTrainer:
         self.clip_eps = clip_eps
         self.entropy_coef = entropy_coef
         
-    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array]):
-        """Computes the PPO loss for a single agent."""
+    def loss_fn(self, actor_params, critic_params, batch: Dict[str, jax.Array], valid_intervention_mask: jax.Array):
+        """
+        Computes the PPO loss for a single agent.
+        valid_intervention_mask: [d] mask of nodes this agent may target on INTERVENE, identical
+        to what was passed to sample_actions_jitted at rollout time. Required so target_logits
+        gets masked identically here as it was at rollout -- otherwise old_log_probs (computed
+        rollout-side from masked logits) and new_log_probs (recomputed here) diverge purely from
+        the masking asymmetry, corrupting the PPO ratio even when the policy hasn't changed.
+        """
         obs = batch["obs"]
         cat_acts = batch["cat_actions"]
         tgt_acts = batch["target_actions"]
@@ -154,9 +167,12 @@ class IPPOTrainer:
         else:
             cat_logits, target_logits = self.actor.apply(actor_params, obs)
         
-        # Action log probs
+        # Action log probs -- mask target_logits exactly as sample_actions_jitted did at
+        # rollout time, so old_log_probs and new_log_probs are computed under the same
+        # distribution (see valid_intervention_mask docstring above).
+        masked_target_logits = mask_invalid_targets(cat_acts, target_logits, valid_intervention_mask)
         cat_dist = jax.nn.log_softmax(cat_logits)
-        tgt_dist = jax.nn.log_softmax(target_logits)
+        tgt_dist = jax.nn.log_softmax(masked_target_logits)
         
         # Gather chosen action probs
         cat_lp = jax.vmap(lambda p, a: p[a])(cat_dist, cat_acts)
@@ -180,10 +196,10 @@ class IPPOTrainer:
         return total_loss, {"actor_loss": actor_loss, "entropy": entropy, "critic_loss": critic_loss}
         
     @functools.partial(jax.jit, static_argnums=(0,))
-    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch):
+    def update_step(self, actor_params, critic_params, actor_opt_state, critic_opt_state, batch, valid_intervention_mask):
         # Compute losses and gradients
         (total_loss, metrics), (a_grads, c_grads) = jax.value_and_grad(self.loss_fn, argnums=(0, 1), has_aux=True)(
-            actor_params, critic_params, batch
+            actor_params, critic_params, batch, valid_intervention_mask
         )
         
         # Apply updates
