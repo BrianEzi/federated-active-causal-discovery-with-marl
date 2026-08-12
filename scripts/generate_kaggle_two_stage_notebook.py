@@ -254,7 +254,12 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     # allocate its own share on top of that OOMs immediately. Force dynamic allocation.
     env = os.environ.copy()
     env["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    subprocess.check_call(cmd, env=env)
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        print("\n=== SUBPROCESS ERROR LOG ===")
+        print(result.stderr)
+        print("============================\n")
+        raise RuntimeError(f"Training script failed with exit code {result.returncode}. See log above.")
 
     return {
         "checkpoint_path": os.path.join(checkpoint_dir, "best_ippo_params.pkl"),
