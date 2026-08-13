@@ -1,7 +1,7 @@
 # Investigation: Why RNN Training No Longer Converges to Low SHD
 
-**Status**: Core investigation complete, fix implemented and confirmed at full scale (overnight autonomous session, 2026-08-13 ~01:00-03:00 UTC). Branch is exploratory WIP -- **not merged**, awaiting your review.
-**Branch**: `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`, pushed to origin as a backup only, not merged anywhere)
+**Status**: Merged into `main` (2026-08-13) with `--estimator_type avici` and `--reward_density sparse` as new defaults. **However, see "Follow-up: does the frozen (deployed) policy actually work?" below (2026-08-13, same day) -- a major caveat discovered *after* the merge that the SHD numbers throughout this doc are training-curve (on-policy, stochastically-sampled) metrics, and the frozen/deterministic policy performs much worse. Read that section before citing any SHD figure from this doc as "the policy's performance."**
+**Branch**: was `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`), merged into `main` via `--no-ff` merge.
 **Trigger**: You observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." Your hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
 
 ## TL;DR
@@ -258,8 +258,41 @@ Ran `{learned, avici (fixed), analytic} x {dense, sparse reward} x 3 seeds`, 200
 5. ~~AVICI's sample-reconstruction shim discards mean-shift information~~ -- fixed (see above). One loose end remains: the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked.
 6. **Kaggle GPU AVICI path** -- the `JAX_PLATFORMS=cpu` fix for the isolated-subprocess PJRT-version-mismatch bug (commit `d0db3ea`) is now confirmed working on real Kaggle GPU hardware.
 
+## Follow-up: does the frozen (deployed) policy actually work? (2026-08-13, post-merge)
+
+**Question that triggered this**: every SHD/F1/reached-SHD0 figure reported above -- both the overnight AVICI-fix diagnostics and the 18-run matrix -- comes from `train.py`'s own episode loop, computed from the same rollout used for that episode's PPO update, with actions **sampled stochastically** from the actor's then-current (still-updating) weights. None of it reflects a separately frozen, "already learned," greedily-evaluated policy. "Early vs late" in the matrix analysis means "early-training policy vs late-training policy," not "no policy vs converged policy."
+
+**Discovery**: `train.py` already runs exactly the right experiment automatically -- at the end of every run it calls `evaluate.py::evaluate_checkpoint` on the best-observed checkpoint, with `temperature=0.0` (greedy/deterministic action selection, no exploration) across **all 8 topologies** (not just the trained-on one), saving `evaluation_trace.json`. This had already run for all 18 Myriad matrix jobs -- it just never got pulled back, because the earlier `scp`/tar step only grabbed `training_metrics.csv`. Retrieved all 18 `evaluation_trace.json` files from `~/marl_causal/diag_runs/matrix_*/` on Myriad (no retraining needed) and analyzed them (144 run x graph combinations).
+
+**Result: severe behavioral collapse under greedy evaluation.**
+
+| | analytic | avici | learned |
+|---|---|---|---|
+| mean final SHD (greedy, 8 graphs) | 3.04 | 2.90 | 2.81 |
+| reached SHD=0 rate | 4.2% | 4.2% | 2.1% |
+| "stuck loop" rate (intervenes, but on <=1 unique target the whole episode) | 66.7% | 60.4% | 43.8% |
+| never intervenes at all (pure NOOP, entire 20-step episode) | 16.7% | 27.1% | 45.8% |
+| genuine target diversity (2+ unique targets) | ~17% | ~13% | ~10% |
+
+Across all 144 run x graph combinations: **78.5% of frozen-policy episodes show *zero* SHD change from step 0 to the final step** -- the deterministic policy does literally nothing informative for the vast majority of evaluated episodes. 9 of the 18 runs (50%) are *completely* static -- SHD never moves on *any* of the 8 topologies for that checkpoint. Concrete example (`matrix_analytic_dense_s7`, graph_0): agent_0 greedily intervenes on target 0 and agent_1 on target 2, **every single one of 20 steps, with zero variation**, SHD frozen at 3.0 throughout.
+
+**Why**: this is a real dynamical property, not obviously an eval-harness bug (checked: RNN hidden-state size matches between train and eval, `boundary_margin` matches, action masking only touches target selection after category is chosen). Two effects most plausibly compound:
+1. **Exploration was doing the real work.** PPO's stochastic sampling + entropy bonus (`--entropy_coef 0.01`) generates the target diversity that lets any of the three estimators accumulate informative interventional data. Strip that away (greedy argmax) and the *policy itself* has not learned a principled, evidence-driven targeting strategy -- it collapses to either inaction or one fixed, evidence-independent target, repeated forever. This is directly visible in the data: episodes with 2+ unique targets reach SHD=0 27.8% of the time; episodes with 0-1 unique targets reach it **0.0%** of the time, regardless of estimator.
+2. **Checkpoint selection is fragile.** `train.py`'s "best" checkpoint criterion (~line 700) picks whichever single stochastic training episode had the lowest one-shot SHD -- a noisy, unaveraged statistic. A lucky early episode can win and never get displaced, meaning `best_ippo_params.pkl` isn't guaranteed to represent a well-converged policy at all. Not fully disentangled from effect (1) in this round -- both point the same direction (don't trust the "best" checkpoint as a proxy for "the policy has learned to intervene well"), but which dominates is untested.
+
+**One deliberate non-claim**: greedy/argmax may not even be the *right* evaluation protocol for this task class -- unlike typical RL tasks, active causal discovery arguably wants an agent that keeps seeking diverse, informative interventions as part of an *optimal* deterministic policy, not just as training-time noise to anneal away. But the collapse found here isn't that -- a principled uncertainty-seeking deterministic policy would still vary its targets as evidence accumulates, and would not perform identically to (or worse than) pure inaction. Repeating one fixed target regardless of topology, with 0% reached-SHD0, is behavioral collapse, not a defensible exploitation strategy.
+
+**What this means for the findings above**: the 18-run matrix's headline "AVICI reaches ~99% SHD=0 from episode 1" / "learned climbs 35%->100%" describes the training-time **policy+exploration-noise system**, not standalone policy competence. It does *not* invalidate the earlier estimator-vs-estimator comparison (all three estimators were measured under the identical stochastic-sampling regime, so that comparison's internal validity holds) -- but it does mean none of this doc's SHD figures should be read as "what you'd get deploying the trained policy deterministically," because right now you would not get that; you'd get something close to random or static.
+
+**Not fixed in this round** (measurement only, matching this round's scope): options worth considering, not decided here --
+- Evaluate (and deploy) at low-but-nonzero temperature rather than pure greedy, since this task may genuinely want persistent stochastic exploration.
+- Fix checkpoint selection to average SHD over several rollouts rather than trusting a single noisy episode.
+- Add an explicit uncertainty/novelty-seeking signal to the deterministic policy itself (e.g. bonus for targeting under-sampled nodes) so good behavior survives temperature -> 0, rather than relying on entropy regularization alone during training.
+- Full analysis script: available on request, ran locally against the pulled-back `evaluation_trace.json` files, not yet committed to the repo (ad-hoc diagnostic, same as the earlier matrix analysis scripts).
+
 ## Backlog (known limitations, not addressed in this round)
 
+- **[Highest priority, found post-merge] Greedy/deployed policy collapses** -- see "Follow-up: does the frozen (deployed) policy actually work?" above. 78.5% of frozen-policy episodes show zero SHD change; the trained policy has not learned a robust deterministic intervention strategy, it relies on training-time stochastic exploration to look competent. This is a bigger open problem than anything else in this doc and should probably be tackled before further estimator/reward tuning.
 - **`redundancy_rate` (agent coordination failure) stays flat at ~5-6%** across every estimator/reward condition and every training bin -- no setting teaches agents to avoid both intervening on the same boundary node in the same step. Some irreducible redundancy is expected from the federation structure itself (private vs. boundary node overlap at X1/X2), but whether the *current* ~5-6% floor is that irreducible minimum or a fixable coordination gap is untested. Worth a closer look if the thesis makes federation-efficiency claims -- e.g. a small penalty for redundant same-step targeting, or exposing each agent's peer's chosen target before committing.
 - **`--freeze_graph_estimator` is dead code** (assigned, never read) -- pre-existing, unrelated to this investigation, clean up or wire in properly whenever convenient.
 - Sparse-vs-dense equivalence was only tested at diagnostic scale (200 episodes, `--fixed_graph 0`); not re-verified at full 1000-episode multi-topology scale.
