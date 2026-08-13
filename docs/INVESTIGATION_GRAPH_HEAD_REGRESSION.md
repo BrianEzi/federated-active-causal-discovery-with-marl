@@ -144,7 +144,20 @@ Trend over the 200 episodes (40-episode bins) is the real story:
 
 **SHD hits exactly 0.0 and F1 exactly 1.0 for 120 consecutive episodes (81-200)** -- this is the same convergence shape as `00vhwhzv` (the old "solved" run), reached with the *same* soft-shift interventions that both frozen estimators (analytic, AVICI) failed badly under. This is strong, clean confirmation that the dominant missing ingredient was the gradient-based structure-learning signal (findings #2/#3), not intervention type (finding #1) -- a separate, actor-decoupled trainable estimator is sufficient to restore full convergence, without needing to touch the actor's own architecture or reward-coupling at all.
 
-Waiting on job 129339 (`learned` + `hard`) to complete the matrix -- if it also converges cleanly (plausibly even faster, given hard intervention's stronger structural-break signal per finding #1), that further supports "learned estimator + either intervention type" as the fix, with hard as a possible additional speed/reliability boost rather than a necessity.
+Job 129339 (`learned` + `hard`) also completed. Full final matrix:
+
+| Estimator | Intervention | mean SHD | mean F1 | fraction episodes at SHD=0 | episodes 161-200 mean SHD |
+|---|---|---|---|---|---|
+| analytic | hard | 1.68 | 0.72 | 33.5% | -- |
+| analytic | soft-shift | 2.95 | 0.52 | 9.5% | -- |
+| AVICI | hard | 2.81 | 0.37 | 0.5% | -- |
+| AVICI | soft-shift | 2.95 | 0.32 | 0.5% | -- |
+| **learned** | **hard** | **0.615** | **0.861** | **61.5%** | **0.075** |
+| **learned** | **soft-shift** | **0.365** | **0.907** | **79%** | **0.0** |
+
+Both `learned` conditions dramatically outperform every frozen-estimator condition. One nuance worth noting honestly rather than glossing over: in this single-seed run, `learned+soft` converged *faster and to a cleaner floor* than `learned+hard` (SHD exactly 0.0 for episodes 81-200 vs. still-improving-but-not-quite-zero at 0.075 by 161-200) -- the opposite of what finding #1 alone would predict. Plausible explanation: the learned estimator's own training dynamics interact with intervention type differently than a fixed formula's do; a single seed each isn't enough to be certain this ordering is robust (would need multiple seeds to know if it's real or noise) -- but the qualitative conclusion is unambiguous either way: **a gradient-connected, continuously-training structure estimator is sufficient to restore convergence under both intervention types**, closing the vast majority of the gap that intervention type alone (finding #1) only partially explained.
+
+**Answering the user's original question directly**: yes, the "disjointing of prediction and intervention" was the dominant cause -- specifically, disjointing combined with *freezing* the predictor (no gradient signal at all). A decoupled-but-*learning* predictor (this implementation) restores the old architecture's effectiveness without re-coupling structure prediction into the intervention policy itself.
 
 ## Next steps (in progress)
 1. Run a 200-episode `--fixed_graph 0 --estimator_type learned` diagnostic on Myriad (both `hard` and `soft_shift`), matching the existing comparison matrix exactly, for a direct apples-to-apples result.
