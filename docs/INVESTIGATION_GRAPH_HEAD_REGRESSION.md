@@ -315,9 +315,26 @@ Since `n_old` only grows, each new step's marginal weight in the observation shr
 - Add an explicit uncertainty/novelty-seeking signal to the deterministic policy itself (e.g. bonus for targeting under-sampled nodes) so good behavior survives temperature -> 0, rather than relying on entropy regularization alone during training.
 - Full analysis script: available on request, ran locally against the pulled-back `evaluation_trace.json` files, not yet committed to the repo (ad-hoc diagnostic, same as the earlier matrix analysis scripts).
 
+## Does the collapse persist under `hard` intervention (current defaults)? (2026-08-13, re-checked after pushback)
+
+You correctly pushed back on treating the collapse finding as settled: the 78.5%-static number above came entirely from the 18-run matrix, which ran under `soft_shift` -- the *old* default. `hard` (adopted afterward specifically because it's a stronger identification signal) had never actually been checked against this. Got a free re-check from the `obs_feedback`/budget ablation jobs (12 runs, current defaults: `hard`/`avici`/`sparse`, 200 episodes, 3 seeds) -- `train.py` auto-generates `evaluation_trace.json` for every run regardless, so no extra runs were needed.
+
+| | `soft_shift` (old, 18 runs) | `hard` (new, 12 runs, current defaults) |
+|---|---|---|
+| static episodes (zero SHD change all episode) | 78.5% | **67.7%** |
+| fully-static runs (dead across all 8 topologies) | 50% (9/18) | **8% (1/12)** |
+| reached SHD=0 under greedy eval | ~3% | **4.2%** |
+| never-intervenes (pure NOOP) | ~24% avg | **21.9%** |
+
+**Verdict: `hard` genuinely helps, but doesn't fix it.** The "completely dead run" rate dropped sharply (1-in-2 to 1-in-12) -- a real, meaningful improvement. But two-thirds of frozen episodes still show zero learning progress, and greedy success rate is still ~4% against 87-99% during stochastic on-policy training for the same conditions. This remains the dominant failure mode, not a residual edge case -- confirmed under current defaults, not just the old ones.
+
+One more clean result from the same 12 runs: **`obs_feedback` and `budget` move neither the training-curve numbers nor the collapse rate meaningfully** -- static rate is 66.7-70.8% across all four conditions (`obs_feedback` true/false, `budget` 20.0/8.0), and `eval/shd`/`eval/f1` differences between conditions are within noise. Neither ablation looks decision-relevant on its own; not worth a dedicated fix or default change based on this round.
+
+Given this, decided to proceed directly to implementing the state-representation fix (UCB-style target-selection bonus + EMA covariance + temperature-swept evaluation) before running another comprehensive comparison -- see the plan at the time (`C:\Users\bezin\.claude\plans\memoized-popping-wind.md`) for the design, and the sections below for implementation and results.
+
 ## Backlog (known limitations, not addressed in this round)
 
-- **[Highest priority, found post-merge] Greedy/deployed policy collapses** -- see "Follow-up: does the frozen (deployed) policy actually work?" above. 78.5% of frozen-policy episodes show zero SHD change; the trained policy has not learned a robust deterministic intervention strategy, it relies on training-time stochastic exploration to look competent. This is a bigger open problem than anything else in this doc and should probably be tackled before further estimator/reward tuning.
+- **[Highest priority, found post-merge, re-confirmed under current defaults] Greedy/deployed policy collapses** -- see "Follow-up: does the frozen (deployed) policy actually work?" and the `hard`-intervention re-check above. 67.7% of frozen-policy episodes show zero SHD change under current defaults (down from 78.5% under the old `soft_shift` default, but still the dominant failure mode, not a residual one); the trained policy has not learned a robust deterministic intervention strategy, it relies on training-time stochastic exploration to look competent. This is a bigger open problem than anything else in this doc and is being tackled now (state-representation fix) before further estimator/reward tuning.
 - **`redundancy_rate` (agent coordination failure) stays flat at ~5-6%** across every estimator/reward condition and every training bin -- no setting teaches agents to avoid both intervening on the same boundary node in the same step. Some irreducible redundancy is expected from the federation structure itself (private vs. boundary node overlap at X1/X2), but whether the *current* ~5-6% floor is that irreducible minimum or a fixable coordination gap is untested. Worth a closer look if the thesis makes federation-efficiency claims -- e.g. a small penalty for redundant same-step targeting, or exposing each agent's peer's chosen target before committing.
 - **`--freeze_graph_estimator` is dead code** (assigned, never read) -- pre-existing, unrelated to this investigation, clean up or wire in properly whenever convenient.
 - Sparse-vs-dense equivalence was only tested at diagnostic scale (200 episodes, `--fixed_graph 0`); not re-verified at full 1000-episode multi-topology scale.
