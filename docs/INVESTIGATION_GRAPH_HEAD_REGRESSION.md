@@ -280,11 +280,33 @@ Across all 144 run x graph combinations: **78.5% of frozen-policy episodes show 
 1. **Exploration was doing the real work.** PPO's stochastic sampling + entropy bonus (`--entropy_coef 0.01`) generates the target diversity that lets any of the three estimators accumulate informative interventional data. Strip that away (greedy argmax) and the *policy itself* has not learned a principled, evidence-driven targeting strategy -- it collapses to either inaction or one fixed, evidence-independent target, repeated forever. This is directly visible in the data: episodes with 2+ unique targets reach SHD=0 27.8% of the time; episodes with 0-1 unique targets reach it **0.0%** of the time, regardless of estimator.
 2. **Checkpoint selection is fragile.** `train.py`'s "best" checkpoint criterion (~line 700) picks whichever single stochastic training episode had the lowest one-shot SHD -- a noisy, unaveraged statistic. A lucky early episode can win and never get displaced, meaning `best_ippo_params.pkl` isn't guaranteed to represent a well-converged policy at all. Not fully disentangled from effect (1) in this round -- both point the same direction (don't trust the "best" checkpoint as a proxy for "the policy has learned to intervene well"), but which dominates is untested.
 
+**Root cause identified for effect (1), confirmed in code, not just inferred from behavior**: the observation fed to the actor is built from `running_covariance`/`running_mean`, which are cumulative weighted averages with an ever-growing denominator (`src/evaluator_env.py:154-158`):
+
+```python
+n_total = n_old + n_new   # n_new = sample_count = 100, added every single step
+updated_cov = (running_covariance * n_old + stitched_cov * n_new) / n_total
+```
+
+Since `n_old` only grows, each new step's marginal weight in the observation shrinks over the episode -- roughly 33% at step 2, ~15% by step 5, under 5% by step 15-19 (at the default `sample_count=100`, `max_steps=20`). The observation converges toward a fixed point almost independent of what the agent does next. An RNN conditioned on an input stream that stops carrying new information has nothing left to justify changing its greedy output -- this directly predicts both collapse modes seen in the data (repeat-one-target, since whatever looked best early gets locked in once the signal that would revise it disappears; and pure-NOOP, since there's no new evidence to act on). It also explains why the collapse is architecture-wide rather than estimator-specific: this is about the *agent's own* observation construction, upstream of and shared by all three estimators.
+
+**Diversity broken down by graph-estimator type** -- checking whether the collapse (and the apparent training-curve "gains") differ by estimator, since if a frozen estimator can still show good training-curve numbers despite a collapsed policy, that's direct evidence the estimator -- not the policy -- is carrying those numbers:
+
+| estimator | never-intervenes (pure NOOP, entire episode) | genuine diversity (2+ unique targets) | training-curve SHD (for reference) |
+|---|---|---|---|
+| analytic | 16.7% | 16.7% | ~3.0 (worst) |
+| avici | 27.1% | 12.5% | ~1.6 |
+| **learned** | **45.8%** | **10.4%** | **~0.3 (best)** |
+
+**This is the sharpest evidence yet for the original memorization concern**: `learned` -- the estimator with by far the best training-curve SHD -- has the *worst* frozen-policy behavior of the three (highest never-intervenes rate, lowest genuine-diversity rate). Better training curve does not correspond to a better policy here; if anything it's mildly inverse. This is consistent with `learned`'s training-curve gains coming disproportionately from the estimator fitting itself to ground truth via its own online BCE loss, not from the RL policy learning better interventions.
+
+**Caveat on statistical power**: diversity is heavily seed-driven, not purely estimator-driven -- seed 42 collapses to ~0% diversity under *all three* estimators, while seed 7 shows meaningfully more diversity under all three. With only 3 seeds x 8 graphs per estimator, the estimator effect above is a strong, consistent lead, not yet a proven result independent of seed variance.
+
 **One deliberate non-claim**: greedy/argmax may not even be the *right* evaluation protocol for this task class -- unlike typical RL tasks, active causal discovery arguably wants an agent that keeps seeking diverse, informative interventions as part of an *optimal* deterministic policy, not just as training-time noise to anneal away. But the collapse found here isn't that -- a principled uncertainty-seeking deterministic policy would still vary its targets as evidence accumulates, and would not perform identically to (or worse than) pure inaction. Repeating one fixed target regardless of topology, with 0% reached-SHD0, is behavioral collapse, not a defensible exploitation strategy.
 
 **What this means for the findings above**: the 18-run matrix's headline "AVICI reaches ~99% SHD=0 from episode 1" / "learned climbs 35%->100%" describes the training-time **policy+exploration-noise system**, not standalone policy competence. It does *not* invalidate the earlier estimator-vs-estimator comparison (all three estimators were measured under the identical stochastic-sampling regime, so that comparison's internal validity holds) -- but it does mean none of this doc's SHD figures should be read as "what you'd get deploying the trained policy deterministically," because right now you would not get that; you'd get something close to random or static.
 
 **Not fixed in this round** (measurement only, matching this round's scope): options worth considering, not decided here --
+- **State representation** (root cause of effect (1) -- see next section for a fuller design discussion): replace or augment the all-time cumulative running average with something that stays sensitive to recent evidence throughout the episode (windowed/recency-weighted covariance, explicit step-index/recency features, or a genuinely new representation).
 - Evaluate (and deploy) at low-but-nonzero temperature rather than pure greedy, since this task may genuinely want persistent stochastic exploration.
 - Fix checkpoint selection to average SHD over several rollouts rather than trusting a single noisy episode.
 - Add an explicit uncertainty/novelty-seeking signal to the deterministic policy itself (e.g. bonus for targeting under-sampled nodes) so good behavior survives temperature -> 0, rather than relying on entropy regularization alone during training.
