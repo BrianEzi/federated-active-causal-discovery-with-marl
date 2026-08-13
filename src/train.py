@@ -237,11 +237,12 @@ def parse_args():
     # Ablation Study Suite Flags
     # ---------------------------------------------------------
     parser.add_argument(
-        "--estimator_type", type=str, default="analytic", choices=["analytic", "avici", "learned"],
-        help="Stage 2 graph prediction engine: 'analytic' (frozen Analytic Invariance Scorer), "
-             "'avici' (pretrained AVICI scm-v0 checkpoint, frozen), or 'learned' (small trainable "
-             "edge-scorer updated online via supervised BCE against the true adjacency each step -- "
-             "see src/marl/graph_estimator.py)"
+        "--estimator_type", type=str, default="avici", choices=["analytic", "avici", "learned"],
+        help="Stage 2 graph prediction engine: 'avici' (pretrained AVICI scm-v0 checkpoint, frozen -- "
+             "default; reaches ~99%% SHD=0 from early training with no memorization risk since it "
+             "cannot adapt, see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md), 'analytic' (frozen "
+             "Analytic Invariance Scorer), or 'learned' (small trainable edge-scorer updated online "
+             "via supervised BCE against the true adjacency each step -- see src/marl/graph_estimator.py)"
     )
     parser.add_argument(
         "--avici_max_context", type=int, default=400,
@@ -271,8 +272,10 @@ def parse_args():
         help="Scaling factor for downstream interventional impact bonus (default: 0.0)"
     )
     parser.add_argument(
-        "--reward_density", type=str, default="dense", choices=["dense", "sparse"],
-        help="Reward density: 'dense' (step-wise SHD reduction) or 'sparse' (terminal episode-end SHD penalty)"
+        "--reward_density", type=str, default="sparse", choices=["dense", "sparse"],
+        help="Reward density: 'sparse' (terminal episode-end SHD penalty -- default; the 18-run "
+             "diagnostic matrix found no meaningful difference vs dense, see investigation doc) or "
+             "'dense' (step-wise SHD reduction)"
     )
     
     # ---------------------------------------------------------
