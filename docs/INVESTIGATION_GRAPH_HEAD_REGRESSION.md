@@ -159,6 +159,10 @@ Both `learned` conditions dramatically outperform every frozen-estimator conditi
 
 **Answering the user's original question directly**: yes, the "disjointing of prediction and intervention" was the dominant cause -- specifically, disjointing combined with *freezing* the predictor (no gradient signal at all). A decoupled-but-*learning* predictor (this implementation) restores the old architecture's effectiveness without re-coupling structure prediction into the intervention policy itself.
 
+## Confirmatory run launched: full-scale, matching n4in20oe's exact config
+
+Submitted job 129344 (`confirm_learned_full`) on Myriad: replicates `n4in20oe`'s exact configuration (dynamic 3-stage multi-topology curriculum, 1000 episodes, `soft_shift`, RNN) with the one change being `--estimator_type learned` instead of `analytic`. This tests whether the fix generalizes beyond the easy `fixed_graph=0` diagnostic to the actual target training regime (dynamic curriculum across all 8 topologies) -- the real thing the user cares about, not just a toy single-topology sanity check. Expect this to take meaningfully longer than the 200-episode diagnostics (roughly 5x the episode count). Checking back once it completes.
+
 ## Next steps (in progress)
 1. Run a 200-episode `--fixed_graph 0 --estimator_type learned` diagnostic on Myriad (both `hard` and `soft_shift`), matching the existing comparison matrix exactly, for a direct apples-to-apples result.
 
