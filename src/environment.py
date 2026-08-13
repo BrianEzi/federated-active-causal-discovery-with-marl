@@ -32,7 +32,8 @@ def init_env(key: jax.Array,
         running_mean=jnp.zeros(config.d),
         raw_samples=jnp.zeros((capacity, config.d)),
         raw_interv=jnp.zeros((capacity, config.d)),
-        raw_count=jnp.array([0], dtype=jnp.int32)
+        raw_count=jnp.array([0], dtype=jnp.int32),
+        node_intervention_counts=jnp.zeros(config.d)
     )
 
 def get_observations(state: EnvState, 

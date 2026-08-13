@@ -17,7 +17,8 @@ def run_evaluation_suite(
     use_rnn: bool = False,
     temperature: float = 0.0,
     boundary_margin: float = 0.10,
-    seed: int = 42
+    seed: int = 42,
+    ucb_coef: float = 1.0
 ) -> Dict[str, Any]:
     """
     Evaluates the trained agents on all 8 possible 4-node topologies.
@@ -40,14 +41,15 @@ def run_evaluation_suite(
     boundary_mask = STANDARD_BOUNDARY_MASK
     edge_masks = compute_edge_authority_masks(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
     
-    from src.marl.ppo_agent import mask_invalid_targets
+    from src.marl.ppo_agent import mask_invalid_targets, compute_ucb_bonus
     from src.stitching import stitch_predicted_dags
     from src.metrics import evaluate_dag_against_true
-    
+
     # Run evaluation on all 8 graphs
     for graph_idx in range(8):
         # We don't want fixed_graph to cache one, we want to force it per episode
-        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False, boundary_margin=boundary_margin)
+        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False,
+                                  boundary_margin=boundary_margin, ucb_coef=ucb_coef)
         key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
@@ -77,17 +79,25 @@ def run_evaluation_suite(
             }
             
             joint_actions = {}
-            
+
+            # Same UCB-style target-selection bonus applied at training time (see
+            # src/marl/ppo_agent.py::compute_ucb_bonus and train.py's rollout loop) --
+            # computed once per step from the shared visit counts, added to both agents'
+            # target_logits before masking/sampling, so frozen evaluation exercises the
+            # same policy definition it was trained under, not a train/eval mismatch.
+            ucb_bonus = compute_ucb_bonus(env.jax_state.node_intervention_counts, env.jax_state.step_count, ucb_coef)
+
             for k in range(config.K):
                 obs = jnp.expand_dims(obs_dict[f"agent_{k}"], axis=0)
                 params_k = actor_params[k] if isinstance(actor_params, list) else actor_params
-                
+
                 if use_rnn:
                     (cat_logits, target_logits), next_state = actor_apply(params_k, obs, actor_states[f"agent_{k}"])
                     actor_states[f"agent_{k}"] = next_state
                 else:
                     cat_logits, target_logits = actor_apply(params_k, obs)
-                
+                target_logits = target_logits + ucb_bonus[None, :]
+
                 local_mask = local_masks[k]
                     
                 # Action selection: Greedy deterministic or temperature-controlled stochastic
@@ -168,6 +178,10 @@ def evaluate_checkpoint(
     use_rnn = ckpt.get("use_rnn", "ippornn" in first_param_key.lower() or "rnn" in first_param_key.lower())
     use_inductive = ckpt.get("use_inductive_graph_head", "inductive" in first_param_key.lower())
     d = ckpt.get("d", 4)
+    # Default 0.0 (no bonus) for checkpoints saved before the UCB fix existed -- they
+    # weren't trained with one, so applying a nonzero bonus at eval time would itself be
+    # a train/eval mismatch for those older checkpoints.
+    ucb_coef = ckpt.get("ucb_coef", 0.0)
 
     if config is None:
         config = SCMConfig(d=d, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
@@ -200,6 +214,7 @@ def evaluate_checkpoint(
         use_rnn=use_rnn,
         temperature=temperature,
         boundary_margin=boundary_margin,
-        seed=seed
+        seed=seed,
+        ucb_coef=ucb_coef
     )
 

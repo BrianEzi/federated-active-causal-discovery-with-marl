@@ -31,14 +31,15 @@ def test_two_stage_env_initialization_and_obs_feedback():
         obs_feedback=True
     )
     
-    # Obs dim: 3 * d * d + 1 + d * d = 3*16 + 1 + 16 = 65
-    assert env.obs_dim == 65
+    # Obs dim: 3*d*d + d + 1 + d*d (obs_cov+run_cov+asym+node_intervention_counts+budget+pred_dag)
+    #        = 3*16 + 4 + 1 + 16 = 69
+    assert env.obs_dim == 69
     
     obs, info = env.reset(jax.random.PRNGKey(42))
     assert "agent_0" in obs
     assert "agent_1" in obs
-    assert obs["agent_0"].shape == (65,)
-    assert obs["agent_1"].shape == (65,)
+    assert obs["agent_0"].shape == (69,)
+    assert obs["agent_1"].shape == (69,)
     assert "true_adjacency" in info
 
 def test_two_stage_env_step_execution():

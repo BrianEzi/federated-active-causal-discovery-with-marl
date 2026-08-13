@@ -104,7 +104,7 @@ def jitted_initial_obs_kernel(
     
     return final_state, agent_observations
 
-@functools.partial(jax.jit, static_argnames=("sample_count", "d", "mech_type", "noise_type", "noise_scale"))
+@functools.partial(jax.jit, static_argnames=("sample_count", "d", "mech_type", "noise_type", "noise_scale", "running_cov_ema_alpha"))
 def jitted_env_step_kernel(
     key: jax.Array,
     state: EnvState,
@@ -118,7 +118,8 @@ def jitted_env_step_kernel(
     d: int,
     mech_type: int,
     noise_type: int,
-    noise_scale: float
+    noise_scale: float,
+    running_cov_ema_alpha: float = 0.3
 ) -> Tuple[EnvState, jax.Array, jax.Array]:
     new_budgets = state.budgets - costs
     new_state = state.replace(
@@ -151,15 +152,30 @@ def jitted_env_step_kernel(
         return frob_norm / jnp.maximum(1.0, num_obs)
     info_gains = jax.vmap(_compute_info_gain)(obs_masks)
 
+    # EMA instead of a cumulative (sample-count-weighted) average: a new step's marginal
+    # weight in the observation used to shrink toward zero as an episode progressed
+    # (~33% at step 2, <5% by step 15 under the old cumulative-mean formula at defaults),
+    # which was identified as a major contributor to the greedy-policy-collapse finding
+    # (docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md) -- the observation converged toward a
+    # near-fixed-point regardless of ongoing agent behavior. A fixed-alpha EMA keeps a
+    # constant "information half-life" for the whole episode instead. First update (n_old
+    # == 0) sets the value directly rather than blending with the zero-initialized state.
     n_old = new_state.total_samples[0]
     n_new = float(sample_count)
     n_total = n_old + n_new
-    updated_cov = (new_state.running_covariance * n_old + stitched_cov * n_new) / n_total
-    updated_mean = (new_state.running_mean * n_old + stitched_mean * n_new) / n_total
+    is_first_update = n_old <= 0.0
+    updated_cov = jnp.where(is_first_update, stitched_cov,
+                             running_cov_ema_alpha * stitched_cov + (1.0 - running_cov_ema_alpha) * new_state.running_covariance)
+    updated_mean = jnp.where(is_first_update, stitched_mean,
+                              running_cov_ema_alpha * stitched_mean + (1.0 - running_cov_ema_alpha) * new_state.running_mean)
 
     is_intervened = mask > 0.5
     updated_int_cov = jnp.where(is_intervened[:, None, None], stitched_cov[None, :, :], new_state.int_covariance)
     updated_int_mask = jnp.maximum(new_state.int_mask, is_intervened.astype(float))
+    # Per-node visit counts: a direct function of the agent's own action history (feeds
+    # the UCB-style target-selection bonus applied in train.py/evaluate.py), not
+    # environment response -- immune to the saturation the EMA switch above addresses.
+    updated_node_counts = new_state.node_intervention_counts + is_intervened.astype(float)
 
     # Raw-sample buffer: write this step's samples at the current cursor, with per-sample
     # intervention labels broadcast from this step's binary intervention mask (`mask`, [d]).
@@ -179,11 +195,12 @@ def jitted_env_step_kernel(
         running_mean=updated_mean,
         raw_samples=updated_raw_samples,
         raw_interv=updated_raw_interv,
-        raw_count=updated_raw_count
+        raw_count=updated_raw_count,
+        node_intervention_counts=updated_node_counts
     )
-    
+
     asymmetry = compute_invariance_asymmetry_matrix(final_state.obs_covariance, final_state.int_covariance, final_state.int_mask)
-    
+
     def _get_agent_obs(k):
         m = obs_masks[k]
         m_cov_obs = final_state.obs_covariance * m[:, None] * m[None, :]
@@ -241,7 +258,8 @@ class FederatedCausalEnv:
                  shift_val: float = 2.0, estimator_type: str = "analytic",
                  freeze_graph_estimator: bool = True, obs_feedback: bool = True,
                  impact_coef: float = 0.0, reward_density: str = "dense",
-                 avici_max_context: int = 400):
+                 avici_max_context: int = 400, running_cov_ema_alpha: float = 0.3,
+                 ucb_coef: float = 1.0):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
@@ -261,6 +279,13 @@ class FederatedCausalEnv:
         # first few steps (while the buffer is still filling up to this cap) see a new
         # shape; every step after that reuses the same shape and JAX's compiled cache.
         self.avici_max_context = avici_max_context
+        # EMA smoothing factor for running_covariance/running_mean (see jitted_env_step_kernel's
+        # docstring comment) -- higher alpha = more weight on the most recent step's evidence.
+        self.running_cov_ema_alpha = running_cov_ema_alpha
+        # UCB-style target-selection exploration coefficient `c` -- see train.py/evaluate.py's
+        # compute_ucb_bonus usage. Exposed here (rather than only in train.py) so evaluate.py's
+        # frozen-eval path can read the same value a checkpoint was trained with.
+        self.ucb_coef = ucb_coef
         self.normalize_rewards = normalize_rewards
         self.intrinsic_coef = intrinsic_coef
         self.intervention_type = intervention_type
@@ -345,9 +370,9 @@ class FederatedCausalEnv:
             )
         
         # Calculate dynamic obs_dim:
-        # Base: 3 * d * d + 1 (obs_cov + run_cov + asym + budget)
+        # Base: 3 * d * d + d + 1 (obs_cov + run_cov + asym + node_intervention_counts + budget)
         # If obs_feedback: + d * d (predicted local DAG slice flattened)
-        self.obs_dim = 3 * self.config.d * self.config.d + 1 + (self.config.d * self.config.d if obs_feedback else 0)
+        self.obs_dim = 3 * self.config.d * self.config.d + self.config.d + 1 + (self.config.d * self.config.d if obs_feedback else 0)
         
         self.jax_state = None
         self._agent_observations = None
@@ -453,15 +478,20 @@ class FederatedCausalEnv:
         ))
         obs_cov = np.array(self.jax_state.obs_covariance)
         run_cov = np.array(self.jax_state.running_covariance)
-        
+        # Normalized by max_steps so this stays in a small, bounded range (~[0, K]) --
+        # a direct function of the agent's own/shared action history, not environment
+        # response, feeding the value head the same signal the UCB bonus uses structurally.
+        visit_counts = np.array(self.jax_state.node_intervention_counts) / max(1, self.max_steps)
+
         for k in range(self.config.K):
             m = np.array(self.obs_masks[k])
             m_obs_cov = obs_cov * m[:, None] * m[None, :]
             m_run_cov = run_cov * m[:, None] * m[None, :]
             m_asym = asymmetry * m[:, None] * m[None, :]
+            m_visits = visit_counts * m
             budget = np.array([float(self.jax_state.budgets[k])])
-            
-            parts = [m_obs_cov.flatten(), m_run_cov.flatten(), m_asym.flatten()]
+
+            parts = [m_obs_cov.flatten(), m_run_cov.flatten(), m_asym.flatten(), m_visits]
             if self.obs_feedback:
                 # Use the narrower edge-authority mask here, not the observation mask: an
                 # agent may *observe* a peer's boundary node's covariance (for computing the
@@ -547,7 +577,8 @@ class FederatedCausalEnv:
         self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             key, self.jax_state, jnp.array(mask), jnp.array(types), jnp.array(values), jnp.array(costs),
             self.sample_count, self.agent_masks, self.obs_masks,
-            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
+            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale),
+            self.running_cov_ema_alpha
         )
         
         asym = np.array(compute_invariance_asymmetry_matrix(
@@ -646,7 +677,8 @@ class FederatedCausalEnv:
         self.jax_state, self._agent_observations, info_gains = jitted_env_step_kernel(
             k_step, self.jax_state, mask, types, values, costs,
             self.sample_count, self.agent_masks, self.obs_masks,
-            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale)
+            int(self.config.d), int(self.config.mechanism_type), int(self.config.noise_type), float(self.config.noise_scale),
+            self.running_cov_ema_alpha
         )
         
         stitched_dag, has_cycle = jitted_stitch_dags(graph_pred_0, graph_pred_1, int(self.config.d), margin=self.boundary_margin)

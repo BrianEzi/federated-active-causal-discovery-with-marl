@@ -9,7 +9,7 @@ import haiku as hk
 
 from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
+from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted, compute_ucb_bonus
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
 from src.metrics import evaluate_dag_against_true
@@ -255,6 +255,21 @@ def parse_args():
              "most recent 4 steps' worth of samples at the default sample_count=100)"
     )
     parser.add_argument(
+        "--running_cov_ema_alpha", type=float, default=0.3,
+        help="EMA smoothing factor for running_covariance/running_mean (replaces the old "
+             "cumulative sample-count-weighted average, which saturated toward a near-fixed "
+             "observation as an episode progressed -- see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's "
+             "greedy-policy-collapse fix). Higher = more weight on the most recent step (default: 0.3)"
+    )
+    parser.add_argument(
+        "--ucb_coef", type=float, default=1.0,
+        help="UCB-style target-selection exploration coefficient c in c*sqrt(log(t+1)/(visits+1)), "
+             "added to target_logits before masking/sampling at both training and eval time -- "
+             "see src/marl/ppo_agent.py::compute_ucb_bonus and "
+             "docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's greedy-policy-collapse fix. "
+             "Set to 0.0 to disable (default: 1.0)"
+    )
+    parser.add_argument(
         "--intervention_type", type=str, default="hard", choices=["soft_shift", "hard"],
         help="Intervention mechanism: 'hard' (do(X_i = c) -- default; the classical 'perfect intervention' "
              "most identifiability theory assumes, and empirically a much stronger structure-learning signal, "
@@ -387,7 +402,9 @@ def main():
         obs_feedback=enable_obs_feedback,
         impact_coef=args.impact_coef,
         reward_density=args.reward_density,
-        avici_max_context=args.avici_max_context
+        avici_max_context=args.avici_max_context,
+        running_cov_ema_alpha=args.running_cov_ema_alpha,
+        ucb_coef=args.ucb_coef
     )
     
     if args.agent_type == "ippo":
@@ -518,6 +535,14 @@ def main():
         
         while not done:
             if args.agent_type == "ippo":
+                # UCB-style target-selection bonus, computed once per step from the shared
+                # (both-agents) visit counts and added to each agent's target_logits before
+                # masking/sampling -- see src/marl/ppo_agent.py::compute_ucb_bonus. Applied
+                # identically here and in the PPO update's loss_fn recomputation (stored in
+                # the buffer below), so training and eval both learn/act under the same
+                # exploration-biased distribution rather than a train/eval mismatch.
+                ucb_bonus = compute_ucb_bonus(env.jax_state.node_intervention_counts, env.jax_state.step_count, args.ucb_coef)
+
                 # Agent 0
                 k0_act, key = jax.random.split(key)
                 obs_0 = jnp.expand_dims(obs_dict["agent_0"], 0)
@@ -528,8 +553,9 @@ def main():
                 else:
                     cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
+                tgt_l0 = tgt_l0 + ucb_bonus[None, :]
                 c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], valid_intervention_masks[0], k0_act)
-                
+
                 # Agent 1
                 k1_act, key = jax.random.split(key)
                 obs_1 = jnp.expand_dims(obs_dict["agent_1"], 0)
@@ -540,23 +566,24 @@ def main():
                 else:
                     cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
+                tgt_l1 = tgt_l1 + ucb_bonus[None, :]
                 c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], valid_intervention_masks[1], k1_act)
-                
+
                 joint_actions = {
                     "agent_0": (int(c0), int(t0)),
                     "agent_1": (int(c1), int(t1))
                 }
-                
+
                 k_step, key = jax.random.split(key)
                 next_obs_dict, rewards, done, step_info = env.step(joint_actions, predicted_dags=None, key=k_step)
-                
+
                 r0 = rewards["agent_0"]
                 r1 = rewards["agent_1"]
                 final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
                 info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
-                
-                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done)
-                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done)
+
+                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done, ucb_bonus=ucb_bonus)
+                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done, ucb_bonus=ucb_bonus)
                 obs_dict = next_obs_dict
                 ep_reward += float(r0 + r1)
                 ep_info_gain_0 += float(info_gains["agent_0"])
@@ -720,7 +747,8 @@ def main():
                         "critic_list": critic_params_list,
                         "use_rnn": args.use_rnn,
                         "use_inductive_graph_head": args.use_inductive_graph_head,
-                        "d": args.num_variables
+                        "d": args.num_variables,
+                        "ucb_coef": args.ucb_coef
                     }, f)
 
     if args.save_file:

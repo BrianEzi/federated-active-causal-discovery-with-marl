@@ -177,6 +177,27 @@ class InductiveIPPORNNActor(hk.Module):
         return jnp.zeros((batch_size, hidden_dim))
 
 
+@jax.jit
+def compute_ucb_bonus(visits: jax.Array, step_count: jax.Array, c: float) -> jax.Array:
+    """UCB-style exploration bonus per node: c * sqrt(log(t+1) / (visits+1)).
+
+    `visits` [d]: per-node intervention counts so far this episode
+    (EnvState.node_intervention_counts, shared across both agents). `step_count`: current
+    episode step index (EnvState.step_count). `c`: exploration coefficient (--ucb_coef).
+
+    Added to an agent's target_logits *before* masking/sampling, at both training-time
+    action selection and eval time (never just grafted on post-hoc), so the trained
+    policy is learned with this structural exploration bias already shaping which
+    targets get reinforced -- see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's
+    greedy-policy-collapse fix. A direct function of the agent's own action history, not
+    environment response, so it doesn't inherit the running-covariance-style saturation
+    that made purely reactive signals converge to a near-fixed-point under a repeated
+    action.
+    """
+    t = jnp.asarray(step_count, dtype=jnp.float32)
+    return c * jnp.sqrt(jnp.log(t + 1.0) / (visits + 1.0))
+
+
 def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, valid_intervention_mask: jax.Array) -> jax.Array:
     is_intervene = (cat_action == int(ActionCategory.INTERVENE))[:, None]
     
