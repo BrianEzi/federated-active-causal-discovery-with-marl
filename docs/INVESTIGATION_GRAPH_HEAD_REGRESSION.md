@@ -122,6 +122,30 @@ Design goal: restore a genuine gradient-based structure-learning signal (finding
 
 **Caught a false-positive job-completion signal** (jobs 129339/129340): the polling monitor briefly reported "both jobs left the queue" based on an empty `qstat` grep result, which turned out to be a transient SSH hiccup, not real completion -- `qstat -j <id>` and a direct re-check immediately after showed both jobs still genuinely queued/running. This is the exact "SSH connection drop misread as job leaving queue" failure mode already documented in persistent memory from earlier work on this project. Fixed the poll script to append an explicit `SSH_OK_MARKER` sentinel after the remote command and only treat empty results as real completion when that marker is actually present in the output -- otherwise treats it as a transient failure and retries. Verified the fix against the real current (still-running) state before trusting it again.
 
+## MAJOR RESULT: `learned` + soft-shift essentially replicates the old "solved" behavior
+
+Job 129340 (`diag_learned_soft_dag0`) completed -- **this uses `soft_shift`, the exact same intervention type as `n4in20oe`, the run that started this whole investigation.**
+
+| | mean SHD | mean F1 | fraction episodes at SHD=0 |
+|---|---|---|---|
+| analytic + soft-shift | 2.95 | 0.52 | 9.5% |
+| AVICI + soft-shift | 2.95 | 0.32 | 0.5% |
+| **learned + soft-shift** | **0.365** | **0.907** | **79%** |
+
+Trend over the 200 episodes (40-episode bins) is the real story:
+
+| Episodes | mean SHD | mean F1 |
+|---|---|---|
+| 1-40 | 1.65 | 0.57 |
+| 41-80 | 0.175 | 0.967 |
+| **81-120** | **0.0** | **1.0** |
+| **121-160** | **0.0** | **1.0** |
+| **161-200** | **0.0** | **1.0** |
+
+**SHD hits exactly 0.0 and F1 exactly 1.0 for 120 consecutive episodes (81-200)** -- this is the same convergence shape as `00vhwhzv` (the old "solved" run), reached with the *same* soft-shift interventions that both frozen estimators (analytic, AVICI) failed badly under. This is strong, clean confirmation that the dominant missing ingredient was the gradient-based structure-learning signal (findings #2/#3), not intervention type (finding #1) -- a separate, actor-decoupled trainable estimator is sufficient to restore full convergence, without needing to touch the actor's own architecture or reward-coupling at all.
+
+Waiting on job 129339 (`learned` + `hard`) to complete the matrix -- if it also converges cleanly (plausibly even faster, given hard intervention's stronger structural-break signal per finding #1), that further supports "learned estimator + either intervention type" as the fix, with hard as a possible additional speed/reliability boost rather than a necessity.
+
 ## Next steps (in progress)
 1. Run a 200-episode `--fixed_graph 0 --estimator_type learned` diagnostic on Myriad (both `hard` and `soft_shift`), matching the existing comparison matrix exactly, for a direct apples-to-apples result.
 
