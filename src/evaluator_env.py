@@ -240,7 +240,8 @@ class FederatedCausalEnv:
                  intrinsic_coef: float = 0.05, intervention_type: str = "soft_shift",
                  shift_val: float = 2.0, estimator_type: str = "analytic",
                  freeze_graph_estimator: bool = True, obs_feedback: bool = True,
-                 impact_coef: float = 0.0, reward_density: str = "dense"):
+                 impact_coef: float = 0.0, reward_density: str = "dense",
+                 avici_max_context: int = 400):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
@@ -248,6 +249,18 @@ class FederatedCausalEnv:
         self.fixed_graph = fixed_graph
         self.max_steps = max_steps
         self.boundary_margin = boundary_margin
+        # Cap on how many of the most-recent raw-sample-buffer rows get fed to AVICI per
+        # call. Two reasons, both confirmed empirically: (1) AVICI's per-call compute cost
+        # grows with n (0.04s at n=100 up to 2.3s at n=2100), and (2) far more importantly,
+        # letting n grow every single step (buffer size increases by sample_count each step)
+        # gives every step a different input shape, forcing JAX to re-JIT-compile AVICI's
+        # internals from scratch each time -- an isolated timing test measured only ~17s of
+        # actual forward-pass compute across a full episode's worth of calls, vs. the ~80s/
+        # episode observed in a real training run, a gap consistent with per-step
+        # recompilation dominating the cost. Capping context to a fixed size means only the
+        # first few steps (while the buffer is still filling up to this cap) see a new
+        # shape; every step after that reuses the same shape and JAX's compiled cache.
+        self.avici_max_context = avici_max_context
         self.normalize_rewards = normalize_rewards
         self.intrinsic_coef = intrinsic_coef
         self.intervention_type = intervention_type
@@ -349,8 +362,13 @@ class FederatedCausalEnv:
                 # discarding any intervention mean-shift, and interv=None, discarding AVICI's
                 # per-sample intervention labels entirely) with AVICI's actual designed input.
                 n_valid = int(self.jax_state.raw_count[0])
-                x = np.array(self.jax_state.raw_samples[:n_valid], dtype=np.float32)
-                interv = np.array(self.jax_state.raw_interv[:n_valid], dtype=np.float32)
+                # Feed only the most recent avici_max_context rows -- see __init__'s
+                # avici_max_context docstring for why (compute cost + JIT-recompilation
+                # avoidance). Still real samples with real intervention labels throughout;
+                # this only bounds how much history is visible per call, not their realism.
+                n_fed = min(n_valid, self.avici_max_context)
+                x = np.array(self.jax_state.raw_samples[n_valid - n_fed:n_valid], dtype=np.float32)
+                interv = np.array(self.jax_state.raw_interv[n_valid - n_fed:n_valid], dtype=np.float32)
 
                 prob = np.array(self.avici_model(x=x, interv=interv))
                 np.fill_diagonal(prob, 0.0)

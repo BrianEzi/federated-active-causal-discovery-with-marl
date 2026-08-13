@@ -243,6 +243,13 @@ def parse_args():
              "see src/marl/graph_estimator.py)"
     )
     parser.add_argument(
+        "--avici_max_context", type=int, default=400,
+        help="Max number of most-recent raw-sample rows fed to AVICI per call (only relevant "
+             "when --estimator_type avici). Bounds per-call compute cost and avoids per-step "
+             "JIT recompilation from a constantly-growing input shape (default: 400, i.e. the "
+             "most recent 4 steps' worth of samples at the default sample_count=100)"
+    )
+    parser.add_argument(
         "--intervention_type", type=str, default="soft_shift", choices=["soft_shift", "hard"],
         help="Intervention mechanism: 'soft_shift' (do(X_i := f_i + e_i + delta_i)) or 'hard' (do(X_i = c))"
     )
@@ -369,7 +376,8 @@ def main():
         freeze_graph_estimator=freeze_estimator,
         obs_feedback=enable_obs_feedback,
         impact_coef=args.impact_coef,
-        reward_density=args.reward_density
+        reward_density=args.reward_density,
+        avici_max_context=args.avici_max_context
     )
     
     if args.agent_type == "ippo":
