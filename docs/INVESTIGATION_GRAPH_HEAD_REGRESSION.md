@@ -104,7 +104,24 @@ Job 129334 (`diag_avici_soft_dag0`) completed. Full comparison matrix, all four 
 
 **Decision: proceeding with the graph-head-reintroduction path** (design consideration section above) as the main thread, since findings #2/#3 are architectural and don't depend on which estimator sits in the frozen Stage-2 slot -- fixing AVICI's sample-blindness wouldn't address the deeper issue that *neither* estimator gets any gradient signal from the actor's training process at all.
 
+## Implemented: `--estimator_type learned` -- a separate, online-trained structure estimator
+
+Design goal: restore a genuine gradient-based structure-learning signal (findings #2/#3) **without** re-coupling it into the intervention-policy actor, since that would abandon the user's own stated research goal (policy should learn *only* interventions; structure estimation should be a separate, potentially strong/pretrained capability -- the same reasoning that motivated testing AVICI).
+
+**New file `src/marl/graph_estimator.py`**: `GraphEstimatorNet` (Haiku module) -- structurally similar to the pre-refactor "shared edge scorer" (node features -> pairwise concat -> MLP edge logit), but a completely separate network with its own params and its own `optax.adam` optimizer, never touched by the actor/critic's gradients. `init_graph_estimator` / `make_graph_estimator_fns` provide init, a jitted `update_step` (masked BCE loss against true adjacency, masked by the same `structural_mask` used everywhere else for domain-privacy), and a jitted `predict`.
+
+**`src/evaluator_env.py`**: `FederatedCausalEnv.__init__` builds this estimator when `estimator_type == "learned"`. `predict_graph_hypothesis` gained a `learned` branch (predicts using current params, applies `structural_mask`, matches the existing analytic/avici output contract exactly). New `update_graph_estimator(obs_cov, run_cov, asym, true_adj)` method performs one online gradient step -- called from `step()` **after** the prediction for that step has already been used for reward, specifically to avoid this step's own label leaking into its own reward (see the method's docstring).
+
+**`src/train.py`**: `--estimator_type` gained `"learned"` as a third choice alongside `analytic`/`avici`.
+
+**Tests** (`tests/test_graph_estimator.py`, 4 new, all passing alongside the existing 60): predict() returns valid `[d,d]` probabilities; update_step() demonstrably reduces loss over repeated steps on a fixed example; the structural mask genuinely prevents training signal from pulling a forbidden edge toward an adversarial label; `FederatedCausalEnv` wiring (predict + update) works end-to-end. Full suite: 64/64 passing.
+
+**Local smoke test**: `python -m src.train --num_episodes 5 --fixed_graph 0 --estimator_type learned` runs end-to-end, no crashes/NaNs. SHD stayed flat over just 5 episodes, which is expected -- a freshly-initialized network with ~100 gradient steps total isn't meaningfully trained yet; the real test is the longer Myriad run below.
+
+**Deliberately not addressed tonight**: `--freeze_graph_estimator` remains dead/unused (confirmed earlier); didn't wire it to gate the "learned" estimator's updates, since "learned but frozen" isn't a meaningful combination and touching that flag's semantics more broadly is out of scope for tonight. Also not attempted: the auxiliary-BCE-on-the-actor's-own-shared-trunk variant (finding #2's most literal mechanism, densifying the actor's *own* representations) -- this implementation restores finding #3 (reward coupled to something actively learning) but not the shared-representation aspect of #2. Worth a follow-up comparison if this doesn't fully close the gap.
+
 ## Next steps (in progress)
+1. Run a 200-episode `--fixed_graph 0 --estimator_type learned` diagnostic on Myriad (both `hard` and `soft_shift`), matching the existing comparison matrix exactly, for a direct apples-to-apples result.
 
 1. **Waiting on results** from jobs 129333/129334 (AVICI hard/soft on graph-0). Check next wake cycle.
 2. Depending on that result: either (a) if AVICI alone fixes it, investigate making AVICI the default estimator and test at full scale/multi-topology, or (b) if AVICI alone doesn't fix it, proceed to design a graph-head-style auxiliary training signal that preserves the decoupled reward/evaluation path (see "Design consideration" above) -- e.g. an auxiliary BCE loss on a small representation-shaping head whose output is *not* what reward/evaluation uses, only what shapes the shared trunk, OR an actually-trainable Stage-2 estimator (implementing the "unfrozen estimator" idea that was scaffolded but never built) updated via its own optimizer each step.

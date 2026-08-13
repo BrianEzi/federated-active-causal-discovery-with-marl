@@ -236,8 +236,11 @@ def parse_args():
     # Ablation Study Suite Flags
     # ---------------------------------------------------------
     parser.add_argument(
-        "--estimator_type", type=str, default="analytic", choices=["analytic", "avici"],
-        help="Stage 2 graph prediction engine: 'analytic' (Analytic Invariance Scorer) or 'avici' (Pre-trained AVICI scm-v0 checkpoint)"
+        "--estimator_type", type=str, default="analytic", choices=["analytic", "avici", "learned"],
+        help="Stage 2 graph prediction engine: 'analytic' (frozen Analytic Invariance Scorer), "
+             "'avici' (pretrained AVICI scm-v0 checkpoint, frozen), or 'learned' (small trainable "
+             "edge-scorer updated online via supervised BCE against the true adjacency each step -- "
+             "see src/marl/graph_estimator.py)"
     )
     parser.add_argument(
         "--intervention_type", type=str, default="soft_shift", choices=["soft_shift", "hard"],

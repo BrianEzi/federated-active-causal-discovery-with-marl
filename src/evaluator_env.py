@@ -271,6 +271,27 @@ class FederatedCausalEnv:
             except Exception as e:
                 print(f"Notice: AVICI model unavailable ({e}), falling back to Analytic Invariance Scorer.")
                 self.estimator_type = "analytic"
+
+        # "learned" estimator: a small trainable edge-scorer (src/marl/graph_estimator.py),
+        # separate from the intervention-policy actor, trained online via supervised BCE
+        # against the true adjacency every step. Restores a genuine gradient-based
+        # structure-learning signal (the frozen "analytic"/"avici" estimators have none)
+        # while keeping the actor's own representations untouched -- see
+        # docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md for why this was added.
+        self.graph_estimator_params = None
+        self.graph_estimator_opt_state = None
+        self._graph_estimator_update_fn = None
+        self._graph_estimator_predict_fn = None
+        if self.estimator_type == "learned":
+            import optax
+            from src.marl.graph_estimator import init_graph_estimator, make_graph_estimator_fns
+            rng = jax.random.PRNGKey(0)
+            transformed, self.graph_estimator_params = init_graph_estimator(rng, self.config.d)
+            optimizer = optax.adam(1e-3)
+            self.graph_estimator_opt_state = optimizer.init(self.graph_estimator_params)
+            self._graph_estimator_update_fn, self._graph_estimator_predict_fn = make_graph_estimator_fns(
+                transformed, optimizer, jnp.array(self.structural_mask)
+            )
         
         # Calculate dynamic obs_dim:
         # Base: 3 * d * d + 1 (obs_cov + run_cov + asym + budget)
@@ -330,6 +351,14 @@ class FederatedCausalEnv:
                 print(f"WARNING: AVICI inference failed ({type(e).__name__}: {e}); "
                       f"falling back to the analytic estimator for this step.")
 
+        if self.estimator_type == "learned" and self._graph_estimator_predict_fn is not None:
+            prob = np.array(self._graph_estimator_predict_fn(
+                self.graph_estimator_params, jnp.array(obs_cov), jnp.array(run_cov), jnp.array(asym)
+            ))
+            prob = prob * self.structural_mask
+            np.fill_diagonal(prob, 0.0)
+            return prob.astype(np.float32)
+
         # Fast Analytic Invariance Estimator
         # Skeleton: S_ij = 0.5 * (|run_cov_ij| + |obs_cov_ij|)
         # Orientation: O_ij = 2.0 * asym_ij
@@ -340,6 +369,23 @@ class FederatedCausalEnv:
         prob = prob * self.structural_mask
         np.fill_diagonal(prob, 0.0)
         return prob.astype(np.float32)
+
+    def update_graph_estimator(self, obs_cov: np.ndarray, run_cov: np.ndarray, asym: np.ndarray, true_adj: np.ndarray) -> float:
+        """One online supervised-learning step for the "learned" estimator, using this
+        step's covariance/asymmetry features and the ground-truth adjacency as the
+        label. Call *after* predict_graph_hypothesis has already produced this step's
+        prediction (and reward has been computed from it) -- updating first would let
+        this step's own label leak into the prediction used for its own reward.
+        No-op if estimator_type != "learned"."""
+        if self.estimator_type != "learned" or self._graph_estimator_update_fn is None:
+            return 0.0
+        new_params, new_opt_state, loss = self._graph_estimator_update_fn(
+            self.graph_estimator_params, self.graph_estimator_opt_state,
+            jnp.array(obs_cov), jnp.array(run_cov), jnp.array(asym), jnp.array(true_adj)
+        )
+        self.graph_estimator_params = new_params
+        self.graph_estimator_opt_state = new_opt_state
+        return float(loss)
 
     def _get_obs_dict(self):
         """Constructs IPPO observations with optional DAG observation feedback."""
@@ -454,11 +500,16 @@ class FederatedCausalEnv:
             self.last_predicted_dag = stitched_dag
         else:
             from src.stitching import detect_cycle
-            self.last_predicted_dag = self.predict_graph_hypothesis(
-                np.array(self.jax_state.obs_covariance), np.array(self.jax_state.running_covariance), asym
-            )
+            obs_cov_np = np.array(self.jax_state.obs_covariance)
+            run_cov_np = np.array(self.jax_state.running_covariance)
+            self.last_predicted_dag = self.predict_graph_hypothesis(obs_cov_np, run_cov_np, asym)
             stitched_dag = (self.last_predicted_dag > 0.5).astype(np.float32)
             has_cycle = detect_cycle(stitched_dag)
+            if self.estimator_type == "learned":
+                # Update *after* this step's prediction/reward are already fixed, using
+                # this step's true adjacency as the training label -- see
+                # update_graph_estimator's docstring for why the ordering matters.
+                self.update_graph_estimator(obs_cov_np, run_cov_np, asym, np.array(self.jax_state.true_adjacency))
 
         true_dag = np.array(self.jax_state.true_adjacency)
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
