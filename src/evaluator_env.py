@@ -6,9 +6,9 @@ from typing import Dict, Tuple
 from src.scm import sample_scm, _sample_scm_jitted
 
 from src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
-                       MechanismType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS,
+                       STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS,
                        compute_edge_authority_mask, compute_global_structural_mask)
-from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance
+from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance, stitch_global_mean
 from src.generators import generate_4node_topologies, generate_scm_params
 
 @jax.jit
@@ -58,25 +58,33 @@ def jitted_initial_obs_kernel(
         value=jnp.zeros(d)
     )
     samples = _sample_scm_jitted(key, state, obs_spec, sample_count, d, mech_type, noise_type, noise_scale)
-    
+
     def _compute_single_agent(m):
         masked_samples = samples * m[None, :]
         mean = jnp.mean(masked_samples, axis=0)
         centered = masked_samples - mean
         N = jnp.maximum(1.0, float(sample_count) - 1.0)
-        return jnp.dot(centered.T, centered) / N
-    local_covs = jax.vmap(_compute_single_agent)(agent_masks)
-    
+        cov = jnp.dot(centered.T, centered) / N
+        return cov, mean
+    local_covs, local_means = jax.vmap(_compute_single_agent)(agent_masks)
+
     sample_counts = jnp.full(agent_masks.shape[0], float(sample_count))
     stitched_cov = stitch_global_covariance(local_covs, agent_masks, sample_counts)
-    
+    stitched_mean = stitch_global_mean(local_means, agent_masks, sample_counts)
+
     n_total = float(sample_count)
+    raw_samples = jnp.zeros_like(state.raw_samples).at[0:sample_count].set(samples)
+    raw_interv = jnp.zeros_like(state.raw_interv)  # observational reset phase: no intervention active
     final_state = state.replace(
         running_covariance=stitched_cov,
         obs_covariance=stitched_cov,
         int_covariance=jnp.zeros((d, d, d)),
         int_mask=jnp.zeros(d),
-        total_samples=jnp.array([n_total])
+        total_samples=jnp.array([n_total]),
+        running_mean=stitched_mean,
+        raw_samples=raw_samples,
+        raw_interv=raw_interv,
+        raw_count=jnp.array([sample_count], dtype=jnp.int32)
     )
     
     asymmetry = compute_invariance_asymmetry_matrix(final_state.obs_covariance, final_state.int_covariance, final_state.int_mask)
@@ -120,18 +128,20 @@ def jitted_env_step_kernel(
     
     int_spec = InterventionSpec(mask=mask, type=types, value=values)
     samples = _sample_scm_jitted(key, new_state, int_spec, sample_count, d, mech_type, noise_type, noise_scale)
-    
+
     def _compute_single_agent(m):
         masked_samples = samples * m[None, :]
         mean = jnp.mean(masked_samples, axis=0)
         centered = masked_samples - mean
         N = jnp.maximum(1.0, float(sample_count) - 1.0)
-        return jnp.dot(centered.T, centered) / N
-    local_covs = jax.vmap(_compute_single_agent)(agent_masks)
-    
+        cov = jnp.dot(centered.T, centered) / N
+        return cov, mean
+    local_covs, local_means = jax.vmap(_compute_single_agent)(agent_masks)
+
     sample_counts = jnp.full(agent_masks.shape[0], float(sample_count))
     stitched_cov = stitch_global_covariance(local_covs, agent_masks, sample_counts)
-    
+    stitched_mean = stitch_global_mean(local_means, agent_masks, sample_counts)
+
     # Compute intrinsic information gain: Frobenius norm of covariance shift projected on observable mask
     diff_cov = stitched_cov - state.running_covariance
     def _compute_info_gain(m):
@@ -140,21 +150,36 @@ def jitted_env_step_kernel(
         num_obs = jnp.sum(m)
         return frob_norm / jnp.maximum(1.0, num_obs)
     info_gains = jax.vmap(_compute_info_gain)(obs_masks)
-    
+
     n_old = new_state.total_samples[0]
     n_new = float(sample_count)
     n_total = n_old + n_new
     updated_cov = (new_state.running_covariance * n_old + stitched_cov * n_new) / n_total
-    
+    updated_mean = (new_state.running_mean * n_old + stitched_mean * n_new) / n_total
+
     is_intervened = mask > 0.5
     updated_int_cov = jnp.where(is_intervened[:, None, None], stitched_cov[None, :, :], new_state.int_covariance)
     updated_int_mask = jnp.maximum(new_state.int_mask, is_intervened.astype(float))
-    
+
+    # Raw-sample buffer: write this step's samples at the current cursor, with per-sample
+    # intervention labels broadcast from this step's binary intervention mask (`mask`, [d]).
+    # Offset is a traced runtime value (the buffer accumulates across steps), so this needs
+    # dynamic_update_slice rather than static .at[] slicing.
+    write_offset = state.raw_count[0]
+    updated_raw_samples = jax.lax.dynamic_update_slice(state.raw_samples, samples, (write_offset, 0))
+    interv_rows = jnp.broadcast_to(mask[None, :], (sample_count, d))
+    updated_raw_interv = jax.lax.dynamic_update_slice(state.raw_interv, interv_rows, (write_offset, 0))
+    updated_raw_count = state.raw_count + sample_count
+
     final_state = new_state.replace(
         running_covariance=updated_cov,
         int_covariance=updated_int_cov,
         int_mask=updated_int_mask,
-        total_samples=jnp.array([n_total])
+        total_samples=jnp.array([n_total]),
+        running_mean=updated_mean,
+        raw_samples=updated_raw_samples,
+        raw_interv=updated_raw_interv,
+        raw_count=updated_raw_count
     )
     
     asymmetry = compute_invariance_asymmetry_matrix(final_state.obs_covariance, final_state.int_covariance, final_state.int_mask)
@@ -312,39 +337,22 @@ class FederatedCausalEnv:
         d = self.config.d
         if self.avici_model is not None and self.estimator_type == "avici":
             try:
-                # AVICI's model expects `x: [n, d]` raw observation samples (asserted
-                # internally), not a [d, d] covariance matrix -- passing run_cov directly
-                # (the previous implementation) fed it a matrix shaped like data but
-                # containing covariances, silently producing meaningless predictions
-                # rather than erroring, since a [d, d] array happens to satisfy `ndim==2`.
-                #
-                # We don't retain raw per-step samples (EnvState only keeps their
-                # aggregated covariance), so we synthesize statistically faithful ones
-                # from the tracked running covariance. This is exact (not an
-                # approximation) for MechanismType.LINEAR with Gaussian noise: the SCM's
-                # stationary joint distribution is then precisely N(0, run_cov), since
-                # the linear structural equations have no bias terms -- covariance is a
-                # complete sufficient statistic. For NONLINEAR_ANM / POST_NONLINEAR this
-                # is NOT faithful (covariance loses higher-order structure); warn rather
-                # than silently pretend it's fine.
-                if int(self.config.mechanism_type) != int(MechanismType.LINEAR):
-                    print(f"WARNING: AVICI sample synthesis from covariance is only exact for "
-                          f"MechanismType.LINEAR (current: {int(self.config.mechanism_type)}); "
-                          f"results may not faithfully represent the true SCM.")
+                # AVICI's model expects `x: [n, d]` raw observation samples plus an optional
+                # `interv: [n, d]` binary label (interv[i,j]==1 iff node j was intervened on
+                # in observation i) -- confirmed from AVICI's real source (avici/pretrain.py).
+                # EnvState.raw_samples/raw_interv now track exactly this: real per-step
+                # samples with real per-sample intervention labels, accumulated across the
+                # episode (fixed-capacity buffer sized to max_steps*sample_count, no eviction
+                # needed since it can never overflow within one episode -- see
+                # docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's AVICI-fix section). This
+                # replaces the previous fake-Gaussian-sample synthesis (always zero-mean,
+                # discarding any intervention mean-shift, and interv=None, discarding AVICI's
+                # per-sample intervention labels entirely) with AVICI's actual designed input.
+                n_valid = int(self.jax_state.raw_count[0])
+                x = np.array(self.jax_state.raw_samples[:n_valid], dtype=np.float32)
+                interv = np.array(self.jax_state.raw_interv[:n_valid], dtype=np.float32)
 
-                cov = np.array(run_cov, dtype=np.float64)
-                cov = (cov + cov.T) / 2.0          # defensive symmetrization (float roundoff)
-                cov = cov + np.eye(d) * 1e-6       # defensive PSD floor
-                rng = np.random.default_rng()
-                x = rng.multivariate_normal(mean=np.zeros(d), cov=cov, size=self.sample_count).astype(np.float32)
-
-                # interv=None: running_covariance pools observational + interventional
-                # samples together, so per-sample intervention identity isn't retained
-                # at this point -- AVICI is given a purely observational-looking batch.
-                # This forfeits some of AVICI's interventional-data capability; properly
-                # threading real per-step samples + intervention masks through would be
-                # a further improvement, not attempted here.
-                prob = np.array(self.avici_model(x=x))
+                prob = np.array(self.avici_model(x=x, interv=interv))
                 np.fill_diagonal(prob, 0.0)
                 return prob * self.structural_mask
             except Exception as e:
@@ -437,7 +445,10 @@ class FederatedCausalEnv:
             scm_params = generate_scm_params(k2, adjacency, int(self.config.mechanism_type))
         
         budgets = jnp.full(self.config.K, self.initial_budget)
-        self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets)
+        # +1 block: jitted_initial_obs_kernel writes one sample_count-sized block for the
+        # observational reset phase *before* any of the max_steps step-kernel writes happen.
+        self.jax_state = init_env(k3, self.config, adjacency, scm_params, topo_order, self.agent_masks, budgets,
+                                   capacity=(self.max_steps + 1) * self.sample_count)
         
         # Reset graph hypothesis and SHD tracking
         self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)

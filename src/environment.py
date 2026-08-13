@@ -4,16 +4,19 @@ from typing import Tuple
 from src.types import SCMConfig, SCMParams, EnvState, AgentObservation, InterventionSpec
 from src.scm import sample_scm
 
-def init_env(key: jax.Array, 
-             config: SCMConfig, 
-             adjacency: jax.Array, 
-             scm_params: SCMParams, 
-             topological_order: jax.Array, 
-             agent_masks: jax.Array, 
-             initial_budgets: jax.Array) -> EnvState:
+def init_env(key: jax.Array,
+             config: SCMConfig,
+             adjacency: jax.Array,
+             scm_params: SCMParams,
+             topological_order: jax.Array,
+             agent_masks: jax.Array,
+             initial_budgets: jax.Array,
+             capacity: int) -> EnvState:
     """
     Initializes the environment state.
     agent_masks is [K, d], identifying which variables each agent can observe/intervene on.
+    capacity: size of the raw-sample buffer (max_steps * sample_count -- the exact max an
+    episode can ever produce, so the buffer never needs eviction/wraparound).
     """
     return EnvState(
         true_adjacency=adjacency,
@@ -25,7 +28,11 @@ def init_env(key: jax.Array,
         total_samples=jnp.array([0.0]),
         obs_covariance=jnp.zeros((config.d, config.d)),
         int_covariance=jnp.zeros((config.d, config.d, config.d)),
-        int_mask=jnp.zeros(config.d)
+        int_mask=jnp.zeros(config.d),
+        running_mean=jnp.zeros(config.d),
+        raw_samples=jnp.zeros((capacity, config.d)),
+        raw_interv=jnp.zeros((capacity, config.d)),
+        raw_count=jnp.array([0], dtype=jnp.int32)
     )
 
 def get_observations(state: EnvState, 
@@ -140,5 +147,28 @@ def stitch_global_covariance(local_covariances: jax.Array,
     
     # Mark unobserved entries (where total_weights == 0) as 0.0 (nan breaks IPPO obs)
     global_cov = jnp.where(total_weights > 0, global_cov, 0.0)
-    
+
     return global_cov
+
+@jax.jit
+def stitch_global_mean(local_means: jax.Array,
+                       agent_masks: jax.Array,
+                       sample_counts: jax.Array) -> jax.Array:
+    """
+    Aggregates local sample means into a global [d] mean vector, mirroring
+    stitch_global_covariance's masked, sample-count-weighted-average pattern at rank 1
+    instead of rank 2 -- a node observed only by one agent takes that agent's local mean
+    rather than being diluted by other agents' masked-to-zero contribution.
+
+    local_means: [m, d]
+    agent_masks: [m, d]
+    sample_counts: [m]
+    Returns: [d] global mean vector.
+    """
+    weights = sample_counts.reshape(-1, 1)  # [m, 1]
+    total_weights = jnp.sum(weights * agent_masks, axis=0)  # [d]
+    sum_means = jnp.sum(weights * agent_masks * local_means, axis=0)  # [d]
+    safe_total_weights = jnp.where(total_weights > 0, total_weights, 1.0)
+    global_mean = sum_means / safe_total_weights
+    global_mean = jnp.where(total_weights > 0, global_mean, 0.0)
+    return global_mean

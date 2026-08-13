@@ -47,6 +47,17 @@ class EnvState:
     int_covariance: chex.Array    # [d, d, d] Slice [k, :, :] is covariance measured under do(X_k)
     int_mask: chex.Array          # [d] Indicator of nodes intervened upon
 
+    # Running mean, tracked alongside running_covariance with identical pooling semantics
+    running_mean: chex.Array      # [d]
+
+    # Raw per-step sample buffer with real intervention labels, feeding estimators
+    # (e.g. AVICI) that need actual data rather than covariance-derived reconstructions.
+    # Capacity is fixed at max_steps * sample_count -- the exact max an episode can ever
+    # produce -- so no eviction/wraparound policy is needed; the buffer is reset each episode.
+    raw_samples: chex.Array       # [capacity, d]
+    raw_interv: chex.Array        # [capacity, d] binary: 1.0 where that sample's node was intervened on this step
+    raw_count: chex.Array         # [1] write cursor -- number of valid rows written so far
+
 class ActionCategory(enum.IntEnum):
     INTERVENE = 0
     NOOP = 1
