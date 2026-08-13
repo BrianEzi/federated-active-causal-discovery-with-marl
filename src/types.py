@@ -58,6 +58,14 @@ class EnvState:
     raw_interv: chex.Array        # [capacity, d] binary: 1.0 where that sample's node was intervened on this step
     raw_count: chex.Array         # [1] write cursor -- number of valid rows written so far
 
+    # Per-node intervention visit counts (shared across both agents, incremented whenever
+    # either agent intervenes on that node), feeding the UCB-style target-selection bonus
+    # -- see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's greedy-policy-collapse fix. A
+    # direct function of the agent's own action history, not environment response, so it's
+    # immune to the running-covariance saturation that made purely reactive observation
+    # channels converge to a near-fixed-point under a repeated action.
+    node_intervention_counts: chex.Array  # [d]
+
 class ActionCategory(enum.IntEnum):
     INTERVENE = 0
     NOOP = 1

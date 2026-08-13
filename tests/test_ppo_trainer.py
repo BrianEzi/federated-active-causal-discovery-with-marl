@@ -49,7 +49,8 @@ def test_compute_gae_padding_does_not_contaminate_real_transitions():
     buf = RolloutBuffer()
     for i in range(5):
         buf.add(obs=jnp.zeros(4), cat_actions=0, target_actions=0,
-                 values=0.1, log_probs=-1.0, rewards=-0.1, dones=(i == 4))
+                 values=0.1, log_probs=-1.0, rewards=-0.1, dones=(i == 4),
+                 ucb_bonus=jnp.zeros(4))
 
     b_unpadded = buf.get_batches(max_size=None)
     advs_ref, rets_ref = compute_gae(b_unpadded["rewards"], b_unpadded["values"], b_unpadded["dones"])
@@ -93,7 +94,7 @@ def test_loss_fn_ratio_is_one_when_policy_unchanged():
 
     buf = RolloutBuffer()
     buf.add(obs=obs[0], cat_actions=cat, target_actions=target, values=value,
-             log_probs=old_log_prob, rewards=-0.1, dones=True)
+             log_probs=old_log_prob, rewards=-0.1, dones=True, ucb_bonus=jnp.zeros(d))
     batch = buf.get_batches(max_size=None)
     advs, rets = compute_gae(batch["rewards"], batch["values"], batch["dones"])
     batch["advantages"] = advs
@@ -136,7 +137,8 @@ def test_update_step_runs_with_valid_intervention_mask():
     buf = RolloutBuffer()
     for i in range(5):
         buf.add(obs=jnp.zeros(obs_dim), cat_actions=0, target_actions=0,
-                 values=0.1, log_probs=-1.0, rewards=-0.1, dones=(i == 4))
+                 values=0.1, log_probs=-1.0, rewards=-0.1, dones=(i == 4),
+                 ucb_bonus=jnp.zeros(d))
     b = buf.get_batches(max_size=20)
     advs, rets = compute_gae(b["rewards"], b["values"], b["dones"])
     b["advantages"] = advs

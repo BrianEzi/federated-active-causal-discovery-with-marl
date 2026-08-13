@@ -92,9 +92,11 @@ def test_obs_feedback_uses_edge_authority_mask_not_observation_mask(base_config)
 
     obs_dict = env._get_obs_dict()
 
+    # Layout: obs_cov(d2), run_cov(d2), asym(d2), node_intervention_counts(d), pred_dag(d2), budget(1)
     d2 = d * d
-    pred_dag_slice_0 = obs_dict["agent_0"][3 * d2: 4 * d2].reshape(d, d)
-    pred_dag_slice_1 = obs_dict["agent_1"][3 * d2: 4 * d2].reshape(d, d)
+    offset = 3 * d2 + d
+    pred_dag_slice_0 = obs_dict["agent_0"][offset: offset + d2].reshape(d, d)
+    pred_dag_slice_1 = obs_dict["agent_1"][offset: offset + d2].reshape(d, d)
 
     # Agent 0: Z1(0)<->X2(2) must not leak, even though X2 is within agent_0's obs_masks.
     assert pred_dag_slice_0[0, 2] == 0.0 and pred_dag_slice_0[2, 0] == 0.0
