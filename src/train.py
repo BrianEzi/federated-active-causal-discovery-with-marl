@@ -252,8 +252,11 @@ def parse_args():
              "most recent 4 steps' worth of samples at the default sample_count=100)"
     )
     parser.add_argument(
-        "--intervention_type", type=str, default="soft_shift", choices=["soft_shift", "hard"],
-        help="Intervention mechanism: 'soft_shift' (do(X_i := f_i + e_i + delta_i)) or 'hard' (do(X_i = c))"
+        "--intervention_type", type=str, default="hard", choices=["soft_shift", "hard"],
+        help="Intervention mechanism: 'hard' (do(X_i = c) -- default; the classical 'perfect intervention' "
+             "most identifiability theory assumes, and empirically a much stronger structure-learning signal, "
+             "see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md) or 'soft_shift' (do(X_i := f_i + e_i + delta_i), "
+             "a weaker but more realistic 'imperfect intervention')"
     )
     parser.add_argument(
         "--soft_shift_val", type=float, default=2.0,
