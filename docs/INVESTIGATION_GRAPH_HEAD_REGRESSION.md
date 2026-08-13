@@ -74,6 +74,36 @@ Verified end-to-end with a 3-episode smoke run (`--estimator_type avici --fixed_
 
 This tests a cleaner, lower-engineering-cost hypothesis before committing to building a new graph head: **is the problem "no learned estimator at all" (which AVICI, already pretrained, would fix without any new code) or "no gradient signal reaching the actor's own representations during training" (which only a jointly-trained head fixes)?** If AVICI alone restores good SHD, the fix might be as simple as making AVICI (not the analytic formula) the default estimator. If AVICI-with-soft-shift still fails like the analytic one did, that's stronger evidence the missing ingredient is specifically the *joint*, actor-coupled training signal (finding #2/#3 above), not just estimator quality in isolation.
 
+## AVICI result #1: hard intervention -- AVICI is WORSE than the analytic formula, not better
+
+Job 129333 (`diag_avici_hard_dag0`) completed (200 episodes). Result, compared directly against the analytic+hard baseline from earlier tonight:
+
+| | mean SHD | mean F1 | fraction episodes at SHD=0 |
+|---|---|---|---|
+| analytic + hard (`u4liks79`) | 1.68 | 0.72 | 33.5% |
+| **AVICI + hard** (`diag_avici_hard_dag0`) | **2.81** | **0.37** | **0.5%** |
+
+This is the opposite of what I expected going in. Likely mechanistic reason: `predict_graph_hypothesis`'s AVICI branch (`src/evaluator_env.py`) synthesizes samples via `rng.multivariate_normal(mean=zeros(d), cov=running_covariance)` -- **always assuming zero mean** -- because the environment only tracks aggregated covariance, not raw per-step samples (documented limitation from earlier tonight, see `bug_avici_wrong_input_shape` in persistent memory). Hard interventions (`X_i := c + noise`) shift the *mean* of the interventional distribution, not just its covariance structure -- that mean-shift signal is exactly what gets thrown away by this reconstruction. So AVICI, however good a pretrained model it is in general, is being fed data that's systematically blind to the specific signal hard interventions produce. This isn't evidence AVICI is a bad estimator in general -- it's evidence the current *sample-reconstruction shim* feeding it is inadequate, especially for hard interventions specifically (probably even more so than for soft-shift, since soft-shift's signal was already weak to begin with per finding #1 above).
+
+**Revises the plan**: "just switch the default estimator to AVICI" is not supported by this result as-is. Either (a) fix the sample reconstruction to preserve mean-shift information (meaningful but scoped fix, doesn't touch the actor/reward architecture at all), or (b) proceed with the graph-head-reintroduction path regardless of AVICI's performance here, since findings #2/#3 (joint training signal, reward-prediction coupling) are architectural and independent of which estimator sits in the frozen Stage-2 slot.
+
+## AVICI result #2: soft-shift -- confirms the mean-blindness hypothesis
+
+Job 129334 (`diag_avici_soft_dag0`) completed. Full comparison matrix, all four cells now filled:
+
+| Estimator | Intervention | mean SHD | mean F1 | fraction episodes at SHD=0 |
+|---|---|---|---|---|
+| analytic | hard | 1.68 | 0.72 | 33.5% |
+| analytic | soft-shift | 2.95 | 0.52 | 9.5% |
+| AVICI | hard | 2.81 | 0.37 | 0.5% |
+| AVICI | soft-shift | 2.95 | 0.32 | 0.5% |
+
+**Both AVICI conditions cluster at SHD~2.8-3.0 and F1~0.32-0.37, almost indifferent to intervention type** -- unlike the analytic formula, which shows a clear, large gap between hard (1.68) and soft (2.95). This is exactly what the mean-blindness hypothesis predicts: `predict_graph_hypothesis`'s AVICI branch always synthesizes samples as `N(0, running_covariance)`, so AVICI's *input* carries essentially no information about whether the true underlying intervention was hard or soft -- both get flattened to "some covariance shape, zero mean" before AVICI ever sees them. The analytic formula, by contrast, is fed `run_cov`/`obs_cov`/`asym` directly and evidently retains *some* differential signal between the two regimes even though it's a hand-derived heuristic, not a learned model.
+
+**Conclusion for this thread**: AVICI, as currently wired into this environment, is strictly worse than the simple analytic formula on this task, and the reason is identifiable and specific (mean-shift discarded during sample reconstruction) rather than "AVICI is just a bad model." A properly-fed AVICI (real per-step samples + real intervention labels, not this covariance-reconstruction shim) might perform very differently -- that would require tracking raw per-step samples through the environment instead of only aggregated covariance, a nontrivially larger change than tonight's scope. Documenting this clearly rather than pursuing it further tonight; flagging as a good candidate for future work distinct from the graph-head question.
+
+**Decision: proceeding with the graph-head-reintroduction path** (design consideration section above) as the main thread, since findings #2/#3 are architectural and don't depend on which estimator sits in the frozen Stage-2 slot -- fixing AVICI's sample-blindness wouldn't address the deeper issue that *neither* estimator gets any gradient signal from the actor's training process at all.
+
 ## Next steps (in progress)
 
 1. **Waiting on results** from jobs 129333/129334 (AVICI hard/soft on graph-0). Check next wake cycle.
