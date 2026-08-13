@@ -1,8 +1,18 @@
 # Investigation: Why RNN Training No Longer Converges to Low SHD
 
-**Status**: In progress (overnight autonomous session, started 2026-08-13 ~01:00 UTC)
-**Branch**: `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`)
-**Trigger**: User observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." User hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
+**Status**: Core investigation complete, fix implemented and confirmed at full scale (overnight autonomous session, 2026-08-13 ~01:00-03:00 UTC). Branch is exploratory WIP -- **not merged**, awaiting your review.
+**Branch**: `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`, pushed to origin as a backup only, not merged anywhere)
+**Trigger**: You observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." Your hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
+
+## TL;DR
+
+**Your hypothesis was right, with one refinement**: it wasn't decoupling *per se* -- it was decoupling combined with *freezing* the structure estimator, leaving the RL policy with zero gradient signal toward getting the graph right. A frozen formula (analytic, or even pretrained AVICI) simply cannot improve, and the policy has no way to push it to.
+
+**The fix**: `src/marl/graph_estimator.py`, a new `--estimator_type learned` option -- a small, separate, trainable network (own params, own optimizer) trained online every step via supervised BCE against the ground-truth adjacency, living *outside* the intervention-policy actor. This restores the old architecture's effectiveness without re-coupling structure prediction into the policy itself (preserving your other stated goal: the policy should learn purely interventions).
+
+**Confirmed at full scale**: replicating `n4in20oe`'s exact config (1000 episodes, full dynamic 8-topology curriculum, soft-shift interventions) with only the estimator swapped: **mean SHD 0.34, F1 0.92, SHD=0 on 77% of episodes**, stabilizing at **SHD ~0.08-0.11 for the final 500 episodes** (all 8 topologies). The original failing run oscillated at SHD 2-6 with no improvement trend for its entire 1000 episodes. Full comparison matrix and every intermediate result below.
+
+**Recommendation**: adopt `learned` as the new default `--estimator_type`. Not yet done -- this branch is unmerged and awaiting your review, per your instruction not to merge without it.
 
 ## Summary of findings so far
 
@@ -159,14 +169,41 @@ Both `learned` conditions dramatically outperform every frozen-estimator conditi
 
 **Answering the user's original question directly**: yes, the "disjointing of prediction and intervention" was the dominant cause -- specifically, disjointing combined with *freezing* the predictor (no gradient signal at all). A decoupled-but-*learning* predictor (this implementation) restores the old architecture's effectiveness without re-coupling structure prediction into the intervention policy itself.
 
-## Confirmatory run launched: full-scale, matching n4in20oe's exact config
+## CONFIRMED AT FULL SCALE: fix generalizes across the full 8-topology dynamic curriculum
 
-Submitted job 129344 (`confirm_learned_full`) on Myriad: replicates `n4in20oe`'s exact configuration (dynamic 3-stage multi-topology curriculum, 1000 episodes, `soft_shift`, RNN) with the one change being `--estimator_type learned` instead of `analytic`. This tests whether the fix generalizes beyond the easy `fixed_graph=0` diagnostic to the actual target training regime (dynamic curriculum across all 8 topologies) -- the real thing the user cares about, not just a toy single-topology sanity check. Expect this to take meaningfully longer than the 200-episode diagnostics (roughly 5x the episode count). Checking back once it completes.
+Job 129344 (`confirm_learned_full`) completed: replicates `n4in20oe`'s exact configuration (dynamic 3-stage multi-topology curriculum, 1000 episodes, `soft_shift`, RNN) with the one change being `--estimator_type learned` instead of `analytic`. (Note: this run hit a transient `wandb.init()` timeout on the compute node -- the project's existing fallback in `src/train.py` handled it gracefully and training completed all 1000 episodes regardless, confirmed by the local `training_metrics.csv` having exactly 1000 data rows. This run isn't on WandB; results below are read directly from that CSV.)
 
-## Next steps (in progress)
-1. Run a 200-episode `--fixed_graph 0 --estimator_type learned` diagnostic on Myriad (both `hard` and `soft_shift`), matching the existing comparison matrix exactly, for a direct apples-to-apples result.
+Overall: **mean SHD 0.342, mean F1 0.923, SHD=0 on 77% of all 1000 episodes.**
 
-1. **Waiting on results** from jobs 129333/129334 (AVICI hard/soft on graph-0). Check next wake cycle.
-2. Depending on that result: either (a) if AVICI alone fixes it, investigate making AVICI the default estimator and test at full scale/multi-topology, or (b) if AVICI alone doesn't fix it, proceed to design a graph-head-style auxiliary training signal that preserves the decoupled reward/evaluation path (see "Design consideration" above) -- e.g. an auxiliary BCE loss on a small representation-shaping head whose output is *not* what reward/evaluation uses, only what shapes the shared trunk, OR an actually-trainable Stage-2 estimator (implementing the "unfrozen estimator" idea that was scaffolded but never built) updated via its own optimizer each step.
-3. Test locally, then confirmatory runs on Myriad HPC (both short diagnostic and longer/full-scale runs approved by user).
-4. Write up final comprehensive findings + recommendation doc.
+Per-stage breakdown (100-episode bins), showing the curriculum's own stage transitions:
+
+| Episodes | Curriculum stage | mean SHD | mean F1 |
+|---|---|---|---|
+| 1-100 | 1 (graph 0 only) | 1.09 | 0.72 |
+| 101-200 | 1 | 0.09 | 0.98 |
+| 201-300 | 2 (chain MEC pair introduced) | 1.05 | 0.76 |
+| 301-400 | 2 | 0.51 | 0.89 |
+| 401-500 | 2 | 0.27 | 0.95 |
+| 501-600 | 3 (all 8 topologies introduced) | 0.05 | 0.99 |
+| 601-700 | 3 | 0.11 | 0.98 |
+| 701-800 | 3 | 0.08 | 0.98 |
+| 801-900 | 3 | 0.09 | 0.98 |
+| 901-1000 | 3 | 0.08 | 0.98 |
+
+The shape is exactly what you'd want to see: SHD spikes briefly whenever the curriculum introduces new topologies (episode ~200 and ~500, as the estimator meets graph structures it hasn't been trained on yet), then recovers and settles -- and by Stage 3 (all 8 topologies, episodes 501-1000), it stabilizes at **SHD 0.05-0.11 for 500 consecutive episodes**, i.e. near-perfect structure recovery sustained across the full topology space, not just the one easy graph tested in the diagnostics above.
+
+Direct comparison to what you originally flagged: `n4in20oe` (analytic, same full config) oscillated between SHD 2-6 with no visible improvement trend for its entire 1000-episode run. This run reaches SHD <0.1 and holds it. That's the headline result.
+
+## What's left for you to decide (nothing more planned autonomously tonight on this)
+
+The core question is answered and confirmed at full scale. What remains is judgment calls that are genuinely yours, not mine to make unilaterally:
+
+1. **Merge decision**: this branch (`investigate/graph-head-regression`) is pushed to origin as a backup but deliberately *not* merged into `feat/vanilla-minimal-baseline`, per your instruction. Review `src/marl/graph_estimator.py`, the `evaluator_env.py`/`train.py` changes, and `tests/test_graph_estimator.py` before deciding whether/how to merge.
+2. **Default estimator**: recommend making `learned` the new default `--estimator_type` (currently `analytic` is still default; `learned` must be explicitly requested). Your call whether to flip the default or just document it as the recommended option.
+3. **Statistical confidence**: every result above is a single seed (42) per condition. The full comparison matrix is consistent and the effect size is large (SHD 2.95 -> 0.34, roughly an order of magnitude), so this is unlikely to be pure noise, but multi-seed runs would firm this up if it matters for the thesis write-up.
+4. **Two loose ends flagged but not chased tonight** (both noted inline above, repeated here for visibility): (a) AVICI's sample-reconstruction shim discards mean-shift information -- fixable, but a separate, larger piece of work from tonight's fix, and AVICI isn't needed now that `learned` works well; (b) the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked -- not needed unless `learned` turns out to have some other limitation you find during review.
+5. **`--freeze_graph_estimator` is still dead code** (assigned, never read) -- pre-existing, unrelated to tonight's work, noted for whenever it's convenient to clean up or properly wire in.
+
+## Session log (for context on how this was produced)
+
+Ran overnight per your request, self-pacing with `ScheduleWakeup` between chunks of work (5-30 min breaks depending on whether waiting on a Myriad job), git-committing incrementally on this branch after each substantive finding so nothing was at risk of being lost. Caught and fixed two real operational bugs along the way (a shared-venv `protobuf`/`wandb` conflict from installing AVICI's dependencies, and a false-positive job-completion signal from a transient SSH connection drop) -- both documented inline above where they happened, not swept under the rug.
