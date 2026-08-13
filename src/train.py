@@ -7,12 +7,13 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS
+from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
 from src.metrics import evaluate_dag_against_true
+from src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
 
 
 try:
@@ -479,17 +480,32 @@ def main():
             
         obs_dict, info = env.reset(k_ep, force_idx=fixed_idx, allowed_topologies=allowed_topos)
         true_adj = info["true_adjacency"]
-        
+
         if args.agent_type == "ippo" and args.use_rnn:
             actor_states = [IPPORNNActor.initial_state(1) for _ in range(args.num_agents)]
             critic_states = [IPPORNNCritic.initial_state(1) for _ in range(args.num_agents)]
-            
+
         done = False
         ep_reward = 0.0
         ep_info_gain_0 = 0.0
         ep_info_gain_1 = 0.0
         ep_steps = 0
         final_dag = None
+
+        # Agent-vs-estimator-learning metrics (see src/episode_metrics.py) -- accumulated
+        # per step, reduced to episode-level scalars after the loop. All purely diagnostic;
+        # none feed back into the reward.
+        initial_shd = float(evaluate_dag_against_true(np.array(env.last_predicted_dag), np.array(true_adj))["shd"])
+        shd_trajectory = [initial_shd]
+        cumulative_interventions = 0
+        interventions_to_zero = None
+        sum_positive_delta = {0: 0.0, 1: 0.0}
+        redundant_steps = 0
+        node_intervention_counts = {i: 0 for i in range(args.num_variables)}
+        ep_impact_sum = {0: 0.0, 1: 0.0}
+        ep_asym_mag_sum = 0.0
+        max_shd_possible = float(np.sum(env.structural_mask))
+        entropy_before = gaussian_entropy(np.array(env.jax_state.running_covariance), args.num_variables)
         
         while not done:
             if args.agent_type == "ippo":
@@ -537,6 +553,30 @@ def main():
                 ep_info_gain_0 += float(info_gains["agent_0"])
                 ep_info_gain_1 += float(info_gains["agent_1"])
                 ep_steps += 1
+
+                # Agent-vs-estimator-learning metric accumulation (see src/episode_metrics.py)
+                did_intervene = {0: int(c0) == int(ActionCategory.INTERVENE), 1: int(c1) == int(ActionCategory.INTERVENE)}
+                cumulative_interventions += int(did_intervene[0]) + int(did_intervene[1])
+                step_shd = float(step_info["shd"])
+                shd_trajectory.append(step_shd)
+                if interventions_to_zero is None and step_shd == 0.0:
+                    interventions_to_zero = cumulative_interventions
+                shd_delta = step_info.get("shd_delta", {"agent_0": 0.0, "agent_1": 0.0})
+                if did_intervene[0]:
+                    sum_positive_delta[0] += max(0.0, float(shd_delta["agent_0"]))
+                if did_intervene[1]:
+                    sum_positive_delta[1] += max(0.0, float(shd_delta["agent_1"]))
+                if did_intervene[0] and did_intervene[1] and int(t0) == int(t1):
+                    redundant_steps += 1
+                if did_intervene[0]:
+                    node_intervention_counts[int(t0)] = node_intervention_counts.get(int(t0), 0) + 1
+                if did_intervene[1]:
+                    node_intervention_counts[int(t1)] = node_intervention_counts.get(int(t1), 0) + 1
+                impact_scores = step_info.get("impact_scores", {"agent_0": 0.0, "agent_1": 0.0})
+                ep_impact_sum[0] += float(impact_scores["agent_0"])
+                ep_impact_sum[1] += float(impact_scores["agent_1"])
+                if "asym_matrix" in step_info:
+                    ep_asym_mag_sum += float(np.mean(np.abs(step_info["asym_matrix"])))
             else:
                 joint_actions = {}
                 predicted_dags = {}
@@ -599,7 +639,33 @@ def main():
         }
         for k in range(args.num_agents):
             log_data[f"agent_{k}_budget"] = float(env.jax_state.budgets[k])
-            
+
+        if args.agent_type == "ippo":
+            entropy_after = gaussian_entropy(np.array(env.jax_state.running_covariance), args.num_variables)
+            log_data.update({
+                "eval/interventions_to_shd0": float(interventions_to_zero) if interventions_to_zero is not None else float("nan"),
+                "eval/reached_shd0": int(interventions_to_zero is not None),
+                "eval/shd_auc_normalized": shd_trajectory_auc(shd_trajectory, max_shd_possible),
+                "eval/shd_reduction_auc_normalized": shd_reduction_auc(shd_trajectory, max_shd_possible),
+                "eval/orientation_precision_a0": sum_positive_delta[0] / max(1, cumulative_interventions),
+                "eval/orientation_precision_a1": sum_positive_delta[1] / max(1, cumulative_interventions),
+                "eval/entropy_gain_episode": entropy_before - entropy_after,
+                "eval/impact_score_a0": ep_impact_sum[0] / max(1, ep_steps),
+                "eval/impact_score_a1": ep_impact_sum[1] / max(1, ep_steps),
+                "eval/asym_magnitude_mean": ep_asym_mag_sum / max(1, ep_steps),
+                "eval/redundant_interventions": redundant_steps,
+                "eval/redundancy_rate": redundant_steps / max(1, cumulative_interventions),
+                "eval/node_coverage": len([v for v in node_intervention_counts.values() if v > 0]) / args.num_variables,
+                "eval/target_entropy_normalized": normalized_target_entropy(node_intervention_counts, args.num_variables),
+            })
+            # Boundary-specific coverage -- the more precise "is federation actually
+            # working" signal than overall coverage, since private nodes never require
+            # coordination at all (derived from STANDARD_BOUNDARY_MASK, not hardcoded).
+            boundary_nodes = [i for i in range(args.num_variables) if float(STANDARD_BOUNDARY_MASK[i]) > 0.5]
+            boundary_covered = len([n for n in boundary_nodes if node_intervention_counts.get(n, 0) > 0])
+            log_data["eval/boundary_node_coverage"] = boundary_covered / max(1, len(boundary_nodes))
+
+
         if args.agent_type == "ippo":
             log_data["train/actor_loss"] = float(actor_loss / args.num_agents)
             log_data["train/critic_loss"] = float(critic_loss / args.num_agents)

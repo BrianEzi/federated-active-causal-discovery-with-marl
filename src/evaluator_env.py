@@ -571,13 +571,23 @@ class FederatedCausalEnv:
             is_terminal=terminated,
             prev_shd=self.prev_shd
         )
+        # Per-agent SHD-delta this step (positive = improved), for attributing structural
+        # improvement to whichever agent(s) actually intervened -- computed from the SAME
+        # prev_shd/e1/e2 the dense reward already uses, just surfaced for evaluation metrics
+        # (edge-orientation-yield) rather than only feeding the reward. None on the first
+        # step of an episode (no prior SHD to compare against yet).
+        if self.prev_shd is not None:
+            shd_delta = {"agent_0": self.prev_shd[0] - e1, "agent_1": self.prev_shd[1] - e2}
+        else:
+            shd_delta = {"agent_0": 0.0, "agent_1": 0.0}
         self.prev_shd = (e1, e2)
-            
+
         obs_dict = self._get_obs_dict()
         return obs_dict, rewards, terminated, {
             "true_adjacency": true_dag, "info_gains": ig_dict,
             "impact_scores": impact_dict, "shd": curr_shd,
-            "predicted_dag": self.last_predicted_dag
+            "predicted_dag": self.last_predicted_dag,
+            "shd_delta": shd_delta, "asym_matrix": asym
         }
 
     def step_jitted(
