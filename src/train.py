@@ -131,10 +131,18 @@ def parse_args():
     # ---------------------------------------------------------
     # Network Architecture & Graph Evaluation Mode
     # ---------------------------------------------------------
-    # When set, equips actor and critic networks with GRU recurrent memory for tracking trajectory history
+    # Equips actor and critic networks with GRU recurrent memory for tracking trajectory history.
+    # Default True: each episode is a sequence of up to max_steps interventions where every step's
+    # observation is only the *current* covariance/mask state with no explicit memory of earlier
+    # steps in the episode, so a feedforward MLP re-decides from scratch each step. An RNN carries
+    # that within-episode history forward instead.
     parser.add_argument(
-        "--use_rnn", action="store_true",
-        help="Enable recurrent GRU layers in Actor and Critic networks to handle partially observable histories"
+        "--use_rnn", action="store_true", default=True,
+        help="Enable recurrent GRU layers in Actor and Critic networks to handle partially observable histories (default: True)"
+    )
+    parser.add_argument(
+        "--no_rnn", action="store_false", dest="use_rnn",
+        help="Disable recurrent GRU layers and use plain feedforward Actor/Critic networks instead"
     )
     # Fixes the ground truth DAG topology: pass int 0-7 for specific topology, flag without int for fixed random, or omit for dynamic multi-topology sampling
     parser.add_argument(

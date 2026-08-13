@@ -50,8 +50,9 @@ This notebook trains the current full-featured Disjoint IPPO architecture:
 - **Personal Local & Shared Boundary Rewards**: Each agent is penalized for its own private-node SHD errors plus a shared penalty on boundary ($X_1 \leftrightarrow X_2$) errors.
 - **Observation Feedback & 3-Stage Curriculum**: Agents observe their own previous predicted DAG slice, and topology sampling ramps from Graph 0 -> Chain MEC pair -> all 8 topologies.
 - **Graph Structure Estimation**: The predicted causal DAG (used for SHD/F1 evaluation) comes from the fixed analytic invariance scorer over the server-stitched covariance, not from a learned graph head -- the actor networks now only learn intervention targeting. `--use_inductive_graph_head` is still accepted for checkpoint/CLI compatibility but is currently architecturally a no-op (the graph-head auxiliary network was removed).
+- **Recurrent Policy (GRU)**: Actor and Critic networks default to GRU-based recurrent memory (`IPPORNNActor`/`IPPORNNCritic`) rather than a plain feedforward MLP. Each episode is a sequence of up to `max_steps` interventions where every step's observation is only the *current* covariance/mask state with no explicit memory of earlier steps -- an MLP re-decides from scratch each step, while the GRU carries that within-episode history forward. Pass `--no_rnn` to `src.train` (or `use_rnn=False` to `train_two_stage_ippo` below) to reproduce the earlier feedforward baseline.
 
-This mirrors the configuration used for the 1000-episode empirical run on the UCL Myriad HPC cluster, so results here are directly comparable to that baseline.
+**Note on the Myriad HPC baseline**: that 1000-episode empirical run used the earlier feedforward-MLP default, before the switch to GRU above -- results from this notebook are **not** directly comparable to it anymore unless you pass `use_rnn=False`.
 
 **Optional (Steps 10-12)**: trains a second comparison run using AVICI, a pretrained learned graph estimator, instead of the analytic formula -- useful for checking whether the analytic estimator's plateauing SHD is a limitation of the heuristic itself, or something deeper in the training loop. See Step 10 for honestly-stated caveats about this integration (sample reconstruction from covariance, no interventional labels yet, heavier optional dependencies).""")
 
@@ -177,6 +178,7 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     learning_rate: float = 3e-4,
     eval_freq: int = 10,
     allowed_topologies: str = None,       # e.g. "0,1" or "0,2,6"; leave None to use the curriculum schedule
+    use_rnn: bool = True,                  # GRU recurrent Actor/Critic to track within-episode history; MLP re-decides from scratch each step
     use_inductive_graph_head: bool = True, # currently a no-op: the graph-head network was removed from the actor; kept for CLI/checkpoint compatibility
     intervention_type: str = "soft_shift", # "soft_shift" or "hard"
     soft_shift_val: float = 2.0,
@@ -247,10 +249,15 @@ the 3-stage topology curriculum -- matching the `submit_job_cpu.sh` / `submit_jo
     else:
         cmd.append("--no_inductive_graph_head")
 
+    if use_rnn:
+        cmd.append("--use_rnn")
+    else:
+        cmd.append("--no_rnn")
+
     if use_wandb:
         cmd.extend(["--use_wandb", "--wandb_project", wandb_project])
 
-    print(f"\n[Training] Launching Two-Stage Soft-Shift IPPO (Inductive Head = {use_inductive_graph_head})...")
+    print(f"\n[Training] Launching Two-Stage Soft-Shift IPPO (RNN = {use_rnn}, Inductive Head = {use_inductive_graph_head})...")
     print(f"[Training] Command: {' '.join(cmd)}\n")
 
     # Kaggle GPU kernels preallocate ~90% of JAX GPU memory; a subprocess trying to
@@ -528,6 +535,27 @@ where the analytic one plateaus.
             "chex==0.1.86", "numpy==1.26.4", "scipy==1.13.1",
         ], "isolated jax-ecosystem stack")
 
+        # avici/__init__.py unconditionally does `from .buffer import Sampler`, and
+        # avici/buffer.py does `import pyarrow.plasma as plasma` at module level. Plasma
+        # was removed from modern pyarrow entirely (confirmed on a real Kaggle run:
+        # ModuleNotFoundError: No module named 'pyarrow.plasma'), and no pyarrow version
+        # both has a prebuilt wheel for Kaggle's Python and still ships Plasma. But
+        # Sampler (and the simulate_data() it backs) is avici's own synthetic
+        # training-data generator -- confirmed by reading avici's real source that
+        # avici/pretrain.py (load_pretrained, AVICIModel) and avici/model.py, the only
+        # code this project actually calls, have zero references to plasma, Sampler, or
+        # buffer. So the crash is an import-time-only dead weight, not a real capability
+        # gap for inference. A sitecustomize.py in the isolated directory (auto-imported
+        # by Python at startup for anything using this PYTHONPATH, so it applies to both
+        # the import check below and the actual training subprocess in Step 11) stubs
+        # out the pyarrow.plasma module before avici ever imports it.
+        with open(os.path.join(isolated_dir, "sitecustomize.py"), "w") as f:
+            f.write(
+                "import sys, types\n"
+                "if 'pyarrow.plasma' not in sys.modules:\n"
+                "    sys.modules['pyarrow.plasma'] = types.ModuleType('pyarrow.plasma')\n"
+            )
+
         isolated_env = os.environ.copy()
         isolated_env["PYTHONPATH"] = isolated_dir + os.pathsep + isolated_env.get("PYTHONPATH", "")
         check = subprocess.run(
@@ -543,6 +571,11 @@ where the analytic one plateaus.
                 print("Still hit the PositionalSharding issue even inside the isolated jax==0.4.30 "
                       "environment -- something didn't isolate cleanly (e.g. a stray system jaxlib "
                       "shadowing the isolated one). See the raw output above.")
+            if "pyarrow.plasma" in check.stderr:
+                print("Still hit the pyarrow.plasma issue even with the sitecustomize.py stub in "
+                      "place -- check that sitecustomize.py actually landed in the isolated directory "
+                      "and that Python is picking it up (site processing must not be disabled). See "
+                      "the raw output above.")
             raise RuntimeError("avici import check failed inside the isolated jax==0.4.30 subprocess")
 
         print("AVICI installed and importable (verified in an isolated jax==0.4.30 subprocess).")
