@@ -71,15 +71,16 @@ Both regimes: `-cycle_penalty` (default 10.0) added if the stitched DAG has a cy
 
 Episode ends (`terminated=True`) when `step_count >= max_steps` (default 20) **or** both agents' budgets are exhausted (rarely triggers first, given 2.2's note). `step()` returns `(obs_dict, rewards, terminated, info)`, where `info` includes `true_adjacency`, `info_gains`, `impact_scores`, `shd`, `predicted_dag`, `shd_delta` (per-agent, for attributing structural improvement to whichever agent(s) intervened), and `asym_matrix`.
 
-## 3. The three Stage-2 graph estimators (`predict_graph_hypothesis`)
+## 3. The four Stage-2 graph estimators (`predict_graph_hypothesis`)
 
-All three consume the same `(obs_covariance, running_covariance, asymmetry)` inputs and produce a `[d,d]` probability matrix; they differ in how.
+All four consume the same `(obs_covariance, running_covariance, asymmetry)` inputs (`bayes_optimal` additionally reads the raw-sample buffer directly, like `avici`) and produce a `[d,d]` probability matrix; they differ in how.
 
 | `--estimator_type` | How it works | Trainable? | Default status |
 |---|---|---|---|
 | `avici` | Pretrained AVICI (`scm-v0` checkpoint) -- a permutation-invariant transformer, fed the real `raw_samples`/`raw_interv` buffer (capped to the most recent `avici_max_context` rows, default 400, to avoid per-step JIT recompilation) | No (frozen) | **Current default.** Reaches ~99% SHD=0 from early training in the diagnostic matrix, no memorization risk since it can't adapt, size-flexible for future scaling. |
 | `analytic` | Pure formula: `S = 0.5*(|running_cov| + |obs_cov|)`, `O = 2*asymmetry`, `prob = sigmoid(S+O)` -- an invariance-testing heuristic, no learned parameters at all | No (frozen, and structurally shape-generic -- no retraining needed at a different `d`) | Original default; now the fallback if AVICI fails to load. |
 | `learned` | `GraphEstimatorNet` (`src/marl/graph_estimator.py`) -- small separate Haiku network, own Adam optimizer, trained online every step via supervised BCE against the true adjacency (masked by `structural_mask`) | Yes, but its weight shapes are fixed to `d` at init -- does not generalize to a different node count without retraining | Gets the lowest raw SHD in testing, but the investigation's frozen-policy follow-up found its gains lean disproportionately on the estimator fitting itself rather than the policy learning -- see the doc's memorization discussion. |
+| `bayes_optimal` | `src/marl/bayes_optimal_estimator.py` -- exact posterior over the 8 known candidate topologies, via per-node closed-form OLS/profile-likelihood fits against the full raw-sample buffer, using the environment's known `noise_scale`. Output is the posterior-weighted mixture of the 8 candidate adjacency matrices. Explicitly scoped to the `hard`-intervention regime (see its module docstring) | No (a closed-form computation, not a network) | **Not a deployable default** -- it requires knowing the full 8-hypothesis candidate set and the true noise scale, which only makes sense as a comparison-ceiling analysis tool in this closed benchmark. Verified against real SCM-simulated data: posterior concentrates >90% on the true hypothesis across spot-checked topologies. Use it to measure how good a graph predictor *could* be here, as a ceiling to compare `avici`/`learned`/`analytic` (and the agents' own intervention choices) against. |
 
 If AVICI fails to import/load, the env silently falls back to `analytic` with a printed notice (`estimator_type` reassigned internally).
 
