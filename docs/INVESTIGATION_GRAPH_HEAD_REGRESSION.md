@@ -200,13 +200,21 @@ The core question is answered and confirmed at full scale. What remains is judgm
 
 1. **Merge decision**: this branch (`investigate/graph-head-regression`) is pushed to origin as a backup but deliberately *not* merged into `feat/vanilla-minimal-baseline`, per your instruction. Review `src/marl/graph_estimator.py`, the `evaluator_env.py`/`train.py` changes, and `tests/test_graph_estimator.py` before deciding whether/how to merge.
 2. **Default estimator**: recommend making `learned` the new default `--estimator_type` (currently `analytic` is still default; `learned` must be explicitly requested). Your call whether to flip the default or just document it as the recommended option.
-3. **Statistical confidence**: every result above is a single seed (42) per condition. The full comparison matrix is consistent and the effect size is large (SHD 2.95 -> 0.34, roughly an order of magnitude), so this is unlikely to be pure noise, but multi-seed runs would firm this up if it matters for the thesis write-up.
+3. ~~**Statistical confidence**~~ -- resolved: confirmed across 3 seeds (42, 7, 13) at the diagnostic scale, all converging to SHD=0.0 by the final 40 episodes (see multi-seed section above). The full-scale 1000-episode multi-topology confirmation remains single-seed (a much heavier run to repeat); worth another seed if this becomes thesis-critical, but the effect size (SHD 2.95 -> ~0.3, roughly an order of magnitude, consistent across seeds at diagnostic scale) makes it very unlikely to be noise.
 4. **Two loose ends flagged but not chased tonight** (both noted inline above, repeated here for visibility): (a) AVICI's sample-reconstruction shim discards mean-shift information -- fixable, but a separate, larger piece of work from tonight's fix, and AVICI isn't needed now that `learned` works well; (b) the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked -- not needed unless `learned` turns out to have some other limitation you find during review.
 5. **`--freeze_graph_estimator` is still dead code** (assigned, never read) -- pre-existing, unrelated to tonight's work, noted for whenever it's convenient to clean up or properly wire in.
 
-## In progress: multi-seed robustness check
+## Multi-seed robustness check: confirmed, not a lucky seed
 
-Submitted SGE array job 129346 (tasks 1-2, seeds 7 and 13) repeating the `learned`+soft-shift+`fixed_graph=0` diagnostic (the seed=42 result was SHD 0.365, F1 0.907, SHD=0 on 79% of episodes) to check whether that result is robust or got lucky on this particular seed. Checking back once complete; will add results here.
+Repeated the `learned`+soft-shift+`fixed_graph=0` diagnostic at 3 seeds total:
+
+| Seed | mean SHD | mean F1 | fraction episodes at SHD=0 | last-40-episode mean SHD |
+|---|---|---|---|---|
+| 42 (original) | 0.365 | 0.907 | 79% | 0.0 |
+| 7 | 0.245 | 0.930 | 88.5% | 0.0 |
+| 13 | 0.325 | 0.915 | 81.5% | 0.0 |
+
+**All three seeds converge to essentially the same strong result and all three reach SHD=0.0 for their final 40 episodes.** This is not a seed=42-specific fluke -- point resolved. (This addresses item 3 from the "what's left for you to decide" list below -- statistical confidence is now solid at the diagnostic scale; only the full-scale 1000-episode multi-topology confirmation remains single-seed, which is a much heavier run to repeat and is left as-is given the diagnostic-scale robustness already shown.)
 
 ## Session log (for context on how this was produced)
 
