@@ -12,19 +12,19 @@ def generate_er_dag(key: jax.Array, num_variables: int, edge_prob: float) -> jax
     # Mask to keep strictly upper triangular part
     return jnp.triu(adj, k=1)
 
-def generate_4node_topologies(key: jax.Array, force_idx: int = None, allowed_indices = None) -> tuple[jax.Array, jax.Array]:
+def _all_4node_topology_matrices() -> tuple[jax.Array, jax.Array]:
     """
-    Generates one of the 4 base topologies (and their reversed perspectives) for a 4-node federated system.
-    Nodes: 0 (Z1, Agent 1 Private), 1 (X1, Agent 1 Boundary), 2 (X2, Agent 2 Boundary), 3 (Z2, Agent 2 Private).
-    If allowed_indices is provided, samples uniformly from that subset.
-    Returns: (adjacency matrix, topological order).
+    Builds all 8 hand-authored 4-node topologies (the 4 base shapes -- Chain, Collider,
+    Fork, Fork+Collider -- and their reversed perspectives). Nodes: 0 (Z1, Agent 1
+    Private), 1 (X1, Agent 1 Boundary), 2 (X2, Agent 2 Boundary), 3 (Z2, Agent 2 Private).
+    Returns: (stacked adjacency matrices [8,4,4], stacked topological orders [8,4]).
+    Single source of truth for the candidate set -- both `generate_4node_topologies`
+    (samples one) and `get_all_4node_topologies` (returns all 8, e.g. for a Bayes-optimal
+    estimator that needs the full known hypothesis space) build from this.
     """
-    # Define adjacency matrices (adj[i, j] means i -> j)
-    # 0=Z1, 1=X1, 2=X2, 3=Z2
-    
     matrices = []
     orders = []
-    
+
     def add_top(edges, order):
         adj = jnp.zeros((4, 4))
         for u, v in edges:
@@ -34,31 +34,44 @@ def generate_4node_topologies(key: jax.Array, force_idx: int = None, allowed_ind
 
     # 1. Chain: Z1 -> X1 -> X2 -> Z2
     add_top([(0, 1), (1, 2), (2, 3)], [0, 1, 2, 3])
-    
+
     # 1b. Reversed Chain: Z1 <- X1 <- X2 <- Z2
     add_top([(1, 0), (2, 1), (3, 2)], [3, 2, 1, 0])
-    
+
     # 2. Collider: Z1 -> X1 <- X2 <- Z2 (X1 is collider, X2 is chain)
     add_top([(0, 1), (2, 1), (3, 2)], [0, 3, 2, 1])
-    
+
     # 2b. Reversed Collider: Z1 -> X1 -> X2 <- Z2 (X2 is collider)
     add_top([(0, 1), (1, 2), (3, 2)], [0, 1, 3, 2])
-    
+
     # 3. Fork: Z1 <- X1 -> X2 -> Z2 (X1 is fork)
     add_top([(1, 0), (1, 2), (2, 3)], [1, 0, 2, 3])
-    
+
     # 3b. Reversed Fork: Z1 <- X1 <- X2 -> Z2 (X2 is fork)
     add_top([(1, 0), (2, 1), (2, 3)], [2, 1, 0, 3])
-    
+
     # 4. Fork + Collider: Z1 -> X1 <- X2 -> Z2 (X1 is collider, X2 is fork)
     add_top([(0, 1), (2, 1), (2, 3)], [0, 2, 1, 3])
-    
+
     # 4b. Reversed Fork + Collider: Z1 <- X1 -> X2 <- Z2 (X1 is fork, X2 is collider)
     add_top([(1, 0), (1, 2), (3, 2)], [1, 3, 0, 2])
-    
-    matrices = jnp.stack(matrices)
-    orders = jnp.stack(orders)
-    
+
+    return jnp.stack(matrices), jnp.stack(orders)
+
+
+def get_all_4node_topologies() -> tuple[jax.Array, jax.Array]:
+    """Returns all 8 candidate topologies: (adjacency matrices [8,4,4], topological orders [8,4])."""
+    return _all_4node_topology_matrices()
+
+
+def generate_4node_topologies(key: jax.Array, force_idx: int = None, allowed_indices = None) -> tuple[jax.Array, jax.Array]:
+    """
+    Samples one of the 8 topologies from `get_all_4node_topologies`.
+    If allowed_indices is provided, samples uniformly from that subset.
+    Returns: (adjacency matrix, topological order).
+    """
+    matrices, orders = _all_4node_topology_matrices()
+
     if force_idx is not None:
         idx = force_idx
     elif allowed_indices is not None and len(allowed_indices) > 0:

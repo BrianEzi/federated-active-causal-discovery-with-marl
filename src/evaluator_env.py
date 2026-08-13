@@ -310,6 +310,19 @@ class FederatedCausalEnv:
                 print(f"Notice: AVICI model unavailable ({e}), falling back to Analytic Invariance Scorer.")
                 self.estimator_type = "analytic"
 
+        # "bayes_optimal" estimator: exact posterior over the 8 known candidate topologies
+        # (src/marl/bayes_optimal_estimator.py) -- a comparison ceiling, not meant as a
+        # realistic deployable estimator (it requires knowing the full candidate hypothesis
+        # set and the true noise_scale, which only makes sense in this closed benchmark).
+        self._bayes_candidate_adjacencies = None
+        self.last_bayes_posterior = None
+        if self.estimator_type == "bayes_optimal":
+            from src.generators import get_all_4node_topologies
+            adjacencies, _ = get_all_4node_topologies()
+            self._bayes_candidate_adjacencies = np.array(adjacencies)
+            self.last_bayes_posterior = np.full(self._bayes_candidate_adjacencies.shape[0],
+                                                 1.0 / self._bayes_candidate_adjacencies.shape[0])
+
         # "learned" estimator: a small trainable edge-scorer (src/marl/graph_estimator.py),
         # separate from the intervention-policy actor, trained online via supervised BCE
         # against the true adjacency every step. Restores a genuine gradient-based
@@ -376,6 +389,25 @@ class FederatedCausalEnv:
             except Exception as e:
                 print(f"WARNING: AVICI inference failed ({type(e).__name__}: {e}); "
                       f"falling back to the analytic estimator for this step.")
+
+        if self.estimator_type == "bayes_optimal":
+            # Exact posterior over the 8 known candidate topologies -- see
+            # src/marl/bayes_optimal_estimator.py's module docstring for the full scope/
+            # assumptions (hard-intervention regime, known noise_scale, profile likelihood).
+            # Uses the same raw_samples/raw_interv buffer AVICI reads above (real per-step
+            # samples with real intervention labels), fed in full (not context-capped --
+            # the per-node OLS fits here are cheap numpy, not a re-JIT-compiled network
+            # call, so there's no AVICI-style recompilation cost to cap against).
+            from src.marl.bayes_optimal_estimator import bayes_optimal_predict
+            n_valid = int(self.jax_state.raw_count[0])
+            x = np.array(self.jax_state.raw_samples[:n_valid], dtype=np.float64)
+            interv = np.array(self.jax_state.raw_interv[:n_valid], dtype=np.float64)
+            prob, posterior = bayes_optimal_predict(
+                x, interv, n_valid, self._bayes_candidate_adjacencies, float(self.config.noise_scale)
+            )
+            self.last_bayes_posterior = posterior
+            np.fill_diagonal(prob, 0.0)
+            return (prob * self.structural_mask).astype(np.float32)
 
         if self.estimator_type == "learned" and self._graph_estimator_predict_fn is not None:
             prob = np.array(self._graph_estimator_predict_fn(

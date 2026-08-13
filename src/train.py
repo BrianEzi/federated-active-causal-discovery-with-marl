@@ -237,12 +237,15 @@ def parse_args():
     # Ablation Study Suite Flags
     # ---------------------------------------------------------
     parser.add_argument(
-        "--estimator_type", type=str, default="avici", choices=["analytic", "avici", "learned"],
+        "--estimator_type", type=str, default="avici",
+        choices=["analytic", "avici", "learned", "bayes_optimal"],
         help="Stage 2 graph prediction engine: 'avici' (pretrained AVICI scm-v0 checkpoint, frozen -- "
              "default; reaches ~99%% SHD=0 from early training with no memorization risk since it "
              "cannot adapt, see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md), 'analytic' (frozen "
-             "Analytic Invariance Scorer), or 'learned' (small trainable edge-scorer updated online "
-             "via supervised BCE against the true adjacency each step -- see src/marl/graph_estimator.py)"
+             "Analytic Invariance Scorer), 'learned' (small trainable edge-scorer updated online "
+             "via supervised BCE against the true adjacency each step -- see src/marl/graph_estimator.py), "
+             "or 'bayes_optimal' (exact posterior over the 8 known candidate topologies -- a comparison "
+             "ceiling, not a realistic deployable estimator; see src/marl/bayes_optimal_estimator.py)"
     )
     parser.add_argument(
         "--avici_max_context", type=int, default=400,
