@@ -50,6 +50,8 @@ The **Federated Active Causal Discovery Engine** is formulated as a **Decentrali
 
 ## 2. Dec-POMDP Mathematical Formulation
 
+> **⚠️ Architectural note (see `docs/CHANGELOG.md`, "Collapsed ActionCategory to INTERVENE/NOOP"):** the action space and graph-prediction head below describe a prior design. The action space is now `[INTERVENE, NOOP]` -- INTERVENE natively targets any node in the agent's local domain or the shared boundary via a unified mask, rather than distinguishing a "Local Intervention" category from a "Peer Request" category. The per-agent graph-prediction head has also been removed from the actor networks; predicted DAG structure now comes entirely from the fixed analytic invariance scorer, not a learned network.
+
 - **State Space $\mathcal{S}$**: Global ground-truth Directed Acyclic Graph $G^*$, current agent budget array $\mathbf{b} \in \mathbb{R}^K$, and the running global covariance matrix $\Sigma_{\text{global}}$.
 - **Observation Space $\Omega_k$**: Agent $k$'s private running covariance matrix $\Sigma_k$ (containing only its local nodes and exposed boundary nodes), its remaining budget $b_k$, its local jurisdictional mask $M_k \in \{0, 1\}^d$, and its previous predicted local DAG matrix.
 - **Action Space $\mathcal{A}_k$**: Hierarchical Multi-Discrete Actions.

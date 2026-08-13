@@ -14,11 +14,10 @@ def test_ippo_actor_shape():
     key = jax.random.PRNGKey(42)
     params = actor.init(key, dummy_obs)
     
-    cat_logits, target_logits, graph_logits = actor.apply(params, dummy_obs)
+    cat_logits, target_logits = actor.apply(params, dummy_obs)
     
-    assert cat_logits.shape == (2, 3)
+    assert cat_logits.shape == (2, 2)
     assert target_logits.shape == (2, 4)
-    assert graph_logits.shape == (2, 4, 4)
 
 def test_ippo_critic_shape():
     def forward(obs):
@@ -34,27 +33,23 @@ def test_ippo_critic_shape():
     assert v.shape == (2,)
 
 def test_mask_invalid_targets():
-    # cat_action: 0=LOCAL, 1=PEER, 2=NOOP
-    cat_actions = jnp.array([0, 1, 2])
-    target_logits = jnp.zeros((3, 4))
+    # cat_action: 0=INTERVENE, 1=NOOP
+    cat_actions = jnp.array([0, 1])
+    target_logits = jnp.zeros((2, 4))
     
-    # Agent 1: local ownership (0, 1), peer boundary (1, 2)
-    local_mask = jnp.array([1, 1, 0, 0])
-    boundary_mask = jnp.array([0, 1, 1, 0])
+    # Valid intervention mask (local + boundary)
+    valid_mask = jnp.array([1, 1, 1, 0])
     
-    masked = mask_invalid_targets(cat_actions, target_logits, local_mask, boundary_mask)
+    masked = mask_invalid_targets(cat_actions, target_logits, valid_mask)
     
-    # Batch 0: LOCAL. Valid targets: 0, 1
-    assert masked[0, 0] == 0.0
-    assert masked[0, 1] == 0.0
-    assert masked[0, 2] < -1e8
-    assert masked[0, 3] < -1e8
+    # Row 0: INTERVENE. Nodes 0, 1, 2 are valid. Node 3 should be -1e9.
+    assert float(masked[0, 0]) == 0.0
+    assert float(masked[0, 1]) == 0.0
+    assert float(masked[0, 2]) == 0.0
+    assert float(masked[0, 3]) < -1e8
     
-    # Batch 1: PEER. Valid targets: 1, 2 (boundary nodes)
-    assert masked[1, 0] < -1e8
-    assert masked[1, 1] == 0.0
-    assert masked[1, 2] == 0.0
-    assert masked[1, 3] < -1e8
-    
-    # Batch 2: NOOP. Nothing is valid, mask all.
-    assert (masked[2] < -1e8).all()
+    # Row 1: NOOP. All targets should be masked (-1e9)
+    assert float(masked[1, 0]) < -1e8
+    assert float(masked[1, 1]) < -1e8
+    assert float(masked[1, 2]) < -1e8
+    assert float(masked[1, 3]) < -1e8

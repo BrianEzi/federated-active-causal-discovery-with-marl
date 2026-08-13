@@ -25,10 +25,10 @@ Detailed technical documentation and algorithmic specifications are available in
 - **Meta-Learning Topologies**: Dynamically generates Chains, Colliders, and Forks at the start of every episode to force structural generalization.
 - **Algorithmic State Aggregation**: Tracks a running covariance matrix to maintain the Markov property without relying on unstable RNNs.
 
-### 2. Dual-Head IPPO MARL Architecture (`src/marl/ppo_agent.py`)
+### 2. IPPO MARL Architecture (`src/marl/ppo_agent.py`)
 - **Independent PPO (IPPO)**: Fully decentralized training execution, ensuring agents learn to act on localized partial observability.
-- **Hierarchical Action Space**: Stage 1 selects intervention category (`Local`, `Peer Request`, `NO-OP`); Stage 2 targets specific boundary/local nodes via embedded vector projection.
-- **Continuous Graph Refinement**: The agent's neural network contains a shared Edge Scorer MLP that outputs dense predictions of the local DAG structure at every time step.
+- **Unified Intervention Action Space**: Agents select `INTERVENE` (natively targeting any node in their local domain or the shared boundary) or `NOOP`.
+- **Graph Structure Estimation**: Predicted DAG structure comes from a fixed, non-learned analytic invariance scorer over the server-stitched covariance (`FederatedCausalEnv.predict_graph_hypothesis`), not a learned graph head -- see `docs/CHANGELOG.md` ("Collapsed ActionCategory to INTERVENE/NOOP") for the prior dual-head design this replaced.
 
 ### 3. Stitching & Rewards (`src/stitching.py`, `src/rewards.py`)
 - **Deterministic Server-Side Stitching**: Averages continuous boundary predictions across agents to resolve overlapping edge conflicts.

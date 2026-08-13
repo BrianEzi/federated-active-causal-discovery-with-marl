@@ -61,24 +61,24 @@ def test_sample_actions_jitted_shapes_and_masks():
     key = jax.random.PRNGKey(0)
     obs = jnp.zeros((1, 17))
     params = trans.init(key, obs)
-    cat_logits, target_logits, graph_logits = trans.apply(params, obs)
+    cat_logits, target_logits = trans.apply(params, obs)
     
     local_mask = jnp.array([1.0, 1.0, 0.0, 0.0])
     boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-    edge_mask = jnp.ones((4, 4))
-    
+
     k1, key = jax.random.split(key)
-    cat, target, lp, gp = sample_actions_jitted(
-        cat_logits[0], target_logits[0], graph_logits[0],
-        local_mask, boundary_mask, edge_mask, k1
+    cat, target, lp = sample_actions_jitted(
+        cat_logits[0], target_logits[0],
+        jnp.maximum(local_mask, boundary_mask), k1
     )
-    
+
     assert cat.shape == ()
     assert target.shape == ()
     assert lp.shape == ()
-    assert gp.shape == (4, 4)
-    assert 0 <= int(cat) <= 2
+    assert 0 <= int(cat) <= 1
     assert 0 <= int(target) <= 3
+
+
 
 def test_env_step_jitted_execution():
     config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
@@ -88,8 +88,8 @@ def test_env_step_jitted_execution():
     
     gp0 = jnp.zeros((4, 4))
     gp1 = jnp.zeros((4, 4))
-    c0 = jnp.array(int(ActionCategory.LOCAL_INTERVENTION))
-    t0 = jnp.array(0) # Node 0 (local to agent 0)
+    c0 = jnp.array(int(ActionCategory.INTERVENE))
+    t0 = jnp.array(0)
     c1 = jnp.array(int(ActionCategory.NOOP))
     t1 = jnp.array(0)
     

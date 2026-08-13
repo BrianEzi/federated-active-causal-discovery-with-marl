@@ -89,6 +89,8 @@ Agents coordinate strictly via two privacy-preserving mechanisms:
 
 ## 5. Sequential Dec-POMDP & Hierarchical Action Space
 
+> **⚠️ Architectural note (see `docs/CHANGELOG.md`, "Collapsed ActionCategory to INTERVENE/NOOP"):** The 3-category action space (`Local Intervention` / `Peer Request` / `NO-OP`) described below was collapsed to 2 categories (`INTERVENE` / `NOOP`) in a later refactor. Agents now natively target any node in their local domain *or* the shared boundary in a single `INTERVENE` action, rather than distinguishing "local" from "peer request." Section 5.2 below describes the prior design.
+
 Each episode runs for a horizon of $T \le T_{\max}$ steps. At each step $t$:
 
 ### 5.1 Observation Space
@@ -112,6 +114,8 @@ Agent $k$ selects a 2-level action $a_k = (c_k, t_k)$ in a single forward pass:
 ---
 
 ## 6. Architectural Inductive Bias: Skew-Symmetric Tournament Head
+
+> **⚠️ Architectural note (see `docs/CHANGELOG.md`, "Collapsed ActionCategory to INTERVENE/NOOP"):** The graph-prediction head described in this section was removed from the actor networks in a later refactor -- `InductiveIPPOActor` no longer outputs `graph_logits` and is currently architecturally identical to the plain `IPPOActor`. Predicted DAG structure now comes entirely from the fixed, non-learned analytic invariance scorer (`FederatedCausalEnv.predict_graph_hypothesis`), not from a learned network. This section describes the prior design.
 
 Standard neural network edge predictors attempt to predict directional edges using unconstrained MLPs over symmetric node features:
 

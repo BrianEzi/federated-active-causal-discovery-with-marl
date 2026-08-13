@@ -4,7 +4,7 @@ import numpy as np
 import json
 from typing import Dict, Any
 
-from src.types import SCMConfig
+from src.types import SCMConfig, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_masks
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPORNNActor, InductiveIPPOActor, InductiveIPPORNNActor
 
@@ -36,12 +36,9 @@ def run_evaluation_suite(
     }
     actor_apply = jax.jit(actor.apply)
     
-    local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
-    boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-    edge_masks = [
-        jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
-        jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
-    ]
+    local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
+    boundary_mask = STANDARD_BOUNDARY_MASK
+    edge_masks = compute_edge_authority_masks(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
     
     from src.marl.ppo_agent import mask_invalid_targets
     from src.stitching import stitch_predicted_dags
@@ -76,54 +73,49 @@ def run_evaluation_suite(
                 "step": step,
                 "budgets": env.jax_state.budgets.tolist(),
                 "actions": {},
-                "graph_preds": {}
+                "rewards": {}
             }
             
             joint_actions = {}
-            predicted_dags = {}
             
             for k in range(config.K):
                 obs = jnp.expand_dims(obs_dict[f"agent_{k}"], axis=0)
                 params_k = actor_params[k] if isinstance(actor_params, list) else actor_params
                 
                 if use_rnn:
-                    (cat_logits, target_logits, graph_logits), next_state = actor_apply(params_k, obs, actor_states[f"agent_{k}"])
+                    (cat_logits, target_logits), next_state = actor_apply(params_k, obs, actor_states[f"agent_{k}"])
                     actor_states[f"agent_{k}"] = next_state
                 else:
-                    cat_logits, target_logits, graph_logits = actor_apply(params_k, obs)
+                    cat_logits, target_logits = actor_apply(params_k, obs)
                 
                 local_mask = local_masks[k]
                     
                 # Action selection: Greedy deterministic or temperature-controlled stochastic
                 if temperature <= 0.0:
                     cat_action = int(jnp.argmax(cat_logits, axis=-1)[0])
-                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
+                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, jnp.maximum(local_mask, boundary_mask))
                     target_action = int(jnp.argmax(masked_target_logits, axis=-1)[0])
                 else:
                     cat_probs = np.array(jax.nn.softmax(cat_logits[0] / temperature))
                     cat_action = int(np.random.choice(len(cat_probs), p=cat_probs))
-                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, local_mask, boundary_mask)
+                    masked_target_logits = mask_invalid_targets(jnp.array([cat_action]), target_logits, jnp.maximum(local_mask, boundary_mask))
                     tgt_probs = np.array(jax.nn.softmax(masked_target_logits[0] / temperature))
                     if np.isnan(tgt_probs).any():
                         target_action = 0
                     else:
                         target_action = int(np.random.choice(len(tgt_probs), p=tgt_probs))
                 
-                graph_pred = jax.nn.sigmoid(graph_logits[0]) * edge_masks[k]
-                
                 joint_actions[f"agent_{k}"] = (cat_action, target_action)
-                predicted_dags[f"agent_{k}"] = np.array(graph_pred)
                 
                 step_trace["actions"][f"agent_{k}"] = {"cat": cat_action, "target": target_action}
-                step_trace["graph_preds"][f"agent_{k}"] = np.array(graph_pred).tolist()
                 
                 step_trace["rewards"] = {k: float(v) for k, v in rewards.items()} if 'rewards' in locals() else {}
                 
-            next_obs, rewards, done, info = env.step(joint_actions, predicted_dags, key)
+            next_obs, rewards, done, info = env.step(joint_actions, predicted_dags=None, key=key)
             
             step_trace["rewards"] = {k: float(v) for k, v in rewards.items()}
             
-            stitched_dag, _ = stitch_predicted_dags(predicted_dags, config.d, margin=boundary_margin)
+            stitched_dag = env.last_predicted_dag
             eval_metrics = evaluate_dag_against_true(stitched_dag, true_adj)
             
             step_trace["stitched_dag"] = stitched_dag.tolist()

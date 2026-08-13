@@ -7,12 +7,13 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from src.types import SCMConfig, MechanismType, NoiseType
+from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
 from src.evaluator_env import FederatedCausalEnv
 from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
-from src.baselines import RandomAgent, RoundRobinAgent
+from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
 from src.metrics import evaluate_dag_against_true
+from src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
 
 
 try:
@@ -39,10 +40,10 @@ def parse_args():
     # ---------------------------------------------------------
     # Agent & Architecture Configuration
     # ---------------------------------------------------------
-    # Specifies the agent algorithm: Disjoint IPPO (RL) or heuristic baselines (Random / Round-Robin)
+    # Specifies the agent algorithm: Disjoint IPPO (RL) or heuristic baselines (Random / Round-Robin / Vanilla)
     parser.add_argument(
-        "--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin"],
-        help="Algorithm type: 'ippo' (Independent PPO), 'random' (random uniform actions), or 'round_robin' (cyclic intervention)"
+        "--agent_type", type=str, default="ippo", choices=["ippo", "random", "round_robin", "vanilla"],
+        help="Algorithm type: 'ippo' (Independent PPO), 'random' (random uniform actions), 'round_robin' (cyclic), or 'vanilla' (flat 4-action discrete baseline)"
     )
     
     # ---------------------------------------------------------
@@ -122,11 +123,6 @@ def parse_args():
         "--entropy_coef", type=float, default=0.01,
         help="Entropy regularization bonus weight to encourage exploration (default: 0.01)"
     )
-    # Coefficient for the auxiliary Binary Cross-Entropy loss on local causal edge prediction heads
-    parser.add_argument(
-        "--graph_coef", type=float, default=1.0,
-        help="Loss weight multiplier for auxiliary edge prediction BCE loss (default: 1.0)"
-    )
     # Evaluation frequency: interval of episodes between computing full metrics, logging, and DAG visualizations
     parser.add_argument(
         "--eval_freq", type=int, default=10,
@@ -136,10 +132,18 @@ def parse_args():
     # ---------------------------------------------------------
     # Network Architecture & Graph Evaluation Mode
     # ---------------------------------------------------------
-    # When set, equips actor and critic networks with GRU recurrent memory for tracking trajectory history
+    # Equips actor and critic networks with GRU recurrent memory for tracking trajectory history.
+    # Default True: each episode is a sequence of up to max_steps interventions where every step's
+    # observation is only the *current* covariance/mask state with no explicit memory of earlier
+    # steps in the episode, so a feedforward MLP re-decides from scratch each step. An RNN carries
+    # that within-episode history forward instead.
     parser.add_argument(
-        "--use_rnn", action="store_true",
-        help="Enable recurrent GRU layers in Actor and Critic networks to handle partially observable histories"
+        "--use_rnn", action="store_true", default=True,
+        help="Enable recurrent GRU layers in Actor and Critic networks to handle partially observable histories (default: True)"
+    )
+    parser.add_argument(
+        "--no_rnn", action="store_false", dest="use_rnn",
+        help="Disable recurrent GRU layers and use plain feedforward Actor/Critic networks instead"
     )
     # Fixes the ground truth DAG topology: pass int 0-7 for specific topology, flag without int for fixed random, or omit for dynamic multi-topology sampling
     parser.add_argument(
@@ -175,14 +179,18 @@ def parse_args():
         "--no_normalize_rewards", action="store_false", dest="normalize_rewards",
         help="Disable reward normalization and use raw unnormalized cumulative step penalties"
     )
-    # When enabled, uses the Anti-Symmetric Tournament Inductive Graph Head (Skew-Symmetric decomposition + empirical invariance bypass)
+    # NOTE: the Anti-Symmetric Tournament Inductive Graph Head was removed from the actor
+    # networks in the ActionCategory INTERVENE/NOOP collapse refactor -- InductiveIPPOActor
+    # is now architecturally equivalent to IPPOActor. This flag is currently a no-op, kept
+    # only so existing scripts/notebooks and saved checkpoints (which store this flag's
+    # value in their metadata) keep working.
     parser.add_argument(
         "--use_inductive_graph_head", action="store_true", default=True,
-        help="Use Skew-Symmetric Tournament Inductive Graph Head for 2-cycle free empirical invariance testing (default: True)"
+        help="[Currently a no-op -- graph head removed] Selects InductiveIPPOActor, which is architecturally identical to IPPOActor (default: True)"
     )
     parser.add_argument(
         "--no_inductive_graph_head", action="store_false", dest="use_inductive_graph_head",
-        help="Disable Inductive Graph Head and use baseline unconstrained MLP Graph Head"
+        help="[Currently a no-op -- graph head removed] Selects the plain IPPOActor class"
     )
     # Sampling temperature for post-training evaluation across topologies
     parser.add_argument(
@@ -224,6 +232,51 @@ def parse_args():
         help="Fraction of total training episodes dedicated to Stage 2 (Graphs 0 & 1 MEC pair) (default: 0.30)"
     )
 
+    
+    # ---------------------------------------------------------
+    # Ablation Study Suite Flags
+    # ---------------------------------------------------------
+    parser.add_argument(
+        "--estimator_type", type=str, default="avici", choices=["analytic", "avici", "learned"],
+        help="Stage 2 graph prediction engine: 'avici' (pretrained AVICI scm-v0 checkpoint, frozen -- "
+             "default; reaches ~99%% SHD=0 from early training with no memorization risk since it "
+             "cannot adapt, see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md), 'analytic' (frozen "
+             "Analytic Invariance Scorer), or 'learned' (small trainable edge-scorer updated online "
+             "via supervised BCE against the true adjacency each step -- see src/marl/graph_estimator.py)"
+    )
+    parser.add_argument(
+        "--avici_max_context", type=int, default=400,
+        help="Max number of most-recent raw-sample rows fed to AVICI per call (only relevant "
+             "when --estimator_type avici). Bounds per-call compute cost and avoids per-step "
+             "JIT recompilation from a constantly-growing input shape (default: 400, i.e. the "
+             "most recent 4 steps' worth of samples at the default sample_count=100)"
+    )
+    parser.add_argument(
+        "--intervention_type", type=str, default="soft_shift", choices=["soft_shift", "hard"],
+        help="Intervention mechanism: 'soft_shift' (do(X_i := f_i + e_i + delta_i)) or 'hard' (do(X_i = c))"
+    )
+    parser.add_argument(
+        "--soft_shift_val", type=float, default=2.0,
+        help="Shift mean magnitude mu_delta for soft shift interventions (default: 2.0)"
+    )
+    parser.add_argument(
+        "--freeze_graph_estimator", type=str, default="true", choices=["true", "false"],
+        help="Whether to freeze Stage 2 graph estimator weights (default: 'true')"
+    )
+    parser.add_argument(
+        "--obs_feedback", type=str, default="true", choices=["true", "false"],
+        help="Whether to feed local predicted DAG slice back into agent observations (default: 'true')"
+    )
+    parser.add_argument(
+        "--impact_coef", type=float, default=0.0,
+        help="Scaling factor for downstream interventional impact bonus (default: 0.0)"
+    )
+    parser.add_argument(
+        "--reward_density", type=str, default="sparse", choices=["dense", "sparse"],
+        help="Reward density: 'sparse' (terminal episode-end SHD penalty -- default; the 18-run "
+             "diagnostic matrix found no meaningful difference vs dense, see investigation doc) or "
+             "'dense' (step-wise SHD reduction)"
+    )
     
     # ---------------------------------------------------------
     # Experiment Tracking & Reproducibility
@@ -280,11 +333,15 @@ def main():
         if not WANDB_AVAILABLE:
             print("WARNING: --use_wandb was passed, but the wandb library is not installed! WandB metrics will not be logged.")
         else:
-            is_fixed = args.fixed_graph is not None
-            name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
-            wandb.init(project=args.wandb_project, name=name, config=vars(args))
-            if wandb.run:
-                print(f"WandB successfully initialized! View live run at: {wandb.run.url}")
+            try:
+                is_fixed = args.fixed_graph is not None
+                name = args.run_name or f"{args.agent_type}{'_rnn' if args.use_rnn else ''}{'_fixed' if is_fixed else ''}_d{args.num_variables}"
+                wandb.init(project=args.wandb_project, name=name, config=vars(args))
+                if wandb.run:
+                    print(f"WandB successfully initialized! View live run at: {wandb.run.url}")
+            except Exception as e:
+                print(f"WARNING: WandB initialization failed ({e}). Continuing training locally.")
+                args.use_wandb = False
             
     print(f"=== Starting Training Session ===")
     print(f"Config: agent={args.agent_type}, d={args.num_variables}, Episodes={args.num_episodes}")
@@ -305,6 +362,9 @@ def main():
     is_fixed = args.fixed_graph is not None
     fixed_idx = args.fixed_graph if (is_fixed and args.fixed_graph >= 0) else None
     
+    freeze_estimator = args.freeze_graph_estimator.lower() == "true"
+    enable_obs_feedback = args.obs_feedback.lower() == "true"
+    
     env = FederatedCausalEnv(
         config, action_costs, 
         initial_budget=args.initial_budget, 
@@ -313,7 +373,15 @@ def main():
         max_steps=args.max_steps,
         boundary_margin=args.boundary_margin,
         normalize_rewards=args.normalize_rewards,
-        intrinsic_coef=args.intrinsic_coef
+        intrinsic_coef=args.intrinsic_coef,
+        intervention_type=args.intervention_type,
+        shift_val=args.soft_shift_val,
+        estimator_type=args.estimator_type,
+        freeze_graph_estimator=freeze_estimator,
+        obs_feedback=enable_obs_feedback,
+        impact_coef=args.impact_coef,
+        reward_density=args.reward_density,
+        avici_max_context=args.avici_max_context
     )
     
     if args.agent_type == "ippo":
@@ -352,18 +420,15 @@ def main():
         critic_apply = jax.jit(critic_trans.apply)
 
         
-        local_masks = [jnp.array([1.0, 1.0, 0.0, 0.0]), jnp.array([0.0, 0.0, 1.0, 1.0])]
-        boundary_mask = jnp.array([0.0, 1.0, 1.0, 0.0])
-        observed_masks = [jnp.array([1.0, 1.0, 1.0, 0.0]), jnp.array([0.0, 1.0, 1.0, 1.0])]
-        edge_masks = [
-            jnp.maximum(jnp.outer(local_masks[0], local_masks[0]), jnp.outer(boundary_mask, boundary_mask)),
-            jnp.maximum(jnp.outer(local_masks[1], local_masks[1]), jnp.outer(boundary_mask, boundary_mask))
-        ]
-        
+        local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
+        boundary_mask = STANDARD_BOUNDARY_MASK
+        observed_masks = [STANDARD_OBS_MASKS[0], STANDARD_OBS_MASKS[1]]
+        valid_intervention_masks = [jnp.maximum(local_masks[0], boundary_mask), jnp.maximum(local_masks[1], boundary_mask)]
+
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
         trainer = IPPOTrainer(actor_trans, critic_trans, actor_lr=actor_lr, critic_lr=critic_lr,
-                              entropy_coef=args.entropy_coef, graph_coef=args.graph_coef, use_rnn=args.use_rnn,
+                              entropy_coef=args.entropy_coef, use_rnn=args.use_rnn,
                               total_episodes=args.num_episodes, normalize_rewards=args.normalize_rewards, max_steps=float(args.max_steps))
                               
         # Initialize Disjoint parameters and optimizers per agent
@@ -372,7 +437,7 @@ def main():
         actor_opts = []
         critic_opts = []
         
-        obs_dim = 3 * args.num_variables * args.num_variables + 1
+        obs_dim = env.obs_dim
         dummy_obs = jnp.zeros((1, obs_dim))
         for k in range(args.num_agents):
             k1, k2, key = jax.random.split(key, 3)
@@ -388,10 +453,14 @@ def main():
             critic_params_list.append(c_p)
             actor_opts.append(trainer.actor_opt.init(a_p))
             critic_opts.append(trainer.critic_opt.init(c_p))
-        
         buffers = [RolloutBuffer() for _ in range(args.num_agents)]
     else:
-        agents = [RandomAgent(i, args.num_variables) if args.agent_type == "random" else RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
+        if args.agent_type == "random":
+            agents = [RandomAgent(i, args.num_variables) for i in range(args.num_agents)]
+        elif args.agent_type == "vanilla":
+            agents = [VanillaAgent(i, args.num_variables) for i in range(args.num_agents)]
+        else:
+            agents = [RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
     
     best_shd = 999.0
     best_f1 = -1.0
@@ -414,53 +483,103 @@ def main():
             
         obs_dict, info = env.reset(k_ep, force_idx=fixed_idx, allowed_topologies=allowed_topos)
         true_adj = info["true_adjacency"]
-        
+
         if args.agent_type == "ippo" and args.use_rnn:
             actor_states = [IPPORNNActor.initial_state(1) for _ in range(args.num_agents)]
             critic_states = [IPPORNNCritic.initial_state(1) for _ in range(args.num_agents)]
-            
+
         done = False
         ep_reward = 0.0
         ep_info_gain_0 = 0.0
         ep_info_gain_1 = 0.0
         ep_steps = 0
         final_dag = None
+
+        # Agent-vs-estimator-learning metrics (see src/episode_metrics.py) -- accumulated
+        # per step, reduced to episode-level scalars after the loop. All purely diagnostic;
+        # none feed back into the reward.
+        initial_shd = float(evaluate_dag_against_true(np.array(env.last_predicted_dag), np.array(true_adj))["shd"])
+        shd_trajectory = [initial_shd]
+        cumulative_interventions = 0
+        interventions_to_zero = None
+        sum_positive_delta = {0: 0.0, 1: 0.0}
+        redundant_steps = 0
+        node_intervention_counts = {i: 0 for i in range(args.num_variables)}
+        ep_impact_sum = {0: 0.0, 1: 0.0}
+        ep_asym_mag_sum = 0.0
+        max_shd_possible = float(np.sum(env.structural_mask))
+        entropy_before = gaussian_entropy(np.array(env.jax_state.running_covariance), args.num_variables)
         
         while not done:
             if args.agent_type == "ippo":
                 # Agent 0
                 k0_act, key = jax.random.split(key)
-                obs_0 = jnp.expand_dims(env._agent_observations[0], 0)
+                obs_0 = jnp.expand_dims(obs_dict["agent_0"], 0)
                 if args.use_rnn:
-                    (cat_l0, tgt_l0, gr_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
+                    (cat_l0, tgt_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
                     v0, critic_states[0] = critic_apply(critic_params_list[0], obs_0, critic_states[0])
                     val_0 = v0[0]
                 else:
-                    cat_l0, tgt_l0, gr_l0 = actor_apply(actor_params_list[0], obs_0)
+                    cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                c0, t0, lp0, gp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], gr_l0[0], local_masks[0], boundary_mask, edge_masks[0], k0_act)
+                c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], valid_intervention_masks[0], k0_act)
                 
                 # Agent 1
                 k1_act, key = jax.random.split(key)
-                obs_1 = jnp.expand_dims(env._agent_observations[1], 0)
+                obs_1 = jnp.expand_dims(obs_dict["agent_1"], 0)
                 if args.use_rnn:
-                    (cat_l1, tgt_l1, gr_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
+                    (cat_l1, tgt_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
                     v1, critic_states[1] = critic_apply(critic_params_list[1], obs_1, critic_states[1])
                     val_1 = v1[0]
                 else:
-                    cat_l1, tgt_l1, gr_l1 = actor_apply(actor_params_list[1], obs_1)
+                    cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                c1, t1, lp1, gp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], gr_l1[0], local_masks[1], boundary_mask, edge_masks[1], k1_act)
+                c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], valid_intervention_masks[1], k1_act)
+                
+                joint_actions = {
+                    "agent_0": (int(c0), int(t0)),
+                    "agent_1": (int(c1), int(t1))
+                }
                 
                 k_step, key = jax.random.split(key)
-                agent_obs, r0, r1, done, final_dag, info_gains = env.step_jitted(c0, t0, gp0, c1, t1, gp1, k_step)
+                next_obs_dict, rewards, done, step_info = env.step(joint_actions, predicted_dags=None, key=k_step)
                 
-                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, graph_preds=gp0, rewards=r0, dones=done)
-                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, graph_preds=gp1, rewards=r1, dones=done)
+                r0 = rewards["agent_0"]
+                r1 = rewards["agent_1"]
+                final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
+                info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
+                
+                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done)
+                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done)
+                obs_dict = next_obs_dict
                 ep_reward += float(r0 + r1)
-                ep_info_gain_0 += float(info_gains[0])
-                ep_info_gain_1 += float(info_gains[1])
+                ep_info_gain_0 += float(info_gains["agent_0"])
+                ep_info_gain_1 += float(info_gains["agent_1"])
                 ep_steps += 1
+
+                # Agent-vs-estimator-learning metric accumulation (see src/episode_metrics.py)
+                did_intervene = {0: int(c0) == int(ActionCategory.INTERVENE), 1: int(c1) == int(ActionCategory.INTERVENE)}
+                cumulative_interventions += int(did_intervene[0]) + int(did_intervene[1])
+                step_shd = float(step_info["shd"])
+                shd_trajectory.append(step_shd)
+                if interventions_to_zero is None and step_shd == 0.0:
+                    interventions_to_zero = cumulative_interventions
+                shd_delta = step_info.get("shd_delta", {"agent_0": 0.0, "agent_1": 0.0})
+                if did_intervene[0]:
+                    sum_positive_delta[0] += max(0.0, float(shd_delta["agent_0"]))
+                if did_intervene[1]:
+                    sum_positive_delta[1] += max(0.0, float(shd_delta["agent_1"]))
+                if did_intervene[0] and did_intervene[1] and int(t0) == int(t1):
+                    redundant_steps += 1
+                if did_intervene[0]:
+                    node_intervention_counts[int(t0)] = node_intervention_counts.get(int(t0), 0) + 1
+                if did_intervene[1]:
+                    node_intervention_counts[int(t1)] = node_intervention_counts.get(int(t1), 0) + 1
+                impact_scores = step_info.get("impact_scores", {"agent_0": 0.0, "agent_1": 0.0})
+                ep_impact_sum[0] += float(impact_scores["agent_0"])
+                ep_impact_sum[1] += float(impact_scores["agent_1"])
+                if "asym_matrix" in step_info:
+                    ep_asym_mag_sum += float(np.mean(np.abs(step_info["asym_matrix"])))
             else:
                 joint_actions = {}
                 predicted_dags = {}
@@ -485,7 +604,6 @@ def main():
         if args.agent_type == "ippo":
             actor_loss = 0.0
             critic_loss = 0.0
-            graph_loss = 0.0
             entropy = 0.0
             per_agent_metrics = {}
             for k in range(args.num_agents):
@@ -497,7 +615,7 @@ def main():
                 
                 # Update agent k's private parameters strictly on its own buffer
                 a_p, c_p, a_opt, c_opt, metrics = trainer.update_step(
-                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, true_adj, observed_masks[k]
+                    actor_params_list[k], critic_params_list[k], actor_opts[k], critic_opts[k], b, valid_intervention_masks[k]
                 )
                 actor_params_list[k] = a_p
                 critic_params_list[k] = c_p
@@ -507,7 +625,6 @@ def main():
                 per_agent_metrics[k] = metrics
                 actor_loss += float(metrics["actor_loss"])
                 critic_loss += float(metrics["critic_loss"])
-                graph_loss += float(metrics["graph_loss"])
                 entropy += float(metrics["entropy"])
                 buffers[k].reset()
                 
@@ -525,16 +642,40 @@ def main():
         }
         for k in range(args.num_agents):
             log_data[f"agent_{k}_budget"] = float(env.jax_state.budgets[k])
-            
+
+        if args.agent_type == "ippo":
+            entropy_after = gaussian_entropy(np.array(env.jax_state.running_covariance), args.num_variables)
+            log_data.update({
+                "eval/interventions_to_shd0": float(interventions_to_zero) if interventions_to_zero is not None else float("nan"),
+                "eval/reached_shd0": int(interventions_to_zero is not None),
+                "eval/shd_auc_normalized": shd_trajectory_auc(shd_trajectory, max_shd_possible),
+                "eval/shd_reduction_auc_normalized": shd_reduction_auc(shd_trajectory, max_shd_possible),
+                "eval/orientation_precision_a0": sum_positive_delta[0] / max(1, cumulative_interventions),
+                "eval/orientation_precision_a1": sum_positive_delta[1] / max(1, cumulative_interventions),
+                "eval/entropy_gain_episode": entropy_before - entropy_after,
+                "eval/impact_score_a0": ep_impact_sum[0] / max(1, ep_steps),
+                "eval/impact_score_a1": ep_impact_sum[1] / max(1, ep_steps),
+                "eval/asym_magnitude_mean": ep_asym_mag_sum / max(1, ep_steps),
+                "eval/redundant_interventions": redundant_steps,
+                "eval/redundancy_rate": redundant_steps / max(1, cumulative_interventions),
+                "eval/node_coverage": len([v for v in node_intervention_counts.values() if v > 0]) / args.num_variables,
+                "eval/target_entropy_normalized": normalized_target_entropy(node_intervention_counts, args.num_variables),
+            })
+            # Boundary-specific coverage -- the more precise "is federation actually
+            # working" signal than overall coverage, since private nodes never require
+            # coordination at all (derived from STANDARD_BOUNDARY_MASK, not hardcoded).
+            boundary_nodes = [i for i in range(args.num_variables) if float(STANDARD_BOUNDARY_MASK[i]) > 0.5]
+            boundary_covered = len([n for n in boundary_nodes if node_intervention_counts.get(n, 0) > 0])
+            log_data["eval/boundary_node_coverage"] = boundary_covered / max(1, len(boundary_nodes))
+
+
         if args.agent_type == "ippo":
             log_data["train/actor_loss"] = float(actor_loss / args.num_agents)
             log_data["train/critic_loss"] = float(critic_loss / args.num_agents)
-            log_data["train/graph_loss"] = float(graph_loss / args.num_agents)
             log_data["train/entropy"] = float(entropy / args.num_agents)
             for k in range(args.num_agents):
                 log_data[f"train/agent_{k}_actor_loss"] = float(per_agent_metrics[k]["actor_loss"])
                 log_data[f"train/agent_{k}_critic_loss"] = float(per_agent_metrics[k]["critic_loss"])
-                log_data[f"train/agent_{k}_graph_loss"] = float(per_agent_metrics[k]["graph_loss"])
                 log_data[f"train/agent_{k}_entropy"] = float(per_agent_metrics[k]["entropy"])
             
         all_metrics_history.append(log_data.copy())
