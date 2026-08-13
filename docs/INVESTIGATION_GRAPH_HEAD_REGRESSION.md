@@ -204,6 +204,10 @@ The core question is answered and confirmed at full scale. What remains is judgm
 4. **Two loose ends flagged but not chased tonight** (both noted inline above, repeated here for visibility): (a) AVICI's sample-reconstruction shim discards mean-shift information -- fixable, but a separate, larger piece of work from tonight's fix, and AVICI isn't needed now that `learned` works well; (b) the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked -- not needed unless `learned` turns out to have some other limitation you find during review.
 5. **`--freeze_graph_estimator` is still dead code** (assigned, never read) -- pre-existing, unrelated to tonight's work, noted for whenever it's convenient to clean up or properly wire in.
 
+## In progress: multi-seed robustness check
+
+Submitted SGE array job 129346 (tasks 1-2, seeds 7 and 13) repeating the `learned`+soft-shift+`fixed_graph=0` diagnostic (the seed=42 result was SHD 0.365, F1 0.907, SHD=0 on 79% of episodes) to check whether that result is robust or got lucky on this particular seed. Checking back once complete; will add results here.
+
 ## Session log (for context on how this was produced)
 
 Ran overnight per your request, self-pacing with `ScheduleWakeup` between chunks of work (5-30 min breaks depending on whether waiting on a Myriad job), git-committing incrementally on this branch after each substantive finding so nothing was at risk of being lost. Caught and fixed two real operational bugs along the way (a shared-venv `protobuf`/`wandb` conflict from installing AVICI's dependencies, and a false-positive job-completion signal from a transient SSH connection drop) -- both documented inline above where they happened, not swept under the rug.
