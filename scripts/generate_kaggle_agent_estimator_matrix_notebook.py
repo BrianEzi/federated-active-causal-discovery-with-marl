@@ -372,6 +372,19 @@ practical ~30 min/200-episode run.""")
 
         isolated_env = os.environ.copy()
         isolated_env["PYTHONPATH"] = isolated_dir + os.pathsep + isolated_env.get("PYTHONPATH", "")
+        # On a GPU-enabled Kaggle kernel, the main environment has a CUDA JAX plugin
+        # (jax_plugins.xla_cuda12) installed. JAX auto-discovers jax_plugins.* namespace
+        # packages across the *entire* sys.path at import time, not just the isolated
+        # directory -- so even though the isolated jax==0.4.30/jaxlib==0.4.30 load
+        # correctly, JAX still finds and tries to initialize that newer CUDA plugin, which
+        # speaks an incompatible PJRT API version to the older jaxlib and crashes with
+        # "Mismatched PJRT plugin PJRT API version" before any training code runs.
+        # Confirmed on a real Kaggle GPU run. JAX_PLATFORMS=cpu skips backend/plugin
+        # discovery entirely -- which is also what we already intend here, since this
+        # isolated environment is CPU-only by design (matching the Myriad HPC comparison
+        # run), so this just makes that explicit instead of relying on discovery to fail
+        # to a CPU fallback safely (it doesn't -- it crashes instead).
+        isolated_env["JAX_PLATFORMS"] = "cpu"
         check = subprocess.run(
             [sys.executable, "-c", "import avici; print('AVICI_IMPORT_OK')"],
             env=isolated_env, capture_output=True, text=True,
@@ -384,7 +397,7 @@ practical ~30 min/200-episode run.""")
             raise RuntimeError("avici import check failed inside the isolated jax==0.4.30 subprocess")
 
         print("AVICI installed and importable (verified in an isolated jax==0.4.30 subprocess).")
-        return True, {"PYTHONPATH": isolated_env["PYTHONPATH"]}
+        return True, {"PYTHONPATH": isolated_env["PYTHONPATH"], "JAX_PLATFORMS": "cpu"}
     except Exception as e:
         print(f"AVICI install failed ({type(e).__name__}: {e}).")
         print("Skipping avici arms of the matrix -- learned/analytic arms are unaffected.")
