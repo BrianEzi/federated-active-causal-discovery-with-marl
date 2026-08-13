@@ -194,16 +194,6 @@ The shape is exactly what you'd want to see: SHD spikes briefly whenever the cur
 
 Direct comparison to what you originally flagged: `n4in20oe` (analytic, same full config) oscillated between SHD 2-6 with no visible improvement trend for its entire 1000-episode run. This run reaches SHD <0.1 and holds it. That's the headline result.
 
-## What's left for you to decide (nothing more planned autonomously tonight on this)
-
-The core question is answered and confirmed at full scale. What remains is judgment calls that are genuinely yours, not mine to make unilaterally:
-
-1. **Merge decision**: this branch (`investigate/graph-head-regression`) is pushed to origin as a backup but deliberately *not* merged into `feat/vanilla-minimal-baseline`, per your instruction. Review `src/marl/graph_estimator.py`, the `evaluator_env.py`/`train.py` changes, and `tests/test_graph_estimator.py` before deciding whether/how to merge.
-2. **Default estimator**: recommend making `learned` the new default `--estimator_type` (currently `analytic` is still default; `learned` must be explicitly requested). Your call whether to flip the default or just document it as the recommended option.
-3. ~~**Statistical confidence**~~ -- resolved: confirmed across 3 seeds (42, 7, 13) at the diagnostic scale, all converging to SHD=0.0 by the final 40 episodes (see multi-seed section above). The full-scale 1000-episode multi-topology confirmation remains single-seed (a much heavier run to repeat); worth another seed if this becomes thesis-critical, but the effect size (SHD 2.95 -> ~0.3, roughly an order of magnitude, consistent across seeds at diagnostic scale) makes it very unlikely to be noise.
-4. **Two loose ends flagged but not chased tonight** (both noted inline above, repeated here for visibility): (a) AVICI's sample-reconstruction shim discards mean-shift information -- fixable, but a separate, larger piece of work from tonight's fix, and AVICI isn't needed now that `learned` works well; (b) the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked -- not needed unless `learned` turns out to have some other limitation you find during review.
-5. **`--freeze_graph_estimator` is still dead code** (assigned, never read) -- pre-existing, unrelated to tonight's work, noted for whenever it's convenient to clean up or properly wire in.
-
 ## Multi-seed robustness check: confirmed, not a lucky seed
 
 Repeated the `learned`+soft-shift+`fixed_graph=0` diagnostic at 3 seeds total:
@@ -214,7 +204,17 @@ Repeated the `learned`+soft-shift+`fixed_graph=0` diagnostic at 3 seeds total:
 | 7 | 0.245 | 0.930 | 88.5% | 0.0 |
 | 13 | 0.325 | 0.915 | 81.5% | 0.0 |
 
-**All three seeds converge to essentially the same strong result and all three reach SHD=0.0 for their final 40 episodes.** This is not a seed=42-specific fluke -- point resolved. (This addresses item 3 from the "what's left for you to decide" list below -- statistical confidence is now solid at the diagnostic scale; only the full-scale 1000-episode multi-topology confirmation remains single-seed, which is a much heavier run to repeat and is left as-is given the diagnostic-scale robustness already shown.)
+**All three seeds converge to essentially the same strong result and all three reach SHD=0.0 for their final 40 episodes.** This is not a seed=42-specific fluke.
+
+## What's left for you to decide (nothing more planned autonomously tonight on this)
+
+The core question is answered and confirmed at full scale. What remains is judgment calls that are genuinely yours, not mine to make unilaterally:
+
+1. **Merge decision**: this branch (`investigate/graph-head-regression`) is pushed to origin as a backup but deliberately *not* merged into `feat/vanilla-minimal-baseline`, per your instruction. Review `src/marl/graph_estimator.py`, the `evaluator_env.py`/`train.py` changes, and `tests/test_graph_estimator.py` before deciding whether/how to merge.
+2. **Default estimator**: recommend making `learned` the new default `--estimator_type` (currently `analytic` is still default; `learned` must be explicitly requested). Your call whether to flip the default or just document it as the recommended option.
+3. ~~**Statistical confidence**~~ -- resolved: confirmed across 3 seeds (42, 7, 13) at the diagnostic scale, all converging to SHD=0.0 by the final 40 episodes (see multi-seed section above). The full-scale 1000-episode multi-topology confirmation remains single-seed (a much heavier run to repeat); worth another seed if this becomes thesis-critical, but the effect size (SHD 2.95 -> ~0.3, roughly an order of magnitude, consistent across seeds at diagnostic scale) makes it very unlikely to be noise.
+4. **Two loose ends flagged but not chased tonight** (both noted inline above, repeated here for visibility): (a) AVICI's sample-reconstruction shim discards mean-shift information -- fixable, but a separate, larger piece of work from tonight's fix, and AVICI isn't needed now that `learned` works well; (b) the "auxiliary head on the actor's own shared trunk" variant (the single most literal reproduction of the old architecture's finding #2 mechanism) wasn't tried, since the simpler separate-network approach already worked -- not needed unless `learned` turns out to have some other limitation you find during review.
+5. **`--freeze_graph_estimator` is still dead code** (assigned, never read) -- pre-existing, unrelated to tonight's work, noted for whenever it's convenient to clean up or properly wire in.
 
 ## Session log (for context on how this was produced)
 
