@@ -253,20 +253,37 @@ def build_intervention_spec_jitted(
 class FederatedCausalEnv:
     def __init__(self, config: SCMConfig, action_costs: np.ndarray,
                  initial_budget: float = 10.0, sample_count: int = 100, fixed_graph: bool = False,
-                 max_steps: int = 20, boundary_margin: float = 0.10, normalize_rewards: bool = True,
+                 max_steps: int = None, boundary_margin: float = 0.10, normalize_rewards: bool = True,
                  intrinsic_coef: float = 0.05, intervention_type: str = "soft_shift",
                  shift_val: float = 2.0, estimator_type: str = "analytic",
                  freeze_graph_estimator: bool = True, obs_feedback: bool = True,
                  impact_coef: float = 0.0, reward_density: str = "dense",
                  avici_max_context: int = 400, running_cov_ema_alpha: float = 0.3,
-                 ucb_coef: float = 0.0, uncertainty_coef: float = 2.0):
+                 ucb_coef: float = 0.0, uncertainty_coef: float = 2.0,
+                 success_bonus: float = 0.0):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
         self.sample_count = sample_count
         self.fixed_graph = fixed_graph
-        self.max_steps = max_steps
+        # Episode horizon. `max_steps=None` (the default) derives it from the budget rather
+        # than carrying an arbitrary, independently-tunable horizon that can silently
+        # contradict the budget: every agent starts with `initial_budget` of its OWN and can
+        # spend at most `action_cost` per step, so after `initial_budget / action_cost` steps
+        # no agent can afford to act and the episode is over on its own terms. The cap still
+        # has to exist, because agents that never intervene never spend and would otherwise
+        # run forever. Note this bound is independent of K -- budgets are per-agent
+        # (`jnp.full(K, initial_budget)`) and are spent in parallel, so scaling by K (as a
+        # parallel session's refactor did) doubles the horizon at K=2 without justification.
+        # At the current defaults (budget 20.0, action_cost 1.0) this reproduces exactly the
+        # old hardcoded 20.
+        if max_steps is None:
+            per_step_cost = float(np.max(action_costs)) if np.size(action_costs) else 1.0
+            self.max_steps = int(np.ceil(initial_budget / max(per_step_cost, 1e-8)))
+        else:
+            self.max_steps = int(max_steps)
         self.boundary_margin = boundary_margin
+        self.success_bonus = success_bonus
         # Cap on how many of the most-recent raw-sample-buffer rows get fed to AVICI per
         # call. Two reasons, both confirmed empirically: (1) AVICI's per-call compute cost
         # grows with n (0.04s at n=100 up to 2.3s at n=2100), and (2) far more importantly,
@@ -638,7 +655,8 @@ class FederatedCausalEnv:
             impact_coef=self.impact_coef,
             reward_density=self.reward_density,
             is_terminal=terminated,
-            prev_shd=self.prev_shd
+            prev_shd=self.prev_shd,
+            success_bonus=self.success_bonus
         )
         # Per-agent SHD-delta this step (positive = improved), for attributing structural
         # improvement to whichever agent(s) actually intervened -- computed from the SAME

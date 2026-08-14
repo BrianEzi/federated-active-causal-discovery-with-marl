@@ -13,12 +13,25 @@ def compute_ippo_rewards(
     impact_coef: float = 0.0,
     reward_density: str = "dense",
     is_terminal: bool = False,
-    prev_shd: float = None
+    prev_shd: float = None,
+    success_bonus: float = 0.0
 ) -> dict:
     """
     Computes mixed cooperative SHD penalty & ablation rewards for IPPO agents.
     Personal local errors (Z1 for Agent 0, Z2 for Agent 1) + shared boundary errors (X1-X2).
     Returns: {"agent_0": r1, "agent_1": r2}
+
+    `success_bonus`: added per-agent at episode end if that agent's error count is zero.
+    Deliberately applied in BOTH the sparse and dense branches -- a parallel session's
+    refactor added an equivalent bonus inside the dense branch only, which made it dead
+    code under this project's `sparse` default. See docs/THEORY_NOTES.md #8 for why the
+    per-step SHD-scaled holding penalty from that same refactor was NOT adopted: it is not
+    of the potential-based form (Ng, Harada & Russell 1999) and so silently changes the
+    optimal policy, whereas the dense branch's `(prev_shd - current_shd)` already IS
+    potential-based with `phi(s) = -SHD(s)` and is therefore policy-invariant relative to
+    sparse. A terminal bonus at an absorbing goal state is a change to the objective too,
+    but an intentional and conventional one (goal-reaching MDP), not shaping dressed up as
+    neutral.
     """
     diff = np.abs(stitched_dag - true_dag)
     
@@ -65,7 +78,15 @@ def compute_ippo_rewards(
     scale = 1.0 / max(1.0, float(max_steps))
     r1 = r1 * scale
     r2 = r2 * scale
-    
+
+    # Terminal success bonus, applied after scaling so its magnitude means the same thing
+    # regardless of horizon normalization.
+    if is_terminal and success_bonus > 0.0:
+        if current_e1 == 0:
+            r1 += success_bonus
+        if current_e2 == 0:
+            r2 += success_bonus
+
     if info_gains is not None and intrinsic_coef > 0.0:
         r1 += intrinsic_coef * float(info_gains.get("agent_0", 0.0))
         r2 += intrinsic_coef * float(info_gains.get("agent_1", 0.0))

@@ -61,8 +61,12 @@ def parse_args():
     )
     # Maximum interaction steps (rollout horizon) allowed per episode
     parser.add_argument(
-        "--max_steps", type=int, default=20,
-        help="Maximum rollout horizon / steps per training episode (default: 20)"
+        "--max_steps", type=int, default=None,
+        help="Maximum rollout horizon / steps per training episode. Default: derived as "
+             "ceil(initial_budget / action_cost), the point past which no agent can afford "
+             "to act (budgets are per-agent and spent in parallel, so this is independent "
+             "of --num_agents). At the default budget 20.0 / cost 1.0 this is 20, matching "
+             "the previous hardcoded value. Pass explicitly only to override."
     )
     # Starting intervention / sampling budget allocated to each agent per episode
     parser.add_argument(
@@ -281,6 +285,16 @@ def parse_args():
              "Set to 0.0 to disable (default: 2.0)"
     )
     parser.add_argument(
+        "--success_bonus", type=float, default=0.0,
+        help="Per-agent bonus added at episode end when that agent's error count is zero. "
+             "Applies under BOTH --reward_density settings. Default 0.0 (off) so existing "
+             "results stay reproducible; try ~5.0 to make goal-reaching explicit. Note this "
+             "is an intentional change of objective (goal-reaching MDP), not potential-based "
+             "shaping -- unlike the dense branch's (prev_shd - curr_shd), it is not "
+             "policy-invariant in the sense of Ng, Harada & Russell (1999). See "
+             "docs/THEORY_NOTES.md #8."
+    )
+    parser.add_argument(
         "--intervention_type", type=str, default="hard", choices=["soft_shift", "hard"],
         help="Intervention mechanism: 'hard' (do(X_i = c) -- default; the classical 'perfect intervention' "
              "most identifiability theory assumes, and empirically a much stronger structure-learning signal, "
@@ -383,6 +397,15 @@ def main():
     key = jax.random.PRNGKey(args.seed)
     
     action_costs = jnp.full(args.num_agents, args.action_cost)
+
+    # Derive the episode horizon from the budget unless explicitly overridden, so the two
+    # cannot silently contradict each other. Resolved here rather than only inside the env
+    # because train.py also uses max_steps for rollout-buffer sizing and GAE padding.
+    if args.max_steps is None:
+        args.max_steps = int(np.ceil(args.initial_budget / max(args.action_cost, 1e-8)))
+        print(f"max_steps not set; derived {args.max_steps} from "
+              f"initial_budget={args.initial_budget} / action_cost={args.action_cost}")
+
     config = SCMConfig(
         d=args.num_variables,
         K=args.num_agents,
@@ -416,7 +439,8 @@ def main():
         avici_max_context=args.avici_max_context,
         running_cov_ema_alpha=args.running_cov_ema_alpha,
         ucb_coef=args.ucb_coef,
-        uncertainty_coef=args.uncertainty_coef
+        uncertainty_coef=args.uncertainty_coef,
+        success_bonus=args.success_bonus
     )
     
     if args.agent_type == "ippo":

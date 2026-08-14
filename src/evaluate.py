@@ -204,6 +204,17 @@ def run_evaluation_suite(
             # `optimal_rate` is therefore computed over informative steps only; the raw
             # figure and the vacuous fraction are both reported so the distinction stays
             # visible in the trace rather than having to be rediscovered.
+            #
+            # Reading `vacuous_rate` correctly: a high aggregate value is NOT by itself a
+            # red flag post-fix. Once interventions have resolved the structure there is
+            # genuinely nothing left to discriminate, so late-episode steps are legitimately
+            # vacuous. What matters is WHERE the vacuity sits. Measured on a corrected run:
+            # step 0 is 100% informative (mean best_score 0.53) and vacuity concentrates
+            # from step 1 onward once the graph is identified -- whereas under the
+            # equal-variance bug step 0 itself was already vacuous, because the posterior
+            # had collapsed before the agent ever acted. If step 0 ever goes vacuous again,
+            # the observational shortcut has returned; see
+            # tests/test_observational_identifiability.py.
             informative = [x for x in scored if x["best_score"] > 1e-9]
             if scored:
                 episode_trace["oracle_summary"] = {
