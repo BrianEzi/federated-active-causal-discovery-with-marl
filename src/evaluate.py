@@ -194,21 +194,45 @@ def run_evaluation_suite(
 
         if oracle_agreement:
             scored = [a["oracle"] for s in episode_trace["steps"] for a in s["actions"].values() if "oracle" in a]
+            # A step is only *informative* about the agent if the oracle actually had a
+            # preference. When every legal target ties (best_score == 0 -- either the
+            # posterior has collapsed to one hypothesis, or all remaining hypotheses agree
+            # about reachability from every legal node), `oracle_best_targets` marks them
+            # ALL optimal, so `is_optimal` is 1.0 by construction regardless of what the
+            # agent did. Counting those as successes is what produced the retracted
+            # "99.4-100% optimal_rate" figure of 2026-08-14, which was 93-98% vacuous.
+            # `optimal_rate` is therefore computed over informative steps only; the raw
+            # figure and the vacuous fraction are both reported so the distinction stays
+            # visible in the trace rather than having to be rediscovered.
+            informative = [x for x in scored if x["best_score"] > 1e-9]
             if scored:
                 episode_trace["oracle_summary"] = {
                     "scored_interventions": len(scored),
-                    "optimal_rate": float(np.mean([x["is_optimal"] for x in scored])),
-                    "mean_normalized_score": float(np.mean([x["normalized_score"] for x in scored])),
-                    "mean_regret": float(np.mean([x["regret"] for x in scored])),
+                    "informative_interventions": len(informative),
+                    "vacuous_rate": float(1.0 - len(informative) / len(scored)),
+                    "optimal_rate": (
+                        float(np.mean([x["is_optimal"] for x in informative])) if informative else None
+                    ),
+                    "mean_normalized_score": (
+                        float(np.mean([x["normalized_score"] for x in informative])) if informative else None
+                    ),
+                    "mean_regret": (
+                        float(np.mean([x["regret"] for x in informative])) if informative else None
+                    ),
+                    # Retained for comparison against pre-fix traces only. Do not report.
+                    "optimal_rate_including_vacuous": float(np.mean([x["is_optimal"] for x in scored])),
                 }
             else:
                 # No interventions at all this episode (pure NOOP) -- report explicitly
                 # rather than emitting a misleading 0.0 or omitting the field silently.
                 episode_trace["oracle_summary"] = {
                     "scored_interventions": 0,
+                    "informative_interventions": 0,
+                    "vacuous_rate": None,
                     "optimal_rate": None,
                     "mean_normalized_score": None,
                     "mean_regret": None,
+                    "optimal_rate_including_vacuous": None,
                 }
 
         trace[f"graph_{graph_idx}"] = episode_trace

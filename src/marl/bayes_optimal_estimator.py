@@ -16,11 +16,28 @@ Scope and assumptions (spelled out explicitly rather than silently baked in):
   downstream nodes conditioned on). Not correct under `soft_shift` (where the
   equation is preserved, just shifted) -- would need a per-hypothesis,
   per-intervention-type likelihood adjustment to extend there.
-- Uses the environment's true, known `noise_scale` -- a fixed config
-  hyperparameter of the simulated environment, not something private to any
-  agent (the same sense in which `true_adjacency` is available for computing
-  reward/SHD but never fed to the policy). This gives an exact Gaussian
-  likelihood rather than one hostage to a small-sample noise-variance estimate.
+- Why the error variance is FITTED, not supplied (changed 2026-08-14 -- this is the
+  single most consequential assumption in the file, see docs/THEORY_NOTES.md #1/#2):
+  an earlier version substituted the environment's true, known `noise_scale` for
+  every node's error variance. That looked like a harmless use of legitimate side
+  information, and it is not. Our SCM draws a single scalar `noise_scale` shared by
+  all nodes, and Peters & Bühlmann (2014) show a linear Gaussian SEM with EQUAL error
+  variances is fully identifiable from observational data alone -- the Markov
+  equivalence class collapses to a point. Substituting a known shared variance
+  therefore broke score equivalence and handed the estimator the answer for free:
+  measured 98% correct-graph recovery from observational samples before any
+  intervention was taken, which made the entire active-discovery task degenerate and
+  silently invalidated the oracle-agreement metric built on top of this posterior.
+  Fitting each node's residual variance by MLE restores score equivalence
+  (Chickering 2002): hypotheses within a Markov equivalence class become genuinely
+  indistinguishable observationally, so interventions are once again REQUIRED to
+  resolve orientation -- which is the regime this project is about. Measured after
+  the change: observational-only accuracy falls to ~0.31-0.39, which is close to the
+  reciprocal MEC size for these spanning-tree topologies, i.e. the estimator now
+  degrades to exactly "right equivalence class, orientation undetermined" as theory
+  predicts. The likelihood is correspondingly no longer exact-variance Gaussian, but
+  it is now the standard Gaussian profile likelihood used throughout the structure
+  -learning literature.
 - The likelihood is a *profile* (plug-in MLE) likelihood, not a fully
   marginalized one: per hypothesis, per node, fits the maximum-likelihood
   linear regression of that node on its hypothesis-specified parents
@@ -46,10 +63,19 @@ def _fit_node_log_likelihood(
     samples: np.ndarray,
     self_intervened: np.ndarray,
     noise_scale: float,
+    use_known_variance: bool = False,
 ) -> float:
     """Profile log-likelihood of node `node_idx`'s samples under a linear-Gaussian
     fit on its hypothesis-specified parents, using only samples where node_idx
-    itself was not intervened on (see module docstring's hard-intervention scope)."""
+    itself was not intervened on (see module docstring's hard-intervention scope).
+
+    `use_known_variance=False` (the default) profiles out the error variance by MLE
+    alongside the regression weights -- see the module docstring's "Why the error
+    variance is fitted, not supplied" section. `True` restores the original behaviour
+    (substituting the environment's true `noise_scale`) and is retained only to
+    reproduce pre-2026-08-14 results; it makes the estimator observationally
+    near-omniscient and should not be used for new experiments.
+    """
     valid = ~self_intervened
     n_valid = int(np.sum(valid))
     if n_valid == 0:
@@ -67,7 +93,11 @@ def _fit_node_log_likelihood(
         beta_hat = np.linalg.solve(gram, x_pa.T @ x_i)
         residuals = x_i - x_pa @ beta_hat
 
-    var = max(noise_scale ** 2, 1e-8)
+    if use_known_variance:
+        var = max(noise_scale ** 2, 1e-8)
+    else:
+        # MLE of the per-node error variance, profiled out jointly with beta_hat.
+        var = max(float(np.mean(residuals ** 2)), 1e-8)
     log_lik = -0.5 * np.sum(residuals ** 2) / var - 0.5 * n_valid * np.log(2 * np.pi * var)
     return float(log_lik)
 
@@ -77,9 +107,14 @@ def compute_hypothesis_posterior(
     raw_interv: np.ndarray,
     candidate_adjacencies: np.ndarray,
     noise_scale: float,
+    use_known_variance: bool = False,
 ) -> np.ndarray:
     """Posterior probability [H] over the candidate hypotheses (uniform prior),
-    given the accumulated (already valid-sliced) samples/intervention labels so far."""
+    given the accumulated (already valid-sliced) samples/intervention labels so far.
+
+    `noise_scale` is now only consulted when `use_known_variance=True`; see
+    `_fit_node_log_likelihood` and the module docstring for why the default fits the
+    per-node error variance instead."""
     candidate_adjacencies = np.asarray(candidate_adjacencies)
     H, d, _ = candidate_adjacencies.shape
     log_liks = np.zeros(H)
@@ -90,7 +125,9 @@ def compute_hypothesis_posterior(
         for node_idx in range(d):
             parents = np.where(adj[:, node_idx] > 0.5)[0]
             self_intervened = raw_interv[:, node_idx] > 0.5
-            total += _fit_node_log_likelihood(node_idx, parents, raw_samples, self_intervened, noise_scale)
+            total += _fit_node_log_likelihood(
+                node_idx, parents, raw_samples, self_intervened, noise_scale, use_known_variance
+            )
         log_liks[h] = total
 
     log_liks = log_liks - np.max(log_liks)  # numerical stability before exponentiating
@@ -104,6 +141,7 @@ def bayes_optimal_predict(
     n_valid: int,
     candidate_adjacencies: np.ndarray,
     noise_scale: float,
+    use_known_variance: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Returns (edge_probability_matrix [d,d], posterior [H]).
     edge_probability_matrix[i,j] = sum_h posterior[h] * candidate_adjacencies[h,i,j] --
@@ -115,7 +153,8 @@ def bayes_optimal_predict(
         posterior = np.full(H, 1.0 / H)
     else:
         posterior = compute_hypothesis_posterior(
-            raw_samples[:n_valid], raw_interv[:n_valid], candidate_adjacencies, noise_scale
+            raw_samples[:n_valid], raw_interv[:n_valid], candidate_adjacencies,
+            noise_scale, use_known_variance,
         )
     prob = np.tensordot(posterior, candidate_adjacencies, axes=(0, 0))
     return prob.astype(np.float32), posterior
