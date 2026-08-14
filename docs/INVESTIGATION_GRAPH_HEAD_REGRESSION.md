@@ -401,7 +401,7 @@ First pass at the numbers showed `reached0` (episodes that ever touch SHD=0) jum
 | `ended_at_zero`, temp=0.2 | -- | 0.0% | **54.2%** (best) |
 | `ended_at_zero`, temp=0.5 | -- | 0.0% | **41.7%** |
 | `ended_at_zero`, temp=1.0 | -- | 0.0% | **41.7%** |
-| oracle-agreement `optimal_rate` (scored interventions) | not measured | not measured | ~~99.4-100%~~ **RETRACTED, see below** |
+| oracle-agreement `optimal_rate` (scored interventions) | not measured | not measured | ~~99.4-100%~~ **RETRACTED -- re-scored to 82.3%, see below** |
 
 Even under the strict, corrected metric: **5x the baseline at greedy, ~13x at temperature=0.2**. This is a real result, not an artifact -- and it directly supports the design decision from earlier (drop pure-greedy as *the* eval target): the policy does *better*, not worse, with a little deployment-time stochasticity on top of the uncertainty bonus, consistent with this being a genuinely active-learning-flavored task.
 
@@ -477,6 +477,41 @@ Equal error variances are a property of the *data*, present in every run. But on
 - **Degenerate, and requiring re-measurement**: (a) the oracle-agreement metric in *every* arm, because `evaluate.py` computes the oracle posterior via the Bayes estimator regardless of the run's own estimator; (b) the `bayes_optimal` arm of the 24-run matrix, whose "comparison ceiling" was a ceiling reached without intervening.
 
 **Practical consequence: Track B needs oracle re-scoring only, not retraining** -- `scripts/temperature_sweep_eval.py` re-run against the already-saved checkpoints, the same cheap eval-only pass used for the `refixed` traces. The `bayes_optimal` matrix arm does need retraining before it can be called a ceiling.
+
+## Track B re-scored on the corrected metric (job `142478`, 2026-08-14 evening)
+
+Eval-only pass over the three already-trained `uncertainty_bonus_s{42,7,13}` checkpoints, using the corrected Bayes posterior and the informative-steps-only oracle metric. Corrected traces in `diag_runs/uncertainty_bonus_s*/rescored_v2/`.
+
+**Process note, recorded because it nearly produced a false positive**: the first attempt (job `140640`, output in `rescored/`) hardcoded `--seed 42` for all three tasks, whereas the original sweep used `--seed $SEED`. Since `evaluate.py` keys the environment off `PRNGKey(seed + graph_idx)`, seeds 7 and 13 were scored on entirely different SCM draws, producing an apparent `ended_at_zero` jump to 83.3% at temp 0.2 that was pure instance mismatch. Caught by asking why a number that *should not have changed* had changed. The invalid traces are kept in `rescored/` rather than deleted.
+
+### The oracle metric, corrected
+
+| temperature | oracle `optimal_rate` (informative steps) | informative fraction | `step0_informative` |
+|---|---|---|---|
+| 0.0 | 81.1% | 9.1% | 100% |
+| 0.2 | 84.6% | 8.6% | 100% |
+| 0.5 | 80.1% | 10.1% | 100% |
+| 1.0 | 83.6% | 8.7% | 100% |
+| **overall** | **82.3%** | 9.1% | 100% |
+
+**Oracle agreement is ~82%, not the retracted 99.4-100%.** The `step0_informative` canary is 100% in all twelve runs -- the oracle always has genuine discriminating work at step 0, which is precisely what the estimator fix restored. The ~9% informative fraction overall is expected rather than alarming: once interventions resolve the structure there is nothing left to discriminate, so late-episode steps are legitimately vacuous. The difference from the bug is *where* the vacuity sits, not how much of it there is.
+
+### `ended_at_zero`: unchanged, exactly as predicted -- and much noisier than assumed
+
+| temperature | original | re-scored | per-seed |
+|---|---|---|---|
+| 0.0 | 20.8% | 20.8% | **identical on all three seeds** |
+| 0.2 | 54.2% | 45.8% | differs |
+| 0.5 | 41.7% | 70.8% | differs |
+| 1.0 | 41.7% | 41.7% | **identical on all three seeds** |
+
+Temperatures 0.0 and 1.0 reproduce *exactly, per seed*, confirming the prediction that the estimator fix cannot touch `avici`-trained runs. But temperatures 0.2 and 0.5 differ, in opposite directions (-8.4pp and +29.1pp) on identical checkpoints, identical seeds and semantically identical code. The cause is floating-point nondeterminism in AVICI's CPU reductions, invisible under greedy argmax and amplified into different trajectories by stochastic sampling.
+
+**This is the more important finding of the re-score, and it is a methodological one.** Each seed contributes 8 episodes, so 24 episodes per temperature and one episode is worth 12.5 percentage points. A 29pp swing from numerical noise alone means the per-temperature figures throughout this document carry error bars comparable to the effects being discussed. Concretely:
+
+- **Track B's headline survives comfortably.** ~0-4% (no bonus, including 0.0% at full scale with 5x the training) to ~40-45% mean is far outside this noise band.
+- **The temperature-ordering story does not survive.** The earlier reading that temp=0.2 is "best" (54.2%) and greedy is worst was built on differences smaller than the noise floor. Re-scored, temp=0.5 comes out highest. **No deployment temperature should be selected on this evidence**, and the "deliberate decision about deployment temperature" listed as a loose end should be treated as unresolved rather than leaning toward 0.2.
+- Any future comparison at this scale needs more episodes per condition, or seed-level confidence intervals, before differences under ~30pp mean anything.
 
 ## Backlog (known limitations, not addressed in this round)
 
