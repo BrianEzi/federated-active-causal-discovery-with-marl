@@ -13,27 +13,37 @@ def compute_ippo_rewards(
     impact_coef: float = 0.0,
     reward_density: str = "dense",
     is_terminal: bool = False,
-    prev_shd: float = None
+    prev_shd: float = None,
+    num_agents: int = 2,
+    holding_bonus: float = 0.05,
+    action_friction: float = 0.0,
+    actions: dict = None,
+    remaining_budgets: dict = None,
+    budget_bonus_coef: float = 0.1
 ) -> dict:
     """
     Computes mixed cooperative SHD penalty & ablation rewards for IPPO agents.
-    Personal local errors (Z1 for Agent 0, Z2 for Agent 1) + shared boundary errors (X1-X2).
-    Returns: {"agent_0": r1, "agent_1": r2}
+    Supports K=2 (federated) and K=1 (single-agent centralized).
     """
     diff = np.abs(stitched_dag - true_dag)
     
-    # Personal local penalty for Agent 0 (edges involving Z1=0)
-    a1_local_errors = np.sum(diff[0, :]) + np.sum(diff[:, 0])
-    
-    # Personal local penalty for Agent 1 (edges involving Z2=3)
-    a2_local_errors = np.sum(diff[3, :]) + np.sum(diff[:, 3])
-    
-    # Shared boundary errors (edges between X1=1 and X2=2)
-    boundary_errors = diff[1, 2] + diff[2, 1]
-    
-    current_e1 = a1_local_errors + boundary_errors
-    current_e2 = a2_local_errors + boundary_errors
-    current_shd = a1_local_errors + a2_local_errors + boundary_errors
+    if num_agents == 1:
+        current_e1 = float(np.sum(diff))
+        current_e2 = 0.0
+        current_shd = current_e1
+    else:
+        # Personal local penalty for Agent 0 (edges involving Z1=0)
+        a1_local_errors = np.sum(diff[0, :]) + np.sum(diff[:, 0])
+        
+        # Personal local penalty for Agent 1 (edges involving Z2=3)
+        a2_local_errors = np.sum(diff[3, :]) + np.sum(diff[:, 3])
+        
+        # Shared boundary errors (edges between X1=1 and X2=2)
+        boundary_errors = diff[1, 2] + diff[2, 1]
+        
+        current_e1 = a1_local_errors + boundary_errors
+        current_e2 = a2_local_errors + boundary_errors
+        current_shd = a1_local_errors + a2_local_errors + boundary_errors
     
     if reward_density == "sparse":
         if is_terminal:
@@ -57,6 +67,19 @@ def compute_ippo_rewards(
         else:
             r1 = -current_e1 * edge_penalty
             r2 = -current_e2 * edge_penalty
+            
+        # Holding bonus: reward staying at SHD=0
+        if current_e1 == 0:
+            r1 += holding_bonus
+        if current_e2 == 0:
+            r2 += holding_bonus
+            
+        # Action friction penalty
+        if actions is not None and action_friction > 0.0:
+            if actions.get("agent_0", 1) == 0:  # INTERVENE
+                r1 -= action_friction
+            if actions.get("agent_1", 1) == 0:  # INTERVENE
+                r2 -= action_friction
     
     if has_cycle and (reward_density == "dense" or is_terminal):
         r1 -= cycle_penalty
@@ -66,6 +89,13 @@ def compute_ippo_rewards(
     r1 = r1 * scale
     r2 = r2 * scale
     
+    # Terminal budget conservation bonus
+    if is_terminal and remaining_budgets is not None and budget_bonus_coef > 0.0:
+        if current_e1 == 0:
+            r1 += budget_bonus_coef * float(remaining_budgets.get("agent_0", 0.0))
+        if current_e2 == 0:
+            r2 += budget_bonus_coef * float(remaining_budgets.get("agent_1", 0.0))
+    
     if info_gains is not None and intrinsic_coef > 0.0:
         r1 += intrinsic_coef * float(info_gains.get("agent_0", 0.0))
         r2 += intrinsic_coef * float(info_gains.get("agent_1", 0.0))
@@ -74,6 +104,8 @@ def compute_ippo_rewards(
         r1 += impact_coef * float(impact_scores.get("agent_0", 0.0))
         r2 += impact_coef * float(impact_scores.get("agent_1", 0.0))
         
+    if num_agents == 1:
+        return {"agent_0": float(r1)}
     return {
         "agent_0": float(r1),
         "agent_1": float(r2)

@@ -47,14 +47,17 @@ def estimate_graph_from_obs(obs: np.ndarray, d: int, agent_id: int, threshold: f
     return graph_pred
 
 class RandomAgent:
-    def __init__(self, agent_id: int, d: int = 4, threshold: float = 0.25):
+    def __init__(self, agent_id: int, d: int = 4, threshold: float = 0.25, num_agents: int = 2):
         self.agent_id = agent_id
         self.d = d
         self.threshold = threshold
-        self.local_nodes = [0, 1] if agent_id == 0 else [2, 3]
-        self.boundary_nodes = [1, 2]
-        # Valid intervention targets: own local domain, union the shared boundary pair.
-        self.valid_targets = sorted(set(self.local_nodes + self.boundary_nodes))
+        self.num_agents = num_agents
+        if num_agents == 1:
+            self.valid_targets = list(range(d))
+        else:
+            self.local_nodes = [0, 1] if agent_id == 0 else [2, 3]
+            self.boundary_nodes = [1, 2]
+            self.valid_targets = sorted(set(self.local_nodes + self.boundary_nodes))
 
     def act(self, obs, avail_actions=None):
         cat = np.random.choice([ActionCategory.INTERVENE, ActionCategory.NOOP])
@@ -68,15 +71,17 @@ class RandomAgent:
         return (int(cat), int(target)), graph_pred
 
 class RoundRobinAgent:
-    def __init__(self, agent_id: int, d: int = 4, threshold: float = 0.25):
+    def __init__(self, agent_id: int, d: int = 4, threshold: float = 0.25, num_agents: int = 2):
         self.agent_id = agent_id
         self.d = d
         self.threshold = threshold
-        self.local_nodes = [0, 1] if agent_id == 0 else [2, 3]
-        self.boundary_nodes = [1, 2]
-        # Cycle through every valid intervention target: own local domain, union the
-        # shared boundary pair.
-        self.targets = sorted(set(self.local_nodes + self.boundary_nodes))
+        self.num_agents = num_agents
+        if num_agents == 1:
+            self.targets = list(range(d))
+        else:
+            self.local_nodes = [0, 1] if agent_id == 0 else [2, 3]
+            self.boundary_nodes = [1, 2]
+            self.targets = sorted(set(self.local_nodes + self.boundary_nodes))
         self.step = 0
 
     def act(self, obs, avail_actions=None):

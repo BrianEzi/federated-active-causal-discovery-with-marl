@@ -103,6 +103,15 @@ STANDARD_OBS_MASKS = jnp.array([
     [0.0, 1.0, 1.0, 1.0]   # Agent 1 observes X1, X2, Z2 (not Z1)
 ])
 
+# Single-agent masks (K=1 centralized experiment designer)
+SINGLE_AGENT_LOCAL_MASKS = jnp.array([
+    [1.0, 1.0, 1.0, 1.0]   # Single agent has authority over all nodes
+])
+SINGLE_AGENT_BOUNDARY_MASK = jnp.zeros(4)
+SINGLE_AGENT_OBS_MASKS = jnp.array([
+    [1.0, 1.0, 1.0, 1.0]   # Single agent observes all nodes
+])
+
 def compute_edge_authority_mask(local_mask: chex.Array, boundary_mask: chex.Array) -> chex.Array:
     """
     Canonical per-agent edge-authority mask (single source of truth).
@@ -131,4 +140,7 @@ def compute_global_structural_mask(local_masks: chex.Array = STANDARD_LOCAL_MASK
     cross-domain edge would be, but they must still respect the topology's actual
     structural constraints (e.g. no direct Z1 <-> Z2 edge, no direct Z1 <-> X2 edge).
     """
+    if local_masks.shape[0] == 1:
+        # In single-agent 4-node setup, structural mask is identical to the canonical 4-node line graph
+        return compute_global_structural_mask(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
     return jnp.max(compute_edge_authority_masks(local_masks, boundary_mask), axis=0)

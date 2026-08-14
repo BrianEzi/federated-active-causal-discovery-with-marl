@@ -118,28 +118,83 @@ def score_agent_choice(
     candidate_adjacencies: np.ndarray,
     valid_mask: np.ndarray = None,
 ) -> Dict[str, float]:
-    """Scores one agent's chosen intervention target against the oracle.
-
-    Returns:
-      - `is_optimal`: 1.0 if the choice is among the tied-optimal targets, else 0.0.
-      - `score`: the chosen target's own discrimination score.
-      - `best_score`: the best achievable score among legal targets.
-      - `regret`: best_score - score (0.0 when optimal).
-      - `normalized_score`: score / best_score, or 1.0 when best_score is ~0 (every legal
-        option is equally useless -- the agent cannot be blamed for any choice, so
-        counting it as failure would be a metric artifact).
-    """
+    """Scores one agent's chosen intervention target against the oracle (target-level only)."""
     scores, best_targets = oracle_best_targets(posterior, candidate_adjacencies, valid_mask)
     best_score = float(np.max(np.where(np.asarray(valid_mask) > 0.5, scores, -np.inf))) if valid_mask is not None else float(np.max(scores))
     chosen_score = float(scores[chosen_target])
     if best_score <= 1e-12:
         normalized = 1.0
+        is_opt = 1.0
     else:
+        is_opt = float(bool(best_targets[chosen_target]))
         normalized = chosen_score / best_score
     return {
-        "is_optimal": float(bool(best_targets[chosen_target])),
+        "is_optimal": is_opt,
         "score": chosen_score,
         "best_score": best_score,
         "regret": max(0.0, best_score - chosen_score),
         "normalized_score": normalized,
     }
+
+
+def score_agent_action(
+    category: int,
+    target: int,
+    posterior: np.ndarray,
+    candidate_adjacencies: np.ndarray,
+    valid_mask: np.ndarray = None,
+) -> Dict[str, float]:
+    """Scores a full action (category + target) against the information-optimal oracle.
+
+    Handles the stopping decision (NOOP vs INTERVENE):
+    - When uncertainty is resolved (best_score <= 1e-12), NOOP is optimal (1.0) and INTERVENE is suboptimal (0.0).
+    - When information remains (best_score > 1e-12), NOOP is suboptimal (0.0) and INTERVENE is scored by target quality.
+    """
+    from src.types import ActionCategory
+    scores, best_targets = oracle_best_targets(posterior, candidate_adjacencies, valid_mask)
+    best_score = float(np.max(np.where(np.asarray(valid_mask) > 0.5, scores, -np.inf))) if valid_mask is not None else float(np.max(scores))
+
+    if best_score <= 1e-12:
+        # Uncertainty is resolved: NOOP is the only optimal action
+        if category == int(ActionCategory.NOOP):
+            return {
+                "is_optimal": 1.0,
+                "score": 0.0,
+                "best_score": 0.0,
+                "regret": 0.0,
+                "normalized_score": 1.0,
+                "action_type": "noop_correct"
+            }
+        else:
+            return {
+                "is_optimal": 0.0,
+                "score": 0.0,
+                "best_score": 0.0,
+                "regret": 0.5,  # Penalize wasting budget when solved
+                "normalized_score": 0.0,
+                "action_type": "intervene_unnecessary"
+            }
+    else:
+        # Information to gain: INTERVENE on optimal target is required
+        if category == int(ActionCategory.NOOP):
+            return {
+                "is_optimal": 0.0,
+                "score": 0.0,
+                "best_score": best_score,
+                "regret": best_score,
+                "normalized_score": 0.0,
+                "action_type": "noop_premature"
+            }
+        else:
+            chosen_score = float(scores[target])
+            is_opt = float(bool(best_targets[target]))
+            normalized = chosen_score / best_score
+            return {
+                "is_optimal": is_opt,
+                "score": chosen_score,
+                "best_score": best_score,
+                "regret": max(0.0, best_score - chosen_score),
+                "normalized_score": normalized,
+                "action_type": "intervene_optimal" if is_opt else "intervene_suboptimal"
+            }
+

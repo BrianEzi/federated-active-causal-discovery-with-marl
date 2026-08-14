@@ -20,19 +20,18 @@ def summarize(trace: dict) -> dict:
     for g in range(8):
         steps = trace[f"graph_{g}"]["steps"]
         first_shd, final_shd = steps[0]["shd"], steps[-1]["shd"]
-        targets0, targets1 = set(), set()
+        targets = set()
         n_interv = 0
         for s in steps:
-            a0, a1 = s["actions"]["agent_0"], s["actions"]["agent_1"]
-            if a0["cat"] == 0:
-                targets0.add(a0["target"]); n_interv += 1
-            if a1["cat"] == 0:
-                targets1.add(a1["target"]); n_interv += 1
+            for k, act in s["actions"].items():
+                if act.get("cat") == 0:
+                    targets.add(act.get("target"))
+                    n_interv += 1
         total += 1
         static_count += int(first_shd == final_shd)
         never_intervenes_count += int(n_interv == 0)
         reached0_count += int(any(s["shd"] == 0.0 for s in steps))
-        diverse_count += int(len(targets0 | targets1) >= 2)
+        diverse_count += int(len(targets) >= 2)
     return {
         "static_rate": static_count / total,
         "never_intervenes_rate": never_intervenes_count / total,
@@ -43,10 +42,13 @@ def summarize(trace: dict) -> dict:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint_path", type=str, required=True)
-    parser.add_argument("--output_dir", type=str, required=True)
+    parser.add_argument("--checkpoint_path", "--ckpt_path", dest="checkpoint_path", type=str, required=True)
+    parser.add_argument("--output_dir", "--out_dir", dest="output_dir", type=str, required=True)
     parser.add_argument("--temperatures", type=str, default="0.0,0.2,0.5,1.0")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--num_agents", type=int, default=None)
+    parser.add_argument("--estimator_type", type=str, default=None)
+    parser.add_argument("--intervention_type", type=str, default=None)
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)

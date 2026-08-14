@@ -455,10 +455,10 @@ def main():
         critic_apply = jax.jit(critic_trans.apply)
 
         
-        local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
-        boundary_mask = STANDARD_BOUNDARY_MASK
-        observed_masks = [STANDARD_OBS_MASKS[0], STANDARD_OBS_MASKS[1]]
-        valid_intervention_masks = [jnp.maximum(local_masks[0], boundary_mask), jnp.maximum(local_masks[1], boundary_mask)]
+        local_masks = [env.agent_masks[k] for k in range(args.num_agents)]
+        boundary_mask = env.boundary_mask
+        observed_masks = [env.obs_masks[k] for k in range(args.num_agents)]
+        valid_intervention_masks = [jnp.maximum(local_masks[k], boundary_mask) for k in range(args.num_agents)]
 
         actor_lr = args.learning_rate if args.learning_rate != 3e-4 else args.actor_lr
         critic_lr = args.learning_rate if args.learning_rate != 3e-4 else args.critic_lr
@@ -498,25 +498,19 @@ def main():
             agents = [RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
     
     best_shd = 999.0
-    best_f1 = -1.0
+    ep_rewards_history = []
+    shd_history = []
+    f1_history = []
     
     all_metrics_history = []
     
-    for episode in range(1, args.num_episodes + 1):
-        k_ep, key = jax.random.split(key)
+    for episode in range(args.num_episodes):
+        k_reset, key = jax.random.split(key)
         
-        if args.curriculum and fixed_idx is None:
-            allowed_topos, curr_stage = get_curriculum_topologies(
-                episode, args.num_episodes, args.curriculum_stage1_ratio, args.curriculum_stage2_ratio
-            )
-        elif args.allowed_topologies is not None and fixed_idx is None:
-            allowed_topos = args.allowed_topologies
-            curr_stage = 0
-        else:
-            allowed_topos = None
-            curr_stage = 0
-            
-        obs_dict, info = env.reset(k_ep, force_idx=fixed_idx, allowed_topologies=allowed_topos)
+        curr_stage = get_curriculum_stage(episode, args.num_episodes)
+        allowed_topologies = get_curriculum_topologies(curr_stage) if not is_fixed else None
+        
+        obs_dict, info = env.reset(k_reset, force_idx=args.fixed_graph, allowed_topologies=allowed_topologies)
         true_adj = info["true_adjacency"]
 
         if args.agent_type == "ippo" and args.use_rnn:
@@ -537,99 +531,75 @@ def main():
         shd_trajectory = [initial_shd]
         cumulative_interventions = 0
         interventions_to_zero = None
-        sum_positive_delta = {0: 0.0, 1: 0.0}
+        sum_positive_delta = {k: 0.0 for k in range(args.num_agents)}
         redundant_steps = 0
         node_intervention_counts = {i: 0 for i in range(args.num_variables)}
-        ep_impact_sum = {0: 0.0, 1: 0.0}
+        ep_impact_sum = {k: 0.0 for k in range(args.num_agents)}
         ep_asym_mag_sum = 0.0
         max_shd_possible = float(np.sum(env.structural_mask))
         entropy_before = gaussian_entropy(np.array(env.jax_state.running_covariance), args.num_variables)
         
         while not done:
             if args.agent_type == "ippo":
-                # Target-selection bonus, computed once per step and added to each agent's
-                # target_logits before masking/sampling -- see
-                # src/marl/ppo_agent.py::compute_ucb_bonus (raw visit-count, defaults off)
-                # and compute_uncertainty_bonus (estimator edge-confidence, the primary
-                # mechanism now -- see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's Track B
-                # discussion). Applied identically here and in the PPO update's loss_fn
-                # recomputation (stored in the buffer below), so training and eval both
-                # learn/act under the same exploration-biased distribution rather than a
-                # train/eval mismatch.
                 ucb_bonus = compute_ucb_bonus(env.jax_state.node_intervention_counts, env.jax_state.step_count, args.ucb_coef)
                 uncertainty_bonus = compute_uncertainty_bonus(
                     jnp.array(env.last_predicted_dag), jnp.array(env.structural_mask), args.uncertainty_coef
                 )
                 target_bonus = ucb_bonus + uncertainty_bonus
 
-                # Agent 0
-                k0_act, key = jax.random.split(key)
-                obs_0 = jnp.expand_dims(obs_dict["agent_0"], 0)
-                if args.use_rnn:
-                    (cat_l0, tgt_l0), actor_states[0] = actor_apply(actor_params_list[0], obs_0, actor_states[0])
-                    v0, critic_states[0] = critic_apply(critic_params_list[0], obs_0, critic_states[0])
-                    val_0 = v0[0]
-                else:
-                    cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
-                    val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                tgt_l0 = tgt_l0 + target_bonus[None, :]
-                c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], valid_intervention_masks[0], k0_act)
+                joint_actions = {}
+                step_records = []
 
-                # Agent 1
-                k1_act, key = jax.random.split(key)
-                obs_1 = jnp.expand_dims(obs_dict["agent_1"], 0)
-                if args.use_rnn:
-                    (cat_l1, tgt_l1), actor_states[1] = actor_apply(actor_params_list[1], obs_1, actor_states[1])
-                    v1, critic_states[1] = critic_apply(critic_params_list[1], obs_1, critic_states[1])
-                    val_1 = v1[0]
-                else:
-                    cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
-                    val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                tgt_l1 = tgt_l1 + target_bonus[None, :]
-                c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], valid_intervention_masks[1], k1_act)
-
-                joint_actions = {
-                    "agent_0": (int(c0), int(t0)),
-                    "agent_1": (int(c1), int(t1))
-                }
+                for k in range(args.num_agents):
+                    k_act, key = jax.random.split(key)
+                    obs_k = jnp.expand_dims(obs_dict[f"agent_{k}"], 0)
+                    if args.use_rnn:
+                        (cat_lk, tgt_lk), actor_states[k] = actor_apply(actor_params_list[k], obs_k, actor_states[k])
+                        vk, critic_states[k] = critic_apply(critic_params_list[k], obs_k, critic_states[k])
+                        val_k = vk[0]
+                    else:
+                        cat_lk, tgt_lk = actor_apply(actor_params_list[k], obs_k)
+                        val_k = critic_apply(critic_params_list[k], obs_k)[0]
+                    tgt_lk = tgt_lk + target_bonus[None, :]
+                    ck, tk, lpk = sample_actions_jitted(cat_lk[0], tgt_lk[0], valid_intervention_masks[k], k_act)
+                    joint_actions[f"agent_{k}"] = (int(ck), int(tk))
+                    step_records.append((obs_k[0], ck, tk, val_k, lpk))
 
                 k_step, key = jax.random.split(key)
                 next_obs_dict, rewards, done, step_info = env.step(joint_actions, predicted_dags=None, key=k_step)
 
-                r0 = rewards["agent_0"]
-                r1 = rewards["agent_1"]
                 final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
-                info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
+                info_gains = step_info.get("info_gains", {f"agent_{k}": 0.0 for k in range(args.num_agents)})
 
-                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done, target_bonus=target_bonus)
-                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done, target_bonus=target_bonus)
+                for k in range(args.num_agents):
+                    obs_k, ck, tk, val_k, lpk = step_records[k]
+                    rk = rewards[f"agent_{k}"]
+                    buffers[k].add(obs=obs_k, cat_actions=ck, target_actions=tk, values=val_k, log_probs=lpk, rewards=rk, dones=done, target_bonus=target_bonus)
+                    ep_reward += float(rk)
+
                 obs_dict = next_obs_dict
-                ep_reward += float(r0 + r1)
-                ep_info_gain_0 += float(info_gains["agent_0"])
-                ep_info_gain_1 += float(info_gains["agent_1"])
+                ep_info_gain_0 += float(info_gains.get("agent_0", 0.0))
+                if args.num_agents > 1:
+                    ep_info_gain_1 += float(info_gains.get("agent_1", 0.0))
                 ep_steps += 1
 
                 # Agent-vs-estimator-learning metric accumulation (see src/episode_metrics.py)
-                did_intervene = {0: int(c0) == int(ActionCategory.INTERVENE), 1: int(c1) == int(ActionCategory.INTERVENE)}
-                cumulative_interventions += int(did_intervene[0]) + int(did_intervene[1])
+                did_intervene = {k: int(step_records[k][1]) == int(ActionCategory.INTERVENE) for k in range(args.num_agents)}
+                cumulative_interventions += sum(int(did_intervene[k]) for k in range(args.num_agents))
                 step_shd = float(step_info["shd"])
                 shd_trajectory.append(step_shd)
                 if interventions_to_zero is None and step_shd == 0.0:
                     interventions_to_zero = cumulative_interventions
-                shd_delta = step_info.get("shd_delta", {"agent_0": 0.0, "agent_1": 0.0})
-                if did_intervene[0]:
-                    sum_positive_delta[0] += max(0.0, float(shd_delta["agent_0"]))
-                if did_intervene[1]:
-                    sum_positive_delta[1] += max(0.0, float(shd_delta["agent_1"]))
-                if did_intervene[0] and did_intervene[1] and int(t0) == int(t1):
+                shd_delta = step_info.get("shd_delta", {f"agent_{k}": 0.0 for k in range(args.num_agents)})
+                for k in range(args.num_agents):
+                    if did_intervene[k]:
+                        sum_positive_delta[k] += max(0.0, float(shd_delta.get(f"agent_{k}", 0.0)))
+                        node_intervention_counts[int(step_records[k][2])] += 1
+                if args.num_agents > 1 and did_intervene[0] and did_intervene[1] and int(step_records[0][2]) == int(step_records[1][2]):
                     redundant_steps += 1
-                if did_intervene[0]:
-                    node_intervention_counts[int(t0)] = node_intervention_counts.get(int(t0), 0) + 1
-                if did_intervene[1]:
-                    node_intervention_counts[int(t1)] = node_intervention_counts.get(int(t1), 0) + 1
-                impact_scores = step_info.get("impact_scores", {"agent_0": 0.0, "agent_1": 0.0})
-                ep_impact_sum[0] += float(impact_scores["agent_0"])
-                ep_impact_sum[1] += float(impact_scores["agent_1"])
+                impact_scores = step_info.get("impact_scores", {f"agent_{k}": 0.0 for k in range(args.num_agents)})
+                for k in range(args.num_agents):
+                    ep_impact_sum[k] += float(impact_scores.get(f"agent_{k}", 0.0))
                 if "asym_matrix" in step_info:
                     ep_asym_mag_sum += float(np.mean(np.abs(step_info["asym_matrix"])))
             else:

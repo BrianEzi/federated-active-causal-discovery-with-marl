@@ -4,6 +4,19 @@ All notable changes, bug fixes, architectural refactors, and performance optimiz
 
 ---
 
+### Added: Single-Agent Optimal Experiment Designer ($K=1$) & Closed-Loop Action Oracle
+- **Single-Agent Framework Support (`src/types.py`, `src/evaluator_env.py`, `src/train.py`, `src/evaluate.py`, `src/baselines.py`)**:
+  - Added single-agent mask configurations (`SINGLE_AGENT_LOCAL_MASKS`, `SINGLE_AGENT_OBS_MASKS`, `SINGLE_AGENT_BOUNDARY_MASK`) allowing a single centralized active experiment designer with full authority over all 4 variables ($d=4, K=1$).
+  - Refactored `FederatedCausalEnv`, `train.py` rollout buffers, and `evaluate.py` to seamlessly handle both $K=1$ and $K=2$ execution pipelines without code bifurcation.
+  - Added unit test suite `tests/test_single_agent.py` and benchmark runner `scripts/evaluate_single_agent_suite.py`.
+- **Closed-Loop Action Oracle (`src/marl/oracle_policy.py`, `src/evaluate.py`)**:
+  - Implemented `score_agent_action` evaluating both `INTERVENE` and `NOOP` actions against the Bayes-optimal information gain.
+  - Explicitly rewards `NOOP` (+1.0 optimality, 0.0 regret) when posterior uncertainty is resolved, and penalizes wasteful interventions on solved topologies.
+- **Fixed Actor Slicing Flaw (`src/marl/ppo_agent.py`)**:
+  - Fixed `IPPORNNActor` and `IPPOActor` which previously sliced only static observational covariance `obs[:, : d*d]`, now embedding the complete dynamic observation vector ($3d^2 + d + 1 = 53$ features for $d=4$) including running covariance, invariance asymmetry, remaining budget, and visit counts.
+- **Reward Holding Bonus & Budget Conservation Payoff (`src/rewards.py`)**:
+  - Added a $+0.05$ holding bonus for sustaining $\text{SHD}=0$ and a terminal budget payoff ($+0.1 \times B_{\text{remaining}}$) when successfully reconstructed.
+
 ### Changed: Recurrent (GRU) Actor/Critic is now the default, not feedforward MLP
 - **`--use_rnn` now defaults to `True` (`src/train.py`)**: Added `--no_rnn` to restore the previous feedforward default. Every episode is a sequence of up to `max_steps` interventions where each step's observation is only the *current* covariance/mask state -- an MLP re-decides from scratch every step with no memory of the episode so far, while `IPPORNNActor`/`IPPORNNCritic` (already implemented, previously opt-in only) carry that within-episode history forward via GRU state. The Myriad HPC 1000-episode baseline and every run in `notebooks/kaggle_two_stage_ippo.ipynb` prior to this change used the feedforward default -- results from those runs are **not** directly comparable to future runs unless `use_rnn=False` is passed.
 - **`scripts/generate_kaggle_two_stage_notebook.py`**: `train_two_stage_ippo` gained a `use_rnn: bool = True` parameter, passed through as `--use_rnn`/`--no_rnn` to the underlying `python -m src.train` call. Both the Step 5 analytic run and the Step 11 AVICI comparison run inherit the new default. Verified locally: `python -m src.train` with the new default runs end-to-end and the saved checkpoint records `use_rnn: True`; full `tests/` suite (60 tests) still passes.

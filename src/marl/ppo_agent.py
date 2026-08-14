@@ -47,19 +47,16 @@ class IPPORNNActor(hk.Module):
         self.hidden_dim = hidden_dim
 
     def __call__(self, obs: jax.Array, state: jax.Array) -> Tuple[Tuple[jax.Array, jax.Array], jax.Array]:
-        cov_flat = obs[:, : self.d * self.d]
-        cov = jnp.reshape(cov_flat, (-1, self.d, self.d))
-        
-        node_embeddings = hk.Sequential([
+        # Encode the full dynamic observation vector (obs_cov + run_cov + asym + counts + budget)
+        obs_features = hk.Sequential([
             hk.Linear(self.hidden_dim),
             jax.nn.relu,
-            hk.Linear(self.embed_dim)
-        ])(cov)
-        
-        global_rep = hk.Flatten()(node_embeddings)
+            hk.Linear(self.hidden_dim),
+            jax.nn.relu
+        ])(obs)
         
         gru = hk.GRU(self.hidden_dim)
-        rnn_out, next_state = gru(global_rep, state)
+        rnn_out, next_state = gru(obs_features, state)
         
         action_hidden = hk.Sequential([
             hk.Linear(self.hidden_dim),

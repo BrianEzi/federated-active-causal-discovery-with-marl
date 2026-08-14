@@ -304,27 +304,22 @@ class FederatedCausalEnv:
         
         self.int_type_code = int(InterventionType.HARD if intervention_type == "hard" else InterventionType.SOFT_SHIFT)
         
-        # Agent masks for the 4-node topology (Agent 1: Z1, X1 -> 0, 1) (Agent 2: X2, Z2 -> 2, 3)
-        self.agent_masks = STANDARD_LOCAL_MASKS
-
-        # Observation masks for Agent 1 (observes 0, 1, 2) and Agent 2 (observes 1, 2, 3)
-        self.obs_masks = STANDARD_OBS_MASKS
+        if self.config.K == 1:
+            from src.types import SINGLE_AGENT_LOCAL_MASKS, SINGLE_AGENT_OBS_MASKS, SINGLE_AGENT_BOUNDARY_MASK
+            self.agent_masks = SINGLE_AGENT_LOCAL_MASKS
+            self.obs_masks = SINGLE_AGENT_OBS_MASKS
+            self.boundary_mask = SINGLE_AGENT_BOUNDARY_MASK
+        else:
+            self.agent_masks = STANDARD_LOCAL_MASKS
+            self.obs_masks = STANDARD_OBS_MASKS
+            self.boundary_mask = STANDARD_BOUNDARY_MASK
 
         self.local_masks = [self.agent_masks[k] for k in range(self.config.K)]
-        self.boundary_mask = STANDARD_BOUNDARY_MASK
         # Edge-authority masks (single source of truth: src.types.compute_edge_authority_mask):
-        # an agent may only assert edges within its own local domain or on the shared boundary
-        # pair, never directly from its private node into the peer's domain.
         self.edge_masks = [
             compute_edge_authority_mask(self.local_masks[k], self.boundary_mask)
             for k in range(self.config.K)
         ]
-        # Structural mask for the centralized graph hypothesis (predict_graph_hypothesis):
-        # union of every agent's edge-authority mask. Not a privacy restriction (this is
-        # server-side, combining both agents' covariance already) but the true topology
-        # never has a direct private-to-peer-domain edge (e.g. Z1 <-> X2) or a direct
-        # private-to-private edge (Z1 <-> Z2), so the hypothesis shouldn't be able to
-        # predict one either.
         self.structural_mask = np.array(compute_global_structural_mask(self.agent_masks, self.boundary_mask))
 
         self.last_predicted_dag = np.full((self.config.d, self.config.d), 0.5, dtype=np.float32)
@@ -613,20 +608,26 @@ class FederatedCausalEnv:
         norm_factor = float(self.max_steps) if self.normalize_rewards else 1.0
         ig_dict = {"agent_0": float(info_gains[0]), "agent_1": float(info_gains[1])}
         
-        # Compute interventional impact scores (number of non-zero variance shift entries)
-        impact_a0 = float(np.sum(np.abs(asym[0:3, 0:3]) > 0.1))
-        impact_a1 = float(np.sum(np.abs(asym[1:4, 1:4]) > 0.1))
-        impact_dict = {"agent_0": impact_a0, "agent_1": impact_a1}
+        if self.config.K == 1:
+            ig_dict = {"agent_0": float(info_gains[0])}
+            impact_dict = {"agent_0": float(np.sum(np.abs(asym) > 0.1))}
+            diff = np.abs(stitched_dag - true_dag)
+            e1 = float(np.sum(diff))
+            e2 = 0.0
+        else:
+            ig_dict = {"agent_0": float(info_gains[0]), "agent_1": float(info_gains[1])}
+            impact_a0 = float(np.sum(np.abs(asym[0:3, 0:3]) > 0.1))
+            impact_a1 = float(np.sum(np.abs(asym[1:4, 1:4]) > 0.1))
+            impact_dict = {"agent_0": impact_a0, "agent_1": impact_a1}
+            diff = np.abs(stitched_dag - true_dag)
+            e1 = float(np.sum(diff[0, :]) + np.sum(diff[:, 0]) + diff[1, 2] + diff[2, 1])
+            e2 = float(np.sum(diff[3, :]) + np.sum(diff[:, 3]) + diff[1, 2] + diff[2, 1])
         
         from src.metrics import evaluate_dag_against_true
         eval_metrics = evaluate_dag_against_true(stitched_dag, true_dag)
         curr_shd = float(eval_metrics["shd"])
         
         terminated = bool(self.jax_state.step_count >= self.max_steps or np.all(np.array(self.jax_state.budgets) <= 0))
-        
-        diff = np.abs(stitched_dag - true_dag)
-        e1 = float(np.sum(diff[0, :]) + np.sum(diff[:, 0]) + diff[1, 2] + diff[2, 1])
-        e2 = float(np.sum(diff[3, :]) + np.sum(diff[:, 3]) + diff[1, 2] + diff[2, 1])
         
         from src.rewards import compute_ippo_rewards
         rewards = compute_ippo_rewards(
@@ -638,18 +639,22 @@ class FederatedCausalEnv:
             impact_coef=self.impact_coef,
             reward_density=self.reward_density,
             is_terminal=terminated,
-            prev_shd=self.prev_shd
+            prev_shd=self.prev_shd,
+            num_agents=self.config.K,
+            remaining_budgets={f"agent_{k}": float(self.jax_state.budgets[k]) for k in range(self.config.K)}
         )
-        # Per-agent SHD-delta this step (positive = improved), for attributing structural
-        # improvement to whichever agent(s) actually intervened -- computed from the SAME
-        # prev_shd/e1/e2 the dense reward already uses, just surfaced for evaluation metrics
-        # (edge-orientation-yield) rather than only feeding the reward. None on the first
-        # step of an episode (no prior SHD to compare against yet).
-        if self.prev_shd is not None:
-            shd_delta = {"agent_0": self.prev_shd[0] - e1, "agent_1": self.prev_shd[1] - e2}
+        if self.config.K == 1:
+            if self.prev_shd is not None:
+                shd_delta = {"agent_0": self.prev_shd[0] - e1}
+            else:
+                shd_delta = {"agent_0": 0.0}
+            self.prev_shd = (e1, 0.0)
         else:
-            shd_delta = {"agent_0": 0.0, "agent_1": 0.0}
-        self.prev_shd = (e1, e2)
+            if self.prev_shd is not None:
+                shd_delta = {"agent_0": self.prev_shd[0] - e1, "agent_1": self.prev_shd[1] - e2}
+            else:
+                shd_delta = {"agent_0": 0.0, "agent_1": 0.0}
+            self.prev_shd = (e1, e2)
 
         obs_dict = self._get_obs_dict()
         return obs_dict, rewards, terminated, {

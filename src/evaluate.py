@@ -67,7 +67,7 @@ def run_evaluation_suite(
     if oracle_agreement:
         from src.generators import get_all_4node_topologies
         from src.marl.bayes_optimal_estimator import compute_hypothesis_posterior
-        from src.marl.oracle_policy import score_agent_choice
+        from src.marl.oracle_policy import score_agent_action
         oracle_adjacencies = np.array(get_all_4node_topologies()[0])
 
     # Run evaluation on all 8 graphs
@@ -79,6 +79,8 @@ def run_evaluation_suite(
                                   intervention_type=intervention_type, obs_feedback=obs_feedback,
                                   sample_count=sample_count, avici_max_context=avici_max_context,
                                   running_cov_ema_alpha=running_cov_ema_alpha)
+        local_masks = env.local_masks
+        boundary_mask = env.boundary_mask
         key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
@@ -167,12 +169,9 @@ def run_evaluation_suite(
 
                 step_trace["actions"][f"agent_{k}"] = {"cat": cat_action, "target": target_action}
 
-                if oracle_agreement and cat_action == int(ActionCategory.INTERVENE):
-                    # Score only actual interventions -- a NOOP has no target to compare
-                    # against the oracle, and treating it as a wrong target would conflate
-                    # "chose badly" with "chose not to act."
-                    step_trace["actions"][f"agent_{k}"]["oracle"] = score_agent_choice(
-                        target_action, oracle_posterior, oracle_adjacencies,
+                if oracle_agreement:
+                    step_trace["actions"][f"agent_{k}"]["oracle"] = score_agent_action(
+                        cat_action, target_action, oracle_posterior, oracle_adjacencies,
                         valid_mask=np.array(jnp.maximum(local_mask, boundary_mask))
                     )
 
@@ -196,16 +195,14 @@ def run_evaluation_suite(
             scored = [a["oracle"] for s in episode_trace["steps"] for a in s["actions"].values() if "oracle" in a]
             if scored:
                 episode_trace["oracle_summary"] = {
-                    "scored_interventions": len(scored),
+                    "scored_steps": len(scored),
                     "optimal_rate": float(np.mean([x["is_optimal"] for x in scored])),
                     "mean_normalized_score": float(np.mean([x["normalized_score"] for x in scored])),
                     "mean_regret": float(np.mean([x["regret"] for x in scored])),
                 }
             else:
-                # No interventions at all this episode (pure NOOP) -- report explicitly
-                # rather than emitting a misleading 0.0 or omitting the field silently.
                 episode_trace["oracle_summary"] = {
-                    "scored_interventions": 0,
+                    "scored_steps": 0,
                     "optimal_rate": None,
                     "mean_normalized_score": None,
                     "mean_regret": None,
