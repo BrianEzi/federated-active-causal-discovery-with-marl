@@ -720,7 +720,22 @@ def main():
                         "critic_list": critic_params_list,
                         "use_rnn": args.use_rnn,
                         "use_inductive_graph_head": args.use_inductive_graph_head,
-                        "d": args.num_variables
+                        "d": args.num_variables,
+                        # Environment-construction parameters needed to faithfully reproduce
+                        # this checkpoint's training conditions at eval time -- found missing
+                        # entirely (evaluate.py silently fell back to FederatedCausalEnv's
+                        # defaults: estimator_type="analytic", intervention_type="soft_shift",
+                        # SCMConfig's noise_scale=1.0) while building the oracle-agreement
+                        # metric on a branch. See docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md
+                        # for the impact on prior frozen-eval findings.
+                        "estimator_type": args.estimator_type,
+                        "intervention_type": args.intervention_type,
+                        "noise_scale": args.noise_scale,
+                        "mechanism_type": args.mechanism_type,
+                        "K": args.num_agents,
+                        "sample_count": args.sample_count,
+                        "obs_feedback": enable_obs_feedback,
+                        "avici_max_context": args.avici_max_context
                     }, f)
 
     if args.save_file:

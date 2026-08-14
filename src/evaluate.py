@@ -17,7 +17,12 @@ def run_evaluation_suite(
     use_rnn: bool = False,
     temperature: float = 0.0,
     boundary_margin: float = 0.10,
-    seed: int = 42
+    seed: int = 42,
+    estimator_type: str = "analytic",
+    intervention_type: str = "soft_shift",
+    obs_feedback: bool = True,
+    sample_count: int = 100,
+    avici_max_context: int = 400
 ) -> Dict[str, Any]:
     """
     Evaluates the trained agents on all 8 possible 4-node topologies.
@@ -31,23 +36,28 @@ def run_evaluation_suite(
             "seed": int(seed),
             "initial_budget": float(initial_budget),
             "boundary_margin": float(boundary_margin),
+            "estimator_type": estimator_type,
+            "intervention_type": intervention_type,
             "use_rnn": bool(use_rnn)
         }
     }
     actor_apply = jax.jit(actor.apply)
-    
+
     local_masks = [STANDARD_LOCAL_MASKS[0], STANDARD_LOCAL_MASKS[1]]
     boundary_mask = STANDARD_BOUNDARY_MASK
     edge_masks = compute_edge_authority_masks(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
-    
+
     from src.marl.ppo_agent import mask_invalid_targets
     from src.stitching import stitch_predicted_dags
     from src.metrics import evaluate_dag_against_true
-    
+
     # Run evaluation on all 8 graphs
     for graph_idx in range(8):
         # We don't want fixed_graph to cache one, we want to force it per episode
-        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False, boundary_margin=boundary_margin)
+        env = FederatedCausalEnv(config, action_costs, initial_budget=initial_budget, fixed_graph=False,
+                                  boundary_margin=boundary_margin, estimator_type=estimator_type,
+                                  intervention_type=intervention_type, obs_feedback=obs_feedback,
+                                  sample_count=sample_count, avici_max_context=avici_max_context)
         key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
@@ -169,8 +179,30 @@ def evaluate_checkpoint(
     use_inductive = ckpt.get("use_inductive_graph_head", "inductive" in first_param_key.lower())
     d = ckpt.get("d", 4)
 
+    # Environment-construction parameters the checkpoint was actually trained under.
+    # IMPORTANT BUG NOTE (found 2026-08-14): before these keys existed, this function
+    # silently fell back to FederatedCausalEnv's own defaults (estimator_type="analytic",
+    # intervention_type="soft_shift") and SCMConfig's default noise_scale=1.0, regardless
+    # of what the checkpoint was actually trained with -- meaning every frozen-eval trace
+    # produced before this fix silently evaluated under those defaults instead. The
+    # get()-fallbacks below intentionally preserve that old (incorrect) behavior *only*
+    # for checkpoints that predate this fix and have no other way to recover their true
+    # training config -- they are a compatibility shim, not a claim that those defaults
+    # were actually used to train those checkpoints. See
+    # docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md for the impact on prior findings.
+    estimator_type = ckpt.get("estimator_type", "analytic")
+    intervention_type = ckpt.get("intervention_type", "soft_shift")
+    noise_scale = ckpt.get("noise_scale", 1.0)
+    mechanism_type = ckpt.get("mechanism_type", "LINEAR")
+    K = ckpt.get("K", 2)
+    sample_count = ckpt.get("sample_count", 100)
+    ckpt_obs_feedback = ckpt.get("obs_feedback", True)
+    avici_max_context = ckpt.get("avici_max_context", 400)
+    mechanism_type_int = int(MechanismType.LINEAR) if mechanism_type == "LINEAR" else int(MechanismType.NONLINEAR_ANM)
+
     if config is None:
-        config = SCMConfig(d=d, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
+        config = SCMConfig(d=d, K=K, mechanism_type=mechanism_type_int, noise_type=int(NoiseType.GAUSSIAN),
+                            noise_scale=noise_scale)
     if action_costs is None:
         action_costs = np.array([1.0, 1.0])
 
@@ -200,6 +232,11 @@ def evaluate_checkpoint(
         use_rnn=use_rnn,
         temperature=temperature,
         boundary_margin=boundary_margin,
-        seed=seed
+        seed=seed,
+        estimator_type=estimator_type,
+        intervention_type=intervention_type,
+        obs_feedback=ckpt_obs_feedback,
+        sample_count=sample_count,
+        avici_max_context=avici_max_context
     )
 
