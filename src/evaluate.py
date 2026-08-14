@@ -284,7 +284,8 @@ def evaluate_checkpoint(
         config = SCMConfig(d=d, K=K, mechanism_type=mechanism_type_int, noise_type=int(NoiseType.GAUSSIAN),
                             noise_scale=noise_scale)
     if action_costs is None:
-        action_costs = np.array([1.0, 1.0])
+        action_costs = np.array([1.0] * K)
+    initial_budget = ckpt.get("initial_budget", initial_budget)
 
     if use_inductive:
         if use_rnn:

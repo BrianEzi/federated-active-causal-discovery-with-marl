@@ -56,19 +56,9 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     temperatures = [float(t) for t in args.temperatures.split(",")]
 
-    kwargs = {
-        "num_agents": args.num_agents,
-        "initial_budget": args.initial_budget,
-        "action_costs": [args.action_cost] * (args.num_agents or 2),
-        "estimator_type": args.estimator_type,
-        "intervention_type": args.intervention_type,
-    }
-    # Filter None values
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
     print(f"{'temperature':>12} | {'static':>8} | {'never_int':>10} | {'reached0':>9} | {'diverse':>8}")
     for t in temperatures:
-        trace = evaluate_checkpoint(ckpt_path=args.checkpoint_path, temperature=t, seed=args.seed, **kwargs)
+        trace = evaluate_checkpoint(ckpt_path=args.checkpoint_path, temperature=t, seed=args.seed)
         out_path = os.path.join(args.output_dir, f"eval_trace_temp{t}.json")
         with open(out_path, "w") as f:
             json.dump(trace, f, indent=2)
