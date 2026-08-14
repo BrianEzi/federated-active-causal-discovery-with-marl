@@ -47,16 +47,28 @@ def main():
     parser.add_argument("--temperatures", type=str, default="0.0,0.2,0.5,1.0")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num_agents", type=int, default=None)
-    parser.add_argument("--estimator_type", type=str, default=None)
-    parser.add_argument("--intervention_type", type=str, default=None)
+    parser.add_argument("--initial_budget", type=float, default=5.0)
+    parser.add_argument("--action_cost", type=float, default=1.0)
+    parser.add_argument("--estimator_type", type=str, default="avici")
+    parser.add_argument("--intervention_type", type=str, default="hard")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
     temperatures = [float(t) for t in args.temperatures.split(",")]
 
+    kwargs = {
+        "num_agents": args.num_agents,
+        "initial_budget": args.initial_budget,
+        "action_costs": [args.action_cost] * (args.num_agents or 2),
+        "estimator_type": args.estimator_type,
+        "intervention_type": args.intervention_type,
+    }
+    # Filter None values
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
     print(f"{'temperature':>12} | {'static':>8} | {'never_int':>10} | {'reached0':>9} | {'diverse':>8}")
     for t in temperatures:
-        trace = evaluate_checkpoint(ckpt_path=args.checkpoint_path, temperature=t, seed=args.seed)
+        trace = evaluate_checkpoint(ckpt_path=args.checkpoint_path, temperature=t, seed=args.seed, **kwargs)
         out_path = os.path.join(args.output_dir, f"eval_trace_temp{t}.json")
         with open(out_path, "w") as f:
             json.dump(trace, f, indent=2)
