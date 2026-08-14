@@ -623,8 +623,9 @@ def main():
                 obs_dict = next_obs_dict
                 ep_reward += sum(rewards.values())
                 if "info_gains" in step_info:
-                    ep_info_gain_0 += float(step_info["info_gains"]["agent_0"])
-                    ep_info_gain_1 += float(step_info["info_gains"]["agent_1"])
+                    ep_info_gain_0 += float(step_info["info_gains"].get("agent_0", 0.0))
+                    if args.num_agents > 1:
+                        ep_info_gain_1 += float(step_info["info_gains"].get("agent_1", 0.0))
                 ep_steps += 1
                 
                 from src.stitching import stitch_predicted_dags
