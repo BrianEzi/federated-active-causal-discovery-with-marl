@@ -1,7 +1,7 @@
 # Investigation: Why RNN Training No Longer Converges to Low SHD
 
 **Status**: Merged into `main` (2026-08-13) with `--estimator_type avici` and `--reward_density sparse` as new defaults. **However, see "Follow-up: does the frozen (deployed) policy actually work?" below (2026-08-13, same day) -- a major caveat discovered *after* the merge that the SHD numbers throughout this doc are training-curve (on-policy, stochastically-sampled) metrics, and the frozen/deterministic policy performs much worse. Read that section before citing any SHD figure from this doc as "the policy's performance."** **Update (2026-08-14 morning): see "Overnight results: Track B works" near the end of this doc -- an uncertainty-driven exploration fix (branch `feature/uncertainty-exploration-and-oracle`, not yet merged) took the frozen-policy success rate from ~0-4% to a verified 20.8-54.2%, the first real progress on the collapse problem. Also see "CRITICAL: frozen evaluation silently ignored the checkpoint's actual training config" -- a significant bug affecting prior frozen-eval numbers, now fixed.**
-**RETRACTION (2026-08-14, later the same day): every oracle-agreement figure in this document is withdrawn.** The `99.4-100% optimal_rate` headline and the `90-97% even for collapsed policies` row of the estimator table were 93-98% vacuous -- see "RETRACTED: the oracle-agreement metric was measuring nothing" near the end of this doc. The `ended_at_zero` results for Track B are unaffected and still stand.
+**RETRACTION (2026-08-14, later the same day): every oracle-agreement figure in this document is withdrawn.** The `99.4-100% optimal_rate` headline and the `90-97% even for collapsed policies` row of the estimator table were 93-98% vacuous -- see "RETRACTED: the oracle-agreement metric was measuring nothing" near the end of this doc. Scope of the damage, stated precisely: the oracle metric is affected in every arm, and the `bayes_optimal` estimator arm is affected as a whole; **agent training under `analytic`/`avici`/`learned` was not affected**, so Track B's `ended_at_zero` results stand and need re-scoring rather than retraining.
 
 **Branch**: was `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`), merged into `main` via `--no-ff` merge.
 **Trigger**: You observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." Your hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
@@ -467,9 +467,16 @@ Verified, and the result is sharper than expected: the corrected posterior is **
 
 `src/evaluate.py` now computes `optimal_rate` over informative steps only, and records `vacuous_rate` alongside the raw pre-fix figure so this cannot silently recur.
 
-### Consequence for everything measured so far
+### Consequence for everything measured so far -- scoped precisely
 
-Every training run and every frozen evaluation in this document was produced under the degenerate environment. The Track B comparison remains internally valid -- all arms shared the same defect, so the relative ordering is meaningful -- but the absolute numbers describe a task that was substantially easier than intended. **Track B requires re-evaluation on the corrected environment before merge.**
+An earlier draft of this section claimed every training run in this document was produced under a degenerate environment. That is too strong, and the correction matters because it changes how much compute the fix costs.
+
+Equal error variances are a property of the *data*, present in every run. But only an estimator that assumes a known or shared variance can exploit them, and `bayes_optimal_predict` is called **only** when `--estimator_type bayes_optimal` (`src/evaluator_env.py:441`). `analytic`, `avici` and `learned` make no such assumption and never had access to the shortcut. So:
+
+- **Agent training under `analytic` / `avici` / `learned` was NOT degenerate.** The task those policies faced was as hard as intended. This includes all three Track B runs, which trained under `avici` -- their `ended_at_zero` figures (20.8-54.2%) stand as reported and need no retraining.
+- **Degenerate, and requiring re-measurement**: (a) the oracle-agreement metric in *every* arm, because `evaluate.py` computes the oracle posterior via the Bayes estimator regardless of the run's own estimator; (b) the `bayes_optimal` arm of the 24-run matrix, whose "comparison ceiling" was a ceiling reached without intervening.
+
+**Practical consequence: Track B needs oracle re-scoring only, not retraining** -- `scripts/temperature_sweep_eval.py` re-run against the already-saved checkpoints, the same cheap eval-only pass used for the `refixed` traces. The `bayes_optimal` matrix arm does need retraining before it can be called a ceiling.
 
 ## Backlog (known limitations, not addressed in this round)
 
