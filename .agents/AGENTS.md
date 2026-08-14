@@ -63,3 +63,11 @@ When working on this repository, you must adhere strictly to the following archi
 - **Meticulous Technical Accuracy**: Every diagnostic assertion, mathematical derivation, and architectural explanation must be precise, concrete, and empirically backed by codebase inspection or test outputs.
 - **Zero Ambiguity**: State exact variable names, mathematical formulas, tensor shapes, and file locations (`file:///path/to/file#L10`) when explaining failures or proposed remedies.
 
+## 13. Absolute Truthfulness & Anti-Fabrication Mandate (Zero-Tolerance)
+- **Zero Hallucination / Zero Fabrication**: NEVER fabricate, extrapolate, assume, or synthesize evaluation results, action trajectories, or performance metrics.
+- **Mandatory Direct Raw File Inspection**: Every single metric, action sequence, SHD value, budget number, and table cell reported to the user MUST be extracted and printed directly from raw disk files (`.json`, `.csv`, `.log`) using an executable inspection command immediately prior to formulating the response.
+- **No Conflating Training Artifacts with Evaluation**: NEVER infer evaluation performance from training logs (e.g. `[Episode X] SHD: 0.00`). Post-training evaluation runs MUST be independently evaluated and directly inspected from their dedicated trace files (`eval_trace_*.json`).
+- **Unvarnished Failure Reporting**: If a policy collapses (e.g., greedy `NOOP` collapse), diverges, or fails to solve the task, you MUST state the exact failure point-blank without defensive filtering, proxy inflation, or rationalization.
+- **Verifiable Provenance**: Always cite the exact source file path and line numbers/keys for every reported empirical claim.
+
+
