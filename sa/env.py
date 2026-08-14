@@ -1,0 +1,183 @@
+"""Single-agent active causal discovery environment.
+
+One agent, full observability, no masks, no federation, no stitching. The agent's only
+job is to decide *where to intervene next*, and the episode ends when the true DAG has
+been identified or the budget runs out.
+
+Deliberately minimal. Everything that made the previous environment hard to reason about
+-- estimator choice, reward density, exploration bonuses, curricula, per-agent
+visibility masks -- is gone. What remains is three parameters: how many samples an
+observation or intervention buys, how large the budget is, and how confident the
+posterior must be before we call the graph identified.
+
+Episode structure:
+  reset  -- draw a DAG uniformly from the graph space, draw weights and per-node noise
+            scales, collect `n_obs` purely observational samples.
+  step   -- the agent picks a node to intervene on (or passes); we draw `n_int` samples
+            under that intervention, append them, and recompute the exact posterior.
+  done   -- the true DAG has posterior mass >= `identify_threshold`, or budget exhausted.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Optional
+
+import numpy as np
+
+from sa.graphs import GraphSpace, build_graph_space
+from sa.posterior import PosteriorEngine, edge_marginals, is_identified
+from sa.scm import sample, sample_scm_params
+from sa.score import get_score
+
+# Sentinel action meaning "do not intervene this step".
+PASS_ACTION = -1
+
+
+@dataclass
+class EnvConfig:
+    d: int = 3
+    # Enough observational data to pin down the Markov equivalence class, so the agent's
+    # job is cleanly "orient within the class" rather than "also find the skeleton".
+    # Calibrated against GATE 1: at d=3 this puts the observational-only identification
+    # rate at ~14% against a theoretical target of 16%.
+    n_obs: int = 1000
+    n_int: int = 100           # samples drawn per intervention
+    budget: int = 10           # maximum interventions per episode
+    # Chosen to sit safely above every Markov-equivalence tie cap. A class of size k caps
+    # each member at 1/k, so a size-2 class reaches exactly 0.5 -- a 0.5 threshold could
+    # therefore declare an unbroken tie "identified". 0.7 cannot be reached while any tie
+    # remains, which is the property that makes this criterion mean something.
+    identify_threshold: float = 0.7
+    score: str = "bge"
+    noise_range: tuple = (0.5, 1.5)   # must not be degenerate -- see sa/scm.py
+    weight_range: tuple = (0.5, 2.0)
+    intervene_scale: float = 2.0
+
+
+@dataclass
+class StepResult:
+    posterior: np.ndarray
+    identified: bool
+    done: bool
+    n_interventions: int
+    info: dict = field(default_factory=dict)
+
+
+class CausalDiscoveryEnv:
+    """The environment. Construct once, `reset` per episode.
+
+    The graph space and posterior engine are built once and reused, since both depend
+    only on `d` and are the expensive part to construct.
+    """
+
+    def __init__(self, config: EnvConfig, space: Optional[GraphSpace] = None):
+        self.config = config
+        self.space = space if space is not None else build_graph_space(config.d)
+        self.engine = PosteriorEngine(self.space, get_score(config.score, config.d))
+
+        self._rng: Optional[np.random.Generator] = None
+        self.true_index: Optional[int] = None
+        self.params = None
+        self.samples: Optional[np.ndarray] = None
+        self.intervened: Optional[np.ndarray] = None
+        self.posterior: Optional[np.ndarray] = None
+        self.n_interventions = 0
+        self.intervention_counts: Optional[np.ndarray] = None
+
+    # -- episode lifecycle --------------------------------------------------------
+
+    def reset(self, seed: Optional[int] = None, force_index: Optional[int] = None) -> StepResult:
+        """Start an episode. `force_index` pins the true DAG, for tests and for
+        evaluating every graph exactly once."""
+        self._rng = np.random.default_rng(seed)
+        cfg = self.config
+
+        if force_index is None:
+            self.true_index = int(self._rng.integers(self.space.n_dags))
+        else:
+            self.true_index = int(force_index)
+
+        self.params = sample_scm_params(
+            self.space.dags[self.true_index],
+            self._rng,
+            weight_range=cfg.weight_range,
+            noise_range=cfg.noise_range,
+        )
+
+        self.samples, self.intervened = sample(self.params, cfg.n_obs, self._rng)
+        self.n_interventions = 0
+        self.intervention_counts = np.zeros(cfg.d, dtype=int)
+        self.posterior = self.engine.posterior(self.samples, self.intervened)
+
+        return self._result()
+
+    def step(self, action: int) -> StepResult:
+        """Intervene on `action` (or `PASS_ACTION` to collect nothing) and update belief.
+
+        Passing is a real choice, not a no-op: it ends the episode's ability to learn
+        anything further, so an agent that passes while unidentified has effectively
+        given up. It exists so that "should I act at all" is a decision the agent makes,
+        rather than one the action space makes for it.
+        """
+        if self.posterior is None:
+            raise RuntimeError("call reset() before step()")
+
+        cfg = self.config
+        if action != PASS_ACTION:
+            if not 0 <= action < cfg.d:
+                raise ValueError(f"action must be in [0, {cfg.d}) or PASS_ACTION, got {action}")
+            new_samples, new_intervened = sample(
+                self.params, cfg.n_int, self._rng,
+                intervene_node=int(action), intervene_scale=cfg.intervene_scale,
+            )
+            self.samples = np.vstack([self.samples, new_samples])
+            self.intervened = np.vstack([self.intervened, new_intervened])
+            self.n_interventions += 1
+            self.intervention_counts[action] += 1
+            self.posterior = self.engine.posterior(self.samples, self.intervened)
+
+        return self._result(passed=(action == PASS_ACTION))
+
+    # -- state ---------------------------------------------------------------------
+
+    def _result(self, passed: bool = False) -> StepResult:
+        identified = is_identified(self.posterior, self.true_index, self.config.identify_threshold)
+        done = identified or passed or self.n_interventions >= self.config.budget
+        return StepResult(
+            posterior=self.posterior.copy(),
+            identified=identified,
+            done=done,
+            n_interventions=self.n_interventions,
+            info={
+                "true_index": self.true_index,
+                "true_mass": float(self.posterior[self.true_index]),
+                "mec_size": int(len(self.space.mec_members(self.true_index))),
+                "is_singleton": bool(self.space.is_singleton[self.true_index]),
+                "passed": passed,
+                "budget_left": self.config.budget - self.n_interventions,
+            },
+        )
+
+    def observation(self, kind: str = "posterior") -> np.ndarray:
+        """The agent's view of the world.
+
+        `posterior` -- the exact belief over DAGs. A sufficient statistic, so the problem
+        is a proper MDP and no recurrence is needed. Does not scale past d ~ 5.
+
+        `edge_marginals` -- d(d-1) edge probabilities plus remaining budget. Scales to any
+        d, but lossy: it discards correlations between edges, so the problem becomes
+        partially observed. The gap between the two is the thing worth measuring.
+        """
+        budget_left = np.array([self.config.budget - self.n_interventions], dtype=float)
+        if kind == "posterior":
+            return np.concatenate([self.posterior, budget_left])
+        if kind == "edge_marginals":
+            marg = edge_marginals(self.space, self.posterior)
+            off_diagonal = ~np.eye(self.config.d, dtype=bool)
+            return np.concatenate([marg[off_diagonal], budget_left])
+        raise ValueError(f"unknown observation kind {kind!r}")
+
+    @property
+    def observation_dim(self) -> dict:
+        d = self.config.d
+        return {"posterior": self.space.n_dags + 1, "edge_marginals": d * (d - 1) + 1}

@@ -160,10 +160,59 @@ class BICScore:
         return log_lik - 0.5 * k * np.log(n)
 
 
-def get_score(name: str, d: int):
-    """Factory so callers can switch scores by name without importing both."""
+class KnownVarianceScore:
+    """DEFECTIVE BY DESIGN -- reproduces the previous codebase's scorer. Do not use for
+    experiments; it exists so the gates can be tested against a known-bad estimator.
+
+    This is the profile likelihood with the environment's *true, shared* error variance
+    plugged in rather than fitted. That single choice is what invalidated the previous
+    round of results. Supplying a known variance breaks score equivalence, and when all
+    nodes share one noise scale the DAG becomes fully identifiable from observational
+    data (Peters & Buehlmann 2014) -- so the estimator recovers the graph before any
+    intervention is taken and the active-discovery task collapses. Measured on the old
+    environment: 98% observational recovery, and roughly half of all episodes solved with
+    the agent doing nothing.
+
+    Worth stating plainly, because it is easy to get backwards: the leak lives in the
+    *estimator*, not in the data. `BGeScore` is score-equivalent by construction, so it
+    cannot separate Markov-equivalent DAGs however the noise is distributed -- feeding it
+    equal-variance data changes nothing. Per-node noise scales in `sa/scm.py` are
+    therefore defence in depth rather than the load-bearing fix, and they matter most if
+    a non-score-equivalent estimator (a learned one, say) is ever swapped in.
+    """
+
+    def __init__(self, d: int, noise_scale: float = 1.0, ridge: float = 1e-6):
+        self.d = d
+        self.noise_scale = noise_scale
+        self.ridge = ridge
+
+    def local_score(self, node: int, parents: Sequence[int], samples: np.ndarray) -> float:
+        parents = sorted(int(p) for p in parents)
+        n = samples.shape[0]
+        if n == 0:
+            return 0.0
+        y = samples[:, int(node)]
+        if parents:
+            X = samples[:, parents]
+            gram = X.T @ X + self.ridge * np.eye(len(parents))
+            residual = y - X @ np.linalg.solve(gram, X.T @ y)
+        else:
+            residual = y
+        var = max(self.noise_scale ** 2, 1e-8)
+        return float(-0.5 * np.sum(residual ** 2) / var - 0.5 * n * np.log(2 * np.pi * var))
+
+
+def get_score(name, d: int):
+    """Factory. Accepts a name, or any object already exposing `local_score`, so tests
+    and diagnostics can inject a custom scorer without going through the registry."""
+    if hasattr(name, "local_score"):
+        return name
     if name == "bge":
         return BGeScore(d)
     if name == "bic":
         return BICScore(d)
-    raise ValueError(f"unknown score {name!r}; expected 'bge' or 'bic'")
+    if name == "known_variance":
+        return KnownVarianceScore(d)
+    raise ValueError(
+        f"unknown score {name!r}; expected 'bge', 'bic', 'known_variance', or a scorer object"
+    )
