@@ -26,6 +26,7 @@ import numpy as np
 
 from sa.graphs import GraphSpace, build_graph_space
 from sa.posterior import PosteriorEngine, edge_marginals, is_identified
+from sa.priors import build_prior
 from sa.scm import sample, sample_scm_params
 from sa.score import get_score
 
@@ -52,6 +53,16 @@ class EnvConfig:
     noise_range: tuple = (0.5, 1.5)   # must not be degenerate -- see sa/scm.py
     weight_range: tuple = (0.5, 2.0)
     intervene_scale: float = 2.0
+    # Graph prior. Used BOTH to draw the true graph and as the posterior's prior, so
+    # generator and inference agree -- pairing a sparse generator with a uniform prior is
+    # a misspecification that would look like an estimator bug. `expected_degree` is held
+    # fixed rather than `p`, so graphs stay sparse as d grows (see sa/priors.py).
+    # p = 0.5 is exactly the uniform-over-DAGs prior; sparsity (p < 0.5) is close to
+    # vacuous below d ~ 8, so it stays the default here and becomes a real lever at scale.
+    prior: str = "erdos_renyi"
+    prior_p: float = 0.5
+    expected_degree: Optional[float] = None
+    scale_free_gamma: float = 1.0
 
 
 @dataclass
@@ -74,6 +85,10 @@ class CausalDiscoveryEnv:
         self.config = config
         self.space = space if space is not None else build_graph_space(config.d)
         self.engine = PosteriorEngine(self.space, get_score(config.score, config.d))
+        self.prior = build_prior(
+            self.space, kind=config.prior, p=config.prior_p,
+            expected_deg=config.expected_degree, gamma=config.scale_free_gamma,
+        )
 
         self._rng: Optional[np.random.Generator] = None
         self.true_index: Optional[int] = None
@@ -93,7 +108,9 @@ class CausalDiscoveryEnv:
         cfg = self.config
 
         if force_index is None:
-            self.true_index = int(self._rng.integers(self.space.n_dags))
+            # Drawn FROM THE PRIOR, not uniformly -- so the generator and the estimator's
+            # assumption are the same distribution.
+            self.true_index = int(self._rng.choice(self.space.n_dags, p=self.prior))
         else:
             self.true_index = int(force_index)
 
@@ -107,7 +124,7 @@ class CausalDiscoveryEnv:
         self.samples, self.intervened = sample(self.params, cfg.n_obs, self._rng)
         self.n_interventions = 0
         self.intervention_counts = np.zeros(cfg.d, dtype=int)
-        self.posterior = self.engine.posterior(self.samples, self.intervened)
+        self.posterior = self.engine.posterior(self.samples, self.intervened, self.prior)
 
         return self._result()
 
@@ -134,7 +151,7 @@ class CausalDiscoveryEnv:
             self.intervened = np.vstack([self.intervened, new_intervened])
             self.n_interventions += 1
             self.intervention_counts[action] += 1
-            self.posterior = self.engine.posterior(self.samples, self.intervened)
+            self.posterior = self.engine.posterior(self.samples, self.intervened, self.prior)
 
         return self._result(passed=(action == PASS_ACTION))
 

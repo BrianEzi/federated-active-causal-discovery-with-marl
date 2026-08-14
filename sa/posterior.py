@@ -23,7 +23,7 @@ separates. See docs/THEORY_NOTES.md #3.
 from __future__ import annotations
 
 import itertools
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -84,15 +84,23 @@ class PosteriorEngine:
         rows = np.arange(self.space.d)[None, :]
         return table[rows, self.parent_set_ids].sum(axis=1)
 
-    def posterior(self, samples: np.ndarray, intervened: np.ndarray) -> np.ndarray:
-        """[N] posterior over DAGs under a uniform prior.
+    def posterior(self, samples: np.ndarray, intervened: np.ndarray,
+                  prior: Optional[np.ndarray] = None) -> np.ndarray:
+        """[N] posterior over DAGs.
 
-        With no usable data the posterior is exactly uniform, which is the honest state
+        `prior` defaults to uniform. It should normally be the SAME distribution the true
+        graph is drawn from -- a sparse generator paired with a uniform prior is a
+        misspecification that would show up as systematic over-confidence in dense graphs,
+        and it would be easy to mistake for an estimator bug later.
+
+        With no usable data the posterior is exactly the prior, which is the honest state
         rather than an arbitrary default.
         """
+        if prior is None:
+            prior = np.full(self.space.n_dags, 1.0 / self.space.n_dags)
         if np.asarray(samples).shape[0] == 0:
-            return np.full(self.space.n_dags, 1.0 / self.space.n_dags)
-        log_p = self.log_scores(samples, intervened)
+            return np.asarray(prior, dtype=float).copy()
+        log_p = self.log_scores(samples, intervened) + np.log(np.maximum(prior, 1e-300))
         log_p = log_p - log_p.max()
         p = np.exp(log_p)
         return p / p.sum()

@@ -203,8 +203,11 @@ def test_gate_1_detects_the_historical_leaky_estimator():
     breaks score equivalence and, on equal-variance data, identifies the DAG before any
     intervention. Paired with equal noise scales this is exactly the old setup.
     """
+    # 600 episodes rather than 150: the leak is ~26% against a 16% target, a ~10pp effect,
+    # and at 150 episodes the sampling noise (+/- ~6pp) can drop it under the gate's
+    # tolerance and make this test flaky. Measured at 1000 episodes: leaky 26.0%, BGe 13.8%.
     leaky = EnvConfig(d=3, score="known_variance", noise_range=(1.0, 1.0))
-    result = check_gate_1(leaky, n_episodes=150, seed=1)
+    result = check_gate_1(leaky, n_episodes=600, seed=1)
     assert not result.passed and "LEAK" in result.detail, (
         f"GATE 1 failed to detect the known-variance shortcut: {result}"
     )
