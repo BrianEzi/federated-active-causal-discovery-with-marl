@@ -8,22 +8,25 @@ def stitch_predicted_dags(predicted_probs: dict, d: int, margin: float = 0.10) -
     predicted_probs maps 'agent_k' -> [d, d] matrix of edge probabilities.
     Returns (stitched_dag, has_cycle).
     """
-    prob_1 = predicted_probs["agent_0"]
-    prob_2 = predicted_probs["agent_1"]
-    
-    global_probs = np.zeros((d, d), dtype=np.float32)
-    
-    # Agent 1 predicts edges among its local domain (Z1, X1) and mutual boundaries
-    global_probs[0, 0:2] = prob_1[0, 0:2]
-    global_probs[1, 0] = prob_1[1, 0]
-    
-    # Agent 2 predicts edges among its local domain (Z2, X2) and mutual boundaries
-    global_probs[3, 2:4] = prob_2[3, 2:4]
-    global_probs[2, 3] = prob_2[2, 3]
-    
-    # Overlapping boundary nodes: {1, 2}
-    # Both agents predict edges between X1 (1) and X2 (2). Use maximum to pool evidence.
-    global_probs[1:3, 1:3] = np.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3])
+    if "agent_1" not in predicted_probs:
+        global_probs = np.array(predicted_probs["agent_0"], dtype=np.float32)
+    else:
+        prob_1 = predicted_probs["agent_0"]
+        prob_2 = predicted_probs["agent_1"]
+        
+        global_probs = np.zeros((d, d), dtype=np.float32)
+        
+        # Agent 1 predicts edges among its local domain (Z1, X1) and mutual boundaries
+        global_probs[0, 0:2] = prob_1[0, 0:2]
+        global_probs[1, 0] = prob_1[1, 0]
+        
+        # Agent 2 predicts edges among its local domain (Z2, X2) and mutual boundaries
+        global_probs[3, 2:4] = prob_2[3, 2:4]
+        global_probs[2, 3] = prob_2[2, 3]
+        
+        # Overlapping boundary nodes: {1, 2}
+        # Both agents predict edges between X1 (1) and X2 (2). Use maximum to pool evidence.
+        global_probs[1:3, 1:3] = np.maximum(prob_1[1:3, 1:3], prob_2[1:3, 1:3])
     
     # Clear self-loops
     np.fill_diagonal(global_probs, 0.0)
