@@ -504,13 +504,21 @@ def main():
     
     all_metrics_history = []
     
-    for episode in range(args.num_episodes):
+    for episode in range(1, args.num_episodes + 1):
         k_reset, key = jax.random.split(key)
         
-        curr_stage = get_curriculum_stage(episode, args.num_episodes)
-        allowed_topologies = get_curriculum_topologies(curr_stage) if not is_fixed else None
-        
-        obs_dict, info = env.reset(k_reset, force_idx=args.fixed_graph, allowed_topologies=allowed_topologies)
+        if args.curriculum and fixed_idx is None:
+            allowed_topologies, curr_stage = get_curriculum_topologies(
+                episode, args.num_episodes, args.curriculum_stage1_ratio, args.curriculum_stage2_ratio
+            )
+        elif args.allowed_topologies is not None and fixed_idx is None:
+            allowed_topologies = args.allowed_topologies
+            curr_stage = 0
+        else:
+            allowed_topologies = None
+            curr_stage = 0
+            
+        obs_dict, info = env.reset(k_reset, force_idx=fixed_idx, allowed_topologies=allowed_topologies)
         true_adj = info["true_adjacency"]
 
         if args.agent_type == "ippo" and args.use_rnn:
