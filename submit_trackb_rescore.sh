@@ -15,7 +15,7 @@
 #$ -N trackb_rescore
 #$ -cwd
 #$ -l h_rt=01:00:00
-#$ -pe smp 2
+#$ -pe smp 4
 #$ -l mem=8G
 #$ -t 1-3
 #$ -o logs/
@@ -34,7 +34,7 @@ export JAX_PLATFORMS=cpu
 SEEDS=(42 7 13)
 SEED=${SEEDS[$((SGE_TASK_ID - 1))]}
 RUN_DIR=/home/ucabbse/marl_causal/diag_runs/uncertainty_bonus_s${SEED}
-OUT_DIR=${RUN_DIR}/rescored
+OUT_DIR=${RUN_DIR}/rescored_v2
 
 mkdir -p "${OUT_DIR}"
 
@@ -42,10 +42,16 @@ echo "=== Track B re-score: seed ${SEED} ==="
 echo "checkpoint: ${RUN_DIR}/checkpoints/best_ippo_params.pkl"
 echo "output:     ${OUT_DIR}"
 
+# --seed MUST match the original sweep's (submit_uncertainty_bonus.sh used --seed $SEED,
+# not a fixed 42). evaluate.py keys the environment off PRNGKey(seed + graph_idx), so a
+# different seed evaluates a DIFFERENT set of SCM parameter draws -- the comparison against
+# the original traces would be against different problem instances entirely. Getting this
+# wrong on the first attempt produced an apparent ended_at_zero jump that was pure
+# instance mismatch.
 python -m scripts.temperature_sweep_eval \
   --checkpoint_path "${RUN_DIR}/checkpoints/best_ippo_params.pkl" \
   --output_dir "${OUT_DIR}" \
   --temperatures 0.0,0.2,0.5,1.0 \
-  --seed 42
+  --seed ${SEED}
 
 echo "=== done seed ${SEED} ==="
