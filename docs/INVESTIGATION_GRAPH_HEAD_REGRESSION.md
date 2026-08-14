@@ -1,6 +1,6 @@
 # Investigation: Why RNN Training No Longer Converges to Low SHD
 
-**Status**: Merged into `main` (2026-08-13) with `--estimator_type avici` and `--reward_density sparse` as new defaults. **However, see "Follow-up: does the frozen (deployed) policy actually work?" below (2026-08-13, same day) -- a major caveat discovered *after* the merge that the SHD numbers throughout this doc are training-curve (on-policy, stochastically-sampled) metrics, and the frozen/deterministic policy performs much worse. Read that section before citing any SHD figure from this doc as "the policy's performance."**
+**Status**: Merged into `main` (2026-08-13) with `--estimator_type avici` and `--reward_density sparse` as new defaults. **However, see "Follow-up: does the frozen (deployed) policy actually work?" below (2026-08-13, same day) -- a major caveat discovered *after* the merge that the SHD numbers throughout this doc are training-curve (on-policy, stochastically-sampled) metrics, and the frozen/deterministic policy performs much worse. Read that section before citing any SHD figure from this doc as "the policy's performance."** **Update (2026-08-14 morning): see "Overnight results: Track B works" near the end of this doc -- an uncertainty-driven exploration fix (branch `feature/uncertainty-exploration-and-oracle`, not yet merged) took the frozen-policy success rate from ~0-4% to a verified 20.8-54.2%, the first real progress on the collapse problem. Also see "CRITICAL: frozen evaluation silently ignored the checkpoint's actual training config" -- a significant bug affecting prior frozen-eval numbers, now fixed.**
 **Branch**: was `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`), merged into `main` via `--no-ff` merge.
 **Trigger**: You observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." Your hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
 
@@ -384,6 +384,49 @@ Launched `feature/uncertainty-exploration-and-oracle` job `uncertainty_bonus_s{4
 2. Once `135173` finishes, re-run `scripts/temperature_sweep_eval.py` against its checkpoint too (`diag_runs/confirm_full_current/checkpoints/best_ippo_params.pkl`) -- it predates the fix the same way the matrix runs did.
 3. Analyze `135184`'s corrected `diag_runs/hardmatrix_*/refixed/` traces -- this is the first *correct* estimator-vs-estimator frozen-eval comparison (previous ones, including last night's, silently used `analytic` for graph prediction regardless of the actual estimator). Compare against each run's own uncorrected trace to see how much the bug actually mattered in practice.
 4. Analyze `uncertainty_bonus_s*`'s temperature-swept traces: static/never-intervenes/reached0/diverse rates (same methodology as the UCB check) *and*, new this time, `oracle_summary.optimal_rate`/`mean_regret` per episode -- the direct test of whether this exploration mechanism is smarter than UCB's, not just different.
+
+## Overnight results (2026-08-14 morning): Track B works -- a real, verified positive result
+
+All three overnight jobs completed. Headline: **the uncertainty-driven exploration bonus (Track B) is a genuine, substantial improvement** -- not a slam-dunk "problem solved," but the first thing all night that moved the frozen-policy success rate off the floor.
+
+### The result, and a correction I made to my own first read of it
+
+First pass at the numbers showed `reached0` (episodes that ever touch SHD=0) jumping from ~0-4% (pre-fix baseline / UCB-only) to **91.7%** at greedy. That number is real but **misleading as a headline** -- inspecting individual traces showed many episodes touch SHD=0 transiently at step 0 (from the initial observational-only guess, before any real intervention-driven work) and then *drift away* as the episode continues, sometimes ending worse than 0. So I recomputed a stricter metric, `ended_at_zero` (did the episode actually finish with the correct structure, not just pass through it), computed identically across all three arms for a fair comparison:
+
+| | pre-fix baseline | UCB-only | **uncertainty bonus (Track B)** |
+|---|---|---|---|
+| `ended_at_zero`, temp=0.0 (greedy) | 4.2% | 0.0% | **20.8%** |
+| `ended_at_zero`, temp=0.2 | -- | 0.0% | **54.2%** (best) |
+| `ended_at_zero`, temp=0.5 | -- | 0.0% | **41.7%** |
+| `ended_at_zero`, temp=1.0 | -- | 0.0% | **41.7%** |
+| oracle-agreement `optimal_rate` (scored interventions) | not measured | not measured | **99.4-100%** |
+
+Even under the strict, corrected metric: **5x the baseline at greedy, ~13x at temperature=0.2**. This is a real result, not an artifact -- and it directly supports the design decision from earlier (drop pure-greedy as *the* eval target): the policy does *better*, not worse, with a little deployment-time stochasticity on top of the uncertainty bonus, consistent with this being a genuinely active-learning-flavored task.
+
+**Oracle-agreement is the more interesting number, honestly**: when the agent does intervene, it matches the information-optimal oracle choice 99.4-100% of the time, at every temperature. Combined with `never_intervenes` dropping to 0% at any nonzero temperature (vs 20.8% at greedy), the story is coherent: the uncertainty bonus successfully teaches the policy *where* to intervene (near-perfect), and temperature mainly helps it get over the "should I act at all" threshold, not the "act well" threshold. That's a meaningfully different (and more encouraging) failure mode than the collapse found earlier tonight.
+
+### The 24-run estimator matrix, re-evaluated with the fixed eval code: collapse confirmed across all four estimators
+
+With the eval-config bug now fixed, re-ran the frozen-eval check for `{analytic, avici, learned, bayes_optimal}` (no exploration bonus -- these all predate Track B):
+
+| estimator | static | `reached0`/`ended_at_zero` | diverse | oracle `optimal_rate` (when scored) | fraction of episodes with any scored intervention |
+|---|---|---|---|---|---|
+| analytic | 87.5% | 0.0% | 20.8% | 92.6% | 68.8% |
+| avici | 83.3% | 0.0% | 18.8% | 90.3% | 66.7% |
+| bayes_optimal | 83.3% | 0.0% | 16.7% | 90.3% | 66.7% |
+| learned | 89.6% | 0.0% | 2.1% | 97.2% | 66.7% |
+
+**Zero episodes reached SHD=0 for any of the four estimators**, confirming this collapse is a policy-level problem upstream of estimator choice, not specific to `avici` -- exactly what the state-representation-fix work this whole investigation has been targeting. Notable: oracle-agreement is *already* fairly high (90-97%) even for these collapsed policies -- **when they do intervene, they don't intervene badly, they just don't intervene enough or diversify enough** (only ~67-69% of episodes have any scored intervention at all). This reframes the collapse slightly: it's less "the policy makes bad choices" and more "the policy doesn't choose to act, or gets stuck on one choice" -- consistent with everything found earlier about the saturating running-covariance representation, and it's exactly the gap Track B's `never_intervenes: 0%` (at nonzero temperature) result speaks to directly.
+
+**How much did the eval-config bug actually matter in practice**, for anyone reading the earlier (bug-affected) matrix numbers: comparing original vs corrected at temp=0.0, `static` dropped somewhat (`avici`: 95.8% to 83.3%) and `diverse` increased slightly across the board, but **`reached0` was 0.0% in both the buggy and corrected versions for every estimator** -- so the core "collapse persists" conclusion was accidentally still true despite the bug, though the exact magnitude numbers reported earlier this investigation should be considered approximate, not precise.
+
+### Full-scale confirmatory run (1000 episodes, dynamic curriculum, current defaults): strong training-curve result, frozen re-eval still pending
+
+`confirm_full_current` (hard/avici/sparse, no exploration bonus -- submitted before Track B existed): training-curve mean SHD 0.79 overall, **0.68 for the final 100 episodes**, F1 0.877, **reached_shd0 100%** on the training curve. For comparison, the *original* full-scale confirmation (`confirm_learned_full`, old defaults: soft_shift/learned) got mean SHD 0.342, 77% reached. This run's raw SHD is higher, but note it's also a harder-in-some-ways setup (frozen `avici` vs the old trainable `learned`) and, as this whole night has been about, **training-curve numbers are not frozen-policy numbers** -- a frozen re-evaluation of this checkpoint (job `136924`) was still running as of writing; check `diag_runs/confirm_full_current/refixed/` for the corrected result before drawing conclusions about how this config performs deployed, not just during training.
+
+### Recommendation
+
+Given tonight's evidence, merging `feature/uncertainty-exploration-and-oracle` into `main` looks justified -- it's a real, verified, honestly-corrected-for-artifacts improvement over both `main`'s current state (no bonus, 0-4% ended_at_zero) and the abandoned UCB approach (0%). Not done unilaterally -- flagging for your review, not merging without it, per the project's own branch-as-experiment convention. Loose ends before calling this fully wrapped: (1) confirm job `136924`'s corrected full-scale result once it lands, (2) the `ended_at_zero` gap between temp=0.0 (20.8%) and temp=0.2 (54.2%) is itself interesting and worth a deliberate decision about deployment temperature, not just defaulting to whichever the code currently uses, (3) this is still only 3 seeds -- real but not yet a large sample.
 
 ## Backlog (known limitations, not addressed in this round)
 
