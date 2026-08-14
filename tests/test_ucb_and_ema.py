@@ -159,18 +159,18 @@ def test_loss_fn_ratio_is_one_when_policy_unchanged_with_nonzero_ucb_bonus():
     critic_params = critic_trans.init(k2, dummy_obs)
 
     valid_mask = jnp.array([1.0, 1.0, 1.0, 0.0])
-    ucb_bonus = jnp.array([2.0, 0.0, -1.0, 0.5])  # nonzero, asymmetric -- would expose a mismatch
+    target_bonus = jnp.array([2.0, 0.0, -1.0, 0.5])  # nonzero, asymmetric -- would expose a mismatch
 
     obs = jax.random.normal(key, (1, obs_dim))
     cat_logits, target_logits = actor_trans.apply(actor_params, obs)
-    target_logits_with_bonus = target_logits + ucb_bonus[None, :]
+    target_logits_with_bonus = target_logits + target_bonus[None, :]
     value = critic_trans.apply(critic_params, obs)[0]
     k_act, key = jax.random.split(key)
     cat, target, old_log_prob = sample_actions_jitted(cat_logits[0], target_logits_with_bonus[0], valid_mask, k_act)
 
     buf = RolloutBuffer()
     buf.add(obs=obs[0], cat_actions=cat, target_actions=target, values=value,
-             log_probs=old_log_prob, rewards=-0.1, dones=True, ucb_bonus=ucb_bonus)
+             log_probs=old_log_prob, rewards=-0.1, dones=True, target_bonus=target_bonus)
     batch = buf.get_batches(max_size=None)
     advs, rets = compute_gae(batch["rewards"], batch["values"], batch["dones"])
     batch["advantages"] = advs
@@ -182,7 +182,7 @@ def test_loss_fn_ratio_is_one_when_policy_unchanged_with_nonzero_ucb_bonus():
     # Reconstruct the ratio the same way loss_fn does internally, to check it's ~1.0
     # (params unchanged since rollout -> new_log_probs should equal old_log_probs).
     cat_logits_lf, target_logits_lf = actor_trans.apply(actor_params, batch["obs"])
-    target_logits_lf = target_logits_lf + batch["ucb_bonus"]
+    target_logits_lf = target_logits_lf + batch["target_bonus"]
     masked_lf = mask_invalid_targets(batch["cat_actions"], target_logits_lf, valid_mask)
     cat_dist = jax.nn.log_softmax(cat_logits_lf)
     tgt_dist = jax.nn.log_softmax(masked_lf)

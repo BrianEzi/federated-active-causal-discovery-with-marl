@@ -15,7 +15,7 @@ class RolloutBuffer:
         self.data = {
             "obs": [], "cat_actions": [], "target_actions": [],
             "rewards": [], "dones": [], "values": [],
-            "log_probs": [], "ucb_bonus": []
+            "log_probs": [], "target_bonus": []
         }
         
     def add(self, **kwargs):
@@ -129,7 +129,7 @@ class IPPOTrainer:
         old_log_probs = batch["log_probs"]
         advs = batch["advantages"]
         returns = batch["returns"]
-        ucb_bonus = batch["ucb_bonus"]
+        target_bonus = batch["target_bonus"]
         valid_mask = batch.get("valid_mask", jnp.ones(obs.shape[0], dtype=jnp.float32))
         valid_count = jnp.maximum(1.0, jnp.sum(valid_mask))
         
@@ -168,13 +168,13 @@ class IPPOTrainer:
         else:
             cat_logits, target_logits = self.actor.apply(actor_params, obs)
         
-        # Action log probs -- add the same per-transition UCB bonus that was applied at
-        # rollout time (see train.py's rollout loop and compute_ucb_bonus's docstring)
-        # before masking, exactly mirroring rollout, so old_log_probs and new_log_probs
+        # Action log probs -- add the same per-transition target-selection bonus (UCB +
+        # uncertainty, combined -- see train.py's rollout loop) that was applied at rollout
+        # time, before masking, exactly mirroring rollout, so old_log_probs and new_log_probs
         # are computed under the same distribution (see valid_intervention_mask docstring
-        # above -- the UCB bonus is a second, equally real source of the same train/eval
+        # above -- this bonus is a second, equally real source of the same train/eval
         # masking-mismatch risk if it were applied inconsistently here).
-        target_logits = target_logits + ucb_bonus
+        target_logits = target_logits + target_bonus
         masked_target_logits = mask_invalid_targets(cat_acts, target_logits, valid_intervention_mask)
         cat_dist = jax.nn.log_softmax(cat_logits)
         tgt_dist = jax.nn.log_softmax(masked_target_logits)

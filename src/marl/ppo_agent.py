@@ -198,6 +198,37 @@ def compute_ucb_bonus(visits: jax.Array, step_count: jax.Array, c: float) -> jax
     return c * jnp.sqrt(jnp.log(t + 1.0) / (visits + 1.0))
 
 
+@jax.jit
+def compute_uncertainty_bonus(predicted_dag: jax.Array, structural_mask: jax.Array, c: float) -> jax.Array:
+    """Uncertainty-driven exploration bonus per node -- Track B (see
+    docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's greedy-policy-collapse follow-up).
+
+    The UCB visit-count bonus (compute_ucb_bonus) increased target diversity
+    dramatically but reached0 fell to 0% -- it diversified "for its own sake" via raw
+    visit counts, blind to which node's data would actually resolve remaining structural
+    uncertainty for the specific topology in play. This version is tied directly to the
+    Stage-2 estimator's own edge-confidence instead: for each candidate edge (i, j), a
+    predicted probability p near 0.5 means the estimator is still unsure whether that
+    edge exists; p near 0 or 1 means it's confident. Per-edge uncertainty is
+    `1 - |2p - 1|` (0 at p=0/1, 1 at p=0.5), masked to only structurally-possible edges.
+    A node's bonus is the sum of uncertainty over every edge touching it (both as source
+    and target) -- nodes sitting at the center of unresolved edges get the biggest push.
+
+    `predicted_dag` [d, d]: the current predicted edge-probability matrix
+    (FederatedCausalEnv.last_predicted_dag -- initialized to 0.5 everywhere at reset,
+    i.e. maximal uncertainty before any data exists). `structural_mask` [d, d]: zeroes
+    out structurally-impossible edges. `c`: exploration coefficient (--uncertainty_coef).
+
+    Added to target_logits the same way and at the same points as compute_ucb_bonus
+    (before masking/sampling, at both training-time action selection and eval time) --
+    the two bonuses are summed, not mutually exclusive, though --ucb_coef defaults to
+    0.0 now given its standalone result.
+    """
+    edge_uncertainty = (1.0 - jnp.abs(2.0 * predicted_dag - 1.0)) * structural_mask
+    node_uncertainty = jnp.sum(edge_uncertainty, axis=1) + jnp.sum(edge_uncertainty, axis=0)
+    return c * node_uncertainty
+
+
 def mask_invalid_targets(cat_action: jax.Array, target_logits: jax.Array, valid_intervention_mask: jax.Array) -> jax.Array:
     is_intervene = (cat_action == int(ActionCategory.INTERVENE))[:, None]
     

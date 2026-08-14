@@ -259,7 +259,7 @@ class FederatedCausalEnv:
                  freeze_graph_estimator: bool = True, obs_feedback: bool = True,
                  impact_coef: float = 0.0, reward_density: str = "dense",
                  avici_max_context: int = 400, running_cov_ema_alpha: float = 0.3,
-                 ucb_coef: float = 1.0):
+                 ucb_coef: float = 0.0, uncertainty_coef: float = 2.0):
         self.config = config
         self.action_costs = action_costs
         self.initial_budget = initial_budget
@@ -284,8 +284,14 @@ class FederatedCausalEnv:
         self.running_cov_ema_alpha = running_cov_ema_alpha
         # UCB-style target-selection exploration coefficient `c` -- see train.py/evaluate.py's
         # compute_ucb_bonus usage. Exposed here (rather than only in train.py) so evaluate.py's
-        # frozen-eval path can read the same value a checkpoint was trained with.
+        # frozen-eval path can read the same value a checkpoint was trained with. Defaults to
+        # 0.0 (disabled) -- standalone UCB increased target diversity dramatically but reached0
+        # fell to 0%, see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md. Kept available for
+        # combination experiments, superseded by uncertainty_coef below as the primary mechanism.
         self.ucb_coef = ucb_coef
+        # Uncertainty-driven target-selection exploration coefficient -- see
+        # train.py/evaluate.py's compute_uncertainty_bonus usage.
+        self.uncertainty_coef = uncertainty_coef
         self.normalize_rewards = normalize_rewards
         self.intrinsic_coef = intrinsic_coef
         self.intervention_type = intervention_type

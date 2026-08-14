@@ -9,7 +9,7 @@ import haiku as hk
 
 from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
 from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted, compute_ucb_bonus
+from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted, compute_ucb_bonus, compute_uncertainty_bonus
 from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
 from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
 from src.metrics import evaluate_dag_against_true
@@ -262,12 +262,23 @@ def parse_args():
              "greedy-policy-collapse fix). Higher = more weight on the most recent step (default: 0.3)"
     )
     parser.add_argument(
-        "--ucb_coef", type=float, default=1.0,
-        help="UCB-style target-selection exploration coefficient c in c*sqrt(log(t+1)/(visits+1)), "
-             "added to target_logits before masking/sampling at both training and eval time -- "
-             "see src/marl/ppo_agent.py::compute_ucb_bonus and "
-             "docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's greedy-policy-collapse fix. "
-             "Set to 0.0 to disable (default: 1.0)"
+        "--ucb_coef", type=float, default=0.0,
+        help="UCB-style (raw visit-count) target-selection exploration coefficient c in "
+             "c*sqrt(log(t+1)/(visits+1)), added to target_logits before masking/sampling at "
+             "both training and eval time -- see src/marl/ppo_agent.py::compute_ucb_bonus. "
+             "Defaults to 0.0 (disabled): standalone, this increased target diversity "
+             "dramatically but reached0 fell to 0%% -- see "
+             "docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md. Kept available for combination "
+             "experiments; superseded by --uncertainty_coef as the primary mechanism."
+    )
+    parser.add_argument(
+        "--uncertainty_coef", type=float, default=2.0,
+        help="Uncertainty-driven target-selection exploration coefficient, added to "
+             "target_logits the same way as --ucb_coef but tied to the Stage-2 estimator's "
+             "own edge-confidence (1-|2p-1| per edge, summed per node) rather than raw visit "
+             "counts -- see src/marl/ppo_agent.py::compute_uncertainty_bonus and "
+             "docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's Track B discussion. "
+             "Set to 0.0 to disable (default: 2.0)"
     )
     parser.add_argument(
         "--intervention_type", type=str, default="hard", choices=["soft_shift", "hard"],
@@ -404,7 +415,8 @@ def main():
         reward_density=args.reward_density,
         avici_max_context=args.avici_max_context,
         running_cov_ema_alpha=args.running_cov_ema_alpha,
-        ucb_coef=args.ucb_coef
+        ucb_coef=args.ucb_coef,
+        uncertainty_coef=args.uncertainty_coef
     )
     
     if args.agent_type == "ippo":
@@ -535,13 +547,20 @@ def main():
         
         while not done:
             if args.agent_type == "ippo":
-                # UCB-style target-selection bonus, computed once per step from the shared
-                # (both-agents) visit counts and added to each agent's target_logits before
-                # masking/sampling -- see src/marl/ppo_agent.py::compute_ucb_bonus. Applied
-                # identically here and in the PPO update's loss_fn recomputation (stored in
-                # the buffer below), so training and eval both learn/act under the same
-                # exploration-biased distribution rather than a train/eval mismatch.
+                # Target-selection bonus, computed once per step and added to each agent's
+                # target_logits before masking/sampling -- see
+                # src/marl/ppo_agent.py::compute_ucb_bonus (raw visit-count, defaults off)
+                # and compute_uncertainty_bonus (estimator edge-confidence, the primary
+                # mechanism now -- see docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md's Track B
+                # discussion). Applied identically here and in the PPO update's loss_fn
+                # recomputation (stored in the buffer below), so training and eval both
+                # learn/act under the same exploration-biased distribution rather than a
+                # train/eval mismatch.
                 ucb_bonus = compute_ucb_bonus(env.jax_state.node_intervention_counts, env.jax_state.step_count, args.ucb_coef)
+                uncertainty_bonus = compute_uncertainty_bonus(
+                    jnp.array(env.last_predicted_dag), jnp.array(env.structural_mask), args.uncertainty_coef
+                )
+                target_bonus = ucb_bonus + uncertainty_bonus
 
                 # Agent 0
                 k0_act, key = jax.random.split(key)
@@ -553,7 +572,7 @@ def main():
                 else:
                     cat_l0, tgt_l0 = actor_apply(actor_params_list[0], obs_0)
                     val_0 = critic_apply(critic_params_list[0], obs_0)[0]
-                tgt_l0 = tgt_l0 + ucb_bonus[None, :]
+                tgt_l0 = tgt_l0 + target_bonus[None, :]
                 c0, t0, lp0 = sample_actions_jitted(cat_l0[0], tgt_l0[0], valid_intervention_masks[0], k0_act)
 
                 # Agent 1
@@ -566,7 +585,7 @@ def main():
                 else:
                     cat_l1, tgt_l1 = actor_apply(actor_params_list[1], obs_1)
                     val_1 = critic_apply(critic_params_list[1], obs_1)[0]
-                tgt_l1 = tgt_l1 + ucb_bonus[None, :]
+                tgt_l1 = tgt_l1 + target_bonus[None, :]
                 c1, t1, lp1 = sample_actions_jitted(cat_l1[0], tgt_l1[0], valid_intervention_masks[1], k1_act)
 
                 joint_actions = {
@@ -582,8 +601,8 @@ def main():
                 final_dag = step_info.get("predicted_dag", env.last_predicted_dag)
                 info_gains = step_info.get("info_gains", {"agent_0": 0.0, "agent_1": 0.0})
 
-                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done, ucb_bonus=ucb_bonus)
-                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done, ucb_bonus=ucb_bonus)
+                buffers[0].add(obs=obs_0[0], cat_actions=c0, target_actions=t0, values=val_0, log_probs=lp0, rewards=r0, dones=done, target_bonus=target_bonus)
+                buffers[1].add(obs=obs_1[0], cat_actions=c1, target_actions=t1, values=val_1, log_probs=lp1, rewards=r1, dones=done, target_bonus=target_bonus)
                 obs_dict = next_obs_dict
                 ep_reward += float(r0 + r1)
                 ep_info_gain_0 += float(info_gains["agent_0"])
@@ -748,7 +767,24 @@ def main():
                         "use_rnn": args.use_rnn,
                         "use_inductive_graph_head": args.use_inductive_graph_head,
                         "d": args.num_variables,
-                        "ucb_coef": args.ucb_coef
+                        "ucb_coef": args.ucb_coef,
+                        "uncertainty_coef": args.uncertainty_coef,
+                        # Environment-construction parameters needed to faithfully reproduce
+                        # this checkpoint's training conditions at eval time -- found missing
+                        # entirely (evaluate.py silently fell back to FederatedCausalEnv's
+                        # defaults: estimator_type="analytic", intervention_type="soft_shift",
+                        # SCMConfig's noise_scale=1.0) while implementing the oracle-agreement
+                        # metric. See docs/INVESTIGATION_GRAPH_HEAD_REGRESSION.md for the
+                        # impact on prior frozen-eval findings.
+                        "estimator_type": args.estimator_type,
+                        "intervention_type": args.intervention_type,
+                        "noise_scale": args.noise_scale,
+                        "mechanism_type": args.mechanism_type,
+                        "K": args.num_agents,
+                        "sample_count": args.sample_count,
+                        "obs_feedback": enable_obs_feedback,
+                        "avici_max_context": args.avici_max_context,
+                        "running_cov_ema_alpha": args.running_cov_ema_alpha
                     }, f)
 
     if args.save_file:
