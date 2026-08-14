@@ -498,6 +498,7 @@ def main():
             agents = [RoundRobinAgent(i, args.num_variables) for i in range(args.num_agents)]
     
     best_shd = 999.0
+    best_f1 = -1.0
     ep_rewards_history = []
     shd_history = []
     f1_history = []
@@ -681,11 +682,11 @@ def main():
                 "eval/reached_shd0": int(interventions_to_zero is not None),
                 "eval/shd_auc_normalized": shd_trajectory_auc(shd_trajectory, max_shd_possible),
                 "eval/shd_reduction_auc_normalized": shd_reduction_auc(shd_trajectory, max_shd_possible),
-                "eval/orientation_precision_a0": sum_positive_delta[0] / max(1, cumulative_interventions),
-                "eval/orientation_precision_a1": sum_positive_delta[1] / max(1, cumulative_interventions),
+                "eval/orientation_precision_a0": sum_positive_delta.get(0, 0.0) / max(1, cumulative_interventions),
+                "eval/orientation_precision_a1": sum_positive_delta.get(1, 0.0) / max(1, cumulative_interventions),
                 "eval/entropy_gain_episode": entropy_before - entropy_after,
-                "eval/impact_score_a0": ep_impact_sum[0] / max(1, ep_steps),
-                "eval/impact_score_a1": ep_impact_sum[1] / max(1, ep_steps),
+                "eval/impact_score_a0": ep_impact_sum.get(0, 0.0) / max(1, ep_steps),
+                "eval/impact_score_a1": ep_impact_sum.get(1, 0.0) / max(1, ep_steps),
                 "eval/asym_magnitude_mean": ep_asym_mag_sum / max(1, ep_steps),
                 "eval/redundant_interventions": redundant_steps,
                 "eval/redundancy_rate": redundant_steps / max(1, cumulative_interventions),
