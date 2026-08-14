@@ -15,7 +15,7 @@ def compute_ippo_rewards(
     is_terminal: bool = False,
     prev_shd: float = None,
     num_agents: int = 2,
-    holding_bonus: float = 0.05,
+    holding_bonus: float = 0.0,
     action_friction: float = 0.0,
     actions: dict = None,
     remaining_budgets: dict = None,
@@ -68,11 +68,12 @@ def compute_ippo_rewards(
             r1 = -current_e1 * edge_penalty
             r2 = -current_e2 * edge_penalty
             
-        # Holding bonus: reward staying at SHD=0
-        if current_e1 == 0:
-            r1 += holding_bonus
-        if current_e2 == 0:
-            r2 += holding_bonus
+        # Holding bonus: reward staying at SHD=0 when cycle-free
+        if not has_cycle and holding_bonus > 0.0:
+            if current_e1 == 0:
+                r1 += holding_bonus
+            if current_e2 == 0:
+                r2 += holding_bonus
             
         # Action friction penalty
         if actions is not None and action_friction > 0.0:
