@@ -1,6 +1,8 @@
 # Investigation: Why RNN Training No Longer Converges to Low SHD
 
 **Status**: Merged into `main` (2026-08-13) with `--estimator_type avici` and `--reward_density sparse` as new defaults. **However, see "Follow-up: does the frozen (deployed) policy actually work?" below (2026-08-13, same day) -- a major caveat discovered *after* the merge that the SHD numbers throughout this doc are training-curve (on-policy, stochastically-sampled) metrics, and the frozen/deterministic policy performs much worse. Read that section before citing any SHD figure from this doc as "the policy's performance."** **Update (2026-08-14 morning): see "Overnight results: Track B works" near the end of this doc -- an uncertainty-driven exploration fix (branch `feature/uncertainty-exploration-and-oracle`, not yet merged) took the frozen-policy success rate from ~0-4% to a verified 20.8-54.2%, the first real progress on the collapse problem. Also see "CRITICAL: frozen evaluation silently ignored the checkpoint's actual training config" -- a significant bug affecting prior frozen-eval numbers, now fixed.**
+**RETRACTION (2026-08-14, later the same day): every oracle-agreement figure in this document is withdrawn.** The `99.4-100% optimal_rate` headline and the `90-97% even for collapsed policies` row of the estimator table were 93-98% vacuous -- see "RETRACTED: the oracle-agreement metric was measuring nothing" near the end of this doc. The `ended_at_zero` results for Track B are unaffected and still stand.
+
 **Branch**: was `investigate/graph-head-regression` (worktree: `.claude/worktrees/investigate-graph-head-regression`), merged into `main` via `--no-ff` merge.
 **Trigger**: You observed WandB run `n4in20oe` (RNN, current architecture) failing to learn accurate causal graphs even on the easiest single-topology case, despite RNN "previously being able to learn the right causal graph." Your hypothesis: the decoupling of graph prediction from intervention policy ("disjointing") is the likely cause.
 
@@ -399,17 +401,17 @@ First pass at the numbers showed `reached0` (episodes that ever touch SHD=0) jum
 | `ended_at_zero`, temp=0.2 | -- | 0.0% | **54.2%** (best) |
 | `ended_at_zero`, temp=0.5 | -- | 0.0% | **41.7%** |
 | `ended_at_zero`, temp=1.0 | -- | 0.0% | **41.7%** |
-| oracle-agreement `optimal_rate` (scored interventions) | not measured | not measured | **99.4-100%** |
+| oracle-agreement `optimal_rate` (scored interventions) | not measured | not measured | ~~99.4-100%~~ **RETRACTED, see below** |
 
 Even under the strict, corrected metric: **5x the baseline at greedy, ~13x at temperature=0.2**. This is a real result, not an artifact -- and it directly supports the design decision from earlier (drop pure-greedy as *the* eval target): the policy does *better*, not worse, with a little deployment-time stochasticity on top of the uncertainty bonus, consistent with this being a genuinely active-learning-flavored task.
 
-**Oracle-agreement is the more interesting number, honestly**: when the agent does intervene, it matches the information-optimal oracle choice 99.4-100% of the time, at every temperature. Combined with `never_intervenes` dropping to 0% at any nonzero temperature (vs 20.8% at greedy), the story is coherent: the uncertainty bonus successfully teaches the policy *where* to intervene (near-perfect), and temperature mainly helps it get over the "should I act at all" threshold, not the "act well" threshold. That's a meaningfully different (and more encouraging) failure mode than the collapse found earlier tonight.
+**[RETRACTED -- see "the oracle-agreement metric was measuring nothing" below. The paragraph is kept as written so the error is visible rather than quietly edited away, but none of it should be cited.]** ~~**Oracle-agreement is the more interesting number, honestly**: when the agent does intervene, it matches the information-optimal oracle choice 99.4-100% of the time, at every temperature.~~ Combined with `never_intervenes` dropping to 0% at any nonzero temperature (vs 20.8% at greedy), the story is coherent: the uncertainty bonus successfully teaches the policy *where* to intervene (near-perfect), and temperature mainly helps it get over the "should I act at all" threshold, not the "act well" threshold. That's a meaningfully different (and more encouraging) failure mode than the collapse found earlier tonight.
 
 ### The 24-run estimator matrix, re-evaluated with the fixed eval code: collapse confirmed across all four estimators
 
 With the eval-config bug now fixed, re-ran the frozen-eval check for `{analytic, avici, learned, bayes_optimal}` (no exploration bonus -- these all predate Track B):
 
-| estimator | static | `reached0`/`ended_at_zero` | diverse | oracle `optimal_rate` (when scored) | fraction of episodes with any scored intervention |
+| estimator | static | `reached0`/`ended_at_zero` | diverse | ~~oracle `optimal_rate`~~ **RETRACTED** | fraction of episodes with any scored intervention |
 |---|---|---|---|---|---|
 | analytic | 87.5% | 0.0% | 20.8% | 92.6% | 68.8% |
 | avici | 83.3% | 0.0% | 18.8% | 90.3% | 66.7% |
@@ -431,6 +433,43 @@ This makes the Track B comparison sharper than it first looked: **200 episodes w
 ### Recommendation
 
 Given tonight's evidence, merging `feature/uncertainty-exploration-and-oracle` into `main` looks justified -- it's a real, verified, honestly-corrected-for-artifacts improvement over `main`'s current state (no bonus: 0-4% at diagnostic scale, confirmed **0.0%** at full scale with 5x the training), and over the abandoned UCB approach (0% everywhere). Not done unilaterally -- flagging for your review, not merging without it, per the project's own branch-as-experiment convention. Loose ends before calling this fully wrapped: (1) the `ended_at_zero` gap between temp=0.0 (20.8%) and temp=0.2 (54.2%) is itself interesting and worth a deliberate decision about deployment temperature, not just defaulting to whichever the code currently uses, (2) this is still only 3 seeds at diagnostic (200-episode) scale -- real but not yet a large sample, and Track B hasn't been tried at full (1000-episode, dynamic curriculum) scale yet, (3) worth deciding whether `--uncertainty_coef 2.0` (chosen as a reasonable starting guess, not tuned) is actually the best value, given how much temperature alone moved the number.
+
+## RETRACTED: the oracle-agreement metric was measuring nothing (2026-08-14, later the same day)
+
+**Every oracle-agreement number reported above is withdrawn.** Found while consolidating with a parallel session (Gemini, worktree `assess_codebase_understanding`) that had independently hit the same wall from the opposite direction: it observed that the Bayes-optimal oracle solves 7 of 8 graphs *without intervening at all*. That is the same defect, seen from the other side.
+
+### The defect
+
+`src/marl/bayes_optimal_estimator.py` substituted the environment's true, shared `noise_scale` for every node's error variance. Our SCM draws one scalar `noise_scale` for all nodes, and **a linear Gaussian SEM with equal error variances is fully identifiable from observational data alone** (Peters & Bühlmann 2014, *Biometrika* 101(1):219-228) -- the Markov equivalence class collapses to a point. Supplying a known shared variance broke score equivalence and handed the estimator the answer for free. Measured: **98% correct-graph recovery from observational samples, before any intervention is taken.** The active-discovery premise of this project was not being tested.
+
+The metric consequence follows mechanically. With the posterior already collapsed, `expected_discrimination` returns all-zeros, so `oracle_best_targets` marks *every* legal node optimal and `is_optimal` is 1.0 by construction regardless of what the agent chose. Re-measured against the actual overnight traces:
+
+| arm | scored steps | reported `optimal_rate` | **vacuous (`best_score == 0`)** | `optimal_rate` on informative steps |
+|---|---|---|---|---|
+| Track B, temp=0.2 | 489 | 99.6% | **96.7%** | 84.6% (n=13) |
+| Track B, temp=0.0 | 333 | 100% | **98.5%** | 100% (n=5) |
+| avici matrix, temp=0.0 | 197 | 98.5% | **92.9%** | 72.7% (n=11) |
+
+So the reported figure was mostly measuring how often the oracle had no opinion. The informative remainder is far too small (n=5-13) to support any conclusion. The narrative built on it -- "the agent intervenes near-optimally, it just doesn't intervene enough" -- **was not established** and should not be repeated.
+
+### What this does and does not invalidate
+
+- **Withdrawn**: the `99.4-100% optimal_rate` headline; the `oracle optimal_rate` column of the four-estimator table; the "oracle-agreement is already high even for collapsed policies" reading.
+- **Unaffected and still standing**: Track B's `ended_at_zero` result (20.8-54.2% vs 0-4%), which is SHD-based and never touches the oracle. The eval-config fix (`b2aff46`). The full-scale 0%-at-every-temperature negative control. The four-estimator collapse finding itself (`ended_at_zero` was 0.0% for all four regardless).
+
+### The fix, and why it is the right one rather than the convenient one
+
+Two options were proposed by the parallel session -- randomize `noise_scale` per node, or train the agent with `bayes_optimal`. Both were tested and both are inadequate. Per-node randomization only drops observational accuracy from 98% to 79%, because the *estimator* still assumes a known variance; and training against the shortcut estimator does not remove the shortcut, it teaches the agent that intervening is pointless, which is correct under that configuration and is precisely the NOOP collapse. Reducing `sample_count`, which this session proposed first, is also insufficient: the shortcut survives to 73% accuracy even at 5 samples.
+
+The actual fix is to stop supplying the variance at all. Profiling the per-node error variance out by MLE restores **score equivalence** (Chickering 2002, *JMLR* 2:445-498): members of a Markov equivalence class receive identical scores, so observational data cannot separate them and interventions become necessary again. Committed as `b218f8b` on `feature/uncertainty-exploration-and-oracle`.
+
+Verified, and the result is sharper than expected: the corrected posterior is **exactly uniform over the Markov equivalence class** -- p(true) = 0.25 where 4 hypotheses tie, 0.50 where 2 tie. The estimator degrades to precisely "correct equivalence class, orientation undetermined", which is the theoretically predicted behaviour rather than mere degradation. A side effect worth knowing: **MAP accuracy is no longer a meaningful metric for this estimator**, because `argmax` over exact ties measures floating-point ordering. The new regression tests (`tests/test_observational_identifiability.py`) assert the equivalence-class property instead, and pin the vacuous-oracle rate below 10%.
+
+`src/evaluate.py` now computes `optimal_rate` over informative steps only, and records `vacuous_rate` alongside the raw pre-fix figure so this cannot silently recur.
+
+### Consequence for everything measured so far
+
+Every training run and every frozen evaluation in this document was produced under the degenerate environment. The Track B comparison remains internally valid -- all arms shared the same defect, so the relative ordering is meaningful -- but the absolute numbers describe a task that was substantially easier than intended. **Track B requires re-evaluation on the corrected environment before merge.**
 
 ## Backlog (known limitations, not addressed in this round)
 
