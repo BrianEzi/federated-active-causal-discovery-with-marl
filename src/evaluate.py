@@ -26,7 +26,8 @@ def run_evaluation_suite(
     obs_feedback: bool = True,
     sample_count: int = 100,
     avici_max_context: int = 400,
-    running_cov_ema_alpha: float = 0.3
+    running_cov_ema_alpha: float = 0.3,
+    success_bonus: float = 0.0
 ) -> Dict[str, Any]:
     """
     Evaluates the trained agents on all 8 possible 4-node topologies.
@@ -78,7 +79,8 @@ def run_evaluation_suite(
                                   uncertainty_coef=uncertainty_coef, estimator_type=estimator_type,
                                   intervention_type=intervention_type, obs_feedback=obs_feedback,
                                   sample_count=sample_count, avici_max_context=avici_max_context,
-                                  running_cov_ema_alpha=running_cov_ema_alpha)
+                                  running_cov_ema_alpha=running_cov_ema_alpha,
+                                  success_bonus=success_bonus)
         key = jax.random.PRNGKey(seed + graph_idx)
         
         obs_dict, info = env.reset(key, force_idx=graph_idx)
@@ -316,13 +318,21 @@ def evaluate_checkpoint(
     ckpt_obs_feedback = ckpt.get("obs_feedback", True)
     avici_max_context = ckpt.get("avici_max_context", 400)
     running_cov_ema_alpha = ckpt.get("running_cov_ema_alpha", 0.3)
+    # Episode-dynamics parameters, saved from 2026-08-14 onward. Older checkpoints fall back
+    # to the values that were hardcoded when they were trained (budget 20.0, cost 1.0,
+    # no success bonus), which is what they actually ran under -- same
+    # reproduce-don't-guess discipline as the estimator/intervention keys above.
+    if ckpt.get("initial_budget") is not None:
+        initial_budget = float(ckpt["initial_budget"])
+    ckpt_action_cost = float(ckpt.get("action_cost", 1.0))
+    success_bonus = float(ckpt.get("success_bonus", 0.0))
     mechanism_type_int = int(MechanismType.LINEAR) if mechanism_type == "LINEAR" else int(MechanismType.NONLINEAR_ANM)
 
     if config is None:
         config = SCMConfig(d=d, K=K, mechanism_type=mechanism_type_int, noise_type=int(NoiseType.GAUSSIAN),
                             noise_scale=noise_scale)
     if action_costs is None:
-        action_costs = np.array([1.0, 1.0])
+        action_costs = np.full(K, ckpt_action_cost)
 
     if use_inductive:
         if use_rnn:
@@ -359,6 +369,7 @@ def evaluate_checkpoint(
         obs_feedback=ckpt_obs_feedback,
         sample_count=sample_count,
         avici_max_context=avici_max_context,
-        running_cov_ema_alpha=running_cov_ema_alpha
+        running_cov_ema_alpha=running_cov_ema_alpha,
+        success_bonus=success_bonus
     )
 

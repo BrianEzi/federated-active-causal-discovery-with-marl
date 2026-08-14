@@ -808,7 +808,14 @@ def main():
                         "sample_count": args.sample_count,
                         "obs_feedback": enable_obs_feedback,
                         "avici_max_context": args.avici_max_context,
-                        "running_cov_ema_alpha": args.running_cov_ema_alpha
+                        "running_cov_ema_alpha": args.running_cov_ema_alpha,
+                        # Added 2026-08-14 alongside the horizon/success-bonus change. Both
+                        # affect episode dynamics, so omitting them would reintroduce exactly
+                        # the silent eval/train config drift that b2aff46 fixed.
+                        "max_steps": args.max_steps,
+                        "initial_budget": args.initial_budget,
+                        "action_cost": args.action_cost,
+                        "success_bonus": args.success_bonus
                     }, f)
 
     if args.save_file:
