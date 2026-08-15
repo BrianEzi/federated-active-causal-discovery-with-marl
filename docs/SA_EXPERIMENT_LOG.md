@@ -1241,3 +1241,46 @@ any further move-set work.
 against the exact posterior rather than through the oracle. Measuring through a downstream
 consumer conflated two questions and made a correctness failure look like a mixing problem.
 The direct check is now the first thing to run on any future sampler.
+
+## 2026-08-15 — E4 seed 0, and a reporting bug in summarise_seeds
+
+[MEASURED] **First gate-valid d=6 result.** Seed 0, n_obs=20000, per-node, action memory:
+
+- `gap_closed` **+1.109** deterministic (+1.091 sampled)
+- solve rate 1.00 against greedy's 0.99
+- GATE 1 passes: observational-only rate 0.0600 (CI 0.0300-0.0950) against a singleton
+  fraction of 0.0810
+- all four criteria pass; G1 entropy 0.559 nats = 29% of the ln(7) ceiling; G5 clean
+
+This replaces the earlier d=6 numbers (+1.098/+1.098/+1.145), which were measured at
+n_obs=1000 where GATE 1 fails at d=6. The result survives the correction: +1.109 on a valid
+environment against +1.098 on an invalid one. Two seeds still running.
+
+[CORRECTED] `sa/evaluate.py::summarise_seeds` takes `min_passing: int = 4` -- an ABSOLUTE
+count of passing seeds, not a fraction. So the printed `OVERALL` verdict is structurally
+unreachable for any run with fewer than 4 seeds. E4 runs one seed per array task by design
+(to fit walltime), so it printed `seeds passing: 1/1` immediately followed by
+`OVERALL: FAIL`.
+
+This is worse than it first appears: **Phase 2 runs 3 seeds per configuration**, so every
+one of its 66 configurations will print `OVERALL: FAIL` regardless of quality. The
+overnight sweep had the same defect on its 3-seed arms, while its 5-seed core arms were
+unaffected -- which is why it was never noticed.
+
+Scope: the underlying data is intact. Per-seed `passed`, `gap_closed`, and the min/median/
+max are all correct; only the aggregate boolean is wrong.
+
+[DECIDED] Do NOT fix `summarise_seeds` while the sweep is running. Tasks 1-35 have already
+completed under the current semantics; changing it now would leave tasks 36-66 evaluated
+differently, which is precisely the kind of silent mid-experiment inconsistency this
+project has been burned by. Instead:
+
+1. `analyse_phase2.py` recomputes the verdict from the stored per-seed records rather than
+   trusting `summary.passed`.
+2. `summarise_seeds` gets a fraction-based criterion after the sweep completes, preserving
+   the original intent -- 4 of 5 seeds is 80%.
+
+[MEASURED] Cluster scheduling: Phase 2 is throttled to roughly 2 concurrent array tasks by
+the site policy, with tasks 36-66 sitting in `hqw`. At ~1.5 h per task that puts completion
+around 20+ hours out. Unattended, so this costs waiting rather than effort, but it means
+the full E1xE2 comparison is a tomorrow result, not a tonight one.
