@@ -85,6 +85,13 @@ class PPOConfig:
     # terminal states, which the guarantee requires for episodic tasks.
     shaping_coef: float = 0.0
 
+    # "flat" is the dense MLP; "pernode" is the permutation-equivariant scorer that matches
+    # the oracle's own structure (see PerNodeActorCritic). Added after a supervised probe
+    # showed the flat network reaches only 0.42 accuracy predicting the oracle's choice
+    # even with full supervision -- evidence that the architecture, not the reward or the
+    # exploration, is what cannot express the mapping.
+    arch: str = "flat"
+
 
 class ActorCritic(nn.Module):
     """Two-headed MLP. Shared trunk, separate policy and value heads."""
@@ -106,6 +113,117 @@ class ActorCritic(nn.Module):
     def forward(self, obs: torch.Tensor):
         h = self.trunk(obs)
         return self.policy_head(h), self.value_head(h).squeeze(-1)
+
+
+class PerNodeActorCritic(nn.Module):
+    """Scores every node with the SAME small network, then reads the logits off.
+
+    The flat `ActorCritic` maps d(d-1) edge marginals to d+1 logits through a dense layer,
+    so it must learn each node's score as a separate function of the whole vector, and
+    learn from scratch that the nodes are interchangeable. The oracle's score for node i is
+    a function of node i's own descendant structure -- the same function for every i. This
+    architecture says so directly: build node i's features from its own row and column of
+    the edge-marginal matrix, push them through a shared MLP, and take the output as node
+    i's logit.
+
+    That makes the policy **permutation-equivariant**: relabel the nodes and the logits
+    permute with them, which is true of the oracle and was not expressible before. It also
+    cuts the parameters that must be learned per node to zero -- one scorer serves all d --
+    and makes the network's width independent of d, so the same model form carries to d=6
+    unchanged.
+
+    Deliberately restricted to the `edge_marginals` observation. The exact posterior has no
+    per-node factorisation to exploit, which is the whole reason the scalable
+    representation is the interesting one.
+    """
+
+    def __init__(self, d: int, hidden: int = 128, include_counts: bool = False,
+                 allow_pass: bool = True):
+        super().__init__()
+        self.d = d
+        self.include_counts = include_counts
+        self.allow_pass = allow_pass
+
+        # Each NEIGHBOUR of node i is embedded from the pair (i->j, j->i), then those
+        # embeddings are pooled. Pooling rather than concatenating in index order is what
+        # makes this genuinely equivariant: a fixed-order neighbour vector reorders when
+        # the nodes are relabelled, so an earlier version of this class was only equivariant
+        # under permutations that happened to preserve neighbour ordering -- which is to
+        # say, not equivariant. The test caught it.
+        #
+        # Mean and max are pooled together: mean carries the typical neighbour, max carries
+        # the most extreme one, and a single statistic loses distinctions the score needs
+        # (Deep Sets, Zaheer et al. 2017).
+        edge_hidden = max(hidden // 4, 8)
+        self.edge_encoder = nn.Sequential(
+            nn.Linear(2, edge_hidden), nn.Tanh(),
+            nn.Linear(edge_hidden, edge_hidden), nn.Tanh(),
+        )
+        per_node_features = 2 * edge_hidden + 1 + (1 if include_counts else 0)
+        self.node_encoder = nn.Sequential(
+            nn.Linear(per_node_features, hidden), nn.Tanh(),
+            nn.Linear(hidden, hidden), nn.Tanh(),
+        )
+        self.node_score = nn.Linear(hidden, 1)
+        # Value and the pass logit both depend on the whole state, so they read a pooled
+        # summary. Mean-pooling keeps them permutation-INVARIANT, which is correct: how
+        # good the state is, and whether to stop, do not depend on node labels.
+        self.value_head = nn.Linear(hidden, 1)
+        self.pass_head = nn.Linear(hidden, 1) if allow_pass else None
+
+        nn.init.orthogonal_(self.node_score.weight, gain=0.01)
+        nn.init.zeros_(self.node_score.bias)
+        if self.pass_head is not None:
+            nn.init.orthogonal_(self.pass_head.weight, gain=0.01)
+            nn.init.zeros_(self.pass_head.bias)
+
+    def _neighbour_pairs(self, obs: torch.Tensor) -> torch.Tensor:
+        """[batch, d, d-1, 2] -- for each node i and neighbour j, the pair (i->j, j->i).
+
+        The flat layout is d(d-1) off-diagonal marginals in row-major order, then the
+        budget, then (optionally) d intervention counts.
+        """
+        d = self.d
+        batch = obs.shape[0]
+        mask = ~torch.eye(d, dtype=torch.bool, device=obs.device)
+
+        matrix = torch.zeros(batch, d, d, dtype=obs.dtype, device=obs.device)
+        matrix[:, mask] = obs[:, : d * (d - 1)]
+
+        outgoing = matrix[:, mask].view(batch, d, d - 1)
+        incoming = matrix.transpose(1, 2)[:, mask].view(batch, d, d - 1)
+        return torch.stack([outgoing, incoming], dim=-1)
+
+    def _node_features(self, obs: torch.Tensor) -> torch.Tensor:
+        """[batch, d, per_node_features], pooled over neighbours so node order cannot leak."""
+        d = self.d
+        batch = obs.shape[0]
+
+        embedded = self.edge_encoder(self._neighbour_pairs(obs))   # [b, d, d-1, edge_hidden]
+        pooled = torch.cat([embedded.mean(dim=2), embedded.max(dim=2).values], dim=-1)
+
+        budget = obs[:, d * (d - 1)].view(batch, 1, 1).expand(batch, d, 1)
+        parts = [pooled, budget]
+        if self.include_counts:
+            parts.append(obs[:, d * (d - 1) + 1:].view(batch, d, 1))
+        return torch.cat(parts, dim=-1)
+
+    def forward(self, obs: torch.Tensor):
+        single = obs.dim() == 1
+        if single:
+            obs = obs.unsqueeze(0)
+
+        embeddings = self.node_encoder(self._node_features(obs))   # [batch, d, hidden]
+        logits = self.node_score(embeddings).squeeze(-1)           # [batch, d]
+
+        pooled = embeddings.mean(dim=1)                            # [batch, hidden]
+        if self.pass_head is not None:
+            logits = torch.cat([logits, self.pass_head(pooled)], dim=-1)
+        value = self.value_head(pooled).squeeze(-1)
+
+        if single:
+            return logits.squeeze(0), value.squeeze(0)
+        return logits, value
 
 
 def action_to_env(action_index: int, d: int) -> int:
@@ -133,7 +251,20 @@ class PPOAgent:
         # problem size.
         self._max_entropy = float(np.log(self.env.space.n_dags))
         self.obs_dim = self.env.observation_dim[ppo_config.observation]
-        self.net = ActorCritic(self.obs_dim, self.n_actions, ppo_config.hidden)
+        if ppo_config.arch == "pernode":
+            if ppo_config.observation != "edge_marginals":
+                raise ValueError(
+                    "arch='pernode' requires observation='edge_marginals'; the exact "
+                    "posterior has no per-node factorisation to exploit"
+                )
+            self.net = PerNodeActorCritic(
+                self.d, ppo_config.hidden, env_config.include_counts,
+                ppo_config.allow_pass,
+            )
+        elif ppo_config.arch == "flat":
+            self.net = ActorCritic(self.obs_dim, self.n_actions, ppo_config.hidden)
+        else:
+            raise ValueError(f"unknown arch {ppo_config.arch!r}")
         self.optimiser = torch.optim.Adam(self.net.parameters(), lr=ppo_config.lr)
         self.rng = np.random.default_rng(ppo_config.seed)
         self.history: List[dict] = []

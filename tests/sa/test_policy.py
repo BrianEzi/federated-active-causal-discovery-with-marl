@@ -13,7 +13,13 @@ import torch
 
 from sa.env import PASS_ACTION, CausalDiscoveryEnv, EnvConfig
 from sa.graphs import build_graph_space
-from sa.policy import ActorCritic, PPOAgent, PPOConfig, action_to_env
+from sa.policy import (
+    ActorCritic,
+    PerNodeActorCritic,
+    PPOAgent,
+    PPOConfig,
+    action_to_env,
+)
 
 
 @pytest.fixture(scope="module")
@@ -212,3 +218,84 @@ def test_intervention_counts_can_be_added_to_the_observation(space3):
     after = with_counts.observation("edge_marginals")
     assert not np.array_equal(before[-3:], after[-3:]), "counts did not update"
     assert after.min() >= -1e-9 and after.max() <= 1.0 + 1e-9
+
+
+# --- the permutation-equivariant architecture -------------------------------------------
+
+def _flat_from_matrix(matrix, budget, counts=None):
+    """Pack a [d, d] marginal matrix into the flat observation layout."""
+    d = matrix.shape[0]
+    off = ~np.eye(d, dtype=bool)
+    parts = [matrix[off], np.array([budget])]
+    if counts is not None:
+        parts.append(counts)
+    return np.concatenate(parts).astype(np.float32)
+
+
+def test_pernode_rebuilds_the_marginal_matrix_correctly():
+    """Node i's neighbour pairs must be (i->j, j->i) for its own row and column."""
+    d = 4
+    net = PerNodeActorCritic(d, hidden=8, include_counts=False, allow_pass=True)
+    matrix = np.arange(d * d, dtype=np.float32).reshape(d, d)
+    np.fill_diagonal(matrix, 0.0)
+    obs = torch.as_tensor(_flat_from_matrix(matrix, 0.5)).unsqueeze(0)
+
+    pairs = net._neighbour_pairs(obs)[0]
+    assert pairs.shape == (d, d - 1, 2)
+    for i in range(d):
+        others = np.arange(d)[np.arange(d) != i]
+        np.testing.assert_allclose(pairs[i, :, 0].numpy(), matrix[i, others], atol=1e-5)
+        np.testing.assert_allclose(pairs[i, :, 1].numpy(), matrix[others, i], atol=1e-5)
+
+
+def test_pernode_is_permutation_equivariant():
+    """Relabel the nodes and the logits must permute with them.
+
+    This is the property the whole architecture exists for, and it is true of the oracle:
+    node identity carries no information, only structure does. The flat MLP cannot express
+    it, which is why it must learn each node's scorer separately.
+    """
+    d, perm = 4, np.array([2, 0, 3, 1])
+    torch.manual_seed(0)
+    net = PerNodeActorCritic(d, hidden=16, include_counts=False, allow_pass=True)
+    rng = np.random.default_rng(0)
+
+    matrix = rng.random((d, d)).astype(np.float32)
+    np.fill_diagonal(matrix, 0.0)
+    permuted = matrix[np.ix_(perm, perm)]
+
+    with torch.no_grad():
+        base, base_value = net(torch.as_tensor(_flat_from_matrix(matrix, 0.5)))
+        other, other_value = net(torch.as_tensor(_flat_from_matrix(permuted, 0.5)))
+
+    # Node logits permute; the pass logit (last) and the value are invariant.
+    np.testing.assert_allclose(other[:d].numpy(), base[:d].numpy()[perm], atol=1e-5)
+    assert float(other[d]) == pytest.approx(float(base[d]), abs=1e-5)
+    assert float(other_value) == pytest.approx(float(base_value), abs=1e-5)
+
+
+def test_pernode_parameter_count_does_not_grow_with_d():
+    """One shared scorer serves every node, so the same model form carries to d=6."""
+    sizes = [sum(p.numel() for p in
+                 PerNodeActorCritic(d, hidden=32).parameters()) for d in (4, 5, 6)]
+    # Only the input width (2(d-1)+1) changes, so growth is linear and small -- not the
+    # quadratic blow-up of a dense layer over d(d-1) inputs mapping to d outputs.
+    assert sizes[2] - sizes[1] == sizes[1] - sizes[0]
+
+
+def test_pernode_shapes_match_the_flat_network(space3):
+    for allow_pass in (True, False):
+        agent = PPOAgent(EnvConfig(d=3, n_obs=200),
+                         PPOConfig(observation="edge_marginals", arch="pernode",
+                                   allow_pass=allow_pass, seed=0), space=space3)
+        agent.env.reset(seed=0)
+        obs = agent.env.observation("edge_marginals")
+        logits, value = agent.net(torch.as_tensor(obs, dtype=torch.float32))
+        assert logits.shape == (agent.n_actions,)
+        assert value.shape == ()
+
+
+def test_pernode_rejects_the_posterior_observation(space3):
+    with pytest.raises(ValueError, match="edge_marginals"):
+        PPOAgent(EnvConfig(d=3, n_obs=200),
+                 PPOConfig(observation="posterior", arch="pernode", seed=0), space=space3)

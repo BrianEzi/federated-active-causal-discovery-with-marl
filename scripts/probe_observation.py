@@ -42,7 +42,7 @@ from sa.baselines import GreedyOraclePolicy, RandomPolicy
 from sa.env import PASS_ACTION, CausalDiscoveryEnv, EnvConfig
 from sa.graphs import build_graph_space
 from sa.oracle import InterventionOracle
-from sa.policy import ActorCritic
+from sa.policy import ActorCritic, PerNodeActorCritic
 
 
 def collect(env, oracle, n_episodes, kind, rng, explore) -> tuple:
@@ -71,15 +71,21 @@ def collect(env, oracle, n_episodes, kind, rng, explore) -> tuple:
     return np.array(observations, dtype=np.float32), np.array(masks, dtype=np.float32)
 
 
-def train_probe(x, y, d, hidden, epochs, lr, seed) -> dict:
+def train_probe(x, y, d, hidden, epochs, lr, seed, arch="flat",
+                include_counts=False) -> dict:
     """Train the agent's own architecture to predict the oracle's best target."""
     torch.manual_seed(seed)
     n_train = int(len(x) * 0.8)
     xtr, ytr = torch.as_tensor(x[:n_train]), torch.as_tensor(y[:n_train])
     xte, yte = torch.as_tensor(x[n_train:]), torch.as_tensor(y[n_train:])
 
-    # Same trunk and head shape as the policy network, so capacity is not the difference.
-    net = ActorCritic(obs_dim=x.shape[1], n_actions=d, hidden=hidden)
+    # Same network the agent would use, so the probe measures the architecture's ability to
+    # express the mapping rather than some other model's.
+    if arch == "pernode":
+        net = PerNodeActorCritic(d, hidden=hidden, include_counts=include_counts,
+                                 allow_pass=False)
+    else:
+        net = ActorCritic(obs_dim=x.shape[1], n_actions=d, hidden=hidden)
     optimiser = torch.optim.Adam(net.parameters(), lr=lr)
 
     for _ in range(epochs):
@@ -122,6 +128,8 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--explore", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--arch", type=str, default="flat",
+                        choices=["flat", "pernode", "both"])
     parser.add_argument("--out", type=str, default=None)
     args = parser.parse_args()
 
@@ -132,19 +140,26 @@ def main() -> None:
     results = {"d": args.d, "episodes": args.episodes, "conditions": {}}
     print(f"d={args.d}  {space.n_dags} DAGs / {space.n_mecs} classes")
 
+    architectures = ["flat", "pernode"] if args.arch == "both" else [args.arch]
     for kind in ("edge_marginals", "posterior"):
         rng = np.random.default_rng(args.seed)
         x, y = collect(env, oracle, args.episodes, kind, rng, args.explore)
         if len(x) < 100:
             print(f"  {kind}: too few informative steps ({len(x)})")
             continue
-        stats = train_probe(x, y, args.d, args.hidden, args.epochs, args.lr, args.seed)
-        results["conditions"][kind] = stats
-        print(f"  {kind:<16} probe {stats['probe_accuracy']:.3f}  "
-              f"majority {stats['majority_accuracy']:.3f}  "
-              f"chance {stats['chance_accuracy']:.3f}  "
-              f"(n={stats['n_train']}+{stats['n_test']}, "
-              f"mean tied-best {stats['mean_tied_best']:.2f})")
+        for arch in architectures:
+            # The per-node scorer reads a [d, d] marginal matrix out of the observation,
+            # which the exact posterior simply is not.
+            if arch == "pernode" and kind != "edge_marginals":
+                continue
+            stats = train_probe(x, y, args.d, args.hidden, args.epochs, args.lr,
+                                args.seed, arch=arch)
+            results["conditions"][f"{kind}/{arch}"] = stats
+            print(f"  {kind:<16} {arch:<8} probe {stats['probe_accuracy']:.3f}  "
+                  f"majority {stats['majority_accuracy']:.3f}  "
+                  f"chance {stats['chance_accuracy']:.3f}  "
+                  f"(n={stats['n_train']}+{stats['n_test']}, "
+                  f"mean tied-best {stats['mean_tied_best']:.2f})")
 
     if args.out:
         with open(args.out, "w") as f:

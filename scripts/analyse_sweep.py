@@ -39,6 +39,7 @@ FIELDS = [
     "train_episodes", "budget", "n_obs", "n_int", "identify_threshold",
     "prior", "prior_p", "intervene_scale",
     "entropy_coef", "lr", "step_cost", "hidden", "gamma", "episodes_per_update",
+    "arch", "shaping_coef", "include_counts", "no_pass",
     "n_dags", "n_mecs", "singleton_fraction", "git_commit", "torch",
 ]
 
@@ -98,6 +99,10 @@ def load_rows(results_dir: str) -> List[Dict]:
                 "step_cost": args.get("step_cost"), "hidden": args.get("hidden"),
                 "gamma": args.get("gamma"),
                 "episodes_per_update": args.get("episodes_per_update"),
+                "arch": args.get("arch", "flat"),
+                "shaping_coef": args.get("shaping_coef", 0.0),
+                "include_counts": args.get("include_counts", False),
+                "no_pass": args.get("no_pass", False),
                 "n_dags": space.get("n_dags"), "n_mecs": space.get("n_mecs"),
                 "singleton_fraction": space.get("singleton_fraction"),
                 "git_commit": provenance.get("git_commit", "")[:8],

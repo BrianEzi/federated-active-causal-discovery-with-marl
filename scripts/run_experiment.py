@@ -71,6 +71,9 @@ def main() -> None:
     ppo_group.add_argument("--no_pass", action="store_true",
                            help="remove `pass` from the action space (makes the "
                                 "under-acting criterion vacuous -- see sa/policy.py)")
+    ppo_group.add_argument("--arch", type=str, default="flat",
+                           choices=["flat", "pernode"],
+                           help="pernode = permutation-equivariant per-node scorer")
     ppo_group.add_argument("--shaping_coef", type=float, default=0.0,
                            help="potential-based shaping on posterior entropy; "
                                 "policy-invariant (Ng, Harada & Russell 1999)")
@@ -140,6 +143,7 @@ def main() -> None:
                       step_cost=args.step_cost, hidden=args.hidden, gamma=args.gamma,
                       episodes_per_update=args.episodes_per_update,
                       allow_pass=not args.no_pass, shaping_coef=args.shaping_coef,
+                      arch=args.arch,
                       seed=seed),
             space=space,
         )
