@@ -564,12 +564,14 @@ per-run precondition, not as a gate someone remembers to run.</p>
 
 <div class="callout finding">
 <span class="tag">Resolved</span>
-<p>The replication is in, and the result survives the correction &mdash; slightly stronger,
-in fact. At d=5 with 5,000 observational samples, where the gate passes, the winning
-configuration scores <strong>+1.233</strong> on its worst seed against +1.116 in the
-under-powered environment, and 3 of 3 seeds pass. At d=4 it reaches <strong>+1.283</strong>,
-also 3 of 3. The flat control, run in that same valid environment, still fails at
-<strong>&minus;1.858</strong>.</p>
+<p>The replication is in, and the result survives the correction. Every gate-valid
+per-node configuration passes all of its seeds: <strong>+1.283</strong> at d=4 with 5,000
+samples, <strong>+1.233</strong> at d=5 with 5,000, <strong>+1.060</strong> at d=5 with
+20,000 &mdash; each 3 of 3, each above the oracle. The flat control, run in the same valid
+environment, fails 0 of 3 at <strong>&minus;1.858</strong>.</p>
+<p>The margin shrinks as the observational phase lengthens (+1.233 at 5,000, +1.060 at
+20,000), which is what should happen: sharper starting beliefs leave the myopic oracle less
+room to be wrong, so there is less headroom to beat it. The agent still beats it.</p>
 <p>So the headline does not rest on a mis-specified environment. It holds where the
 environment is what it claims to be.</p>
 </div>
