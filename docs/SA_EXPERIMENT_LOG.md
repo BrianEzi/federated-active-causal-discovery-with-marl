@@ -251,3 +251,49 @@ damaging at d=4. Practical consequence: **d=5 should be the primary reporting si
 any d=4 number needs either many more episodes or a wider tolerance band. This is the same
 class of error as the previous project's +/-30pp noise floor, and worth catching before it
 sets a threshold rather than after.
+
+---
+
+## 2026-08-15 — Phase 3: the agent, and two metric bugs it exposed
+
+**[CORRECTED] The primary metric was gameable by failing.** The first smoke agent scored
+gap-closed **2.04** -- apparently twice as good as greedy -- while agreeing with the oracle
+**6%** of the time and solving only 65% of episodes. It solved easy episodes quickly and
+let hard ones hit the budget; the solved-only average then excluded exactly the episodes it
+was bad at.
+
+I had guarded against this via *passing* (`under_acting_rate`), but budget exhaustion
+causes identical censoring and that rate read 0.00. Fixed by charging unsolved episodes at
+the full budget (`episode_costs`), plus a solve-rate hard fail as belt and braces. The same
+agent now scores **-16.2** and correctly fails every check.
+
+**[CORRECTED] The metric's anchors were wrong.** Random must score exactly 0.0 and greedy
+exactly 1.0 by definition. They read **0.233** and **1.067**, because stateful baseline
+policies carried RNG state that advanced between the reference run and the evaluation run
+-- so evaluating the same policy twice gave different answers. Baselines are now
+resettable and `run_episodes` resets them; anchors are exact.
+
+**[CORRECTED] Observation features were on incompatible scales.** The budget feature was a
+raw count sitting at 20.0 while posterior entries averaged 0.04 -- a ~500x mismatch that
+saturated the tanh trunk and drowned out the belief the agent acts on. Normalised to [0,1],
+with a regression test.
+
+**[MEASURED] The greedy-collapse signature reproduced from an entropy bonus alone.** With
+`entropy_coef = 0.01`, training looked healthy (solve rate 1.0, mean length 1.3 against
+greedy's 1.0) but entropy plateaued at **1.09 against a 1.386 maximum**. The policy never
+sharpened, so argmax was arbitrary -- the deterministic policy picked node 2 regardless of
+belief, while the sampled policy performed fine. That is precisely the previous project's
+"trains well, collapses when evaluated greedily" failure, and it arose here purely from an
+exploration bonus that never decayed. Lowered to 0.003; entropy now falls 1.39 -> 1.08 over
+1500 episodes. Worth remembering as a candidate explanation whenever that pattern recurs.
+
+**[MEASURED] d=3 is a poor training testbed.** Random costs 1.31 against greedy's 1.00, so
+the entire learnable advantage is 0.31 interventions and there is almost no gradient signal.
+Consistent with GATE 2 (gap 0.57 at d=3 vs 1.52 at d=5). Do not read much into any d=3
+training number; d=5 remains the primary reporting size.
+
+**[DECIDED] Move experiments to Myriad.** Local runs are single-threaded on CPU and seeds
+are fully independent, so an SGE array job gives near-linear speedup. A separate
+`~/envs/sa_env` was built rather than reusing the shared `marl_env`, since installing extra
+dependencies into that environment previously caused a protobuf/wandb conflict, and `sa/`
+is meant to stay isolated. Worktree at `~/marl_sa`.
