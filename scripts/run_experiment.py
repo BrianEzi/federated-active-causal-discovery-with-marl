@@ -46,6 +46,10 @@ def main() -> None:
                              "saving them if it does not exist")
     parser.add_argument("--refs_only", action="store_true",
                         help="compute and cache the references, then stop (no training)")
+    parser.add_argument("--require_gate1", action="store_true",
+                        help="refuse to train when GATE 1 fails, instead of warning")
+    parser.add_argument("--gate1_episodes", type=int, default=200,
+                        help="episodes for the GATE 1 precondition check; 0 to skip")
 
     # -- environment levers -----------------------------------------------------------
     env_group = parser.add_argument_group("environment")
@@ -91,6 +95,28 @@ def main() -> None:
 
     print(f"d={args.d}  observation={args.observation}  "
           f"{space.n_dags} DAGs / {space.n_mecs} classes")
+
+    gate1 = _check_gate1(env_config, space, args.gate1_episodes)
+    if gate1 is not None:
+        status = "OK" if gate1["passed"] else "FAILS"
+        print(f"  GATE 1 {status}: observational-only rate {gate1['rate']:.4f} "
+              f"CI {gate1['ci'][0]:.4f}-{gate1['ci'][1]:.4f}, "
+              f"target {gate1['target']:.4f}")
+        if not gate1["passed"]:
+            message = (
+                f"GATE 1 FAILS at d={args.d}, n_obs={args.n_obs}: the observational-only "
+                f"identification rate is {gate1['rate']:.4f} (CI {gate1['ci'][0]:.4f}-"
+                f"{gate1['ci'][1]:.4f}) but the singleton fraction of the graph space is "
+                f"{gate1['target']:.4f}. The environment does not match its specification "
+                f"-- the agent starts from a blurrier belief than intended, and absolute "
+                f"difficulty is not comparable across d. Raise n_obs."
+            )
+            if args.require_gate1:
+                raise SystemExit(message)
+            print("")
+            print("  *** WARNING ***")
+            print("  " + message)
+            print("")
 
     # References, computed once and reused by every seed. They are recomputed for every
     # configuration rather than cached across the sweep, because environment levers
@@ -198,6 +224,11 @@ def main() -> None:
             "space": {"d": args.d, "n_dags": space.n_dags, "n_mecs": space.n_mecs,
                       "singleton_fraction": space.singleton_fraction},
             "references": reference_metrics,
+            # Recorded on every run so a result can never be read without its validity
+            # check alongside. This gate was pinned once at d=3 and silently stopped
+            # holding at d>=5, which invalidated a night of environments before anyone
+            # noticed.
+            "gate1": gate1,
             "per_seed": per_seed,
             "training_history": histories,
             "summary": summary,
@@ -205,6 +236,32 @@ def main() -> None:
         with open(args.out, "w") as f:
             json.dump(payload, f, indent=2, default=float)
         print(f"  written to {args.out}")
+
+
+def _check_gate1(env_config, space, n_episodes: int):
+    """Does the environment satisfy GATE 1 -- is intervening actually necessary?
+
+    The fraction of DAGs alone in their Markov equivalence class is exactly the fraction of
+    problems solvable without intervening, and it is computable from the graph space. If
+    the measured no-intervention rate sits above it, information is leaking; if below, there
+    is not enough observational data to identify even the identifiable graphs.
+
+    Run per training run rather than once per project, because the default n_obs=1000
+    passed this at d=3 and d=4 and then silently failed at d=5 and d=6 -- the check had
+    been performed once and assumed thereafter.
+    """
+    if n_episodes <= 0:
+        return None
+    from sa.baselines import no_intervention_policy
+    from sa.gates import bootstrap_ci, run_policy
+
+    outcome = run_policy(env_config, no_intervention_policy, n_episodes, seed=7,
+                         space=space)
+    rate = float(np.mean(outcome["identified"]))
+    low, high = bootstrap_ci(outcome["identified"], seed=7)
+    target = space.singleton_fraction
+    return {"rate": rate, "ci": [low, high], "target": target,
+            "passed": bool(low <= target <= high), "n_episodes": n_episodes}
 
 
 def _ref_fingerprint(env_config, eval_episodes: int) -> str:
