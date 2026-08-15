@@ -180,7 +180,11 @@ class CausalDiscoveryEnv:
                 "true_index": self.true_index,
                 "true_mass": float(self.posterior[self.true_index]),
                 "mec_size": int(len(self.space.mec_members(self.true_index))),
-                "is_singleton": bool(self.space.is_singleton[self.true_index]),
+                # Indexed directly rather than via `space.is_singleton`, which is a
+                # property that materialises an [N] bool array -- 3.8 million entries at
+                # d=6 -- on every access, to read a single element once per step.
+                "is_singleton": bool(
+                    self.space.mec_sizes[self.space.mec_id[self.true_index]] == 1),
                 "passed": passed,
                 "budget_left": self.config.budget - self.n_interventions,
             },
@@ -212,7 +216,7 @@ class CausalDiscoveryEnv:
         if kind == "posterior":
             return np.concatenate([self.posterior] + extra)
         if kind == "edge_marginals":
-            marg = edge_marginals(self.space, self.posterior)
+            marg = self.engine.edge_marginals(self.posterior)
             off_diagonal = ~np.eye(self.config.d, dtype=bool)
             return np.concatenate([marg[off_diagonal]] + extra)
         raise ValueError(f"unknown observation kind {kind!r}")

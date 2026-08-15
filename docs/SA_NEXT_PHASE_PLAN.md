@@ -138,10 +138,29 @@ E1, E2 and E4 are independent and run concurrently. E3 waits on Phase 1.
 
 ## Known risks
 
-- **E4 may be too slow.** If the timing probe puts it beyond ~20h/seed, reduce to 2 seeds or
-  drop to a gate-passing n_obs between 5000 and 20000 (needs its own GATE 1 check first) and
-  record the change here.
 - **WandB may still misbehave under 34 concurrent offline writers.** Non-fatal by
   construction; if it causes trouble, disable and proceed — the JSON files are the record.
-- **E1/E2 at n_obs=5000 are slower than the overnight runs** (more samples to score per
-  posterior update). Expect roughly 2x, so ~1.5–2h per configuration.
+- **E4 timing is an extrapolation.** Now projected at ~2.7h/seed (see below), well inside
+  the 10h walltime. The timing probe stays anyway: this extrapolates laptop CPU to Myriad,
+  and the last two d=6 runtime predictions were both wrong.
+
+## Superseded risk — hot path optimised 2026-08-15
+
+Two risks listed above originally have been measured away. Full detail in
+`docs/SA_EXPERIMENT_LOG.md`; the short version:
+
+- **"E1/E2 will be ~2x slower at n_obs=5000" was wrong, and backwards.** The sample-count
+  dependence was an implementation artefact: BGe needs only (n, means, centred scatter),
+  and subset statistics are submatrices of the full ones, but the old code re-read all n
+  rows once per (node, parent-set) pair — 160 passes per posterior at d=5. Hoisted to one
+  pass per node, d=5 is now flat in n_obs (49.0 / 48.0 / 49.3 ms at 1000 / 5000 / 20000).
+  E1/E2 at n_obs=5000 run at 42.1 ms/step, *faster* than the overnight runs they extend
+  (d=5, n_obs=1000, 57.6 ms/step).
+- **"E4 may be too slow" was diagnosed to the wrong cause.** d=6's cost was never sample
+  count; it was two n-independent reductions over 3.78M enumerated DAGs (gather 384 ms,
+  edge marginals 517 ms, against a 90 ms score table). Both replaced with exact
+  equivalents. d=6 at n_obs=20000: 1850.6 → 845.7 ms/step, i.e. ~2.7h/seed at **20x** the
+  sample count of the run that cost 4.7h.
+
+All four changes are exact restatements, pinned by `tests/test_optimisations.py` (23 tests)
+against the implementations they replaced. Full suite: 268 passed.

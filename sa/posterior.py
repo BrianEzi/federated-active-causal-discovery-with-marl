@@ -83,25 +83,91 @@ class PosteriorEngine:
 
         self.n_parent_sets = max(len(s) for s in self.parent_sets)
 
+        # Index into the FLATTENED score table. The obvious `table[rows, parent_set_ids]`
+        # broadcasts a [1, d] row index against [N, d] and casts the int32 ids to intp on
+        # every call; precomputing the flat intp index halves the gather (384 -> 193 ms at
+        # d=6, bit-identical). Costs 2x8 bytes per DAG-node, ~180 MB at d=6, against a
+        # 12 GB request.
+        self._flat_ids = np.ascontiguousarray(
+            self.parent_set_ids.astype(np.intp)
+            + (np.arange(d) * self.n_parent_sets)[None, :].astype(np.intp)
+        )
+
+        # [d, n_parent_sets, d] indicator: does parent set `i` of `node` contain `parent`?
+        # Used to turn edge marginals into d small bincounts -- see `edge_marginals`.
+        self._parent_membership = np.zeros((d, self.n_parent_sets, d), dtype=np.float64)
+        for node in range(d):
+            for i, parents in enumerate(self.parent_sets[node]):
+                for parent in parents:
+                    self._parent_membership[node, i, parent] = 1.0
+
     def local_score_table(self, samples: np.ndarray, intervened: np.ndarray) -> np.ndarray:
         """[d, n_parent_sets] local scores, computed once per node/parent-set pair.
 
         `intervened[i, j]` is truthy when node j was set by intervention in sample i.
         """
         d = self.space.d
+        samples = np.asarray(samples)
+        intervened = np.asarray(intervened)
         table = np.zeros((d, self.n_parent_sets))
+        # Scorers may expose sufficient statistics, in which case the n rows are read once
+        # per node rather than once per (node, parent set) -- 2^(d-1) times fewer passes.
+        # Scorers that do not (BIC, KnownVariance) take the original path unchanged.
+        use_stats = hasattr(self.score, "sufficient_stats") and hasattr(
+            self.score, "local_score_from_stats")
         for node in range(d):
-            usable = np.asarray(intervened)[:, node] < 0.5
-            subset = np.asarray(samples)[usable]
-            for i, parents in enumerate(self.parent_sets[node]):
-                table[node, i] = self.score.local_score(node, parents, subset)
+            usable = intervened[:, node] < 0.5
+            # Skip the copy entirely when nothing was intervened on this node, which is
+            # every node at reset and most nodes for most of an episode.
+            subset = samples if usable.all() else samples[usable]
+            if use_stats:
+                stats = self.score.sufficient_stats(subset)
+                for i, parents in enumerate(self.parent_sets[node]):
+                    table[node, i] = self.score.local_score_from_stats(node, parents, stats)
+            else:
+                for i, parents in enumerate(self.parent_sets[node]):
+                    table[node, i] = self.score.local_score(node, parents, subset)
         return table
 
     def log_scores(self, samples: np.ndarray, intervened: np.ndarray) -> np.ndarray:
         """[N] unnormalised log posterior for every DAG."""
         table = self.local_score_table(samples, intervened)
-        rows = np.arange(self.space.d)[None, :]
-        return table[rows, self.parent_set_ids].sum(axis=1)
+        return table.ravel()[self._flat_ids].sum(axis=1)
+
+    def edge_marginals(self, posterior: np.ndarray) -> np.ndarray:
+        """[d, d] probability that each directed edge is present.
+
+        Same quantity as the module-level `edge_marginals`, computed without ever
+        materialising the DAG array as float64. Edge i->j exists exactly when i is in j's
+        parent set, so the mass on each of node j's 2^(d-1) parent sets -- one bincount --
+        determines the whole j-th column. That is d bincounts over N, rather than a
+        weighted sum over N x d x d floats: 517 -> 245 ms at d=6, agreeing to 2.5e-15.
+        """
+        d = self.space.d
+        posterior = np.asarray(posterior, dtype=np.float64)
+        out = np.zeros((d, d), dtype=np.float64)
+        for node in range(d):
+            mass = np.bincount(self.parent_set_ids[:, node], weights=posterior,
+                               minlength=self.n_parent_sets)
+            out[:, node] = self._parent_membership[node].T @ mass
+        return out
+
+    def _log_prior(self, prior: np.ndarray) -> np.ndarray:
+        """log of the prior, memoised on the identity of the array passed in.
+
+        The environment holds one fixed prior for its whole lifetime and hands the very
+        same array to every call, so this turns a 3.8-million-element log (plus a clamp,
+        plus two temporaries) per step into one at reset. Keyed on identity deliberately:
+        priors are built once in `sa/priors.py` and never mutated in place. If that ever
+        changes, rebind the array rather than editing it -- an in-place edit would be
+        silently ignored here.
+        """
+        cached = getattr(self, "_log_prior_cache", None)
+        if cached is not None and cached[0] is prior:
+            return cached[1]
+        value = np.log(np.maximum(np.asarray(prior, dtype=float), 1e-300))
+        self._log_prior_cache = (prior, value)
+        return value
 
     def posterior(self, samples: np.ndarray, intervened: np.ndarray,
                   prior: Optional[np.ndarray] = None) -> np.ndarray:
@@ -119,7 +185,7 @@ class PosteriorEngine:
             prior = np.full(self.space.n_dags, 1.0 / self.space.n_dags)
         if np.asarray(samples).shape[0] == 0:
             return np.asarray(prior, dtype=float).copy()
-        log_p = self.log_scores(samples, intervened) + np.log(np.maximum(prior, 1e-300))
+        log_p = self.log_scores(samples, intervened) + self._log_prior(prior)
         log_p = log_p - log_p.max()
         p = np.exp(log_p)
         return p / p.sum()

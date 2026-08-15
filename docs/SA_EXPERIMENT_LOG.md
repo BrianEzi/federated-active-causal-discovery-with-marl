@@ -721,3 +721,70 @@ aggregate in `results/all_runs.csv` is the number that means anything.
 
 **[NOTE] The d=6 result files carry `gate1: None`** because they predate the precondition.
 Their GATE 1 failure is known from the separate audit, not from the runs themselves.
+
+## 2026-08-15 — Hot-path optimisation before the next phase
+
+[MEASURED] Profiled the environment step before committing compute to Phase 2. The cost
+structure was not what the plan assumed. Milliseconds per `step` + `edge_marginals`
+observation, laptop CPU:
+
+| config | before | after | speedup |
+|---|---|---|---|
+| d=4, n_obs=1000  |   22.2 |  16.9 | 1.31x |
+| d=4, n_obs=5000  |   29.4 |  17.7 | 1.66x |
+| d=4, n_obs=20000 |   57.3 |  27.9 | 2.05x |
+| d=5, n_obs=1000  |   57.6 |  38.3 | 1.50x |
+| d=5, n_obs=5000  |   72.5 |  42.1 | 1.72x |
+| d=5, n_obs=20000 |  137.2 |  51.2 | 2.68x |
+| d=6, n_obs=1000  | 1470.5 | 791.7 | 1.86x |
+| d=6, n_obs=20000 | 1850.6 | 845.7 | 2.19x |
+
+[CORRECTED] The plan's "known risk" that E1/E2 would run ~2x slower at n_obs=5000 was
+wrong, in two ways.
+
+1. The n_obs dependence was an implementation artefact, not intrinsic. `BGeScore` depends
+   on the data only through (n, column means, centred scatter), and the statistics for a
+   subset of columns are submatrices of the full-column ones. The old code nevertheless
+   re-sliced and re-centred all n rows once per (node, parent set) pair -- 160 passes over
+   the data per posterior at d=5. Hoisting that to one pass per node makes the score table
+   nearly n-independent. Measured at d=5: 49.0 / 48.0 / 49.3 ms at n_obs 1000 / 5000 /
+   20000 -- flat.
+2. Consequently E1/E2 at n_obs=5000 (42.1 ms/step) are now *faster* than the overnight
+   runs they extend, which were d=5 n_obs=1000 at 57.6 ms/step. The risk is not merely
+   absent, it is reversed.
+
+[MEASURED] At d=6 the bottleneck was never sample count at all: it was two n-independent
+reductions over the 3.78 million enumerated DAGs. Original split at n_obs=1000 --
+score table 90 ms, score gather 384 ms, edge marginals 517 ms. This is what made d=6 cost
+4.7 h/seed, and it explains why the earlier runtime extrapolation from smaller d missed.
+
+Four changes, each an exact restatement rather than an approximation:
+
+- **Sufficient statistics** (`sa/score.py`): `BGeScore.sufficient_stats` /
+  `local_score_from_stats`. Scorers without them (BIC, KnownVariance) take the old path.
+- **Flat gather index** (`sa/posterior.py`): the old `table[rows, parent_set_ids]`
+  broadcast a [1, d] index against [N, d] and cast int32 to intp on every call.
+  Precomputing the flat intp index is bit-identical: 384 -> 193 ms at d=6, ~180 MB against
+  a 12 GB request.
+- **Edge marginals by bincount** (`sa/posterior.py`): edge i->j exists exactly when i is
+  in j's parent set, so d bincounts over the parent-set ids replace a weighted sum over
+  N x d x d floats (which upcast the int8 DAG array to float64 in chunks). 517 -> 245 ms,
+  agreeing to 2.5e-15.
+- **Two accidental O(N)-per-step costs**: `space.is_singleton` is a property that
+  materialised a 3.8M-element bool array to read one element each step; and the posterior
+  re-took the log of a prior that never changes. Both hoisted.
+
+[DECIDED] Stopped here. The remaining d=6 cost is Python-level overhead across ~750 small
+slogdet calls per step; removing it needs a batched rewrite of the score table, which is a
+real correctness risk for one arm (E4, 3 seeds). Not worth it.
+
+[MEASURED] Consequences for the plan. E4 (d=6, n_obs=20000, the arm flagged as possibly
+unaffordable) is now ~845.7/1470.5 x 4.7 h = **~2.7 h/seed**, comfortably inside the 10 h
+walltime -- and that is at 20x the sample count of the run that took 4.7 h. The timing
+probe stays in the plan, because this is an extrapolation from laptop CPU to Myriad and
+the last two d=6 runtime predictions were both wrong.
+
+[MEASURED] Verification: `tests/test_optimisations.py`, 23 tests, pins every fast path
+against the slow one it replaced -- including the pre-optimisation BGe marginal inlined
+verbatim as a reference, so the comparison cannot drift into the new code checking itself.
+Full suite 268 passed (and got faster: 277 s -> 182 s).

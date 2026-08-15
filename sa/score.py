@@ -39,10 +39,33 @@ different sample subsets, equivalence classes separate, which is the entire poin
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Sequence, Tuple
 
 import numpy as np
 from scipy.special import gammaln
+
+
+@dataclass(frozen=True)
+class GaussianStats:
+    """Sufficient statistics for the BGe marginal likelihood.
+
+    BGe depends on the data ONLY through the sample count, the column means and the
+    centred scatter matrix -- everything else in `_log_marginal` is a function of those
+    three. Crucially the statistics for a *subset* of columns are plain submatrices of
+    the full-column versions (a column's mean does not depend on which other columns are
+    selected, and scatter[a, b] = sum_i c_ia c_ib regardless of the subset). So the whole
+    table of local scores can be built from one O(n d^2) pass instead of re-reading all n
+    rows once per (node, parent-set) pair -- of which there are d * 2^(d-1), i.e. 160
+    re-reads at d=5.
+
+    This is an exact restatement, not an approximation: the only difference from the
+    naive path is BLAS summation order, which shows up at ~1e-12 relative.
+    """
+
+    n: int
+    mean: np.ndarray     # [d]
+    scatter: np.ndarray  # [d, d], centred
 
 
 def _log_multivariate_gamma(a: float, p: int) -> float:
@@ -73,6 +96,16 @@ class BGeScore:
         t = self.alpha_mu * (self.alpha_w - d - 1) / (self.alpha_mu + 1)
         self.T = t * np.eye(d)
 
+    def sufficient_stats(self, samples: np.ndarray) -> GaussianStats:
+        """One O(n d^2) pass producing everything `local_score_from_stats` needs."""
+        x = np.asarray(samples, dtype=float)
+        n = x.shape[0]
+        if n == 0:
+            return GaussianStats(0, np.zeros(self.d), np.zeros((self.d, self.d)))
+        mean = x.mean(axis=0)
+        centered = x - mean
+        return GaussianStats(n, mean, centered.T @ centered)
+
     def _log_marginal(self, samples: np.ndarray, subset: Sequence[int]) -> float:
         """log p(data restricted to `subset`) under the joint Normal-Wishart model.
 
@@ -80,18 +113,19 @@ class BGeScore:
         the node added to its parent set), which is the standard way BGe is assembled
         and is what makes it decompose.
         """
+        return self._log_marginal_stats(self.sufficient_stats(samples), subset)
+
+    def _log_marginal_stats(self, stats: GaussianStats, subset: Sequence[int]) -> float:
         p = len(subset)
         if p == 0:
             return 0.0
-        n = samples.shape[0]
+        n = stats.n
         if n == 0:
             return 0.0
 
         idx = np.asarray(subset, dtype=int)
-        x = samples[:, idx]
-        mean = x.mean(axis=0)
-        centered = x - mean
-        scatter = centered.T @ centered
+        mean = stats.mean[idx]
+        scatter = stats.scatter[np.ix_(idx, idx)]
 
         # Prior mean is zero, so the mean-shift correction uses `mean` directly.
         shrink = n * self.alpha_mu / (n + self.alpha_mu)
@@ -115,9 +149,20 @@ class BGeScore:
     def local_score(self, node: int, parents: Sequence[int], samples: np.ndarray) -> float:
         """log p(node's data | parents' data). `samples` must already exclude rows where
         `node` was itself intervened on."""
+        return self.local_score_from_stats(node, parents, self.sufficient_stats(samples))
+
+    def local_score_from_stats(self, node: int, parents: Sequence[int],
+                               stats: GaussianStats) -> float:
+        """As `local_score`, but reusing statistics computed once for the whole table.
+
+        `stats` must have been built from the same already-filtered sample subset that
+        `local_score` would have received -- i.e. rows where `node` was intervened on are
+        the caller's responsibility to remove, exactly as before.
+        """
         parents = sorted(int(p) for p in parents)
         with_node = sorted(parents + [int(node)])
-        return self._log_marginal(samples, with_node) - self._log_marginal(samples, parents)
+        return (self._log_marginal_stats(stats, with_node)
+                - self._log_marginal_stats(stats, parents))
 
 
 class BICScore:
