@@ -612,3 +612,48 @@ same failure shape that cost this project its previous round: a check performed 
 one setting, and thereafter assumed. The check is cheap — 200 no-intervention episodes — and
 the target is free to compute. It belongs in `run_experiment.py` as a guard that refuses to
 train when the environment does not match its specification.
+
+### Stage 6 — the result survives the GATE 1 correction
+
+**[MEASURED] Re-run where the gate passes, the headline holds and tightens.**
+
+| configuration | d | n_obs | GATE 1 | seeds | min gap |
+|---|---|---|---|---|---|
+| `s6_d4_nobs5000` | 4 | 5000 | passes | 3/3 | **+1.283** |
+| `s6_d5_nobs5000` | 5 | 5000 | passes | 3/3 | **+1.233** |
+| `s5_pernode_best_counts` | 5 | 1000 | **fails** | 5/5 | +1.116 |
+| `s6_d5_nobs5000_flat` | 5 | 5000 | passes | 0/2 | −1.858 |
+
+The winning configuration scores **+1.233** on its worst seed in the specification-compliant
+environment, against +1.116 in the under-powered one — better, not worse. The flat control
+run in that same valid environment still fails at −1.858, so the architecture comparison
+also survives.
+
+This matters more than the small numerical improvement: the headline no longer rests on an
+environment that did not match its own specification. It was worth the extra hour rather
+than shipping the result with a footnote.
+
+**[MEASURED] More observational data helps the agent substantially at d=4 too.** At
+n_obs=1000 the d=4 per-node arm scored min +0.239 with 1/5 seeds passing; at n_obs=5000 it
+scores min +1.283 with 3/3. Sharper starting beliefs make the which-node decision easier to
+learn, not just the environment more correct.
+
+### Where this leaves the single-agent case
+
+The scaling ladder's first rung is done: **the agent beats the myopic information-gain
+oracle at d=4 and d=5, on every seed, in a gate-valid environment.** That is criterion S2
+from docs/SA_PLAN.md, recorded in advance as "the result".
+
+The recipe is three things together, none sufficient alone:
+1. a permutation-equivariant per-node scorer (worth ~2.7 gap-closed against its control),
+2. tuned optimiser settings (lr 1e-3, hidden 256, episodes_per_update 16),
+3. intervention counts in the observation — which buys *stability*, not capability.
+
+Open items for the next session, in priority order:
+- **Make GATE 1 a per-run precondition** in `run_experiment.py`. This is the highest-value
+  change: the same "checked once, then assumed" failure has now cost this project twice.
+- **d=6 is unresolved.** Its runs used n_obs=1000, where the gate misses widest; a valid
+  d=6 needs n_obs=20000, and training cost there is ~7h/seed.
+- Re-run the d=5 lever sweep at n_obs=5000 — every stage-1 conclusion was measured in the
+  under-powered environment and may not transfer.
+- Only then move to two agents.

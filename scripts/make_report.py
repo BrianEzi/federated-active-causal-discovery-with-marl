@@ -117,6 +117,8 @@ def build(results_dir: str) -> str:
         ("s5_pernode_best", "per-node, no memory"),
         ("s5_pernode_best_counts", "per-node + memory"),
         ("s5_pernode_best_counts_shape", "+ shaping"),
+        ("s6_d5_nobs5000_flat", "flat, GATE 1 valid"),
+        ("s6_d5_nobs5000", "per-node, GATE 1 valid"),
     ]
     arc_groups = [(label, gaps(grouped[tag])) for tag, label in arc if tag in grouped]
 
@@ -558,6 +560,18 @@ gate-passing sample sizes is running.</p>
 <p>This is the same failure shape that cost this project its previous round — a check
 performed once, under one setting, then assumed. It belongs in the training script as a
 per-run precondition, not as a gate someone remembers to run.</p>
+</div>
+
+<div class="callout finding">
+<span class="tag">Resolved</span>
+<p>The replication is in, and the result survives the correction &mdash; slightly stronger,
+in fact. At d=5 with 5,000 observational samples, where the gate passes, the winning
+configuration scores <strong>+1.233</strong> on its worst seed against +1.116 in the
+under-powered environment, and 3 of 3 seeds pass. At d=4 it reaches <strong>+1.283</strong>,
+also 3 of 3. The flat control, run in that same valid environment, still fails at
+<strong>&minus;1.858</strong>.</p>
+<p>So the headline does not rest on a mis-specified environment. It holds where the
+environment is what it claims to be.</p>
 </div>
 
 <div class="stage"><span class="stage-num">CAVEATS</span><h2>What this does not show</h2></div>
