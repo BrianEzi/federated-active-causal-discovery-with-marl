@@ -96,6 +96,22 @@ def main() -> None:
         print(f"  d={row['d']} episodes={row['episodes']:>5}  "
               f"lift {row['lift']:+.3f}  {marker}")
 
+    # Refuse to decide on a partial grid. The rule requires depth to win on BOTH d, so a
+    # missing cell can only ever turn a "does not fire" into a "fires" -- which means a
+    # verdict read early is systematically biased towards keeping depth 1. Observed live:
+    # with d=5's two largest data sizes still queued, the script reported "RULE DOES NOT
+    # FIRE" while d=4 was clearing the threshold at exactly those sizes.
+    missing_cells = [(d, size) for d in ds for size in sizes
+                     if not table.get((d, size, 1))]
+    if missing_cells:
+        print("\n=== NO DECISION: grid incomplete ===")
+        print(f"  {len(missing_cells)} of {len(ds) * len(sizes)} cells have no results: "
+              f"{missing_cells}")
+        print("  A missing cell can only turn 'does not fire' into 'fires', so reading a "
+              "verdict now is biased towards keeping depth 1. Re-run when the grid is "
+              "complete.")
+        return
+
     # The rule: depth must win at matched data size on BOTH d values.
     per_d = {d: any(beats[d]) for d in ds}
     fires = all(per_d.values()) and len(ds) > 1

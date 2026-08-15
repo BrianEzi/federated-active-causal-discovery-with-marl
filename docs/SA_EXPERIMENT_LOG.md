@@ -901,3 +901,41 @@ E4's full run is deliberately NOT submitted yet. The projection from the hot-pat
 has been mis-predicted twice already. The probe measures it on a real node first.
 
 [MEASURED] Test suite 335 passed (158 at the start of this phase).
+
+## 2026-08-15 — Depth probe, partial (18 of 24 cells)
+
+[MEASURED] Mean probe accuracy over 3 seeds, per cell. d=5 at 3000 and 9000 episodes were
+still running when this was read.
+
+| d | episodes | L1 | L2 | L3 | flat |
+|---|---|---|---|---|---|
+| 4 |  300 | 0.783 | 0.769 | 0.724 | 0.452 |
+| 4 | 1000 | 0.852 | 0.895 | 0.901 | 0.590 |
+| 4 | 3000 | 0.872 | 0.917 | 0.919 | 0.740 |
+| 4 | 9000 | 0.880 | 0.941 | 0.944 | 0.782 |
+| 5 |  300 | 0.748 | 0.725 | 0.708 | 0.363 |
+| 5 | 1000 | 0.782 | 0.801 | 0.798 | 0.385 |
+
+[CORRECTED] The hypothesis that the ~0.89 ceiling is *not* about multi-hop reachability is
+looking wrong at d=4. Depth 3 reaches 0.944 against depth 1's 0.880 at 9000 episodes, and
+clears the +0.03 threshold at three of four data sizes. Multi-hop aggregation does lift the
+ceiling there.
+
+The pattern is data-dependent in a way worth stating: at 300 episodes depth *hurts* at both
+d (-0.014, -0.022), which is what an under-determined larger model should do. Depth only
+pays once there is enough data to fit it.
+
+[CORRECTED] My local pilot -- d=4, 800 episodes, one seed, 40 epochs -- reported 0.802 /
+0.788 / 0.799 and I logged it as "no signal for depth". The grid at 1000 episodes with 3
+seeds and 60 epochs gives 0.852 / 0.895 / 0.901, a +0.050 lift. The pilot was undertrained
+on both axes and its reading did not survive. Recorded because I explicitly logged that
+pilot as the prior the grid would confirm or overturn; it overturned it.
+
+[CORRECTED] `analyse_depth.py` printed "RULE DOES NOT FIRE" from this partial grid. That
+was a flaw in the script, not a result. The rule needs depth to win on BOTH d, so a missing
+cell can only ever convert "does not fire" into "fires" -- reading a verdict early is
+therefore systematically biased towards keeping depth 1. And the missing cells were exactly
+d=5 at 3000 and 9000, which at d=4 are where the effect is largest. The script now refuses
+to decide on an incomplete grid.
+
+[DECIDED] No decision on depth until all 24 cells are in. E3 stays unsubmitted.
