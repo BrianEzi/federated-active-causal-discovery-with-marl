@@ -545,10 +545,12 @@ paid again by every job; in blocks it takes 37 seconds.</p>
 
 <p>The per-node architecture carries over unchanged, which is the point of it: its
 parameter count does not grow with d, so d=6 continues the same experiment rather than
-starting a new one. On its first completed seed it scores <strong>+1.145</strong> &mdash;
-beating the myopic oracle again &mdash; at a cost of 2.57 interventions against greedy's
-2.77, and agreeing with the oracle on 42.6% of informative steps, against 2&ndash;10% for
-every configuration that failed.</p>
+starting a new one. On its two completed seeds it scores <strong>+1.098</strong> and
+<strong>+1.145</strong> &mdash; beating the myopic oracle again &mdash; at a cost of 2.57
+interventions against greedy's 2.77. It agrees with the oracle on 43&ndash;49% of
+informative steps, against 2&ndash;10% for every configuration that failed: the policy has
+gone from anti-correlated with the oracle to genuinely tracking it, across three million
+candidate graphs.</p>
 
 <p><strong>This number is not gate-valid</strong>, and should be read as encouraging rather
 than established. See the section below.</p>
@@ -616,8 +618,8 @@ gate misses by the widest margin (0.025 measured against a 0.081 target), so it 
 an environment further from specification than anything else here. It is reported because
 one caveated data point beats none, not because it carries the same weight. A valid d=6
 needs n_obs=20,000, at roughly seven hours per seed.</li>
-<li><strong>d=6 has one seed, not three.</strong> The other two were still running against
-their walltime when this was written.</li>
+<li><strong>d=6 has two seeds, not three.</strong> The third was still running when this
+was written. Each seed costs about 4.8 hours at this size.</li>
 <li><strong>The oracle is myopic.</strong> It is the best single next experiment, not the
 best sequence, which is precisely why beating it is possible.</li>
 </ul>
