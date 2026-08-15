@@ -1284,3 +1284,44 @@ project has been burned by. Instead:
 the site policy, with tasks 36-66 sitting in `hqw`. At ~1.5 h per task that puts completion
 around 20+ hours out. Unattended, so this costs waiting rather than effort, but it means
 the full E1xE2 comparison is a tomorrow result, not a tonight one.
+
+## 2026-08-15 — MH scaling: it was chain length, and the oracle problem is closed
+
+[MEASURED] Oracle regret against the exact oracle, by chain length and d. The floor is the
+IDEAL sampler (draws taken from the enumerated posterior at 1000 samples): 0.0010 / 0.0009
+/ 0.0009 at d=4/5/6. MH cannot beat that floor, only approach it.
+
+| d | draws | agreement | regret | vs ideal | max regret | ms/step |
+|---|---|---|---|---|---|---|
+| 4 | 1000 | 90.3% | 0.0055 | 5.5x | 0.137 | 322 |
+| 4 | 4000 | 93.5% | 0.0011 | 1.1x | 0.034 | 1207 |
+| 4 | 16000 | 96.8% | 0.0000 | 0.0x | 0.000 | 2426 |
+| 5 | 1000 | 90.4% | 0.0036 | 4.0x | 0.108 | 246 |
+| 5 | 4000 | 98.1% | 0.0005 | 0.5x | 0.024 | 1008 |
+| 5 | 16000 | 100.0% | 0.0000 | 0.0x | 0.000 | 2628 |
+| 6 | 1000 | 79.7% | 0.0528 | 58.6x | 0.721 | 382 |
+| 6 | 4000 | 89.9% | 0.0080 | 8.9x | 0.486 | 1254 |
+| 6 | 16000 | 95.7% | 0.0023 | 2.5x | 0.137 | 2265 |
+
+[CORRECTED] The earlier conclusion that MH "is not good enough at d=6" was a chain-length
+artefact, exactly as the direct total-variation check suggested. At 16000 draws d=6 reaches
+2.5x the Monte Carlo floor and 95.7% agreement; d=4 and d=5 reach the floor exactly, with
+d=5 agreeing with the exact oracle on every informative step. Nothing was wrong with the
+move set. The Gibbs detour was unnecessary as well as buggy.
+
+[MEASURED] Chain length required to approach the floor grows with d: ~4000 draws at d=4 and
+d=5, ~16000 at d=6. If that 4x-per-node trend continues it implies ~64000 at d=7 and
+~256000 at d=8, which at ~2.3 s per 16000 draws would be seconds to tens of seconds per
+call.
+
+[DECIDED] That cost is affordable, because of WHERE the oracle is used. It is not used in
+training at all -- the agent observes edge marginals, which subset DP supplies exactly and
+cheaply. The oracle is needed only to (a) build the greedy reference policy and (b) score
+actions during evaluation. Those run on ~300 evaluation episodes per configuration, not on
+6000 training episodes, so the expensive path is exercised roughly 20x less often than the
+cheap one. Training scales on subset DP; evaluation pays for the oracle and can afford to.
+
+[DECIDED] The oracle/reachability blocker is closed. Scaling d past 6 now rests on:
+belief representation -- solved exactly by subset DP; oracle -- solved by MH sampling with
+a d-dependent chain length, verified against ground truth at d=4/5/6; score table -- the
+remaining bottleneck, unaddressed, with batching and Cholesky updates as the candidates.
