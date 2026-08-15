@@ -236,19 +236,25 @@ def build(results_dir: str) -> str:
     best_tag = max(grouped, key=lambda t: min(gaps(grouped[t])) if gaps(grouped[t]) else -99)
     best_min = min(gaps(grouped[best_tag]))
     # Counted, not asserted: how many flat-architecture configurations had any passing seed.
-    n_flat_failed = sum(1 for g in grouped.values()
+    n_flat_total = sum(1 for g in grouped.values() if g[0]["arch"] == "flat")
+    n_flat_passed = sum(1 for g in grouped.values()
                         if g[0]["arch"] == "flat" and any(r["passed"] for r in g))
+    assert n_flat_passed == 0, (
+        f"{n_flat_passed} flat configurations passed -- the write-up's central claim is "
+        f"that none did, so this must be checked rather than asserted in prose"
+    )
 
     stats_block = "".join([
         stat(total_runs, "runs", f"{total_configs} configurations"),
         stat(f"{best_min:+.2f}", "best worst-seed gap", "1.00 = greedy oracle", tone="ok"),
         stat(len(passing), "configs with a passing seed", "all use the per-node scorer",
              tone="ok"),
-        stat(n_flat_failed, "flat-network configs passed", "stages 1-4", tone="bad"),
+        stat(f"0 / {n_flat_total}", "flat-network configs passed", "every lever, stages 1-4",
+             tone="bad"),
     ])
 
     return PAGE.format(
-        stats=stats_block,
+        stats=stats_block, n_flat=n_flat_total,
         arc_chart=arc_chart, entropy_chart=entropy_chart, probe_chart=probe_chart,
         entropy_curve=entropy_curve, length_curve=length_curve,
         probe_table=table(["size", "observation · architecture", "episodes",
@@ -379,9 +385,9 @@ footer {{ margin-top:72px; padding-top:24px; border-top:1px solid var(--rule);
 <header class="hero">
   <p class="eyebrow">Single-agent active causal discovery · overnight run · 15 Aug 2026</p>
   <h1>Why the agent wouldn't learn</h1>
-  <p class="standfirst">Fifty-four configurations failed before a supervised probe showed
-  the problem was never the reward, the exploration, or the observation. It was that the
-  network could not express the question.</p>
+  <p class="standfirst">{n_flat} configurations of the original network failed before a
+  supervised probe showed the problem was never the reward, the exploration, or the
+  observation. It was that the network could not express the question.</p>
 </header>
 
 <div class="stats">
