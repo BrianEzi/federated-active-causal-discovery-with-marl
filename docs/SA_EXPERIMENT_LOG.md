@@ -516,3 +516,62 @@ rather than starting a separate one. The reference cache fingerprint now exclude
 what `env.observation()` returns, and no reference policy calls it — random draws from its
 RNG, no_intervention is constant, and both greedy variants read `result.posterior` directly.
 Every other field can move the references and every other field stays in the fingerprint.
+
+### Stage 5 — the agent beats the greedy oracle at d=5
+
+**[MEASURED] The winning configuration, and it needs all three ingredients.** At d=5,
+gap-closed per seed (0 = random, 1 = greedy oracle, >1 = beating it):
+
+| configuration | arch | seeds | min gap | entropy | verdict |
+|---|---|---|---|---|---|
+| `pernode_best_counts_shape` | per-node | 3 | **+1.276** | 0.57 | **3/3 pass** |
+| `pernode_best_counts` | per-node | 4 | **+1.116** | 0.52 | all beat greedy |
+| `pernode_best` (no memory) | per-node | 4 | −1.766 | — | unstable |
+| `pernode` alone | per-node | 3 | −3.696 | 1.11 | fail |
+| `flat_control` (same settings) | flat | 3 | −1.553 | 1.32 | fail |
+
+`pernode_best_counts` reads +1.284, +1.116, +1.181, +1.304 across its four seeds — every
+one beating the myopic oracle, with a spread of 0.19. That is criterion **S2** from
+docs/SA_PLAN.md, the outcome recorded in advance as "the result".
+
+**[MEASURED] The architecture is worth ~2.7 gap-closed, isolated by control.**
+`flat_control` runs *identical* settings — lr 1e-3, hidden 256, episodes_per_update 16,
+`include_counts` — on the old dense network and scores −1.553 against +1.116. The control
+was put in the matrix precisely so the learning rate could not be credited for this, and it
+earned its place.
+
+**[MEASURED] Action memory is what makes it *stable*, not what makes it *work*.** The same
+architecture without `include_counts` swings from +1.043 to −1.766 across seeds. With it,
+the four seeds span 0.19. This is consistent with the collapse mechanism: a deterministic
+policy that cannot see which nodes it has already targeted has no way to break out of
+re-picking one, and whether it does becomes a lottery over initialisations. Note the
+posterior is *formally* sufficient, so this is not an information fix — it is a fix to the
+policy's ability to act on information it already had.
+
+**[MEASURED] Entropy is the single clearest tell across the whole night.** Every failing
+configuration ended between 1.21 and 1.61 nats against a 1.79 maximum; every passing one
+ended between 0.52 and 0.60. Across 60-plus configurations this separated pass from fail
+more reliably than any hyperparameter.
+
+**[CORRECTED] My "the architecture is the bottleneck" claim was initially overstated, then
+confirmed on better evidence.** I first compared flat (0.528) against per-node (0.814) at
+600 episodes of probe data while the cluster's flat-only run reached 0.766 at 3000 — so
+part of the original gap was data quantity. Re-run at matched sizes, per-node dominates at
+every point and has a higher ceiling:
+
+| episodes | flat | per-node |
+|---|---|---|
+| 300 | 0.430 | 0.840 |
+| 1,000 | 0.648 | 0.856 |
+| 3,000 | 0.766 | 0.872 |
+| 9,000 | 0.791 | 0.890 |
+
+Per-node at 300 episodes beats flat at 9,000 — roughly a 30x sample-efficiency advantage.
+The conclusion survived, but only because the matched comparison was run rather than
+assumed.
+
+**[CORRECTED] The raw results were not committed when I first said they were.** The repo
+carries a blanket `*.json` ignore rule, so the archiving commit added the README and none of
+the 61 result files. `git add` on ignored paths is a silent no-op and the commit succeeded
+normally. Now exempted explicitly in `.gitignore`; 71 files tracked. Worth remembering that
+"the commit succeeded" is not evidence the files are in it.
