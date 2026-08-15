@@ -17,6 +17,9 @@ import pytest
 from sa.baselines import make_baselines
 from sa.env import EnvConfig
 from sa.evaluate import (
+    action_histogram,
+    distinct_targets,
+    repeat_rate,
     EpisodeTrace,
     check_criteria,
     episode_costs,
@@ -185,3 +188,42 @@ def test_stratification_separates_easy_from_hard(refs, space3):
     bands = m["by_mec_size"]
     assert set(bands) == {"mec_1", "mec_2-4", "mec_5-inf"}
     assert sum(v["n"] for v in bands.values()) == 60
+
+
+# --- the collapse diagnostics ----------------------------------------------------------
+#
+# Added after every configuration in the first sweep produced a DETERMINISTIC solve rate
+# below random's, which points at a policy re-picking one node until the budget runs out.
+# These turn that from an inference into a measurement.
+
+def trace_with_actions(actions, identified=True):
+    return EpisodeTrace(identified=identified, n_interventions=len(actions),
+                        passed_early=False, mec_size=2, is_singleton=False,
+                        actions=list(actions))
+
+
+def test_repeat_rate_is_zero_when_every_target_is_fresh():
+    assert repeat_rate([trace_with_actions([0, 1, 2])]) == pytest.approx(0.0)
+
+
+def test_repeat_rate_counts_every_revisit_after_the_first():
+    # 0,0,0 -> the 2nd and 3rd are repeats: 2 of 3.
+    assert repeat_rate([trace_with_actions([0, 0, 0])]) == pytest.approx(2 / 3)
+
+
+def test_repeat_rate_is_per_episode_not_global():
+    """Choosing node 0 in two different episodes is not a repeat -- the budget resets."""
+    traces = [trace_with_actions([0]), trace_with_actions([0])]
+    assert repeat_rate(traces) == pytest.approx(0.0)
+
+
+def test_distinct_targets_detects_total_collapse():
+    assert distinct_targets([trace_with_actions([2, 2, 2, 2])]) == pytest.approx(1.0)
+    assert distinct_targets([trace_with_actions([0, 1, 2])]) == pytest.approx(3.0)
+
+
+def test_action_histogram_is_a_distribution_and_finds_a_favourite():
+    hist = action_histogram([trace_with_actions([1, 1, 1, 0])], d=3)
+    assert sum(hist) == pytest.approx(1.0)
+    assert hist[1] == pytest.approx(0.75)
+    assert hist[2] == pytest.approx(0.0)

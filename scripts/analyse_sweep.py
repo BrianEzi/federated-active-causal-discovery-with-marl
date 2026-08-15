@@ -28,6 +28,8 @@ FIELDS = [
     "gap_closed", "gap_closed_sampled",
     "solve_rate", "greedy_solve_rate", "mean_cost", "cost_ci_low", "cost_ci_high",
     "under_acting_rate", "optimal_rate", "informative_fraction", "mean_regret",
+    # Collapse diagnostics: a policy that stops reading its observation re-picks one node.
+    "repeat_rate", "distinct_targets",
     "final_entropy", "passed", "train_seconds",
     # The reference policies, carried on every row so a row is self-contained: gap-closed
     # is only interpretable next to the anchors it was computed from.
@@ -77,6 +79,8 @@ def load_rows(results_dir: str) -> List[Dict]:
                 "optimal_rate": _get(det, "optimal_rate"),
                 "informative_fraction": _get(det, "informative_fraction"),
                 "mean_regret": _get(det, "mean_regret"),
+                "repeat_rate": _get(det, "repeat_rate"),
+                "distinct_targets": _get(det, "distinct_targets"),
                 "final_entropy": verdict.get("final_entropy"),
                 "passed": verdict.get("passed"),
                 "train_seconds": verdict.get("train_seconds"),
@@ -137,6 +141,8 @@ def summarise(rows: List[Dict]) -> List[Dict]:
             "mean_under_acting": float(np.mean([r["under_acting_rate"] for r in group])),
             "mean_entropy": float(np.mean([r["final_entropy"] for r in group])),
             "mean_optimal": float(np.nanmean([r["optimal_rate"] for r in group])),
+            "mean_repeat": float(np.nanmean([r["repeat_rate"] for r in group])),
+            "mean_distinct": float(np.nanmean([r["distinct_targets"] for r in group])),
         })
     return out
 

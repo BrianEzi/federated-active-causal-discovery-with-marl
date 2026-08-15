@@ -191,3 +191,24 @@ def test_shaping_telescopes_to_zero_over_an_episode(space3):
 def test_shaping_off_by_default_leaves_rewards_untouched(space3):
     assert PPOConfig().shaping_coef == 0.0
     assert PPOConfig().allow_pass is True
+
+
+def test_intervention_counts_can_be_added_to_the_observation(space3):
+    """The agent cannot otherwise tell which nodes it has already targeted."""
+    plain = CausalDiscoveryEnv(EnvConfig(d=3, n_obs=200), space=space3)
+    with_counts = CausalDiscoveryEnv(EnvConfig(d=3, n_obs=200, include_counts=True),
+                                     space=space3)
+    for env in (plain, with_counts):
+        env.reset(seed=0)
+    assert with_counts.observation_dim["edge_marginals"] == \
+        plain.observation_dim["edge_marginals"] + 3
+
+    for kind in ("posterior", "edge_marginals"):
+        assert len(with_counts.observation(kind)) == with_counts.observation_dim[kind]
+
+    # The counts must actually move, and stay in [0, 1] like every other feature.
+    before = with_counts.observation("edge_marginals").copy()
+    with_counts.step(1)
+    after = with_counts.observation("edge_marginals")
+    assert not np.array_equal(before[-3:], after[-3:]), "counts did not update"
+    assert after.min() >= -1e-9 and after.max() <= 1.0 + 1e-9

@@ -36,6 +36,12 @@ class EpisodeTrace:
     regrets: List[float] = field(default_factory=list)
     informative: List[bool] = field(default_factory=list)
     optimal: List[bool] = field(default_factory=list)
+    # The targets chosen, in order. Recorded because a deterministic policy whose logits
+    # barely depend on the observation picks the SAME node every step -- re-intervening
+    # where it already has, learning almost nothing, and exhausting the budget. That
+    # produces a solve rate below random's, which is what the first results showed. The
+    # sequence turns that from an inference into a measurement.
+    actions: List[int] = field(default_factory=list)
 
 
 def run_episodes(config: EnvConfig, policy: Callable, n_episodes: int = 300,
@@ -68,6 +74,7 @@ def run_episodes(config: EnvConfig, policy: Callable, n_episodes: int = 300,
         while not result.done:
             action = policy(env, result)
             if action != PASS_ACTION:
+                trace.actions.append(int(action))
                 scored = oracle.score_choice(action, result.posterior)
                 trace.regrets.append(scored["regret"])
                 trace.informative.append(bool(scored["informative"]))
@@ -198,6 +205,48 @@ def stratify_by_mec_size(agent: List[EpisodeTrace], random_ref: List[EpisodeTrac
     return out
 
 
+def repeat_rate(traces: List[EpisodeTrace]) -> float:
+    """Fraction of interventions aimed at a node already targeted this episode.
+
+    The direct measure of the collapse suspected from the first results: a policy whose
+    output barely depends on its input keeps picking the same node, gathering almost no new
+    structural information and running the budget out. Re-intervening is not automatically
+    wrong -- more samples do sharpen a posterior -- but a high rate alongside a solve rate
+    below random's is the signature of a policy that has stopped reading its observation.
+    """
+    repeats = total = 0
+    for trace in traces:
+        seen = set()
+        for action in trace.actions:
+            total += 1
+            if action in seen:
+                repeats += 1
+            seen.add(action)
+    return repeats / total if total else float("nan")
+
+
+def distinct_targets(traces: List[EpisodeTrace]) -> float:
+    """Mean number of distinct nodes targeted per episode. 1.0 means total collapse."""
+    counts = [len(set(t.actions)) for t in traces if t.actions]
+    return float(np.mean(counts)) if counts else float("nan")
+
+
+def action_histogram(traces: List[EpisodeTrace], d: int) -> List[float]:
+    """How often each node was chosen, as a distribution.
+
+    A near-uniform histogram means choices vary; a spike on one node means the policy has
+    a fixed favourite. Read together with `repeat_rate`, this distinguishes "picks one node
+    forever" from "varies across episodes but repeats within them".
+    """
+    counts = np.zeros(d, dtype=float)
+    for trace in traces:
+        for action in trace.actions:
+            if 0 <= action < d:
+                counts[action] += 1
+    total = counts.sum()
+    return (counts / total).tolist() if total else counts.tolist()
+
+
 def evaluate(config: EnvConfig, agent_policy: Callable, random_ref: List[EpisodeTrace],
              greedy_ref: List[EpisodeTrace], n_episodes: int = 300, seed: int = 0,
              space=None, oracle: Optional[InterventionOracle] = None) -> Dict:
@@ -217,6 +266,9 @@ def evaluate(config: EnvConfig, agent_policy: Callable, random_ref: List[Episode
         "optimal_rate": optimal_rate(traces),
         "informative_fraction": informative_fraction(traces),
         "by_mec_size": stratify_by_mec_size(traces, random_ref, greedy_ref, config.budget),
+        "repeat_rate": repeat_rate(traces),
+        "distinct_targets": distinct_targets(traces),
+        "action_histogram": action_histogram(traces, config.d),
         "_traces": traces,
     }
 

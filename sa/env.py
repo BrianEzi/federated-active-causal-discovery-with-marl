@@ -61,6 +61,17 @@ class EnvConfig:
     # vacuous below d ~ 8, so it stays the default here and becomes a real lever at scale.
     prior: str = "erdos_renyi"
     prior_p: float = 0.5
+    # Append per-node intervention counts to the observation.
+    #
+    # Off by default because the posterior is formally a sufficient statistic: if an
+    # intervention taught nothing, the belief is unchanged and the same target really is
+    # still the best one. But that argument holds for the OPTIMAL policy, not for a
+    # deterministic network whose output barely varies with its input -- such a policy
+    # re-picks the same node until the budget runs out, which is what the first results
+    # showed (solve rate below random's). Making past actions explicit is the cheapest way
+    # to let a policy break that tie, and whether it helps is a measurement, not an
+    # assumption.
+    include_counts: bool = False
     expected_degree: Optional[float] = None
     scale_free_gamma: float = 1.0
 
@@ -192,15 +203,23 @@ class CausalDiscoveryEnv:
             [(self.config.budget - self.n_interventions) / max(self.config.budget, 1)],
             dtype=float,
         )
+        # Also normalised to [0, 1], for the same reason the budget feature is.
+        extra = [budget_left]
+        if self.config.include_counts:
+            extra.append(np.asarray(self.intervention_counts, dtype=float)
+                         / max(self.config.budget, 1))
+
         if kind == "posterior":
-            return np.concatenate([self.posterior, budget_left])
+            return np.concatenate([self.posterior] + extra)
         if kind == "edge_marginals":
             marg = edge_marginals(self.space, self.posterior)
             off_diagonal = ~np.eye(self.config.d, dtype=bool)
-            return np.concatenate([marg[off_diagonal], budget_left])
+            return np.concatenate([marg[off_diagonal]] + extra)
         raise ValueError(f"unknown observation kind {kind!r}")
 
     @property
     def observation_dim(self) -> dict:
         d = self.config.d
-        return {"posterior": self.space.n_dags + 1, "edge_marginals": d * (d - 1) + 1}
+        extra = 1 + (d if self.config.include_counts else 0)
+        return {"posterior": self.space.n_dags + extra,
+                "edge_marginals": d * (d - 1) + extra}

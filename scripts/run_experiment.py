@@ -57,6 +57,8 @@ def main() -> None:
                            choices=["uniform", "erdos_renyi", "scale_free"])
     env_group.add_argument("--prior_p", type=float, default=0.5)
     env_group.add_argument("--intervene_scale", type=float, default=2.0)
+    env_group.add_argument("--include_counts", action="store_true",
+                           help="append per-node intervention counts to the observation")
 
     # -- agent levers -----------------------------------------------------------------
     ppo_group = parser.add_argument_group("agent")
@@ -80,6 +82,7 @@ def main() -> None:
         d=args.d, budget=args.budget, n_obs=args.n_obs, n_int=args.n_int,
         identify_threshold=args.identify_threshold, prior=args.prior,
         prior_p=args.prior_p, intervene_scale=args.intervene_scale,
+        include_counts=args.include_counts,
     )
     baselines = make_baselines(space, seed=0)
 
