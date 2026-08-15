@@ -1371,3 +1371,42 @@ hour ago for `summarise_seeds`. Consistency is worth more than a speedup on runs
 under way. Sync after the sweep completes.
 
 [MEASURED] Full suite 358 passed.
+
+## 2026-08-15 — Session close: prototypes preserved, next fix recorded
+
+[DECIDED] Tonight's verified work on subset DP and posterior sampling existed only in a
+session scratchpad, which is temporary. Moved into `prototypes/` with a README recording
+what is verified, what is measured, and what is broken. Import paths made repo-relative and
+every module confirmed to import and reproduce its result from the new location (subset DP
+still matches enumeration exactly at d=6).
+
+The two failed samplers are kept, prefixed `BROKEN_` and with a banner in their docstrings,
+on the same reasoning that keeps `KnownVarianceScore` in `sa/score.py`: the log cites
+measurements from them and the root cause was never found.
+
+[DECIDED] **Next task, recorded before it is forgotten: edge marginals in one pass.**
+
+Having removed the enumeration wall, this is what now caps d at roughly 8.
+`prototypes/subset_dp_edge_marginals.py` obtains `P(u -> v)` by re-running the entire DP
+with node `v` restricted to parent sets containing `u`, then taking `Z_forced / Z`. Correct,
+and already faster than enumeration at d=6 (65 ms against 733 ms) -- but it is `d(d-1)`
+separate full DP runs, so it scales as `d^2 * 3^d`. Projected per environment step: ~1 s at
+d=8, ~3.5 s at d=9, ~14 s at d=10.
+
+Two routes, expected to compose:
+
+1. **Reuse the DP table.** The recurrence already computes `f(A)` for every subset on the
+   way to `f(V)`. An edge marginal should be recoverable from that table plus a
+   complementary backward pass -- the standard forward/backward structure of subset DP.
+   Reference: Koivisto & Sood (2004), which computes all edge posteriors in `O(2^d d^2)`
+   rather than one run per edge.
+2. **Fast subset convolution**, to bring the recurrence itself from `O(3^d)` to
+   `O(2^d d^2)`. Reference: Bjorklund, Husfeldt, Kaski & Koivisto, "Fourier meets Mobius".
+
+Expected effect: practical ceiling from d~8 to d~12-15.
+
+**Acceptance test fixed in advance:** direct comparison against enumerated edge marginals at
+d=4, 5 and 6, in the style of `prototypes/verify_sampler_correctness.py`. NOT through a
+downstream consumer. Checking a sampler through the oracle instead of directly is what let a
+broken implementation look like a mixing problem for three rounds tonight, and that mistake
+is cheap to avoid twice.
