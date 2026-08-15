@@ -1088,3 +1088,50 @@ per node, so it does not come out of this machinery at all. Z and edge marginals
 worked, which makes this easy to overlook. Candidate route is exact posterior sampling of
 DAGs followed by Monte Carlo over reachability, but sampling from an inclusion-exclusion
 recurrence with signed terms is not straightforward and has not been checked.
+
+## 2026-08-15 — Oracle reachability: Monte Carlo is viable, sampler validated partially
+
+[MEASURED] How many posterior samples the greedy EIG oracle needs to make the same choice
+as the exact oracle. Realistic posteriors taken from actual episodes at every step, not
+synthetic draws; restricted to steps where the oracle has a genuine preference (96-99% of
+them here).
+
+| samples | agreement d=4 | d=5 | d=6 | mean regret d=6 | max regret d=6 |
+|---|---|---|---|---|---|
+| 200 | 82.3% | 81.7% | 80.3% | 0.0057 | 0.283 |
+| 1000 | 89.5% | 88.3% | 91.5% | 0.0009 | 0.091 |
+| 5000 | 93.2% | 91.7% | 95.7% | 0.0002 | 0.016 |
+
+[DECIDED] Read the regret, not the agreement. Agreement never reaches 100% because it
+demands landing inside the exact tied-best SET, and it counts a disagreement between two
+near-identical targets as a total failure. The information actually lost at 1000 samples is
+0.0009 nats against oracle scores of order 1 nat. For a baseline policy that is free.
+
+Roughly 1000 samples per step is the working figure.
+
+[MEASURED] Sampling without enumeration. Metropolis-Hastings over single-edge
+add/delete/reverse moves needs only score RATIOS, and because the score decomposes per
+node, one move changes at most two local terms -- so it needs the local score table and
+nothing else. No normalising constant, no enumeration. Validated against exact enumerated
+edge marginals:
+
+| d | max abs error | mean abs error | acceptance | 4000 draws |
+|---|---|---|---|---|
+| 4 | 0.0059 | 0.0016 | 0.06 | 0.8 s |
+| 5 | 0.0154 | 0.0035 | 0.12 | 0.7 s |
+| 6 | 0.0099 | 0.0024 | 0.06 | 0.7 s |
+
+[DECIDED] This validation is WEAKER than it looks and must not be reported as sufficient.
+Edge marginals are per-edge quantities; the oracle needs the distribution over descendant
+SETS, which is a joint property of the whole graph. An MCMC chain can reproduce marginals
+correctly while getting the joint structure wrong, and reachability is exactly the kind of
+global feature that would expose it. The acceptance rates of 0.06-0.12 are low enough to
+make that a real concern rather than a formality.
+
+The acceptance test still to run: compare oracle SCORES computed from MH samples against
+the exact oracle, at d=4/5/6, using the same regret measure as above. Until that is done,
+the claim is "MH reproduces edge marginals", not "MH supports the oracle".
+
+[MEASURED] Cost note: 4000 draws take ~0.7 s at d=6, and the oracle needs ~1000, so ~0.2 s
+per step. The posterior changes only slightly between steps, so warm-starting the chain
+from the previous step's DAG should reduce this substantially; untested.
