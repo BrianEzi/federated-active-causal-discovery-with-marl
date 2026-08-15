@@ -25,3 +25,8 @@ notebooks/*
 !notebooks/run_analysis_*.ipynb
 !notebooks/comparative_run_analysis_suite.ipynb
 !notebooks/overnight_analysis_2026-08-14.ipynb
+# Experiment results are DATA, not build artefacts: the blanket *.json rule above would
+# silently drop every raw result, which is exactly what the reproducibility requirement
+# needs kept. Exempt them explicitly.
+!results/**/*.json
+!results/*.json
