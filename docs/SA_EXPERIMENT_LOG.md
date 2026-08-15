@@ -575,3 +575,40 @@ carries a blanket `*.json` ignore rule, so the archiving commit added the README
 the 61 result files. `git add` on ignored paths is a silent no-op and the commit succeeded
 normally. Now exempted explicitly in `.gitignore`; 71 files tracked. Worth remembering that
 "the commit succeeded" is not evidence the files are in it.
+
+### GATE 1 was pinned once, at d=3, and silently stopped holding
+
+**[MEASURED] The observational-only rate falls below its theoretical target as d grows.**
+GATE 1 requires the no-intervention identification rate to equal the fraction of DAGs alone
+in their Markov equivalence class — a number computable exactly from the graph space. It was
+checked at d=3 (14.67% against 16.00%) and at d=4, passed both times, and was then assumed.
+Measured properly across d and n_obs, 200 episodes each, with bootstrap CIs:
+
+| d | target | n_obs=1000 | n_obs=5000 | n_obs=20000 |
+|---|---|---|---|---|
+| 4 | 0.1087 | 0.085 OK | 0.085 OK | 0.090 OK |
+| 5 | 0.0893 | **0.040 MISSES** | 0.060 OK | 0.075 OK |
+| 6 | 0.0810 | **0.025 MISSES** | **0.050 MISSES** | 0.060 OK |
+
+The default `n_obs=1000` therefore fails the gate at d=5 — the primary reporting size — and
+fails it badly at d=6. Larger graphs have more parameters to estimate from the same 1000
+samples, so the posterior never concentrates enough to identify even the graphs that are
+observationally identifiable in principle.
+
+**[CORRECTED] Every d=5 result tonight ran in an under-powered environment, including the
+headline.** The agent began each episode from a blurrier belief than the design intends, and
+some episodes that should have been solvable without intervening were not.
+
+What this does *not* break: gap-closed is measured against random and greedy baselines
+evaluated in the *same* environment, so the ranking, the flat-versus-per-node comparison,
+and the ablation all stand. What it does break: the claim that the environment matches its
+specification, and any comparison of *absolute* difficulty across d.
+
+**[DECIDED] Stage 6 re-runs the winner where the gate passes** (d=5 at n_obs 5000 and
+20000, with the flat control alongside), rather than shipping the result with a footnote.
+
+**[DECIDED] GATE 1 should be a per-configuration precondition, not a one-off.** This is the
+same failure shape that cost this project its previous round: a check performed once, under
+one setting, and thereafter assumed. The check is cheap — 200 no-intervention episodes — and
+the target is free to compute. It belongs in `run_experiment.py` as a guard that refuses to
+train when the environment does not match its specification.
