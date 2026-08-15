@@ -297,3 +297,65 @@ are fully independent, so an SGE array job gives near-linear speedup. A separate
 `~/envs/sa_env` was built rather than reusing the shared `marl_env`, since installing extra
 dependencies into that environment previously caused a protobuf/wandb conflict, and `sa/`
 is meant to stay isolated. Worktree at `~/marl_sa`.
+
+---
+
+## 2026-08-15 — overnight lever sweep
+
+**[DECIDED] One-factor-at-a-time around a fixed baseline, not a grid.** Thirteen levers is
+far too many for a full factorial, and the question actually being asked is "what does each
+lever do, and does the conclusion depend on it?" — which OFAT answers directly. The cost is
+that it cannot detect interactions between levers; that limitation is stated in the results
+rather than papered over. Baseline: `d=5, edge_marginals, 6000 episodes, budget 20,
+entropy 0.003, lr 3e-4, step_cost 0.05, hidden 128, n_obs 1000, n_int 100, threshold 0.7,
+ER p=0.5`. 34 configurations, 110 (config, seed) runs. Matrix lives in
+`scripts/sweep_configs.py` as data, read by both the submit script and the analysis, so
+intent and report cannot drift apart.
+
+**[DECIDED] d=3 dropped, d=6 added.** d=3's learnable advantage is 0.31 interventions — no
+signal worth a night of compute. d=5 stays the primary reporting size.
+
+**[DECIDED] Two deliberate negative controls in the matrix.** `identify_threshold=0.5`
+should *inflate* solve rates, because a Markov equivalence class of size 2 caps each member
+at exactly 0.5 and the threshold can therefore declare an unbroken tie identified. And
+`step_cost=0.0` removes any incentive to be quick, leaving only "identify eventually" — if
+gap-closed survives that unchanged, the metric is not measuring what it claims to. Both are
+predictions that can fail.
+
+**[DECIDED] `n_int` included despite being a predicted dead lever.** A 20x change moved the
+previous measurement by 0.3. It is in the matrix precisely because that is falsifiable.
+
+**[MEASURED] d=6 is reachable after vectorising three construction loops.** Enumerating its
+DAGs one candidate at a time takes ~28 minutes, paid again by every job. Rewritten as array
+operations over blocks of graphs (Kahn's algorithm, transitive closure, and MEC signatures
+packed into integer bit-codes), d=6 now builds in **37 seconds** and reproduces both
+externally known counts exactly: **3,781,503 DAGs** (OEIS A003024) and **1,067,825
+equivalence classes** (A007984). Its singleton fraction — the GATE 1 target at d=6 — is
+**8.10%**, continuing the decline from 16.00% (d=3), 10.87% (d=4), 8.93% (d=5).
+
+The enumeration *order* is preserved byte-for-byte against the per-graph implementation,
+asserted by test at d=2..5. This is not cosmetic: a DAG's index is its identity everywhere
+in the codebase, so a reordering would silently renumber every graph while every count
+still looked correct.
+
+**[MEASURED] d=6 costs ~0.7s per posterior update.** That puts the four reference policies
+at roughly an hour, which cannot be repeated per seed — hence `--ref_cache`, which stores a
+fingerprint of the entire environment config and *refuses to load* when it differs. Sharing
+baselines across seeds is only safe because they are deterministic given the config and the
+fixed seed 99; silently reusing references from another environment would look like a
+result rather than a bug.
+
+**[DECIDED] d=6 runs `edge_marginals` only.** The exact-posterior observation is 3,781,504
+numbers wide at d=6 — a 484M-parameter first layer. Condition A is structurally out of
+reach at this size, which is exactly the cost the A-vs-B comparison at d=4 and d=5 exists
+to quantify.
+
+**[DECIDED] Raw training history is now saved.** Entropy and solve-rate trajectories are how
+a collapse is diagnosed after the fact, and re-running a night of jobs to recover a curve is
+not an acceptable cost. Results also carry provenance (git commit, package versions, host,
+UTC time) and the reference-policy metrics, so a row is self-contained.
+
+**[CORRECTED] The cluster and the laptop are not on the same torch.** Myriad's package index
+tops out at `torch 2.6.0+cpu`; the laptop has `2.10.0+cpu`. numpy and scipy were pinned to
+match exactly (1.26.4 / 1.13.1), but torch could not be. Now recorded in provenance so a
+numerical difference between environments cannot be invisible.
