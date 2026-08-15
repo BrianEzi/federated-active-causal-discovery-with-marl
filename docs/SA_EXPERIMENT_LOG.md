@@ -1410,3 +1410,26 @@ d=4, 5 and 6, in the style of `prototypes/verify_sampler_correctness.py`. NOT th
 downstream consumer. Checking a sampler through the oracle instead of directly is what let a
 broken implementation look like a mixing problem for three rounds tonight, and that mistake
 is cheap to avoid twice.
+
+## 2026-08-15 (23:30) — E4 complete: gate-valid d=6 confirmed
+
+[MEASURED] d=6, n_obs=20000, per-node, action memory, 3 seeds run as separate array tasks
+against a shared reference cache.
+
+| seed | gap_closed | solve rate | greedy solve | GATE 1 |
+|---|---|---|---|---|
+| 0 | +1.109 | 1.00 | 0.99 | pass (0.0600 vs 0.0810) |
+| 1 | +1.063 | 1.00 | 0.99 | pass |
+| 2 | +1.088 | 1.00 | 0.99 | pass |
+
+Seed spread 0.046. All five canaries clean on every seed; final entropy 0.427 nats at 22%
+of the ln(7) ceiling, so the policy committed. Anchors exact, informative fraction 100%.
+
+[MEASURED] This supersedes the earlier d=6 numbers (+1.145 / +1.098 / +1.098), which were
+measured at n_obs=1000 where GATE 1 fails at d=6 and the task did not require intervening.
+**The result survives the correction**: +1.063 to +1.109 on a valid environment against
++1.098 to +1.145 on an invalid one -- slightly lower, and now meaningful.
+
+The single-agent claim is therefore established at d=4, d=5 and d=6 on environments that
+all pass GATE 1, with the agent beating the myopic greedy information-gain oracle on every
+seed at every size.
