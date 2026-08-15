@@ -213,3 +213,41 @@ The cost grows with d (3% -> 5% -> 11%), the expected direction: more edges mean
 discarded correlations. Re-measure at each new d rather than extrapolating — this trend is
 what licenses trusting edge-marginal results at d >= 6, where the exact posterior cannot be
 computed at all.
+
+**[NOTED] `EdgeMarginalGreedy` should become a permanent baseline, not a one-off.** An
+agent restricted to edge marginals compared against a full-posterior oracle conflates two
+different deficits: being a worse policy, and holding a lossier belief. The edge-marginal
+greedy policy is the correct opponent for the condition-B agent.
+
+---
+
+## 2026-08-15 — Calibrating the success metric
+
+**[DECIDED] Primary metric is "gap closed":** `(random - agent) / (random - greedy)`,
+measured in interventions to identify. 1.0 means matching greedy, 0.0 means no better than
+random. Normalising this way keeps the number comparable as `d` changes, which raw
+intervention counts are not.
+
+**[MEASURED] What gap-closed values actually mean.** An epsilon-greedy oracle (the greedy
+policy, acting uniformly at random a fraction `eps` of the time), 300 episodes:
+
+| eps (fraction of random actions) | gap-closed, d=4 | gap-closed, d=5 |
+|---|---|---|
+| 0.0 | 1.00 | 1.00 |
+| 0.1 | 0.92 | 0.95 |
+| 0.2 | 0.92 | 0.88 |
+| 0.3 | 0.80 | 0.82 |
+| 0.5 | 0.61 | 0.70 |
+| 0.75 | 0.21 | 0.51 |
+
+So **gap-closed >= 0.8 corresponds to choosing correctly roughly 70% of the time**, and
+>= 0.9 to roughly 80-90%. That grounds any threshold in behaviour rather than taste.
+
+**[MEASURED] d=4 is a noisy regime for this metric; d=5 is much better.** The eps=1.0 row
+should read exactly 0.00 by construction, and instead came out at **-0.29 at d=4** versus
+**-0.02 at d=5** over 300 episodes. The cause is the denominator: the greedy-random gap is
+only 0.78 interventions at d=4 but 1.61 at d=5, so identical absolute noise is twice as
+damaging at d=4. Practical consequence: **d=5 should be the primary reporting size**, and
+any d=4 number needs either many more episodes or a wider tolerance band. This is the same
+class of error as the previous project's +/-30pp noise floor, and worth catching before it
+sets a threshold rather than after.
