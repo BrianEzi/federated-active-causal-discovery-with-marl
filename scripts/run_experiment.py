@@ -188,13 +188,19 @@ def _provenance() -> dict:
     """Enough to re-run this exact configuration months later."""
     import platform
     import subprocess
+
+    import torch
     try:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"],
                                          stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         commit = "unknown"
+    # torch is recorded because the cluster and the laptop are NOT on the same version
+    # (the cluster's package index tops out at 2.6.0+cpu, the laptop has 2.10.0+cpu), and
+    # a numerical difference between the two would otherwise be invisible in the results.
     return {"git_commit": commit, "python": platform.python_version(),
-            "numpy": np.__version__, "host": platform.node(),
+            "numpy": np.__version__, "torch": torch.__version__,
+            "host": platform.node(),
             "finished_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
