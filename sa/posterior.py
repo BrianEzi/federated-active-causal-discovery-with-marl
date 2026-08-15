@@ -28,6 +28,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from sa.graphs import GraphSpace
+from sa.scoretable import LocalScorer
 
 
 # Rows of the DAG array converted to float64 at once when accumulating edge marginals.
@@ -47,18 +48,13 @@ class PosteriorEngine:
         self.score = score
         d = space.d
 
-        # All parent sets for each node, and a lookup from set -> index.
-        self.parent_sets: List[List[Tuple[int, ...]]] = []
-        lookup: List[dict] = []
-        for node in range(d):
-            others = [k for k in range(d) if k != node]
-            sets = [
-                combo
-                for r in range(len(others) + 1)
-                for combo in itertools.combinations(others, r)
-            ]
-            self.parent_sets.append(sets)
-            lookup.append({s: i for i, s in enumerate(sets)})
+        # All parent sets for each node, and a lookup from set -> index. Owned by
+        # `LocalScorer`, which is shared with the enumeration-free DP path so the two
+        # cannot drift apart; the attributes below stay as aliases because they are part
+        # of this class's interface and are read directly by tests and scripts.
+        self.scorer = LocalScorer(d, score)
+        self.parent_sets: List[List[Tuple[int, ...]]] = self.scorer.parent_sets
+        lookup: List[dict] = self.scorer.lookup
 
         # [N, d] index of each DAG's parent set for each node.
         #
@@ -81,7 +77,7 @@ class PosteriorEngine:
                 masks |= adjacency[:, parent, node].astype(np.int64) << position
             self.parent_set_ids[:, node] = mask_to_index[masks]
 
-        self.n_parent_sets = max(len(s) for s in self.parent_sets)
+        self.n_parent_sets = self.scorer.n_parent_sets
 
         # Index into the FLATTENED score table. The obvious `table[rows, parent_set_ids]`
         # broadcasts a [1, d] row index against [N, d] and casts the int32 ids to intp on
@@ -95,7 +91,7 @@ class PosteriorEngine:
 
         # Layout for the batched score table. Depends only on the graph space, never on
         # the data, so it is built once here rather than on every posterior update.
-        self._table_plan = [self._plan_node(node) for node in range(d)]
+        self._table_plan = self.scorer._table_plan
 
         # [d, n_parent_sets, d] indicator: does parent set `i` of `node` contain `parent`?
         # Used to turn edge marginals into d small bincounts -- see `edge_marginals`.
@@ -105,80 +101,12 @@ class PosteriorEngine:
                 for parent in parents:
                     self._parent_membership[node, i, parent] = 1.0
 
-    def _plan_node(self, node: int) -> dict:
-        """Where each of `node`'s marginals lives in the batched output.
-
-        A local score is `marginal(parents + node) - marginal(parents)`, so the subsets
-        needed are every parent set and every parent set with the node added. They are
-        grouped by size, since only same-sized subsets can share a batched determinant,
-        and the position of each one is recorded so the table can be assembled by gather
-        rather than by lookup.
-        """
-        parent_sets = self.parent_sets[node]
-        needed = set()
-        for parents in parent_sets:
-            needed.add(tuple(parents))
-            needed.add(tuple(sorted(parents + (node,))))
-
-        by_size: dict = {}
-        for subset in sorted(needed, key=lambda t: (len(t), t)):
-            by_size.setdefault(len(subset), []).append(subset)
-        position = {s: i for size in by_size for i, s in enumerate(by_size[size])}
-
-        return {
-            "index_by_size": {p: np.array([list(s) for s in subsets], dtype=int)
-                              for p, subsets in by_size.items() if p > 0},
-            "with_size": np.array([len(s) + 1 for s in parent_sets]),
-            "with_pos": np.array([position[tuple(sorted(s + (node,)))]
-                                  for s in parent_sets]),
-            "without_size": np.array([len(s) for s in parent_sets]),
-            "without_pos": np.array([position[tuple(s)] for s in parent_sets]),
-        }
-
     def local_score_table(self, samples: np.ndarray, intervened: np.ndarray) -> np.ndarray:
         """[d, n_parent_sets] local scores, computed once per node/parent-set pair.
 
         `intervened[i, j]` is truthy when node j was set by intervention in sample i.
         """
-        d = self.space.d
-        samples = np.asarray(samples)
-        intervened = np.asarray(intervened)
-        table = np.zeros((d, self.n_parent_sets))
-        # Scorers may expose sufficient statistics, in which case the n rows are read once
-        # per node rather than once per (node, parent set) -- 2^(d-1) times fewer passes.
-        # Scorers that do not (BIC, KnownVariance) take the original path unchanged.
-        use_stats = hasattr(self.score, "sufficient_stats") and hasattr(
-            self.score, "local_score_from_stats")
-        use_batched = use_stats and hasattr(self.score, "log_marginals_batched")
-
-        for node in range(d):
-            usable = intervened[:, node] < 0.5
-            # Skip the copy entirely when nothing was intervened on this node, which is
-            # every node at reset and most nodes for most of an episode.
-            subset = samples if usable.all() else samples[usable]
-
-            if use_batched:
-                stats = self.score.sufficient_stats(subset)
-                plan = self._table_plan[node]
-                marginals = self.score.log_marginals_batched(
-                    stats, plan["index_by_size"])
-                # Assembled by gather: for each parent set, the marginal WITH the node
-                # minus the marginal without. Size 0 is the empty subset, whose marginal
-                # is zero by definition.
-                with_values = np.array(
-                    [marginals[p][i] for p, i in zip(plan["with_size"], plan["with_pos"])])
-                without_values = np.array(
-                    [0.0 if p == 0 else marginals[p][i]
-                     for p, i in zip(plan["without_size"], plan["without_pos"])])
-                table[node] = with_values - without_values
-            elif use_stats:
-                stats = self.score.sufficient_stats(subset)
-                for i, parents in enumerate(self.parent_sets[node]):
-                    table[node, i] = self.score.local_score_from_stats(node, parents, stats)
-            else:
-                for i, parents in enumerate(self.parent_sets[node]):
-                    table[node, i] = self.score.local_score(node, parents, subset)
-        return table
+        return self.scorer.table(samples, intervened)
 
     def log_scores(self, samples: np.ndarray, intervened: np.ndarray) -> np.ndarray:
         """[N] unnormalised log posterior for every DAG."""

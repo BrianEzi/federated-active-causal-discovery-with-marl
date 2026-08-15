@@ -1433,3 +1433,53 @@ measured at n_obs=1000 where GATE 1 fails at d=6 and the task did not require in
 The single-agent claim is therefore established at d=4, d=5 and d=6 on environments that
 all pass GATE 1, with the agent beating the myopic greedy information-gain oracle on every
 seed at every size.
+
+## 2026-08-16 (00:4x) — Block 1: subset-DP posterior wired into `sa/`
+
+[DECIDED] Split `LocalScorer` out of `PosteriorEngine` into `sa/scoretable.py`. The
+`d * 2^(d-1)` local scores never needed the enumerated DAG list -- only the gather that
+turns them into per-graph scores did. Both paths now read the *same* scorer, so the
+acceptance test below compares two algorithms rather than two models. Full suite re-run
+before adding anything: **358 passed**, i.e. the refactor is a no-op.
+
+[MEASURED] `sa/dp.py` — `DPPosterior`, exact posterior by Robinson's sink recurrence with
+inclusion-exclusion, per-node score shifts, and a vectorised zeta transform. Checked
+DIRECTLY against enumeration (`tests/test_dp.py`, 21 tests, all passing):
+
+| d | log Z enum | log Z dp | diff | max edge-marginal diff |
+|---|---|---|---|---|
+| 3 | -1968.2325165608 | -1968.2325165608 | 0.00e+00 | 4.6e-15 |
+| 4 | -2704.5796851144 | -2704.5796851144 | 0.00e+00 | 3.2e-14 |
+| 5 | -3441.3035964895 | -3441.3035964895 | 0.00e+00 | 2.7e-14 |
+| 6 | -4170.0702325873 | -4170.0702325873 | 9.09e-13 | 2.6e-13 |
+
+**Block 1 acceptance test PASSES.** Also verified: `P(true DAG | data)` — the single number
+`is_identified` thresholds — matches the enumerated posterior to 1e-7 relative on 25 random
+graphs at d=3,4,5; interventional masking agrees on both observational and interventional
+data; and with zero rows the DP returns the prior's own edge marginals.
+
+[MEASURED] Cost at d=6 (log Z + all edge marginals): enumeration 771 ms, DP **64 ms**
+(12x). Beyond enumeration, where no ground truth exists:
+
+| d | log Z | edge marginals | cancellation growth |
+|---|---|---|---|
+| 7 | 15.8 ms | 176 ms | 0.90 |
+| 8 | 26.4 ms | 1023 ms | 0.88 |
+| 9 | 121 ms | 4007 ms | 0.89 |
+
+Growth (largest intermediate over the final answer) stays below 1 everywhere, so the
+alternating recurrence is not cancelling — the numbers at d=7-9 are trustworthy on
+conditioning grounds even though they cannot be checked against a DAG list.
+
+[MEASURED] The bottleneck moved exactly where it was predicted to. log Z is now free; the
+`d(d-1)` constrained runs for edge marginals are 92% of the cost at d=8 and dominate
+completely by d=9. That is block 2.
+
+[DECIDED] The DP requires a **modular** prior. Erdos-Renyi is one, exactly:
+`P(G) ~ (p/(1-p))^|E|` and `|E| = sum_i |Pa_i|`, so it becomes a per-parent-set weight of
+`log_edge_odds * |Pa_i|` (verified against the enumerated ER prior at p = 0.2, 0.5, 0.8).
+`scale_free` is **not** modular — its Gini reweighting reads the whole degree sequence —
+so `for_prior` raises rather than silently scoring a different model. A quietly-ignored
+reweighting would produce a plausible-looking posterior under the wrong prior, which is
+the hardest class of bug to notice; a second test pins that scale_free really does differ
+from ER, so the refusal cannot become spurious without a test failing.
