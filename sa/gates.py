@@ -124,13 +124,15 @@ def check_gate_1(config: EnvConfig, n_episodes: int = 400, seed: int = 0,
 
 
 def run_policy(config: EnvConfig, policy: Callable, n_episodes: int = 200,
-               seed: int = 0) -> dict:
+               seed: int = 0, space=None) -> dict:
     """Run a policy for `n_episodes` and collect per-episode outcomes.
 
     `policy(env, result) -> action` is called each step. Returns arrays of per-episode
     identification indicators and intervention counts, suitable for bootstrapping.
     """
-    env = CausalDiscoveryEnv(config)
+    # `space` lets a caller reuse an already-built graph space. It matters at d=6, where
+    # construction takes ~37s and would otherwise be repeated on every call.
+    env = CausalDiscoveryEnv(config, space=space)
     identified = np.zeros(n_episodes)
     n_used = np.zeros(n_episodes)
     for i in range(n_episodes):
