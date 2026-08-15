@@ -463,3 +463,56 @@ policy; a deterministic network whose output barely varies with its input has no
 the loop at all. `include_counts` adds them, `repeat_rate`/`distinct_targets` measure whether
 the loop is real, and arm 6 (best settings, no counts) is the control that stops the learning
 rate taking credit for the observation change.
+
+### The architecture was the bottleneck
+
+**[MEASURED] A supervised probe localises the failure to the network, not the task.**
+Trained on the agent's own observation to predict the oracle's tied-best target at d=4,
+with abundant labels and no exploration problem (chance 0.279, majority 0.271):
+
+| observation | architecture | probe accuracy |
+|---|---|---|
+| edge marginals | flat MLP | 0.528 |
+| **edge marginals** | **per-node scorer** | **0.814** |
+| exact posterior | flat MLP | 0.618 |
+
+The per-node scorer reading the *lossy* summary beats the flat network reading the *exact
+sufficient statistic*. That is the cleanest possible localisation: the difficulty is not the
+reward, not the exploration, not the information content of the observation. It is the flat
+network's ability to express the mapping at all. Fifty-four configurations across stages 1-4
+were tuning things that could not have mattered.
+
+**[DECIDED] `PerNodeActorCritic`, and why this shape.** The oracle's score for node i is a
+function of i's own descendant structure — *the same function for every i*. A dense layer
+from d(d−1) marginals to d logits must instead learn each node's scorer separately and
+rediscover from data that the nodes are interchangeable. The new network embeds each
+neighbour pair (i→j, j→i), pools over neighbours, and scores node i from its own pooled
+summary, with one shared scorer serving all d nodes. Value and the pass logit read a
+mean-pooled summary, so they are permutation-*invariant* — correct, since how good a state
+is does not depend on node labels.
+
+Two consequences beyond accuracy: the policy is permutation-**equivariant**, which the
+oracle is and the flat network structurally cannot be; and the parameter count no longer
+grows with d, so the identical model form carries to d=6 rather than needing a new one.
+
+**[CORRECTED] My first version of this class was not equivariant, and the test caught it.**
+Node i's features were its neighbours' marginals *in index order*. Relabelling the nodes
+reorders that vector, so the network was equivariant only under permutations that happened
+to preserve neighbour ordering — which is to say, not equivariant. I had written the test
+asserting the property before believing it held, and it failed with a max absolute
+difference of 1.9e-3 on logits of order 1e-3, i.e. completely. Fixed by pooling over
+neighbours (mean and max concatenated) instead of concatenating them in order, following
+Deep Sets (Zaheer et al. 2017); mean and max together because a single statistic collapses
+distinctions the score depends on. The property now holds to 1e-5.
+
+Worth keeping as a general lesson: the inductive bias I *intended* and the one I *wrote*
+differed, and nothing about the code's appearance revealed it. Only asserting the
+mathematical property directly did.
+
+**[DECIDED] d=6 runs the per-node architecture.** It is the only configuration with evidence
+behind it, and its d-independent parameter count means d=6 continues the same experiment
+rather than starting a separate one. The reference cache fingerprint now excludes
+`include_counts`, which is safe for a specific and checkable reason: that flag only changes
+what `env.observation()` returns, and no reference policy calls it — random draws from its
+RNG, no_intervention is constant, and both greedy variants read `result.posterior` directly.
+Every other field can move the references and every other field stays in the fingerprint.
