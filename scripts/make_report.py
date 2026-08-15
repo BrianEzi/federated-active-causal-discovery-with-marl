@@ -108,6 +108,7 @@ def build(results_dir: str) -> str:
         ("s4_best_nocounts", "+ tuned optimiser"),
         ("s4_counts_best", "+ action memory"),
         ("s5_flat_control", "flat, all fixes"),
+        ("s4_everything", "flat, everything + 15k eps"),
         ("s5_pernode_best", "per-node, no memory"),
         ("s5_pernode_best_counts", "per-node + memory"),
         ("s5_pernode_best_counts_shape", "+ shaping"),
@@ -413,8 +414,11 @@ sample counts, identification threshold, graph prior, intervention strength. Two
 stages gridded the levers that interact and tested two structural changes — removing the
 option to pass, and adding potential-based reward shaping.</p>
 
-<p><strong>Every configuration failed.</strong> That uniformity was the finding: no lever
-rescued the run, so the problem was not in the region any of them explored.</p>
+<p><strong>Not one passed.</strong> That uniformity was the finding: no lever rescued the
+run, so the problem was not in the region any of them explored. The best the original
+network ever managed was <code>+0.450</code>, and only with every fix at once plus 15,000
+training episodes &mdash; positive, but well short of the 0.80 bar, and reached by brute
+force rather than by any lever doing what it was supposed to.</p>
 
 <p>The sharpest symptom was that the deterministic agent solved episodes <em>less often than
 random</em> — 0.25 to 0.59 against random's ~1.00 — while picking the oracle's best target
