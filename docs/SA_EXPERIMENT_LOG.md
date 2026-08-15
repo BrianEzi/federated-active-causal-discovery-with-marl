@@ -359,3 +359,48 @@ UTC time) and the reference-policy metrics, so a row is self-contained.
 tops out at `torch 2.6.0+cpu`; the laptop has `2.10.0+cpu`. numpy and scipy were pinned to
 match exactly (1.26.4 / 1.13.1), but torch could not be. Now recorded in provenance so a
 numerical difference between environments cannot be invisible.
+
+**[MEASURED] The agent learns the easy half of the action space and none of the hard half.**
+First stage-1 result, `core_d4_edge_marginals`, 5 seeds. Reading the training trajectory
+rather than the endpoint:
+
+| episodes | solve rate | mean length | entropy |
+|---|---|---|---|
+| 32 | 0.66 | 1.31 | 1.609 |
+| 800 | 0.97 | 1.97 | 1.427 |
+| 1568 | 1.00 | 2.19 | 1.389 |
+| 5984 | 0.97 | 2.44 | 1.337 |
+
+The early state is not "good and getting worse". A uniform policy over `d+1 = 5` actions
+passes 20% of the time, and passing ends the episode immediately — hence solve 0.66 at
+length 1.31. What the agent then learns, over ~1500 episodes, is **not to pass**: solve
+rate goes to 1.00. What it never learns is *which node to target* — mean length settles at
+~2.4, and random costs **2.44**. It ends at exactly random-policy quality.
+
+Entropy stalls at 1.34–1.39 against a maximum of ln(5) = 1.609, so the deterministic
+policy's argmax is essentially arbitrary, which is why deterministic gap-closed (−4.9 to
+−9.9) is so much worse than sampled (+0.08). Same collapse signature as before, from the
+same cause: a policy that never sharpened.
+
+**[CORRECTED] My first explanation of this was wrong, and the error is worth recording.**
+I initially wrote that the learnable signal is "5% of the reward scale" — step cost 0.05
+against a +1 terminal bonus — and that the gradient is therefore tiny. That reasoning does
+not survive contact with the algorithm. Advantages are normalised to unit standard
+deviation before the policy update, and the near-constant +1 is absorbed by the value
+baseline, so the *absolute* scale of the reward cancels. `value_loss` falling cleanly from
+0.38 to 0.01 confirms the critic is doing exactly that job. Likewise `policy_loss ≈ 0.005`
+is not evidence of a weak signal: with normalised advantages the clipped surrogate is
+near zero at the start of every epoch by construction. I misread a structural constant as
+a symptom.
+
+The defensible version is *relative*, not absolute: the pass-versus-act contrast has a
+large and consistent effect on return (+1 against 0), while the which-node contrast has a
+small one (fractions of a step). Both share one batch-wide normalisation, so the
+which-node signal is a small share of the normalised advantage. That predicts precisely
+what was measured — the large contrast gets learned, the small one does not.
+
+This leaves the stage-2 grid well-motivated but for a corrected reason. `step_cost` is not
+a no-op under normalisation, because it changes the *relative* worth of acting versus
+passing rather than the overall scale; `gamma` changes how much finishing sooner is worth;
+`entropy_coef` sets how hard the policy is held toward uniform. All three move the same
+underlying quantity, which is why they are gridded rather than swept one at a time.
