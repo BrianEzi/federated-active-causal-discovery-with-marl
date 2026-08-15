@@ -657,3 +657,35 @@ Open items for the next session, in priority order:
 - Re-run the d=5 lever sweep at n_obs=5000 — every stage-1 conclusion was measured in the
   under-powered environment and may not transfer.
 - Only then move to two agents.
+
+### d=6 — one seed, encouraging, not established
+
+**[MEASURED] The agent beats the oracle at d=6 too, on the one seed that finished.**
+gap-closed **+1.145** (sampled +1.054), solve rate 0.98 against greedy's 0.98, cost 2.57
+against greedy's 2.77, final entropy 0.73. Oracle agreement on informative steps is
+**0.426**, against 0.02–0.10 for every configuration that failed — the agent is now
+positively correlated with the oracle rather than anti-correlated.
+
+**[CORRECTED] This number is not gate-valid and must not be reported as equivalent to the
+d=4/d=5 results.** It ran at `n_obs=1000`, where GATE 1 misses by the widest margin of any
+setting measured (0.025 against a 0.081 target). A valid d=6 needs `n_obs=20000`, and at
+~6.4s per episode that is roughly seven hours per seed before the extra sampling cost.
+
+**[MEASURED] d=6 costs about 4.6 hours per seed at n_obs=1000.** Seed 2 took 16,737s. The
+other two tasks were still running at 9h30m CPU against a 10-hour walltime and are likely to
+be killed before writing output — a sizing mistake on my part: I estimated 3.5h per seed
+from a small sample and set the walltime with too little headroom. The completed seed's
+result file was copied off the cluster before the deadline.
+
+**[DECIDED] Two-thirds of a d=6 run is worth keeping as one caveated data point** rather
+than discarded, but it does not change the headline, which rests on d=4 and d=5 where the
+environment is verified.
+
+### Standing recommendation
+
+`GATE 1` now runs as a precondition on every training run (`scripts/run_experiment.py`),
+prints its verdict, records it in the output JSON, and can be made fatal with
+`--require_gate1`. Tests assert it fails when it should. This is the single most valuable
+change of the night: the same "checked once, then assumed" failure has now cost this
+project twice, and it is cheap to prevent — 200 no-intervention episodes against a target
+that is free to compute.
