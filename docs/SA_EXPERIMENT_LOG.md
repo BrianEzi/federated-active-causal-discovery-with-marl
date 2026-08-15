@@ -1040,3 +1040,51 @@ DID correctly identify the flat-vs-per-node gap, which was worth ~2.7 gap closed
 detects a difference in kind. It did not transfer for a difference in degree. Worth
 carrying into the 2-agent case, where the temptation to screen designs by probe will be
 strong.
+
+## 2026-08-15 — Subset DP works: exact inference without enumerating DAGs
+
+[MEASURED] Replaced enumeration of every DAG with a recurrence over SUBSETS of nodes,
+decomposing each DAG by its sinks with inclusion-exclusion. Validated against our existing
+enumeration, which is available as ground truth up to d=6.
+
+| quantity | d | enumeration | subset DP | difference |
+|---|---|---|---|---|
+| log Z | 3 | -1983.533170655 | -1983.533170655 | 0.0 |
+| log Z | 4 | -2732.543408664 | -2732.543408664 | 4.6e-13 |
+| log Z | 5 | -3427.871521346 | -3427.871521346 | 0.0 |
+| log Z | 6 | -4137.304999572 | -4137.304999572 | 0.0 |
+| edge marginals | 4 | - | - | 1.4e-17 |
+| edge marginals | 5 | - | - | 1.5e-14 |
+| edge marginals | 6 | - | - | 7.2e-14 |
+
+Not an approximation -- the same number by a cheaper route.
+
+[MEASURED] Cost. Edge marginals at d=6: 733 ms enumerated, 65 ms by DP (11x). Partition
+function alone: 294 ms enumerated at d=6, 2 ms by DP (147x). Beyond enumeration's reach,
+Z costs 0.15 s at d=10 and 0.46 s at d=11.
+
+[CORRECTED] I expected catastrophic cancellation to be the binding constraint, since the
+recurrence alternates in sign. It was, with a single global score shift -- d=6 returned
+Z <= 0 and log Z = -inf. Fixing it was a scaling issue, not a numerical-stability issue:
+shifting each NODE's local scores by its own maximum (valid exactly, because the score
+decomposes per node) keeps every term near 1. With that, the measured growth ratio -- the
+largest intermediate magnitude divided by the final answer -- is BELOW 1 at every d from 3
+to 11. There is no cancellation to speak of.
+
+[MEASURED] The practical ceiling is the d(d-1) constrained re-runs used to get edge
+marginals, not the DP itself. Projected per environment step: ~1 s at d=8, ~3.5 s at d=9,
+~14 s at d=10. So RL is feasible to about d=8 with this straightforward implementation,
+against a hard wall at d=6 before. Computing all edge marginals in one pass instead of
+d(d-1) separate runs is the obvious optimisation and has not been attempted.
+
+[MEASURED] The definition of "identified" survives unchanged. It is posterior mass on the
+true DAG, which is exp(score(G_true) - log Z) -- available directly once Z exists. It does
+NOT require reconstructing a graph posterior from edge marginals, which is impossible in
+general anyway, since marginals discard the correlations between edges.
+
+[DECIDED] Open problem, and it is the real blocker for scaling d: the greedy EIG oracle
+needs the distribution over each node's DESCENDANT set. Reachability is not decomposable
+per node, so it does not come out of this machinery at all. Z and edge marginals both
+worked, which makes this easy to overlook. Candidate route is exact posterior sampling of
+DAGs followed by Monte Carlo over reachability, but sampling from an inclusion-exclusion
+recurrence with signed terms is not straightforward and has not been checked.
