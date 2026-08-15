@@ -25,9 +25,11 @@ from sa.evaluate import (
     run_episodes,
     summarise_seeds,
 )
+from sa.gates import collect_canaries
 from sa.graphs import build_graph_space
 from sa.oracle import InterventionOracle
 from sa.policy import PPOAgent, PPOConfig
+from sa.tracking import start_run
 
 
 def main() -> None:
@@ -50,6 +52,12 @@ def main() -> None:
                         help="refuse to train when GATE 1 fails, instead of warning")
     parser.add_argument("--gate1_episodes", type=int, default=200,
                         help="episodes for the GATE 1 precondition check; 0 to skip")
+    parser.add_argument("--wandb_project", type=str, default=None,
+                        help="log to this WandB project; off unless given. Writes offline "
+                             "(compute nodes have no internet) -- sync afterwards with "
+                             "scripts/sync_wandb.py from the login node")
+    parser.add_argument("--wandb_dir", type=str, default=None,
+                        help="where offline WandB runs are written (default: ./wandb)")
 
     # -- environment levers -----------------------------------------------------------
     env_group = parser.add_argument_group("environment")
@@ -162,6 +170,17 @@ def main() -> None:
     histories = {}
     for seed in args.seeds:
         t0 = time.time()
+        # Grouped so a 34-config x 3-seed sweep stays readable: seeds of one configuration
+        # collapse into one group, and E1 vs E2 split on job_type.
+        tracker = start_run(
+            args.wandb_project,
+            name=f"{args.tag or 'run'}_s{seed}",
+            group=args.tag or None,
+            job_type=args.arch,
+            config={**vars(args), "seed": seed},
+            tags=[f"d{args.d}", f"n_obs{args.n_obs}", args.arch, args.observation],
+            directory=args.wandb_dir,
+        )
         agent = PPOAgent(
             env_config,
             PPOConfig(observation=args.observation, total_episodes=args.train_episodes,
@@ -177,6 +196,12 @@ def main() -> None:
         # Kept in full: the entropy and solve-rate trajectories are how a collapse is
         # diagnosed after the fact, and re-running to recover them costs a whole night.
         histories[str(seed)] = history
+        # Replayed after training rather than streamed from inside the PPO loop, so that
+        # `sa/policy.py` stays free of any tracking dependency. The curves are identical;
+        # only their arrival time differs, and nothing watches them live on a batch queue.
+        for update, entry in enumerate(history):
+            tracker.log({k: v for k, v in entry.items()
+                         if isinstance(v, (int, float))}, step=update)
         per_seed_time = time.time() - t0
 
         deterministic = evaluate(env_config, agent.as_policy(True), random_ref, greedy_ref,
@@ -190,6 +215,22 @@ def main() -> None:
         verdict["deterministic"] = _serialisable(deterministic)
         verdict["sampled"] = _serialisable(sampled)
         per_seed.append(verdict)
+
+        tracker.summarise({
+            "gap_closed": deterministic["gap_closed"],
+            "sampled_gap_closed": sampled["gap_closed"],
+            "solve_rate": deterministic["solve_rate"],
+            "greedy_solve_rate": deterministic["greedy_solve_rate"],
+            "mean_cost": deterministic["mean_cost"],
+            "under_acting_rate": deterministic["under_acting_rate"],
+            "optimal_rate": deterministic["optimal_rate"],
+            "informative_fraction": deterministic["informative_fraction"],
+            "final_entropy": verdict["final_entropy"],
+            "passed": verdict["passed"],
+            "train_seconds": per_seed_time,
+            "gate1_passed": None if gate1 is None else gate1["passed"],
+        })
+        tracker.finish()
 
         print(f"\nseed {seed} ({time.time() - t0:.0f}s, final entropy "
               f"{history[-1]['entropy']:.2f})")
@@ -216,6 +257,22 @@ def main() -> None:
           f"max {summary['max_gap_closed']:+.3f}")
     print(f"  OVERALL: {'PASS' if summary['passed'] else 'FAIL'}")
 
+    # Attached to every result, not run on demand. In each case the earlier failure was
+    # not that a check failed -- it is that nobody thought to run it, so a number was read
+    # without the thing that qualified it.
+    n_actions = args.d + (0 if args.no_pass else 1)
+    canaries = collect_canaries(per_seed, gate1, n_actions,
+                                random_ref=random_ref, greedy_ref=greedy_ref,
+                                budget=args.budget)
+    print("\n=== CANARIES ===")
+    for record in canaries:
+        marker = "ok  " if record["ok"] else record["severity"].upper()
+        print(f"  [{marker}] {record['name']}: {record['detail']}")
+    fired = [r["name"] for r in canaries if not r["ok"]]
+    if fired:
+        print(f"  {len(fired)} fired: {', '.join(fired)} -- results below still stand as "
+              f"recorded, but read them with these in view.")
+
     if args.out:
         payload = {
             "args": vars(args),
@@ -229,6 +286,7 @@ def main() -> None:
             # holding at d>=5, which invalidated a night of environments before anyone
             # noticed.
             "gate1": gate1,
+            "canaries": canaries,
             "per_seed": per_seed,
             "training_history": histories,
             "summary": summary,

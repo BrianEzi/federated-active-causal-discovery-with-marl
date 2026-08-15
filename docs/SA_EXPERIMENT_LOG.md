@@ -788,3 +788,54 @@ the last two d=6 runtime predictions were both wrong.
 against the slow one it replaced -- including the pre-optimisation BGe marginal inlined
 verbatim as a reference, so the comparison cannot drift into the new code checking itself.
 Full suite 268 passed (and got faster: 277 s -> 182 s).
+
+## 2026-08-15 — Phase 0 complete: instrumentation
+
+[DECIDED] Built before any Phase 2 compute, because instrumentation added afterwards
+cannot explain runs that have already happened.
+
+**WandB** (`sa/tracking.py`, `scripts/sync_wandb.py`). Off unless `--wandb_project` is
+passed; offline by default; never fatal. The third property is the one that mattered to
+get right: a compute node has no outbound internet, so an online `wandb.init()` there does
+not fail fast, it hangs -- burning the entire walltime of a job that was otherwise going
+to succeed. Every call is wrapped, so a missing package, a full disk, a permissions
+problem or 34 concurrent array writers all degrade to a warning and a no-op tracker.
+`tests/test_tracking.py` breaks WandB eleven different ways and asserts the caller
+continues, including failure on the first `log` mid-training -- later and more expensive
+than a clean failure at startup.
+
+Training curves are replayed to WandB after `train()` returns rather than streamed from
+inside the PPO loop, which keeps `sa/policy.py` free of any tracking dependency. The
+curves are identical; only their arrival time differs, and nothing watches a batch job
+live.
+
+**Canaries G1-G5** (`sa/gates.py`), recorded in every result JSON and printed at the end
+of every run. Distinct from GATE 1/2, which qualify an environment beforehand; these
+travel with the numbers so a result cannot be read without its checks.
+
+[CORRECTED] G2 as first written was decoration. It asserted that gap closed evaluates to
+0 at the random reference and 1 at greedy -- but that is an algebraic identity of the
+formula, which defines its own endpoints, so it holds even when the two references are
+swapped. The test asserting "G2 fires on swapped references" passed while the canary
+stayed silent; it was passing on an incidental assertion about costs, not on the canary.
+Fixed by also checking the ordering (greedy cannot cost more than random), which is what
+actually detects a swap. Recording this because it is the exact failure mode the canaries
+exist to prevent, reproduced while building them.
+
+[MEASURED] End-to-end verification, d=4, 2 seeds, deliberately under-trained at 200
+episodes. Two canaries fired and three stayed quiet, which is correct for a run this
+short:
+
+- G1 fired: final entropy 1.603 nats = 100% of the ln(5) = 1.609 ceiling.
+- G4 fired: gap closed spanned 1.191 across two seeds (-2.830 to -1.638).
+- G2 quiet: anchors exact, random -> 0.0e+00, greedy -> 1.000000 (costs 2.500 vs 1.717).
+- G3 quiet: 100% of scored actions informative.
+- G5 quiet: GATE 1 rate 0.0700 against singleton fraction 0.1087.
+
+Result JSON contains all five records; two offline WandB run directories were written and
+`scripts/sync_wandb.py --dry_run` lists both. `wandb/` added to `.gitignore` -- the JSON
+files remain the record.
+
+[MEASURED] Full suite 302 passed (was 268 after the optimisation commit, 158 before this
+phase). The 34 new tests are `test_canaries.py` (22) and `test_tracking.py` (11), plus
+one G2 test rewritten to assert the canary itself rather than a side condition.

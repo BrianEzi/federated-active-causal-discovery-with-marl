@@ -21,15 +21,23 @@ GATE 2 -- choices must matter.
   A random intervention policy must be clearly worse than the greedy oracle. If they
   tie, nothing about experiment selection is being rewarded and there is nothing for an
   agent to learn.
+
+Below those sit five CANARIES (G1-G5), which differ from the gates in when they run: the
+gates qualify an environment before an experiment, the canaries are attached to every
+result file so a number can never be read without its checks. Each one is a specific past
+failure turned into code -- see `collect_canaries`. They are recorded, and warn loudly,
+but never abort a run: the JSON is the record, and a suppressed result is worse than a
+flagged one.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 
 from sa.env import PASS_ACTION, CausalDiscoveryEnv, EnvConfig
+from sa.evaluate import episode_costs, gap_closed
 
 
 @dataclass
@@ -185,3 +193,233 @@ def check_gate_2(config: EnvConfig, random_policy: Callable, oracle_policy: Call
     )
     return GateResult("GATE 2 (choices matter)", passed, orac_mean, rand_mean,
                       orac_ci, detail)
+
+
+# ======================================================================================
+# Canaries G1-G5
+#
+# Each encodes a failure that actually happened and was not caught. They are recorded in
+# every result file rather than run on demand, because in each case the problem was not
+# that a check failed -- it is that nobody thought to run it.
+# ======================================================================================
+
+
+@dataclass
+class Canary:
+    """One automatic check attached to a result.
+
+    `severity` is "warn" or "fail". Nothing here aborts a run: a canary firing means the
+    number needs interpreting, not that it should be discarded unseen.
+    """
+
+    name: str
+    ok: bool
+    severity: str
+    observed: Optional[float]
+    threshold: Optional[float]
+    detail: str
+
+    def as_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "ok": bool(self.ok),
+            "severity": self.severity,
+            "observed": None if self.observed is None else float(self.observed),
+            "threshold": None if self.threshold is None else float(self.threshold),
+            "detail": self.detail,
+        }
+
+    def __str__(self) -> str:
+        return f"[{'ok' if self.ok else self.severity.upper()}] {self.name}: {self.detail}"
+
+
+def canary_entropy(final_entropy: float, n_actions: int, fraction: float = 0.65) -> Canary:
+    """G1 -- has the policy actually committed to anything?
+
+    A policy that has learned nothing keeps a near-uniform action distribution, whose
+    entropy is ln(n_actions). Overnight, every one of the 61 failing configurations sat at
+    1.2-1.6 nats while every passing one sat at 0.5-0.7 -- that separated pass from fail
+    better than any hyperparameter did. The quantity was already being logged; nobody was
+    comparing it against its own ceiling.
+
+    Warns rather than fails: high entropy on a genuinely tied task is legitimate, so this
+    points at a cause rather than delivering a verdict.
+    """
+    ceiling = float(np.log(max(n_actions, 2)))
+    ratio = float(final_entropy) / ceiling if ceiling > 0 else float("nan")
+    ok = bool(ratio <= fraction) if np.isfinite(ratio) else False
+    if not np.isfinite(ratio):
+        detail = "final entropy is not finite -- training produced no usable history."
+    elif ok:
+        detail = (f"final entropy {final_entropy:.3f} nats is {ratio:.0%} of the uniform "
+                  f"ceiling {ceiling:.3f}; the policy has committed.")
+    else:
+        detail = (f"final entropy {final_entropy:.3f} nats is {ratio:.0%} of the uniform "
+                  f"ceiling {ceiling:.3f} -- near-uniform, so the policy has probably not "
+                  f"learned to discriminate between targets. Every overnight failure "
+                  f"looked like this.")
+    return Canary("G1 entropy", ok, "warn", ratio, fraction, detail)
+
+
+def canary_anchors(random_ref, greedy_ref, budget: int, tolerance: float = 1e-9) -> Canary:
+    """G2 -- the gap-closed scale must actually be anchored at 0 and 1.
+
+    `gap_closed` is defined so that scoring the random reference against itself gives
+    exactly 0, and the greedy reference exactly 1. That identity is worth asserting
+    precisely BECAUSE it is an identity: if it does not hold, the inputs are wrong -- the
+    references were swapped, built from mismatched RNG state, or sit so close together
+    that the denominator is noise. Anchors of 0.233 and 1.067 were once read off a run and
+    taken at face value.
+
+    Fails rather than warns: every gap-closed number in the file is measured on this
+    scale, so if the scale is broken none of them mean anything.
+    """
+    at_random = gap_closed(random_ref, random_ref, greedy_ref, budget)
+    at_greedy = gap_closed(greedy_ref, random_ref, greedy_ref, budget)
+    r = float(episode_costs(random_ref, budget).mean())
+    g = float(episode_costs(greedy_ref, budget).mean())
+
+    if np.isfinite(at_random) and np.isfinite(at_greedy):
+        worst = float(max(abs(at_random - 0.0), abs(at_greedy - 1.0)))
+    else:
+        worst = float("inf")
+
+    # The 0/1 identity alone is not enough: it holds algebraically even when the two
+    # references are swapped, because the formula is symmetric in how it defines its own
+    # endpoints. What a swap does break is the ordering -- a policy labelled "greedy"
+    # cannot cost MORE than random unless the labels are wrong. Checking the sign of the
+    # denominator is what actually catches that, and it is free.
+    ordered = bool(g < r)
+    ok = bool(worst <= tolerance and ordered)
+
+    if not np.isfinite(worst):
+        detail = (f"gap closed is UNDEFINED: random costs {r:.3f} and greedy costs "
+                  f"{g:.3f}, so the denominator is ~0. The references are "
+                  f"indistinguishable and no gap-closed number here is meaningful.")
+    elif not ordered:
+        detail = (f"REFERENCES INVERTED: the greedy reference costs {g:.3f} against "
+                  f"random's {r:.3f}. Greedy cannot be worse than random, so the two are "
+                  f"almost certainly swapped -- which silently flips the sign of every "
+                  f"gap-closed number in this file.")
+    elif ok:
+        detail = (f"anchors exact: random -> {at_random:.1e}, greedy -> {at_greedy:.6f} "
+                  f"(costs {r:.3f} vs {g:.3f}).")
+    else:
+        detail = (f"ANCHORS CORRUPT: random -> {at_random:.6f} (expected 0), greedy -> "
+                  f"{at_greedy:.6f} (expected 1), costs {r:.3f} vs {g:.3f}. Every "
+                  f"gap-closed number in this file is on a broken scale.")
+    return Canary("G2 anchors", ok, "fail", worst, tolerance, detail)
+
+
+def canary_informative_fraction(fraction: float, floor: float = 0.10) -> Canary:
+    """G3 -- refuse to report oracle agreement computed from almost nothing.
+
+    `optimal_rate` averages over steps where the oracle had a preference. When nearly every
+    step is a tie, that average rests on a handful of actions and means essentially
+    nothing -- which is how "99.4-100% oracle agreement" came to be reported and then
+    retracted, having been 93-98% vacuous.
+
+    Fails, but note the blast radius: this invalidates `optimal_rate` and `mean_regret`
+    only. Gap closed, solve rate and cost are unaffected.
+    """
+    ok = bool(np.isfinite(fraction) and fraction >= floor)
+    if not np.isfinite(fraction):
+        detail = "no scored actions at all, so oracle agreement is undefined, not high."
+    elif ok:
+        detail = (f"{fraction:.1%} of scored actions were ones the oracle had a preference "
+                  f"about; agreement numbers rest on a real sample.")
+    else:
+        detail = (f"only {fraction:.1%} of scored actions were informative (floor "
+                  f"{floor:.0%}) -- optimal_rate and mean_regret here come from too few "
+                  f"real choices to mean anything. Gap closed is unaffected.")
+    return Canary("G3 informative fraction", ok, "fail", fraction, floor, detail)
+
+
+def canary_seed_spread(gap_values: Sequence[float], limit: float = 0.5) -> Canary:
+    """G4 -- a good median across seeds can hide an unstable configuration.
+
+    `pernode_best` without action memory ran from +1.043 to -1.766 across seeds. Reading
+    the median alone would have called that a success; it is a coin flip. A spread this
+    wide means the seed, not the architecture, is doing the work.
+
+    Warns: wide spread is information about variance, not evidence the run is wrong.
+    """
+    values = np.asarray([v for v in gap_values if np.isfinite(v)], dtype=float)
+    if values.size < 2:
+        return Canary("G4 seed spread", True, "warn", None, limit,
+                      f"only {values.size} finite seed(s); spread is not defined.")
+    spread = float(values.max() - values.min())
+    ok = bool(spread <= limit)
+    detail = (f"gap closed spans {spread:.3f} across {values.size} seeds "
+              f"({values.min():+.3f} to {values.max():+.3f})")
+    detail += ("." if ok else
+               f" -- above the {limit:.2f} limit, so the median is not a safe summary. "
+               f"Treat this configuration as unstable rather than as good.")
+    return Canary("G4 seed spread", ok, "warn", spread, limit, detail)
+
+
+def canary_gate1(gate1: Optional[dict]) -> Canary:
+    """G5 -- was the environment's validity checked for THIS run?
+
+    GATE 1 was verified once at d=3 and silently stopped holding from d=5 upward, which
+    invalidated a night of runs. The failure was not that the gate was wrong; it is that
+    its result lived in a different file from the results it qualified. So the ABSENCE of
+    a check is itself a finding here, and is reported distinctly from a check that ran and
+    failed.
+    """
+    if gate1 is None:
+        return Canary("G5 gate 1 recorded", False, "fail", None, None,
+                      "GATE 1 was NOT evaluated for this run, so nothing establishes that "
+                      "the task required intervening at this d and n_obs. This is exactly "
+                      "the state that invalidated the d>=5 runs.")
+    rate, target = float(gate1["rate"]), float(gate1["target"])
+    ok = bool(gate1["passed"])
+    detail = (f"observational-only rate {rate:.4f} against a singleton fraction of "
+              f"{target:.4f}")
+    detail += (" -- the task requires intervening." if ok else
+               " -- GATE 1 FAILED, so this environment does not match its specification "
+               "and the results below describe a different task than intended.")
+    return Canary("G5 gate 1 recorded", ok, "fail", rate, target, detail)
+
+
+def collect_canaries(per_seed: List[dict], gate1: Optional[dict], n_actions: int,
+                     random_ref=None, greedy_ref=None,
+                     budget: Optional[int] = None) -> List[dict]:
+    """All five canaries for one configuration, ready to serialise into the result JSON.
+
+    Built defensively: a canary that raised would take down a run that has already spent
+    hours of compute, so an internal failure becomes a recorded, failing canary rather
+    than an exception.
+    """
+    out: List[Canary] = []
+
+    entropies = [s.get("final_entropy", float("nan")) for s in per_seed]
+    finite = [e for e in entropies if np.isfinite(e)]
+    out.append(_safe(canary_entropy,
+                     float(np.mean(finite)) if finite else float("nan"), n_actions))
+
+    if random_ref is not None and greedy_ref is not None and budget is not None:
+        out.append(_safe(canary_anchors, random_ref, greedy_ref, budget))
+    else:
+        out.append(Canary("G2 anchors", False, "fail", None, None,
+                          "references unavailable, so the gap-closed scale was not "
+                          "checked."))
+
+    fractions = [s.get("deterministic", {}).get("informative_fraction", float("nan"))
+                 for s in per_seed]
+    finite_f = [f for f in fractions if np.isfinite(f)]
+    out.append(_safe(canary_informative_fraction,
+                     float(np.mean(finite_f)) if finite_f else float("nan")))
+
+    out.append(_safe(canary_seed_spread,
+                     [s.get("gap_closed", float("nan")) for s in per_seed]))
+    out.append(_safe(canary_gate1, gate1))
+    return [c.as_dict() for c in out]
+
+
+def _safe(fn: Callable, *args) -> Canary:
+    try:
+        return fn(*args)
+    except Exception as exc:  # noqa: BLE001 -- never lose a completed run to a check
+        return Canary(getattr(fn, "__name__", "canary"), False, "fail", None, None,
+                      f"canary raised {type(exc).__name__}: {exc}")
