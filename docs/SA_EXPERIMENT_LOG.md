@@ -1189,3 +1189,55 @@ of exact-sampling regret AT d=6, not just at d=4.
 (§ earlier entry), so belief representation is solved. The ORACLE is not. Until the sampler
 improves, d=7+ can be trained but not fairly evaluated, since gap_closed needs a
 trustworthy greedy reference.
+
+## 2026-08-15 — Attempted sampler improvement FAILED; MH was correct all along
+
+[CORRECTED] I replaced the single-edge MH chain with parent-set Gibbs, on the reasoning
+that resampling a whole parent set from its exact conditional would cross the
+low-probability valley that blocks edge reversals. **That reasoning was wrong and I stated
+it to the user before testing it.**
+
+A single-node Gibbs update changes ONE node's parents. Flipping u->v to v->u changes BOTH
+endpoints' parent sets, so it takes two updates, and the state in between is exactly the
+valley. Gibbs, despite never rejecting anything, cannot cross precisely the gap that
+matters -- and it loses the atomic reversal move that MH already had.
+
+[MEASURED] Gibbs alone froze: 3 distinct graphs among 500 draws, against an exact posterior
+with effective support 9.1 graphs whose top two entries are tied at 0.3328 each. Tied mass
+means Markov-equivalent DAGs, and those are exactly what a coordinated flip is needed to
+reach. Oracle regret 0.2301 / 0.4055 / 0.4358 at d=4/5/6, against MH's 0.0037 / 0.0036 /
+0.0559.
+
+[MEASURED] Adding atomic reversals back improved MIXING substantially -- distinct graphs
+3 -> 24/130/272, reversal acceptance 6-12% -> 26-35% -- and did NOT improve accuracy. That
+combination is the signature of a correctness bug rather than a mixing problem, which is
+what prompted checking the samplers directly instead of through the oracle.
+
+[MEASURED] Direct check, sampled graph frequency against exact posterior probability, d=4,
+20000 draws, total variation distance:
+
+| interventions | target top mass | MH | Gibbs+reversal |
+|---|---|---|---|
+| 0 | 0.1195 | 0.0217 | 0.0684 |
+| 1 | 0.4876 | **0.0085** | 0.3888 |
+| 3 | 0.9862 | **0.0037** | 0.1227 |
+
+MH is correct throughout and gets BETTER as the posterior concentrates. The Gibbs-based
+sampler is systematically wrong, worst on interventional data, and does not improve with
+chain length. Root cause not yet found; the failure is localised to the Gibbs step, since
+MH shares the same score table and target and is fine.
+
+[DECIDED] Keep MH. Do not ship the Gibbs sampler. The measurement that motivated replacing
+it has been reinterpreted:
+
+MH's total variation distance at d=4 is 0.0037-0.02, which is not a badly-mixing chain. The
+earlier d=6 oracle regret of 0.0559 was measured at 1000 samples with burn-in 3000 and
+thin 10, whereas this direct check used 20000 draws with burn-in 5000. So the likely
+explanation is **chain length at d=6, not the move set** -- consistent with warm-starting
+having already cut d=5 regret 4x. That is a cheap thing to test and should be tested before
+any further move-set work.
+
+[DECIDED] Process note. The bug was found only because the sampler was checked DIRECTLY
+against the exact posterior rather than through the oracle. Measuring through a downstream
+consumer conflated two questions and made a correctness failure look like a mixing problem.
+The direct check is now the first thing to run on any future sampler.
