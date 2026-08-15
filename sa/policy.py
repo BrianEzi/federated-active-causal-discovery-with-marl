@@ -57,6 +57,34 @@ class PPOConfig:
     step_cost: float = 0.05
     seed: int = 0
 
+    # -- two diagnostic levers, both added to test one measured failure ----------------
+    #
+    # The agent learns NOT TO PASS within ~1500 episodes and then never learns WHERE to
+    # intervene, settling at exactly random-policy cost. The suspected reason is that
+    # pass-versus-act is a large, consistent contrast in return while which-node is a small
+    # one, and both share a single batch-wide advantage normalisation -- so the small
+    # contrast is a small share of the normalised advantage. These are the two ways to
+    # attack that directly.
+
+    # Drop `pass` from the action space entirely. If the mechanism above is right, removing
+    # the large contrast should let the small one dominate. NOTE: an agent without `pass`
+    # satisfies the under-acting criterion by construction, so that check becomes VACUOUS
+    # for it and must not be read as evidence -- exactly the trap that produced a retracted
+    # oracle-agreement figure earlier in this project.
+    allow_pass: bool = True
+
+    # Potential-based shaping on the posterior's entropy: F = gamma*phi(s') - phi(s) with
+    # phi = -H(posterior)/log(n_dags), i.e. higher when belief is sharper. This gives a
+    # dense per-step signal about whether THIS intervention was informative, which is
+    # precisely the credit assignment the sparse terminal reward fails to deliver.
+    #
+    # Policy-invariant by construction (Ng, Harada & Russell 1999): any potential-based
+    # term leaves the optimal policy unchanged, whatever its scale. That is why this is
+    # admissible here when arbitrary reward shaping is not -- it cannot invent a better
+    # policy that the unshaped objective would not also prefer. phi is forced to 0 at
+    # terminal states, which the guarantee requires for episodic tasks.
+    shaping_coef: float = 0.0
+
 
 class ActorCritic(nn.Module):
     """Two-headed MLP. Shared trunk, separate policy and value heads."""
@@ -81,7 +109,11 @@ class ActorCritic(nn.Module):
 
 
 def action_to_env(action_index: int, d: int) -> int:
-    """Index `d` is pass; indices `0..d-1` are node interventions."""
+    """Index `d` is pass; indices `0..d-1` are node interventions.
+
+    With `allow_pass=False` the action space is only `d` wide, so index `d` never occurs
+    and every action maps straight through to a node.
+    """
     return PASS_ACTION if action_index == d else action_index
 
 
@@ -95,7 +127,11 @@ class PPOAgent:
         self.env = CausalDiscoveryEnv(env_config, space=space)
 
         self.d = env_config.d
-        self.n_actions = self.d + 1
+        self.n_actions = self.d + 1 if ppo_config.allow_pass else self.d
+        # Normaliser for the shaping potential: entropy of a uniform posterior, so phi
+        # lands in [-1, 0] regardless of d and shaping_coef means the same thing at every
+        # problem size.
+        self._max_entropy = float(np.log(self.env.space.n_dags))
         self.obs_dim = self.env.observation_dim[ppo_config.observation]
         self.net = ActorCritic(self.obs_dim, self.n_actions, ppo_config.hidden)
         self.optimiser = torch.optim.Adam(self.net.parameters(), lr=ppo_config.lr)
@@ -106,6 +142,17 @@ class PPOAgent:
 
     def _observe(self) -> np.ndarray:
         return self.env.observation(self.cfg.observation)
+
+    def _potential(self, result) -> float:
+        """phi(s) = -H(posterior) / log(n_dags), in [-1, 0]; higher means sharper belief.
+
+        Normalised by the uniform-posterior entropy so that `shaping_coef` carries the same
+        meaning at every d, rather than silently scaling with the size of the graph space.
+        """
+        posterior = np.asarray(result.posterior, dtype=np.float64)
+        nonzero = posterior[posterior > 0]
+        entropy = float(-np.sum(nonzero * np.log(nonzero)))
+        return -entropy / self._max_entropy
 
     @torch.no_grad()
     def act(self, obs: np.ndarray, deterministic: bool = False):
@@ -135,12 +182,20 @@ class PPOAgent:
 
             while not result.done:
                 obs = self._observe()
+                potential = self._potential(result)
                 action, logp, value = self.act(obs)
                 result = self.env.step(action_to_env(action, self.d))
 
                 reward = -self.cfg.step_cost
                 if result.identified:
                     reward += 1.0
+                if self.cfg.shaping_coef:
+                    # F = gamma * phi(s') - phi(s), with phi forced to 0 at terminal
+                    # states as the policy-invariance guarantee requires.
+                    next_potential = 0.0 if result.done else self._potential(result)
+                    reward += self.cfg.shaping_coef * (
+                        self.cfg.gamma * next_potential - potential
+                    )
 
                 obs_buf.append(obs)
                 act_buf.append(action)

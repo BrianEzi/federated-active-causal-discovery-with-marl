@@ -126,3 +126,68 @@ def test_advantages_do_not_bootstrap_across_episode_boundaries(agent):
     values = np.array([0.0, 0.0], dtype=np.float32)
     done_then_not = agent._advantages(rewards, values, np.array([1.0, 0.0], dtype=np.float32))[1]
     assert done_then_not[0] == pytest.approx(1.0)
+
+
+# --- the two diagnostic levers ---------------------------------------------------------
+#
+# Both exist to attack one measured failure: the agent learns not to pass within ~1500
+# episodes and then never learns where to intervene, ending at exactly random-policy cost.
+
+def test_removing_pass_shrinks_the_action_space(space3):
+    agent = PPOAgent(EnvConfig(d=3, n_obs=200),
+                     PPOConfig(allow_pass=False, seed=0), space=space3)
+    assert agent.n_actions == agent.d, "pass should be gone, leaving one action per node"
+
+
+def test_an_agent_without_pass_never_emits_the_pass_action(space3):
+    """The under-acting criterion is satisfied by CONSTRUCTION for such an agent, so it
+    must not be read as evidence of good behaviour -- this test pins the reason why."""
+    agent = PPOAgent(EnvConfig(d=3, n_obs=200),
+                     PPOConfig(allow_pass=False, seed=0), space=space3)
+    env = CausalDiscoveryEnv(agent.env_config, space=space3)
+    env.reset(seed=0)
+    policy = agent.as_policy(deterministic=False)
+    torch.manual_seed(0)
+    assert all(policy(env, None) != PASS_ACTION for _ in range(60))
+
+
+def test_shaping_potential_is_normalised_and_ordered(space3):
+    """phi in [-1, 0], and a sharper belief must score higher than a flat one."""
+    agent = PPOAgent(EnvConfig(d=3, n_obs=200), PPOConfig(seed=0), space=space3)
+
+    class R:
+        pass
+    flat, sharp = R(), R()
+    flat.posterior = np.full(space3.n_dags, 1.0 / space3.n_dags)
+    sharp.posterior = np.zeros(space3.n_dags); sharp.posterior[4] = 1.0
+
+    assert agent._potential(flat) == pytest.approx(-1.0)
+    assert agent._potential(sharp) == pytest.approx(0.0)
+    assert -1.0 <= agent._potential(flat) <= agent._potential(sharp) <= 0.0
+
+
+def test_shaping_telescopes_to_zero_over_an_episode(space3):
+    """The property that makes potential-based shaping policy-invariant: summed
+    undiscounted over an episode ending in a terminal state, the shaping contributes
+    phi(terminal) - phi(start) = -phi(start), never a payoff that depends on the ROUTE
+    taken. A shaping term that failed this could invent a better-looking policy that the
+    unshaped objective would not prefer (Ng, Harada & Russell 1999)."""
+    agent = PPOAgent(EnvConfig(d=3, n_obs=200),
+                     PPOConfig(gamma=1.0, shaping_coef=1.0, seed=0), space=space3)
+
+    class R:
+        pass
+    potentials = []
+    for mass in (0.2, 0.5, 0.9):
+        r = R(); r.posterior = np.full(space3.n_dags, (1 - mass) / (space3.n_dags - 1))
+        r.posterior[0] = mass
+        potentials.append(agent._potential(r))
+
+    # gamma = 1, phi(terminal) = 0
+    total = sum(b - a for a, b in zip(potentials, potentials[1:] + [0.0]))
+    assert total == pytest.approx(-potentials[0])
+
+
+def test_shaping_off_by_default_leaves_rewards_untouched(space3):
+    assert PPOConfig().shaping_coef == 0.0
+    assert PPOConfig().allow_pass is True
