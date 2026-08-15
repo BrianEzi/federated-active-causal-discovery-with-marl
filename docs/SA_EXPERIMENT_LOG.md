@@ -1135,3 +1135,57 @@ the claim is "MH reproduces edge marginals", not "MH supports the oracle".
 [MEASURED] Cost note: 4000 draws take ~0.7 s at d=6, and the oracle needs ~1000, so ~0.2 s
 per step. The posterior changes only slightly between steps, so warm-starting the chain
 from the previous step's DAG should reduce this substantially; untested.
+
+## 2026-08-15 — Oracle acceptance test: MH is NOT good enough at d=6
+
+[MEASURED] The full pipeline with no enumeration anywhere under test:
+local score table -> MH samples -> descendants per sample -> entropy -> chosen target,
+compared against the exact oracle on the exact posterior. Realistic posteriors from actual
+episodes, restricted to steps where the oracle has a preference.
+
+| d | start | samples | agreement | mean regret | max regret | ms/step |
+|---|---|---|---|---|---|---|
+| 4 | warm | 1000 | 94.6% | 0.0037 | 0.137 | 227 |
+| 5 | warm | 1000 | 87.1% | 0.0036 | 0.108 | 248 |
+| 6 | warm | 1000 | 81.0% | **0.0559** | **0.772** | 353 |
+| 5 | cold | 1000 | 87.1% | 0.0151 | 0.693 | 385 |
+| 5 | warm | 3000 | 91.9% | 0.0016 | 0.042 | 985 |
+
+[CORRECTED] This is a FAILED acceptance test, and the caution recorded earlier was
+justified rather than pro forma. Against the same measurement using samples drawn from the
+enumerated posterior -- the ideal sampler -- MH is:
+
+| d | exact-sampling regret @1000 | MH regret @1000 | ratio |
+|---|---|---|---|
+| 4 | 0.0010 | 0.0037 | 3.7x |
+| 5 | 0.0009 | 0.0036 | 4.0x |
+| 6 | 0.0009 | 0.0559 | **62x** |
+
+The degradation grows sharply with d, which is precisely the wrong direction: the entire
+reason for building this was to scale d past 6. A max regret of 0.772 nats at d=6, against
+oracle scores of order 1 nat, is a single-step error large enough to change which
+experiment gets run.
+
+[CORRECTED] Edge marginals did not transfer, exactly as flagged. The same chain reproduced
+enumerated edge marginals to 0.0099 max error at d=6 while losing 0.0559 nats of oracle
+regret. Per-edge accuracy is not joint accuracy, and descendant sets are a joint property.
+Recording this because the earlier check looked like validation and was not.
+
+[MEASURED] Two things that do help, neither sufficient. Warm-starting the chain from the
+previous step's graph cuts d=5 mean regret from 0.0151 to 0.0036 AND is faster (385 -> 248
+ms/step), because the posterior moves only slightly between steps. Raising samples from
+1000 to 3000 cuts d=5 regret from 0.0036 to 0.0016 at 4x the cost -- and cost already
+dominates, so this does not scale.
+
+[DECIDED] The blocker is chain mixing, not sample count. Acceptance is 6-12%, and the
+single-edge move set is the known culprit: a reversal must pass through a lower-probability
+intermediate. This is a solved problem in the literature rather than an open one --
+Grzegorczyk & Husmeier's new edge-reversal move, or partition MCMC (Kuipers & Moffa), both
+recorded in docs/THEORY_NOTES.md. Next step is to implement one and re-run exactly this
+test, which is now a fixed acceptance criterion: MH regret must stay within a small factor
+of exact-sampling regret AT d=6, not just at d=4.
+
+[DECIDED] Status of scaling d past 6: subset DP gives the posterior exactly and cheaply
+(§ earlier entry), so belief representation is solved. The ORACLE is not. Until the sampler
+improves, d=7+ can be trained but not fairly evaluated, since gap_closed needs a
+trustworthy greedy reference.
