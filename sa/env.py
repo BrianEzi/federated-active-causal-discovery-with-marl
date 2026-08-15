@@ -185,7 +185,13 @@ class CausalDiscoveryEnv:
         d, but lossy: it discards correlations between edges, so the problem becomes
         partially observed. The gap between the two is the thing worth measuring.
         """
-        budget_left = np.array([self.config.budget - self.n_interventions], dtype=float)
+        # Normalised to [0, 1]. Raw counts were a real bug: the budget feature sat at 20.0
+        # while posterior entries averaged 0.04, a ~500x scale mismatch that saturated the
+        # tanh trunk and drowned out the belief the agent is supposed to act on.
+        budget_left = np.array(
+            [(self.config.budget - self.n_interventions) / max(self.config.budget, 1)],
+            dtype=float,
+        )
         if kind == "posterior":
             return np.concatenate([self.posterior, budget_left])
         if kind == "edge_marginals":

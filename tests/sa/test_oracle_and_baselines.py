@@ -9,7 +9,13 @@ was 93-98% vacuous.
 import numpy as np
 import pytest
 
-from sa.baselines import GreedyOraclePolicy, RandomPolicy, make_baselines, no_intervention_policy
+from sa.baselines import (
+    EdgeMarginalGreedyPolicy,
+    GreedyOraclePolicy,
+    RandomPolicy,
+    make_baselines,
+    no_intervention_policy,
+)
 from sa.env import PASS_ACTION, CausalDiscoveryEnv, EnvConfig
 from sa.gates import bootstrap_ci, check_gate_2, run_policy
 from sa.graphs import build_graph_space
@@ -161,7 +167,8 @@ def test_no_intervention_baseline_matches_the_gate_1_rate():
 
 def test_make_baselines_provides_the_standard_set(space3):
     baselines = make_baselines(space3)
-    assert set(baselines) == {"no_intervention", "random", "greedy_oracle"}
+    assert set(baselines) == {"no_intervention", "random", "greedy_oracle",
+                              "edge_marginal_greedy"}
 
 
 # --- GATE 2 --------------------------------------------------------------------------
@@ -189,3 +196,48 @@ def test_gate_2_reports_failure_when_the_two_policies_are_identical():
     oracle = make_baselines(space, seed=0)["greedy_oracle"]
     result = check_gate_2(cfg, oracle, oracle, n_episodes=80, seed=1)
     assert not result.passed and "OVERLAP" in result.detail
+
+
+# --- the condition-B opponent -------------------------------------------------------
+
+def test_edge_marginal_greedy_reconstruction_is_a_distribution(space3):
+    """The independent-edge rebuild must stay a valid distribution over DAGs, despite the
+    independence assumption ignoring acyclicity."""
+    policy = EdgeMarginalGreedyPolicy(space3, seed=0)
+    rng = np.random.default_rng(0)
+    for _ in range(5):
+        posterior = rng.dirichlet(np.ones(space3.n_dags))
+        approx = policy.approximate_posterior(posterior)
+        assert approx.min() >= 0.0
+        assert float(approx.sum()) == pytest.approx(1.0)
+
+
+def test_edge_marginal_greedy_recovers_a_point_mass(space3):
+    """When the posterior is certain, the edge marginals are 0/1 and the reconstruction
+    must return that same graph -- no information is lost in the degenerate case."""
+    policy = EdgeMarginalGreedyPolicy(space3, seed=0)
+    point = np.zeros(space3.n_dags); point[7] = 1.0
+    assert int(np.argmax(policy.approximate_posterior(point))) == 7
+
+
+def test_edge_marginal_greedy_is_close_to_but_not_identical_to_full_posterior_greedy(space3):
+    """It is the right opponent for a condition-B agent precisely because it differs only
+    by the lost cross-edge correlations -- measured at +3% interventions at d=3."""
+    cfg = EnvConfig(d=3, n_obs=200, budget=20)
+    full = run_policy(cfg, GreedyOraclePolicy(space3, 0), 60, seed=3)
+    edge = run_policy(cfg, EdgeMarginalGreedyPolicy(space3, 0), 60, seed=3)
+    full_steps = full["n_interventions"][full["identified"] > 0.5].mean()
+    edge_steps = edge["n_interventions"][edge["identified"] > 0.5].mean()
+    assert edge_steps >= full_steps - 0.1, "edge marginals should not beat the exact posterior"
+    assert edge_steps < full_steps * 1.5, "the compression cost should be modest, not ruinous"
+
+
+def test_baseline_policies_are_resettable(space3):
+    """Stateful policies must restore their RNG, or the same policy scores differently on
+    repeated evaluation -- which broke the metric's anchors (random read 0.233, not 0.0)."""
+    for policy in (RandomPolicy(seed=1), GreedyOraclePolicy(space3, seed=1),
+                   EdgeMarginalGreedyPolicy(space3, seed=1)):
+        assert hasattr(policy, "reset")
+        first = policy.rng.random()
+        policy.reset()
+        assert policy.rng.random() == pytest.approx(first)

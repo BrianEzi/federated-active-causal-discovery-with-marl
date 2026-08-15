@@ -1,0 +1,254 @@
+"""PPO agent for single-agent active causal discovery.
+
+Deliberately plain. A feedforward actor-critic, a clipped surrogate objective, GAE, and
+nothing else -- no recurrence, no exploration bonus, no reward shaping. Each of those was
+a lever in the previous codebase and none of them earned its place.
+
+**No recurrence, on purpose.** Under observation condition A the agent sees the exact
+posterior, which is a sufficient statistic for everything observed so far: nothing in the
+history adds information beyond it. That makes the problem a proper MDP, so a feedforward
+network is enough. It also structurally removes the saturating running-average state that
+was diagnosed as the cause of the previous project's greedy-policy collapse -- a posterior
+sharpens with evidence, it does not saturate. Under condition B (edge marginals) the
+representation is lossy and the problem is formally partially observed, so recurrence could
+help there; that is left as a measured question rather than assumed.
+
+**Reward: +1 on identification, minus a small cost per step.** A shortest-path objective.
+Nothing is added to it, which means no potential-based-shaping analysis is needed to know
+what the optimal policy is (see docs/THEORY_NOTES.md #8 for why that mattered before).
+
+**Action space is `d + 1`**: one action per node, plus pass. Passing is a real decision --
+it ends the episode -- so "should I act at all" is something the agent must learn rather
+than something the action space decides for it. It is also what makes under-acting
+measurable, which is a hard-fail criterion.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional
+
+import numpy as np
+import torch
+import torch.nn as nn
+
+from sa.env import PASS_ACTION, CausalDiscoveryEnv, EnvConfig
+
+
+@dataclass
+class PPOConfig:
+    observation: str = "posterior"     # or "edge_marginals"
+    hidden: int = 128
+    lr: float = 3e-4
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+    clip: float = 0.2
+    # Lowered from 0.01 after the first training run: entropy plateaued at 1.09 against a
+    # 1.386 maximum, so the policy stayed near-uniform and argmax was arbitrary -- the
+    # deterministic policy always picked the same node regardless of belief. That is the
+    # same greedy-collapse signature as the previous project, reproduced here from an
+    # exploration bonus that never decayed.
+    entropy_coef: float = 0.003
+    value_coef: float = 0.5
+    max_grad_norm: float = 0.5
+    epochs_per_update: int = 4
+    minibatch: int = 256
+    episodes_per_update: int = 32
+    total_episodes: int = 6000
+    step_cost: float = 0.05
+    seed: int = 0
+
+
+class ActorCritic(nn.Module):
+    """Two-headed MLP. Shared trunk, separate policy and value heads."""
+
+    def __init__(self, obs_dim: int, n_actions: int, hidden: int = 128):
+        super().__init__()
+        self.trunk = nn.Sequential(
+            nn.Linear(obs_dim, hidden), nn.Tanh(),
+            nn.Linear(hidden, hidden), nn.Tanh(),
+        )
+        self.policy_head = nn.Linear(hidden, n_actions)
+        self.value_head = nn.Linear(hidden, 1)
+
+        # Small final-layer policy weights so the initial policy is close to uniform.
+        # Without this the agent can start almost deterministic and never explore.
+        nn.init.orthogonal_(self.policy_head.weight, gain=0.01)
+        nn.init.zeros_(self.policy_head.bias)
+
+    def forward(self, obs: torch.Tensor):
+        h = self.trunk(obs)
+        return self.policy_head(h), self.value_head(h).squeeze(-1)
+
+
+def action_to_env(action_index: int, d: int) -> int:
+    """Index `d` is pass; indices `0..d-1` are node interventions."""
+    return PASS_ACTION if action_index == d else action_index
+
+
+class PPOAgent:
+    """Trains and acts. `as_policy()` yields a callable usable by `sa.evaluate`."""
+
+    def __init__(self, env_config: EnvConfig, ppo_config: PPOConfig, space=None):
+        self.env_config = env_config
+        self.cfg = ppo_config
+        torch.manual_seed(ppo_config.seed)
+        self.env = CausalDiscoveryEnv(env_config, space=space)
+
+        self.d = env_config.d
+        self.n_actions = self.d + 1
+        self.obs_dim = self.env.observation_dim[ppo_config.observation]
+        self.net = ActorCritic(self.obs_dim, self.n_actions, ppo_config.hidden)
+        self.optimiser = torch.optim.Adam(self.net.parameters(), lr=ppo_config.lr)
+        self.rng = np.random.default_rng(ppo_config.seed)
+        self.history: List[dict] = []
+
+    # -- acting --------------------------------------------------------------------
+
+    def _observe(self) -> np.ndarray:
+        return self.env.observation(self.cfg.observation)
+
+    @torch.no_grad()
+    def act(self, obs: np.ndarray, deterministic: bool = False):
+        logits, value = self.net(torch.as_tensor(obs, dtype=torch.float32))
+        if deterministic:
+            action = int(torch.argmax(logits).item())
+            return action, torch.tensor(0.0), value
+        dist = torch.distributions.Categorical(logits=logits)
+        action = dist.sample()
+        return int(action.item()), dist.log_prob(action), value
+
+    # -- training ------------------------------------------------------------------
+
+    def _collect(self, n_episodes: int) -> dict:
+        obs_buf, act_buf, logp_buf, rew_buf, val_buf, done_buf = [], [], [], [], [], []
+        solved, lengths = [], []
+
+        for _ in range(n_episodes):
+            seed = int(self.rng.integers(1 << 31))
+            result = self.env.reset(seed=seed)
+            # A graph already identified from observational data is a valid episode with
+            # nothing to do; skip it rather than training on a zero-length trajectory.
+            if result.done:
+                solved.append(float(result.identified))
+                lengths.append(0)
+                continue
+
+            while not result.done:
+                obs = self._observe()
+                action, logp, value = self.act(obs)
+                result = self.env.step(action_to_env(action, self.d))
+
+                reward = -self.cfg.step_cost
+                if result.identified:
+                    reward += 1.0
+
+                obs_buf.append(obs)
+                act_buf.append(action)
+                logp_buf.append(float(logp))
+                val_buf.append(float(value))
+                rew_buf.append(reward)
+                done_buf.append(float(result.done))
+
+            solved.append(float(result.identified))
+            lengths.append(result.n_interventions)
+
+        return {
+            "obs": np.array(obs_buf, dtype=np.float32),
+            "actions": np.array(act_buf, dtype=np.int64),
+            "logp": np.array(logp_buf, dtype=np.float32),
+            "values": np.array(val_buf, dtype=np.float32),
+            "rewards": np.array(rew_buf, dtype=np.float32),
+            "dones": np.array(done_buf, dtype=np.float32),
+            "solve_rate": float(np.mean(solved)) if solved else float("nan"),
+            "mean_length": float(np.mean(lengths)) if lengths else float("nan"),
+        }
+
+    def _advantages(self, rewards, values, dones):
+        """GAE. Bootstrapping is cut at episode boundaries via `dones`.
+
+        Normalised over the whole batch AFTER computing returns, so returns stay on the
+        reward's scale -- normalising before would corrupt the value targets, which is a
+        bug this project has hit before.
+        """
+        advantages = np.zeros_like(rewards)
+        running = 0.0
+        for t in reversed(range(len(rewards))):
+            next_value = 0.0 if dones[t] else (values[t + 1] if t + 1 < len(values) else 0.0)
+            delta = rewards[t] + self.cfg.gamma * next_value * (1.0 - dones[t]) - values[t]
+            running = delta + self.cfg.gamma * self.cfg.gae_lambda * (1.0 - dones[t]) * running
+            advantages[t] = running
+        returns = advantages + values
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        return advantages, returns
+
+    def _update(self, batch: dict) -> dict:
+        advantages, returns = self._advantages(batch["rewards"], batch["values"], batch["dones"])
+        obs = torch.as_tensor(batch["obs"])
+        actions = torch.as_tensor(batch["actions"])
+        old_logp = torch.as_tensor(batch["logp"])
+        advantages_t = torch.as_tensor(advantages, dtype=torch.float32)
+        returns_t = torch.as_tensor(returns, dtype=torch.float32)
+
+        n = len(actions)
+        losses = []
+        for _ in range(self.cfg.epochs_per_update):
+            order = torch.randperm(n)
+            for start in range(0, n, self.cfg.minibatch):
+                idx = order[start:start + self.cfg.minibatch]
+                logits, values = self.net(obs[idx])
+                dist = torch.distributions.Categorical(logits=logits)
+                logp = dist.log_prob(actions[idx])
+
+                ratio = torch.exp(logp - old_logp[idx])
+                unclipped = ratio * advantages_t[idx]
+                clipped = torch.clamp(ratio, 1 - self.cfg.clip, 1 + self.cfg.clip) * advantages_t[idx]
+                policy_loss = -torch.min(unclipped, clipped).mean()
+                value_loss = ((values - returns_t[idx]) ** 2).mean()
+                entropy = dist.entropy().mean()
+
+                loss = (policy_loss
+                        + self.cfg.value_coef * value_loss
+                        - self.cfg.entropy_coef * entropy)
+
+                self.optimiser.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.max_grad_norm)
+                self.optimiser.step()
+                losses.append((policy_loss.item(), value_loss.item(), entropy.item()))
+
+        arr = np.array(losses)
+        return {"policy_loss": float(arr[:, 0].mean()),
+                "value_loss": float(arr[:, 1].mean()),
+                "entropy": float(arr[:, 2].mean())}
+
+    def train(self, verbose: bool = False) -> List[dict]:
+        episodes_done = 0
+        while episodes_done < self.cfg.total_episodes:
+            batch = self._collect(self.cfg.episodes_per_update)
+            episodes_done += self.cfg.episodes_per_update
+            if len(batch["actions"]) == 0:
+                continue  # every episode was pre-solved; nothing to learn from
+            stats = self._update(batch)
+            record = {"episodes": episodes_done,
+                      "solve_rate": batch["solve_rate"],
+                      "mean_length": batch["mean_length"], **stats}
+            self.history.append(record)
+            if verbose:
+                print(f"ep {episodes_done:>6} | solve {record['solve_rate']:.2f} "
+                      f"| len {record['mean_length']:.2f} | entropy {record['entropy']:.3f}")
+        return self.history
+
+    # -- deployment ------------------------------------------------------------------
+
+    def as_policy(self, deterministic: bool = True):
+        """A callable `(env, result) -> action` for `sa.evaluate`.
+
+        `deterministic=True` is the deployment condition and the one every pass/fail
+        number comes from. The sampled variant exists only to detect a collapse gap
+        between the two -- the specific failure that ended the previous round.
+        """
+        def policy(env: CausalDiscoveryEnv, result) -> int:
+            obs = env.observation(self.cfg.observation)
+            action, _, _ = self.act(obs, deterministic=deterministic)
+            return action_to_env(action, env.config.d)
+        return policy

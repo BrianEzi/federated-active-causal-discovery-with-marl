@@ -19,6 +19,7 @@ import numpy as np
 
 from sa.env import PASS_ACTION, CausalDiscoveryEnv
 from sa.oracle import InterventionOracle
+from sa.posterior import edge_marginals
 
 
 def no_intervention_policy(env: CausalDiscoveryEnv, result) -> int:
@@ -35,7 +36,17 @@ class RandomPolicy:
     """
 
     def __init__(self, seed: int = 0):
+        self._seed = seed
         self.rng = np.random.default_rng(seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """Restore the RNG so repeated evaluations of this policy are identical.
+
+        Without this, evaluating the same policy twice gives different results because the
+        generator has advanced -- which made `random` score gap-closed 0.233 instead of the
+        0.000 it is by definition, and `greedy` 1.067 instead of 1.000.
+        """
+        self.rng = np.random.default_rng(self._seed if seed is None else seed)
 
     def __call__(self, env: CausalDiscoveryEnv, result) -> int:
         return int(self.rng.integers(env.config.d))
@@ -53,7 +64,12 @@ class GreedyOraclePolicy:
 
     def __init__(self, space, seed: int = 0):
         self.oracle = InterventionOracle(space)
+        self._seed = seed
         self.rng = np.random.default_rng(seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """See `RandomPolicy.reset` -- tie-breaking must be reproducible across runs."""
+        self.rng = np.random.default_rng(self._seed if seed is None else seed)
 
     def __call__(self, env: CausalDiscoveryEnv, result) -> int:
         scores, best = self.oracle.best_targets(result.posterior)
@@ -62,10 +78,66 @@ class GreedyOraclePolicy:
         return int(self.rng.choice(np.flatnonzero(best)))
 
 
+class EdgeMarginalGreedyPolicy:
+    """Greedy EIG computed from edge marginals alone -- the opponent for a condition-B agent.
+
+    Why this exists as a first-class baseline rather than a diagnostic: an agent whose
+    observation is edge marginals is carrying a *lossier belief* than the full-posterior
+    oracle. Scoring it against that oracle would conflate two separate deficits -- being a
+    worse policy, and knowing less. This policy holds the belief fixed at the agent's level
+    and varies only the policy, which is the comparison that isolates the thing being
+    measured.
+
+    Mechanism: take the true posterior's edge marginals, rebuild an approximate posterior
+    that assumes every edge is independent, then score with the same oracle. The
+    independence assumption is exactly what edge marginals discard, so the gap between this
+    and `GreedyOraclePolicy` is the measured cost of the compression -- +3% at d=3, +5% at
+    d=4, +11% at d=5 in interventions to identify.
+    """
+
+    def __init__(self, space, seed: int = 0):
+        self.space = space
+        self.oracle = InterventionOracle(space)
+        self._seed = seed
+        self.rng = np.random.default_rng(seed)
+        self._dags = space.dags.astype(np.float64)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """See `RandomPolicy.reset`."""
+        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+
+    def approximate_posterior(self, posterior: np.ndarray) -> np.ndarray:
+        """Rebuild a distribution over DAGs from edge marginals alone.
+
+        Each edge is treated as an independent Bernoulli, so a DAG's weight is the product
+        over all ordered pairs of (marginal if the edge is present, 1 - marginal if not).
+        Renormalised over the DAG space, which is what keeps the result a valid
+        distribution despite the independence assumption ignoring acyclicity.
+        """
+        marginals = np.clip(edge_marginals(self.space, posterior), 1e-9, 1 - 1e-9)
+        log_w = (
+            self._dags * np.log(marginals) + (1 - self._dags) * np.log1p(-marginals)
+        ).reshape(self.space.n_dags, -1).sum(axis=1)
+        w = np.exp(log_w - log_w.max())
+        return w / w.sum()
+
+    def __call__(self, env: CausalDiscoveryEnv, result) -> int:
+        approx = self.approximate_posterior(result.posterior)
+        scores, best = self.oracle.best_targets(approx)
+        if scores.max() <= 1e-9:
+            return PASS_ACTION
+        return int(self.rng.choice(np.flatnonzero(best)))
+
+
 def make_baselines(space, seed: int = 0) -> dict:
-    """The standard comparison set, built together so seeds stay aligned."""
+    """The standard comparison set, built together so seeds stay aligned.
+
+    `greedy_oracle` is the opponent for a full-posterior (condition A) agent;
+    `edge_marginal_greedy` is the opponent for an edge-marginal (condition B) agent.
+    """
     return {
         "no_intervention": no_intervention_policy,
         "random": RandomPolicy(seed=seed),
         "greedy_oracle": GreedyOraclePolicy(space, seed=seed),
+        "edge_marginal_greedy": EdgeMarginalGreedyPolicy(space, seed=seed),
     }
