@@ -839,3 +839,65 @@ files remain the record.
 [MEASURED] Full suite 302 passed (was 268 after the optimisation commit, 158 before this
 phase). The 34 new tests are `test_canaries.py` (22) and `test_tracking.py` (11), plus
 one G2 test rewritten to assert the canary itself rather than a side condition.
+
+## 2026-08-15 — Phases 1 and 2 launched
+
+[DECIDED] Depth added to the per-node scorer as `layers`, repeating the neighbour
+aggregation round k times. The constraint that shaped the implementation: `layers=1` has
+to reproduce the network behind the d=4/5/6 results *exactly*, not merely have the same
+shape. Every `nn.Linear` draws from the torch RNG at construction, so creating the extra
+modules anywhere but last would shift the initialisation of everything after them -- and
+the resulting divergence would look like ordinary seed variance, not like a bug. The round
+modules are therefore built last and only when `layers > 1`, and `tests/test_depth.py`
+asserts state-dict and output equality at d=4/5/6, with and without action memory.
+
+Equivariance re-checked at depth 2 and 3. The added rounds gather neighbour embeddings by
+index, which is exactly the mistake an earlier version of this class made -- it pooled
+neighbours in index order and so was equivariant only under permutations that happened to
+preserve that order. Messages are pooled mean+max, as in the first round.
+
+[MEASURED] Local pilot, d=4, 800 episodes, one seed: depth 1/2/3 gave 0.802 / 0.788 /
+0.799. No signal for depth, but that is one cell. Noted here because it is the prior the
+full grid will either confirm or overturn, and recording it now prevents reading the grid
+as confirmation of something already believed.
+
+An earlier pilot at 150 episodes returned 0.592 for all three depths, which looked like
+the parameter being ignored. It was a 49-sample tie -- test accuracy has 1/49 granularity
+there. Confirmed wired in by re-running at 800 episodes, where the depths separate.
+
+[DECIDED] Probe grid restructured from the plan's 24 (d x size x depth) tasks to 24
+(d x size x seed) tasks, each training all three depths on the SAME collected data. Two
+reasons: collection dominates the cost, so this is ~3x cheaper; and it makes "at matched
+data size" in the decision rule literal rather than approximate. The three seeds are the
+important half of the change -- the decision threshold is 0.03 and the pilot showed 0.014
+of spread between depths on identical data, so a single-seed grid would have been applying
+a fine rule to noise.
+
+[DECIDED] Phase 2 baseline moved to the configuration that actually won (per-node,
+lr=1e-3, hidden=256, episodes_per_update=16, action memory on, n_obs=5000). The overnight
+sweep characterised 13 levers around a network that could not express the task whatever
+the lever was set to, so those numbers describe the failure mode rather than the levers.
+E2 repeats all 33 configurations with `arch=flat` and everything else byte-identical; a
+test asserts the two halves differ in `arch` and nothing else, since that is the whole
+basis of the comparison.
+
+[DECIDED] Added a deliberate negative control to both arms: n_obs=1000 at d=5, where GATE
+1 does not pass. Not in the original plan, which specified gate-passing n_obs throughout.
+Included because it costs one task per architecture and converts "the gate matters" from
+an assertion into a measurement. Verified locally before submission: G5 fires with
+"observational-only rate 0.0267 against a singleton fraction of 0.0893 -- GATE 1 FAILED",
+recorded in the result file rather than left for someone to notice later.
+
+[MEASURED] Jobs submitted to Myriad, all queued:
+
+| job | what | tasks |
+|---|---|---|
+| 146493 | P1 depth probe | 24 |
+| 146525 | E1 + E2 lever sweep (33 configs x 2 arches x 3 seeds) | 66 |
+| 146526 | E4 d=6 timing probe, n_obs=20000 | 1 |
+
+E4's full run is deliberately NOT submitted yet. The projection from the hot-path work is
+~2.7 h/seed, but that extrapolates a laptop benchmark to a cluster node, and d=6 runtime
+has been mis-predicted twice already. The probe measures it on a real node first.
+
+[MEASURED] Test suite 335 passed (158 at the start of this phase).
