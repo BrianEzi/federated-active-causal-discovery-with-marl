@@ -689,3 +689,35 @@ prints its verdict, records it in the output JSON, and can be made fatal with
 change of the night: the same "checked once, then assumed" failure has now cost this
 project twice, and it is cheap to prevent — 200 no-intervention episodes against a target
 that is free to compute.
+
+**[CORRECTED] All three d=6 seeds finished; my walltime worry was wrong.** I predicted two
+of three would be killed before writing output. They completed at 4.6-4.8 hours each,
+comfortably inside the 10-hour limit. The estimate was wrong in both directions across the
+night: 3.5h predicted, ~4.7h actual, and then an unfounded fear of overrun on top of it.
+
+Final d=6 results, all three seeds passing their per-seed criteria:
+
+| seed | gap | solve | oracle agreement | entropy | repeat rate |
+|---|---|---|---|---|---|
+| 0 | +1.098 | 0.99 | 0.492 | 0.59 | 0.158 |
+| 1 | +1.098 | 0.99 | 0.445 | 0.96 | 0.173 |
+| 2 | +1.145 | 0.98 | 0.426 | 0.73 | 0.155 |
+
+Repeat rate of 0.15-0.17 is worth noting against the diagnostic's purpose: the collapse it
+was built to detect would push this toward 1.0. The agent revisits targets occasionally,
+which is legitimate — more samples do sharpen a posterior — rather than pathologically.
+
+**[MEASURED] The identical +1.098 on seeds 0 and 1 is a coincidence, not a duplicated run.**
+Both used exactly 400 interventions across 150 episodes, so `mean_cost` is 400/150 for both.
+They differ in regret (0.111 vs 0.136), final entropy (0.59 vs 0.96) and oracle agreement
+(0.492 vs 0.445). Episode costs are integers, so exact ties in the mean are unremarkable —
+but worth checking rather than assuming, since a duplicated run would look identical.
+
+**[CORRECTED] The per-task "OVERALL: FAIL" lines in the d=6 logs are an artefact.** Each
+array task ran a single seed, and `summarise_seeds` requires 4 passing seeds by default, so
+a one-seed summary can never pass regardless of its result. The per-seed verdicts are all
+`passed: True`. Anyone reading those logs directly would draw the opposite conclusion; the
+aggregate in `results/all_runs.csv` is the number that means anything.
+
+**[NOTE] The d=6 result files carry `gate1: None`** because they predate the precondition.
+Their GATE 1 failure is known from the separate audit, not from the runs themselves.

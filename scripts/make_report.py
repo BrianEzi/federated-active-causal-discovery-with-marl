@@ -545,12 +545,20 @@ paid again by every job; in blocks it takes 37 seconds.</p>
 
 <p>The per-node architecture carries over unchanged, which is the point of it: its
 parameter count does not grow with d, so d=6 continues the same experiment rather than
-starting a new one. On its two completed seeds it scores <strong>+1.098</strong> and
-<strong>+1.145</strong> &mdash; beating the myopic oracle again &mdash; at a cost of 2.57
-interventions against greedy's 2.77. It agrees with the oracle on 43&ndash;49% of
-informative steps, against 2&ndash;10% for every configuration that failed: the policy has
-gone from anti-correlated with the oracle to genuinely tracking it, across three million
-candidate graphs.</p>
+starting a new one. All three seeds beat the myopic oracle &mdash; <strong>+1.098,
++1.098, +1.145</strong> &mdash; at 2.57&ndash;2.67 interventions against greedy's 2.86.</p>
+
+<p>The sharper signal is agreement with the oracle: <strong>43&ndash;49%</strong> of
+informative steps, against 2&ndash;10% for every configuration that failed. The policy went
+from anti-correlated with the oracle to genuinely tracking it, across 3.78 million candidate
+graphs. Its repeat rate &mdash; how often it re-targets a node it has already intervened on
+&mdash; sits at 0.15&ndash;0.17, against the near-total collapse that diagnostic was built
+to catch.</p>
+
+<p>Two seeds report an identical +1.098. That is a coincidence of the aggregate, not a
+duplicated run: both used exactly 400 interventions across 150 episodes, while differing in
+regret (0.111 vs 0.136), final entropy (0.59 vs 0.96) and oracle agreement (0.492 vs 0.445).
+Episode costs are integers, so exact ties in the mean are entirely possible.</p>
 
 <p><strong>This number is not gate-valid</strong>, and should be read as encouraging rather
 than established. See the section below.</p>
@@ -618,8 +626,9 @@ gate misses by the widest margin (0.025 measured against a 0.081 target), so it 
 an environment further from specification than anything else here. It is reported because
 one caveated data point beats none, not because it carries the same weight. A valid d=6
 needs n_obs=20,000, at roughly seven hours per seed.</li>
-<li><strong>d=6 has two seeds, not three.</strong> The third was still running when this
-was written. Each seed costs about 4.8 hours at this size.</li>
+<li><strong>d=6 predates the GATE 1 precondition</strong>, so its result files carry no
+gate record &mdash; the failure is known from the separate audit rather than from the runs
+themselves. Each seed costs about 4.8 hours at this size.</li>
 <li><strong>The oracle is myopic.</strong> It is the best single next experiment, not the
 best sequence, which is precisely why beating it is possible.</li>
 </ul>
