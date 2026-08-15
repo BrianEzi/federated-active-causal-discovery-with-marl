@@ -36,29 +36,57 @@ def main() -> None:
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     parser.add_argument("--train_episodes", type=int, default=4000)
     parser.add_argument("--eval_episodes", type=int, default=300)
-    parser.add_argument("--budget", type=int, default=20)
-    parser.add_argument("--entropy_coef", type=float, default=0.003)
-    parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--out", type=str, default=None)
+    parser.add_argument("--tag", type=str, default="",
+                        help="free-text label recorded in the output, e.g. the sweep arm")
+
+    # -- environment levers -----------------------------------------------------------
+    env_group = parser.add_argument_group("environment")
+    env_group.add_argument("--budget", type=int, default=20)
+    env_group.add_argument("--n_obs", type=int, default=1000)
+    env_group.add_argument("--n_int", type=int, default=100)
+    env_group.add_argument("--identify_threshold", type=float, default=0.7)
+    env_group.add_argument("--prior", type=str, default="erdos_renyi",
+                           choices=["uniform", "erdos_renyi", "scale_free"])
+    env_group.add_argument("--prior_p", type=float, default=0.5)
+    env_group.add_argument("--intervene_scale", type=float, default=2.0)
+
+    # -- agent levers -----------------------------------------------------------------
+    ppo_group = parser.add_argument_group("agent")
+    ppo_group.add_argument("--entropy_coef", type=float, default=0.003)
+    ppo_group.add_argument("--lr", type=float, default=3e-4)
+    ppo_group.add_argument("--step_cost", type=float, default=0.05)
+    ppo_group.add_argument("--hidden", type=int, default=128)
+    ppo_group.add_argument("--gamma", type=float, default=0.99)
+    ppo_group.add_argument("--episodes_per_update", type=int, default=32)
     args = parser.parse_args()
 
     space = build_graph_space(args.d)
     oracle = InterventionOracle(space)
-    env_config = EnvConfig(d=args.d, budget=args.budget)
+    env_config = EnvConfig(
+        d=args.d, budget=args.budget, n_obs=args.n_obs, n_int=args.n_int,
+        identify_threshold=args.identify_threshold, prior=args.prior,
+        prior_p=args.prior_p, intervene_scale=args.intervene_scale,
+    )
     baselines = make_baselines(space, seed=0)
 
     print(f"d={args.d}  observation={args.observation}  "
           f"{space.n_dags} DAGs / {space.n_mecs} classes")
 
-    # References, computed once and reused by every seed.
+    # References, computed once and reused by every seed. They are recomputed for every
+    # configuration rather than cached across the sweep, because environment levers
+    # (budget, n_obs, prior, ...) move the baselines too -- gap-closed is only meaningful
+    # against baselines measured in the SAME environment.
     refs = {}
+    reference_metrics = {}
     for name in ("random", "greedy_oracle", "edge_marginal_greedy", "no_intervention"):
         t0 = time.time()
         refs[name] = run_episodes(env_config, baselines[name], args.eval_episodes,
                                   seed=99, space=space, oracle=oracle)
-        solved = np.mean([t.identified for t in refs[name]])
-        cost = np.mean([t.n_interventions if t.identified else args.budget
-                        for t in refs[name]])
+        solved = float(np.mean([t.identified for t in refs[name]]))
+        cost = float(np.mean([t.n_interventions if t.identified else args.budget
+                              for t in refs[name]]))
+        reference_metrics[name] = {"solve_rate": solved, "mean_cost": cost}
         print(f"  {name:<22} solve={solved:.2f} cost={cost:.2f} ({time.time() - t0:.0f}s)")
 
     random_ref = refs["random"]
@@ -69,21 +97,33 @@ def main() -> None:
                       else "greedy_oracle"]
 
     per_seed = []
+    histories = {}
     for seed in args.seeds:
         t0 = time.time()
         agent = PPOAgent(
             env_config,
             PPOConfig(observation=args.observation, total_episodes=args.train_episodes,
-                      entropy_coef=args.entropy_coef, lr=args.lr, seed=seed),
+                      entropy_coef=args.entropy_coef, lr=args.lr,
+                      step_cost=args.step_cost, hidden=args.hidden, gamma=args.gamma,
+                      episodes_per_update=args.episodes_per_update, seed=seed),
             space=space,
         )
         history = agent.train()
+        # Kept in full: the entropy and solve-rate trajectories are how a collapse is
+        # diagnosed after the fact, and re-running to recover them costs a whole night.
+        histories[str(seed)] = history
+        per_seed_time = time.time() - t0
 
         deterministic = evaluate(env_config, agent.as_policy(True), random_ref, greedy_ref,
                                  args.eval_episodes, seed=99, space=space, oracle=oracle)
         sampled = evaluate(env_config, agent.as_policy(False), random_ref, greedy_ref,
                            args.eval_episodes, seed=99, space=space, oracle=oracle)
         verdict = check_criteria(deterministic, sampled)
+        verdict["seed"] = seed
+        verdict["train_seconds"] = per_seed_time
+        verdict["final_entropy"] = float(history[-1]["entropy"]) if history else float("nan")
+        verdict["deterministic"] = _serialisable(deterministic)
+        verdict["sampled"] = _serialisable(sampled)
         per_seed.append(verdict)
 
         print(f"\nseed {seed} ({time.time() - t0:.0f}s, final entropy "
@@ -112,10 +152,50 @@ def main() -> None:
     print(f"  OVERALL: {'PASS' if summary['passed'] else 'FAIL'}")
 
     if args.out:
+        payload = {
+            "args": vars(args),
+            "tag": args.tag,
+            "provenance": _provenance(),
+            "space": {"d": args.d, "n_dags": space.n_dags, "n_mecs": space.n_mecs,
+                      "singleton_fraction": space.singleton_fraction},
+            "references": reference_metrics,
+            "per_seed": per_seed,
+            "training_history": histories,
+            "summary": summary,
+        }
         with open(args.out, "w") as f:
-            json.dump({"args": vars(args), "per_seed": per_seed, "summary": summary},
-                      f, indent=2, default=float)
+            json.dump(payload, f, indent=2, default=float)
         print(f"  written to {args.out}")
+
+
+def _serialisable(metrics: dict) -> dict:
+    """Drop the raw `EpisodeTrace` objects, keeping every summary number.
+
+    The traces are per-episode Python objects carried through `evaluate` for the
+    stratified breakdowns; they are not JSON and re-deriving them is not needed, since
+    every statistic computed from them is already in the dict alongside.
+    """
+    return {k: v for k, v in metrics.items() if not _has_traces(v)}
+
+
+def _has_traces(value) -> bool:
+    if isinstance(value, (list, tuple)):
+        return any(hasattr(v, "n_interventions") for v in value)
+    return hasattr(value, "n_interventions")
+
+
+def _provenance() -> dict:
+    """Enough to re-run this exact configuration months later."""
+    import platform
+    import subprocess
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                         stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        commit = "unknown"
+    return {"git_commit": commit, "python": platform.python_version(),
+            "numpy": np.__version__, "host": platform.node(),
+            "finished_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 
 
 if __name__ == "__main__":
