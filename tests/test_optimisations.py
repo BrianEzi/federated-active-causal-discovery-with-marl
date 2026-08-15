@@ -185,6 +185,64 @@ def test_log_prior_cache_does_not_leak_between_priors():
     assert np.allclose(second, fresh.posterior(samples, intervened, skewed))
 
 
+@pytest.mark.parametrize("d", [3, 4, 5])
+@pytest.mark.parametrize("frac", [0.0, 0.3, 1.0])
+def test_batched_table_is_bit_identical_to_per_subset(d, frac):
+    """The batched path must be a pure reordering of work, not a different computation.
+
+    `frac=1.0` covers the case where a node was intervened on in EVERY row, so its
+    sufficient statistics are empty -- the branch most likely to differ between the two
+    implementations.
+    """
+    space = build_graph_space(d, fast=True)
+    engine = PosteriorEngine(space, BGeScore(d))
+    samples, intervened = _data(400, d, seed=d, frac_intervened=frac)
+
+    batched = engine.local_score_table(samples, intervened)
+
+    # The per-subset path, driven through the same engine so only the inner method differs.
+    reference = np.zeros_like(batched)
+    for node in range(d):
+        usable = np.asarray(intervened)[:, node] < 0.5
+        stats = engine.score.sufficient_stats(np.asarray(samples)[usable])
+        for i, parents in enumerate(engine.parent_sets[node]):
+            reference[node, i] = engine.score.local_score_from_stats(node, parents, stats)
+
+    assert np.array_equal(batched, reference)
+
+
+def test_batched_plan_covers_every_parent_set():
+    """A gather that silently missed an entry would leave a zero, which looks like a
+    legitimate score rather than a bug."""
+    d = 5
+    engine = PosteriorEngine(build_graph_space(d, fast=True), BGeScore(d))
+    for node in range(d):
+        plan = engine._table_plan[node]
+        assert len(plan["with_pos"]) == len(engine.parent_sets[node])
+        assert len(plan["without_pos"]) == len(engine.parent_sets[node])
+        for size, pos in zip(plan["with_size"], plan["with_pos"]):
+            assert pos < len(plan["index_by_size"][size])
+
+
+def test_batched_marginals_match_single_subset_calls():
+    d = 5
+    score = BGeScore(d)
+    rng = np.random.default_rng(0)
+    stats = score.sufficient_stats(rng.normal(size=(300, d)))
+
+    subsets = [(0,), (1, 3), (0, 2, 4)]
+    by_size = {}
+    for s in subsets:
+        by_size.setdefault(len(s), []).append(s)
+    index_by_size = {p: np.array([list(s) for s in ss]) for p, ss in by_size.items()}
+
+    batched = score.log_marginals_batched(stats, index_by_size)
+    for s in subsets:
+        i = by_size[len(s)].index(s)
+        assert batched[len(s)][i] == pytest.approx(
+            score._log_marginal_stats(stats, s), rel=1e-12, abs=1e-12)
+
+
 def test_non_stats_scorer_still_works():
     """BIC has no sufficient_stats; it must take the original path, not crash."""
     d = 4

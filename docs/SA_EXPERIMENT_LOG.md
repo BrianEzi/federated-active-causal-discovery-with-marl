@@ -1325,3 +1325,49 @@ cheap one. Training scales on subset DP; evaluation pays for the oracle and can 
 belief representation -- solved exactly by subset DP; oracle -- solved by MH sampling with
 a d-dependent chain length, verified against ground truth at d=4/5/6; score table -- the
 remaining bottleneck, unaddressed, with batching and Cholesky updates as the candidates.
+
+## 2026-08-15 — Score table batched: bit-identical, up to 39.7x
+
+[MEASURED] The score table is `d * 2^(d-1)` local scores, each a difference of two
+marginals, each marginal a `slogdet` of a matrix at most `d x d`. Doing them individually
+spends nearly all its time in Python and numpy dispatch rather than arithmetic. Subsets of
+the SAME SIZE give same-shaped matrices, so they stack into `[m, p, p]` and go through
+`np.linalg.slogdet` in one call -- it batches over leading axes. At d=10 that is 110 calls
+instead of 10,240.
+
+| d | per-subset | batched | speedup | max diff |
+|---|---|---|---|---|
+| 5 | 37.2 ms | 7.9 ms | 4.7x | **0.0** |
+| 6 | 100.7 ms | 14.0 ms | 7.2x | **0.0** |
+| 7 | 187.0 ms | 19.0 ms | 9.9x | **0.0** |
+| 8 | 397.7 ms | 20.7 ms | 19.2x | **0.0** |
+| 9 | 806.3 ms | 32.5 ms | 24.8x | **0.0** |
+| 10 | 1994.7 ms | 50.2 ms | **39.7x** | **0.0** |
+
+Bit-identical, not merely close, and the speedup grows with d -- which is where it is
+needed. The subset layout depends only on the graph space, so it is precomputed once at
+engine construction rather than per update.
+
+[MEASURED] End-to-end environment step, against this morning's starting point:
+
+| config | this morning | after DP-era fixes | after batching | total |
+|---|---|---|---|---|
+| d=4, n_obs=1000 | 22.2 ms | 16.9 ms | **5.6 ms** | 4.0x |
+| d=5, n_obs=5000 | 72.5 ms | 42.1 ms | **11.3 ms** | 6.4x |
+| d=5, n_obs=20000 | 137.2 ms | 51.2 ms | **17.7 ms** | 7.8x |
+| d=6, n_obs=20000 | 1850.6 ms | 845.7 ms | 885.5 ms | 2.1x |
+
+[MEASURED] d=6 is unchanged, and that is the expected result rather than a disappointment.
+At d=6 the score table was already only ~90 ms of an ~845 ms step; the rest is the two
+reductions over 3.78 million enumerated DAGs. Batching a 90 ms term cannot move an 845 ms
+total. The thing that fixes d=6 is subset DP, which removes the enumeration entirely and is
+verified but not yet wired into the environment.
+
+[DECIDED] NOT syncing this to Myriad while Phase 2 runs. Tasks 36-66 are still held and
+would start under different code from tasks 1-35. The change is bit-identical so results
+would not differ -- but "bit-identical so it is probably fine" is precisely the reasoning
+that produces silent mid-experiment inconsistencies, and the same argument was declined an
+hour ago for `summarise_seeds`. Consistency is worth more than a speedup on runs already
+under way. Sync after the sweep completes.
+
+[MEASURED] Full suite 358 passed.
