@@ -1005,3 +1005,38 @@ a 12 h walltime; at 4.14 h each that is ~13 h, so it would have been killed part
 the third seed -- losing it entirely and reporting two seeds as though three had been
 planned. Split into one seed per array task at 8 h, behind a shared references stage
 (jobs 146805 -> 146806) so all three seeds face a numerically identical opponent.
+
+## 2026-08-15 — E3: depth helps the probe, not the agent
+
+[MEASURED] d=5, n_obs=5000, per-node, 5 seeds each.
+
+| arm | seeds passing | min | median | max | spread | final entropy |
+|---|---|---|---|---|---|---|
+| layers=1 | 5/5 | +1.144 | +1.203 | +1.241 | 0.096 | 0.652 |
+| layers=2 | 5/5 | +0.989 | +1.217 | +1.299 | 0.310 | 0.816 |
+
+[MEASURED] Depth 2 is +0.014 on the median -- inside noise -- while its worst seed is
+0.155 WORSE and its seed spread is 3.2x wider. On the project's own standard, that a
+configuration is only as good as its worst seed, depth 1 is the better arm.
+
+[DECIDED] Keep layers=1. The pre-registered rule fired on the probe and E3 was run as
+promised; the RL measurement says the probe gain does not convert.
+
+[MEASURED] This is the substantive finding, and it is a negative one worth stating
+plainly: **supervised probe accuracy does not predict RL performance here.** Depth lifted
+probe accuracy from 0.880 to 0.944 at d=4/9000 and from 0.801 to 0.864 at d=5/9000 -- a
+real, replicated, multi-seed gain in the network's ability to express the oracle's
+mapping -- and none of it appeared in the agent's gap closed.
+
+The probe measured expressive capacity. Whatever caps RL performance at this task is
+therefore not expressive capacity. Note both arms already sit well ABOVE greedy (+1.2), so
+one plausible reading is that both are near the achievable ceiling for this environment and
+there is simply no room for depth to show. That is a hypothesis, not a conclusion --
+distinguishing "no headroom" from "headroom that depth cannot reach" would need a
+sequential-optimal reference, which does not exist here.
+
+[CORRECTED] This weakens the probe as a cheap proxy for architecture decisions. The probe
+DID correctly identify the flat-vs-per-node gap, which was worth ~2.7 gap closed, so it
+detects a difference in kind. It did not transfer for a difference in degree. Worth
+carrying into the 2-agent case, where the temptation to screen designs by probe will be
+strong.
