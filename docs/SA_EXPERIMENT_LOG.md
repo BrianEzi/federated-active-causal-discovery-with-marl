@@ -939,3 +939,69 @@ d=5 at 3000 and 9000, which at d=4 are where the effect is largest. The script n
 to decide on an incomplete grid.
 
 [DECIDED] No decision on depth until all 24 cells are in. E3 stays unsubmitted.
+
+## 2026-08-15 — Depth probe complete: the rule fires
+
+[MEASURED] All 24 cells, mean probe accuracy over 3 seeds.
+
+| d | episodes | L1 | L2 | L3 | flat | best lift |
+|---|---|---|---|---|---|---|
+| 4 |  300 | 0.783 | 0.769 | 0.724 | 0.452 | -0.014 |
+| 4 | 1000 | 0.852 | 0.895 | 0.901 | 0.590 | **+0.050** |
+| 4 | 3000 | 0.872 | 0.917 | 0.919 | 0.740 | **+0.046** |
+| 4 | 9000 | 0.880 | 0.941 | 0.944 | 0.782 | **+0.064** |
+| 5 |  300 | 0.748 | 0.725 | 0.708 | 0.363 | -0.022 |
+| 5 | 1000 | 0.782 | 0.801 | 0.798 | 0.385 | +0.020 |
+| 5 | 3000 | 0.781 | 0.823 | 0.841 | 0.638 | **+0.059** |
+| 5 | 9000 | 0.801 | 0.863 | 0.864 | 0.703 | **+0.063** |
+
+[DECIDED] The pre-registered rule FIRES: depth clears +0.03 at 3/4 data sizes at d=4 and
+2/4 at d=5. E3 submitted (job 146804), depth 2 against depth 1, 5 seeds each.
+
+[CORRECTED] My partial read at 18 cells said the rule did not fire, and I flagged at the
+time that the missing cells were d=5 at 3000 and 9000 -- exactly where d=4's effect was
+largest. They came in at +0.059 and +0.063. The guard added to `analyse_depth.py` did its
+job: without it, "RULE DOES NOT FIRE" would have been logged as a finding and E3 skipped.
+
+[MEASURED] The original hypothesis is supported after all. The ~0.89 ceiling IS partly
+about multi-hop reachability: at d=4/9000 depth lifts accuracy from 0.880 to 0.944. This
+reverses my own intermediate correction, which had been made on partial data.
+
+[DECIDED] Carrying layers=2, not 3, and this part was NOT covered by the pre-registered
+rule -- which said only "carry the best depth", leaving the selection between 2 and 3 to
+judgement. Recording the judgement so it is not mistaken for a measurement:
+
+- L3 edges L2 at the larger data sizes, but by 0.001-0.018 across three seeds. That is not
+  resolved; the two are tied within noise everywhere except d=5/3000.
+- At 300 episodes L3 is distinctly the worst (0.724 vs L2's 0.769 at d=4; 0.708 vs 0.725
+  at d=5), which is the expected behaviour of an under-determined larger model.
+- An RL run passes THROUGH the low-data regime on its way to the high-data one, so the
+  early-training behaviour is not an irrelevant corner of the grid. L2 is never much worse
+  than L1 at low data; L3 clearly is.
+
+The script's automatic pick was also L2, but by averaging across all cells including the
+300-episode ones, which is not the same reasoning and would not generalise. Noted so the
+agreement is not read as independent confirmation.
+
+## 2026-08-15 — E4 sized from measurement
+
+[MEASURED] Timing probe (job 146526) at d=6, n_obs=20000 on a real node: 400 training
+episodes took 993s, so 6000 episodes is 4.14 h/seed. References cost 648s in total --
+random 131s, greedy_oracle 80s, edge_marginal_greedy 414s, no_intervention 23s. GATE 1
+passes: observational-only rate 0.0800 against a singleton fraction of 0.0810.
+
+[CORRECTED] My projection of ~2.7 h/seed was derived invalidly. I took the old Myriad
+figure of 4.7 h/seed and scaled it by a ratio measured on my laptop (1850.6 -> 845.7
+ms/step). A Myriad baseline multiplied by a laptop ratio is not an extrapolation; the node
+is slower per core. This is the third d=6 runtime mis-prediction, and the first where the
+error was in the method rather than the estimate.
+
+What the optimisation did achieve is undisputed and is the point that matters: 4.14 h at
+TWENTY TIMES the sample count, against 4.7 h before. Without it this arm would be roughly
+9 h/seed.
+
+[CORRECTED] The consequence was concrete. The draft script ran three seeds sequentially in
+a 12 h walltime; at 4.14 h each that is ~13 h, so it would have been killed partway through
+the third seed -- losing it entirely and reporting two seeds as though three had been
+planned. Split into one seed per array task at 8 h, behind a shared references stage
+(jobs 146805 -> 146806) so all three seeds face a numerically identical opponent.
