@@ -404,3 +404,62 @@ a no-op under normalisation, because it changes the *relative* worth of acting v
 passing rather than the overall scale; `gamma` changes how much finishing sooner is worth;
 `entropy_coef` sets how hard the policy is held toward uniform. All three move the same
 underlying quantity, which is why they are gridded rather than swept one at a time.
+
+### Stage 1 results — all 34 configurations fail, and the reason is not a hyperparameter
+
+**[MEASURED] Every arm fails, and the failure is qualitatively the same.** Gap-closed ranges
+from −2.1 to −18.3; not one configuration passed a single seed. The uniformity is the
+finding: no lever rescues the run, so the problem is not in the region any of them explore.
+
+**[MEASURED] The deterministic agent solves LESS often than random.** Deterministic solve
+rate is 0.25–0.59 across arms while greedy solves 0.99 and random solves ~1.00 at budget 20.
+Inefficiency cannot produce this — a merely clumsy policy still identifies the graph
+eventually. `optimal_rate` of **0.02–0.10 against a chance level near 0.29** says the same
+thing more sharply: the agent is *systematically anti-correlated* with the oracle, not
+simply unhelpful.
+
+Both are what a policy that has stopped reading its observation looks like. Its argmax is
+constant, so it re-intervenes on the same node every step, gathers almost no new structural
+information, and exhausts the budget.
+
+**[CORRECTED] The entropy bonus is not the cause, and my earlier suspicion of it was wrong.**
+`entropy_coef=0.0` — the bonus switched off entirely — still ends at final entropy **1.596**
+against a maximum of ln(6)=1.792, and gap-closed −6.53. Across 0.0 / 0.001 / 0.01 / 0.03 the
+median gap moves only from −6.53 to −6.42. If the policy stays near-uniform with no bonus at
+all, the bonus was never what held it there. This retires the explanation carried over from
+the previous project.
+
+**[MEASURED] Which levers move anything (none rescue it).** `lr=1e-3` gives −5.35 against
+−8.60 at 1e-4, and the lowest final entropy of any arm (1.495) — the clearest sign of a
+policy actually sharpening. `hidden=256` gives −5.08 against −8.98 at 64. `episodes_per_update=16`
+gives −5.04. Capacity and step size matter; reward shape barely does.
+
+**[CORRECTED] `budget` is largely a metric artifact and must not be read as a lever.**
+`budget_10` scores −2.79 and `budget_40` scores −17.97, which looks like a huge effect. It
+is mostly definitional: `episode_costs` charges unsolved episodes at the full budget, so
+raising the budget multiplies the penalty for the same underlying failure. The comparison
+is not wrong — it is exactly what the metric is designed to do — but it measures the cost
+of failing, not sensitivity to the budget.
+
+**[MEASURED] The observation carries a decodable answer; PPO is not extracting it.** A
+supervised probe (`scripts/probe_observation.py`) trained on the agent's *own architecture*
+to predict the oracle's tied-best target from the agent's *own observation* reaches **0.42**
+at d=4 against a chance level of 0.287 and a majority-class baseline of 0.26. Well short of
+perfect, but decisively above both. So explanation "the representation does not contain the
+answer" is ruled out at d=4; the failure is in the learning, not the input.
+
+Notably the exact posterior reaches only **0.46** against edge marginals' 0.42 — the
+sufficient statistic is barely better than the lossy summary. That points at the *decoding
+computation* being the hard part, not the information content: recovering the oracle's
+choice means reconstructing a posterior over DAGs, computing each node's descendant-set
+partition, and taking its entropy. That is a lot to ask of a two-layer MLP, whichever
+representation it starts from.
+
+**[DECIDED] Stage 4 follows from the diagnosis, not from tuning.** The observation contains
+the posterior and remaining budget but **not which nodes have already been intervened on**.
+Formally it does not need them — the posterior is sufficient, and if an intervention taught
+nothing then the same target really is still best. But that argument is about the *optimal*
+policy; a deterministic network whose output barely varies with its input has no way out of
+the loop at all. `include_counts` adds them, `repeat_rate`/`distinct_targets` measure whether
+the loop is real, and arm 6 (best settings, no counts) is the control that stops the learning
+rate taking credit for the observation change.
