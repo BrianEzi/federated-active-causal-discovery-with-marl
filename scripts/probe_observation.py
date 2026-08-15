@@ -72,7 +72,7 @@ def collect(env, oracle, n_episodes, kind, rng, explore) -> tuple:
 
 
 def train_probe(x, y, d, hidden, epochs, lr, seed, arch="flat",
-                include_counts=False) -> dict:
+                include_counts=False, layers=1) -> dict:
     """Train the agent's own architecture to predict the oracle's best target."""
     torch.manual_seed(seed)
     n_train = int(len(x) * 0.8)
@@ -83,7 +83,7 @@ def train_probe(x, y, d, hidden, epochs, lr, seed, arch="flat",
     # express the mapping rather than some other model's.
     if arch == "pernode":
         net = PerNodeActorCritic(d, hidden=hidden, include_counts=include_counts,
-                                 allow_pass=False)
+                                 allow_pass=False, layers=layers)
     else:
         net = ActorCritic(obs_dim=x.shape[1], n_actions=d, hidden=hidden)
     optimiser = torch.optim.Adam(net.parameters(), lr=lr)
@@ -130,6 +130,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--arch", type=str, default="flat",
                         choices=["flat", "pernode", "both"])
+    parser.add_argument("--layers", type=int, nargs="+", default=[1],
+                        help="rounds of neighbour aggregation in the per-node scorer; "
+                             "several values train on the SAME collected data, which is "
+                             "both cheaper and the matched comparison the decision rule "
+                             "needs. Ignored by arch=flat")
     parser.add_argument("--out", type=str, default=None)
     args = parser.parse_args()
 
@@ -137,7 +142,9 @@ def main() -> None:
     oracle = InterventionOracle(space)
     env = CausalDiscoveryEnv(EnvConfig(d=args.d, budget=20), space=space)
 
-    results = {"d": args.d, "episodes": args.episodes, "conditions": {}}
+    results = {"d": args.d, "episodes": args.episodes, "layers_probed": args.layers,
+               "hidden": args.hidden, "epochs": args.epochs, "seed": args.seed,
+               "conditions": {}}
     print(f"d={args.d}  {space.n_dags} DAGs / {space.n_mecs} classes")
 
     architectures = ["flat", "pernode"] if args.arch == "both" else [args.arch]
@@ -152,14 +159,23 @@ def main() -> None:
             # which the exact posterior simply is not.
             if arch == "pernode" and kind != "edge_marginals":
                 continue
-            stats = train_probe(x, y, args.d, args.hidden, args.epochs, args.lr,
-                                args.seed, arch=arch)
-            results["conditions"][f"{kind}/{arch}"] = stats
-            print(f"  {kind:<16} {arch:<8} probe {stats['probe_accuracy']:.3f}  "
-                  f"majority {stats['majority_accuracy']:.3f}  "
-                  f"chance {stats['chance_accuracy']:.3f}  "
-                  f"(n={stats['n_train']}+{stats['n_test']}, "
-                  f"mean tied-best {stats['mean_tied_best']:.2f})")
+            # Depth only exists in the per-node scorer, so the flat network runs once.
+            # Every depth trains on the SAME (x, y) collected above, which is what makes
+            # "at matched data size" in the decision rule literally true rather than
+            # approximately so.
+            depths = args.layers if arch == "pernode" else [1]
+            for layers in depths:
+                stats = train_probe(x, y, args.d, args.hidden, args.epochs, args.lr,
+                                    args.seed, arch=arch, layers=layers)
+                stats["layers"] = layers
+                key = f"{kind}/{arch}" + (f"/L{layers}" if arch == "pernode" else "")
+                results["conditions"][key] = stats
+                print(f"  {kind:<16} {arch:<8} L{layers} "
+                      f"probe {stats['probe_accuracy']:.3f}  "
+                      f"majority {stats['majority_accuracy']:.3f}  "
+                      f"chance {stats['chance_accuracy']:.3f}  "
+                      f"(n={stats['n_train']}+{stats['n_test']}, "
+                      f"mean tied-best {stats['mean_tied_best']:.2f})")
 
     if args.out:
         with open(args.out, "w") as f:

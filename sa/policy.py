@@ -91,6 +91,10 @@ class PPOConfig:
     # even with full supervision -- evidence that the architecture, not the reward or the
     # exploration, is what cannot express the mapping.
     arch: str = "flat"
+    # Rounds of neighbour aggregation in the per-node scorer. 1 is the network behind the
+    # d=4/5/6 results; higher values let a node's embedding reach further, which is the
+    # candidate explanation for the probe's ~0.89 ceiling. Ignored by arch="flat".
+    layers: int = 1
 
 
 class ActorCritic(nn.Module):
@@ -135,14 +139,28 @@ class PerNodeActorCritic(nn.Module):
     Deliberately restricted to the `edge_marginals` observation. The exact posterior has no
     per-node factorisation to exploit, which is the whole reason the scalable
     representation is the interesting one.
+
+    `layers` sets how many rounds of neighbour aggregation run. One round means a node's
+    score sees only its immediate edges. The oracle's score depends on each node's
+    DESCENDANTS -- reachability, which is inherently multi-hop -- so a single round is a
+    plausible explanation for the supervised probe topping out near 0.89 rather than 1.0.
+    Extra rounds let a node's embedding carry information from `layers` hops away.
+
+    `layers=1` constructs exactly the network that produced the d=4/5/6 results: the extra
+    round modules are created only when `layers > 1`, and only after every existing
+    parameter has been initialised, so the RNG draw is untouched and the state dict is
+    identical. `tests/test_depth.py` asserts this rather than assuming it.
     """
 
     def __init__(self, d: int, hidden: int = 128, include_counts: bool = False,
-                 allow_pass: bool = True):
+                 allow_pass: bool = True, layers: int = 1):
         super().__init__()
         self.d = d
         self.include_counts = include_counts
         self.allow_pass = allow_pass
+        self.layers = int(layers)
+        if self.layers < 1:
+            raise ValueError(f"layers must be >= 1, got {layers}")
 
         # Each NEIGHBOUR of node i is embedded from the pair (i->j, j->i), then those
         # embeddings are pooled. Pooling rather than concatenating in index order is what
@@ -177,6 +195,25 @@ class PerNodeActorCritic(nn.Module):
             nn.init.orthogonal_(self.pass_head.weight, gain=0.01)
             nn.init.zeros_(self.pass_head.bias)
 
+        # Constructed LAST, and only when asked for. Every `nn.Linear` above draws from the
+        # torch RNG at construction, so creating these earlier would shift the
+        # initialisation of everything after them -- and `layers=1` has to reproduce the
+        # network behind the d=4/5/6 results exactly, not merely have the same shape. An
+        # empty ModuleList contributes nothing to the state dict.
+        self.rounds = nn.ModuleList()
+        for _ in range(self.layers - 1):
+            self.rounds.append(nn.ModuleDict({
+                # A message from neighbour j to node i is built from j's current embedding
+                # together with the (i->j, j->i) marginals, so the edge itself keeps
+                # influencing what propagates rather than only seeding the first round.
+                "message": nn.Sequential(nn.Linear(hidden + 2, hidden), nn.Tanh()),
+                # Mean and max pooled, as in the first round: same reason (Zaheer et al.
+                # 2017), and it keeps every round permutation-equivariant.
+                # Named "combine" rather than "update" because ModuleDict already has an
+                # `update` method and registering that key raises.
+                "combine": nn.Sequential(nn.Linear(3 * hidden, hidden), nn.Tanh()),
+            }))
+
     def _neighbour_pairs(self, obs: torch.Tensor) -> torch.Tensor:
         """[batch, d, d-1, 2] -- for each node i and neighbour j, the pair (i->j, j->i).
 
@@ -193,6 +230,17 @@ class PerNodeActorCritic(nn.Module):
         outgoing = matrix[:, mask].view(batch, d, d - 1)
         incoming = matrix.transpose(1, 2)[:, mask].view(batch, d, d - 1)
         return torch.stack([outgoing, incoming], dim=-1)
+
+    def _neighbour_index(self, device) -> torch.Tensor:
+        """[d, d-1] -- row i lists every node other than i, in ascending order.
+
+        Used to gather neighbour embeddings for the extra rounds. The ordering is fixed,
+        but nothing downstream depends on it: messages are pooled, exactly as in the first
+        round, which is what keeps the added depth equivariant.
+        """
+        d = self.d
+        mask = ~torch.eye(d, dtype=torch.bool, device=device)
+        return torch.arange(d, device=device).repeat(d, 1)[mask].view(d, d - 1)
 
     def _node_features(self, obs: torch.Tensor) -> torch.Tensor:
         """[batch, d, per_node_features], pooled over neighbours so node order cannot leak."""
@@ -214,6 +262,21 @@ class PerNodeActorCritic(nn.Module):
             obs = obs.unsqueeze(0)
 
         embeddings = self.node_encoder(self._node_features(obs))   # [batch, d, hidden]
+
+        # Rounds 2..k. Empty at layers=1, so this loop does not execute and the forward
+        # pass is the original one instruction for instruction.
+        if self.rounds:
+            pairs = self._neighbour_pairs(obs)                     # [b, d, d-1, 2]
+            index = self._neighbour_index(obs.device)              # [d, d-1]
+            for block in self.rounds:
+                neighbours = embeddings[:, index]                  # [b, d, d-1, hidden]
+                messages = block["message"](
+                    torch.cat([neighbours, pairs], dim=-1))
+                pooled_messages = torch.cat(
+                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                embeddings = block["combine"](
+                    torch.cat([embeddings, pooled_messages], dim=-1))
+
         logits = self.node_score(embeddings).squeeze(-1)           # [batch, d]
 
         pooled = embeddings.mean(dim=1)                            # [batch, hidden]
@@ -259,7 +322,7 @@ class PPOAgent:
                 )
             self.net = PerNodeActorCritic(
                 self.d, ppo_config.hidden, env_config.include_counts,
-                ppo_config.allow_pass,
+                ppo_config.allow_pass, ppo_config.layers,
             )
         elif ppo_config.arch == "flat":
             self.net = ActorCritic(self.obs_dim, self.n_actions, ppo_config.hidden)

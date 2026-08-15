@@ -86,6 +86,10 @@ def main() -> None:
     ppo_group.add_argument("--arch", type=str, default="flat",
                            choices=["flat", "pernode"],
                            help="pernode = permutation-equivariant per-node scorer")
+    ppo_group.add_argument("--layers", type=int, default=1,
+                           help="rounds of neighbour aggregation in the per-node scorer. "
+                                "1 reproduces the network behind the d=4/5/6 results "
+                                "exactly; higher lets a node see further than one hop")
     ppo_group.add_argument("--shaping_coef", type=float, default=0.0,
                            help="potential-based shaping on posterior entropy; "
                                 "policy-invariant (Ng, Harada & Russell 1999)")
@@ -188,7 +192,7 @@ def main() -> None:
                       step_cost=args.step_cost, hidden=args.hidden, gamma=args.gamma,
                       episodes_per_update=args.episodes_per_update,
                       allow_pass=not args.no_pass, shaping_coef=args.shaping_coef,
-                      arch=args.arch,
+                      arch=args.arch, layers=args.layers,
                       seed=seed),
             space=space,
         )
