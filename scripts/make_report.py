@@ -45,12 +45,17 @@ def load(results_dir: str):
         with open(path) as f:
             probes.append(json.load(f))
 
+    gate1 = []
+    for path in sorted(glob.glob(os.path.join(results_dir, "gate1", "*.json"))):
+        with open(path) as f:
+            gate1.append(json.load(f))
+
     raw = {}
     for path in sorted(glob.glob(os.path.join(results_dir, "raw", "*.json"))):
         with open(path) as f:
             payload = json.load(f)
         raw[payload.get("tag") or os.path.basename(path)[:-5]] = payload
-    return rows, probes, raw
+    return rows, probes, raw, gate1
 
 
 def by_tag(rows: List[Dict]) -> Dict[str, List[Dict]]:
@@ -95,7 +100,7 @@ def table(headers, rows, aligns=None) -> str:
 
 
 def build(results_dir: str) -> str:
-    rows, probes, raw = load(results_dir)
+    rows, probes, raw, gate1 = load(results_dir)
     grouped = by_tag(rows)
 
     total_runs = len(rows)
@@ -234,6 +239,22 @@ def build(results_dir: str) -> str:
             f"{np.mean([r['final_entropy'] for r in group]):.2f}",
         ])
 
+    gate_rows = []
+    for entry in sorted(gate1, key=lambda e: e["d"]):
+        row = [f"d={entry['d']}", f"{entry['target']:.4f}"]
+        for n_obs in ("1000", "5000", "20000"):
+            measured = entry["measured"].get(n_obs)
+            if not measured:
+                row.append("—")
+                continue
+            mark = "OK" if measured["covers_target"] else "MISSES"
+            row.append((f"{measured['rate']:.3f} {mark}",
+                        "ok" if measured["covers_target"] else "bad"))
+        gate_rows.append(row)
+    gate_table = table(["size", "target", "n_obs = 1,000", "n_obs = 5,000",
+                        "n_obs = 20,000"], gate_rows,
+                       ["left", "right", "right", "right", "right"]) if gate_rows else ""
+
     best_tag = max(grouped, key=lambda t: min(gaps(grouped[t])) if gaps(grouped[t]) else -99)
     best_min = min(gaps(grouped[best_tag]))
     # Counted, not asserted: how many flat-architecture configurations had any passing seed.
@@ -255,7 +276,7 @@ def build(results_dir: str) -> str:
     ])
 
     return PAGE.format(
-        stats=stats_block, n_flat=n_flat_total,
+        stats=stats_block, n_flat=n_flat_total, gate_table=gate_table,
         arc_chart=arc_chart, entropy_chart=entropy_chart, probe_chart=probe_chart,
         entropy_curve=entropy_curve, length_curve=length_curve,
         probe_table=table(["size", "observation · architecture", "episodes",
@@ -512,6 +533,33 @@ at identical settings does not.</figcaption>
 learned not to give up, and nothing about where to intervene.</figcaption>
 </figure>
 
+<div class="stage"><span class="stage-num">GATE 1</span><h2>A check that stopped holding</h2></div>
+<div class="prose">
+<p>The environment is supposed to satisfy one exact property: the fraction of problems
+solvable <em>without</em> intervening must equal the fraction of graphs alone in their
+Markov equivalence class. That number is computable from the graph space, so it is a
+prediction, not a vibe. It was checked at d=3, passed, and thereafter assumed.</p>
+</div>
+
+{gate_table}
+
+<div class="callout correction">
+<span class="tag">Correction</span>
+<p>At the default 1,000 observational samples the gate <strong>fails at d=5</strong> — the
+primary reporting size — and fails badly at d=6. Larger graphs have more parameters to
+estimate from the same data, so the posterior never concentrates enough to identify even the
+graphs that are identifiable in principle. Every d=5 result on this page, the headline
+included, ran with an observational phase shorter than the design intends.</p>
+<p>What survives: gap-closed is measured against random and greedy baselines evaluated in
+the <em>same</em> environment, so the ranking, the flat-versus-per-node comparison and the
+ablation all hold. What does not: the claim that the environment matches its specification,
+and any comparison of <em>absolute</em> difficulty across sizes. A replication at
+gate-passing sample sizes is running.</p>
+<p>This is the same failure shape that cost this project its previous round — a check
+performed once, under one setting, then assumed. It belongs in the training script as a
+per-run precondition, not as a gate someone remembers to run.</p>
+</div>
+
 <div class="stage"><span class="stage-num">CAVEATS</span><h2>What this does not show</h2></div>
 <div class="prose">
 <ul>
@@ -528,6 +576,9 @@ passes by construction for those arms and is vacuous there. Recorded before the 
 existed, because a vacuous metric produced a retracted result earlier in this project.</li>
 <li><strong>Seed counts are small</strong> — three for most arms, five for the headline
 ones. The minimum across seeds is reported everywhere, never the mean.</li>
+<li><strong>d=6 is not reported.</strong> Its runs use n_obs=1000, where the gate misses
+by the widest margin, so any number from them would describe an environment further from
+specification than the ones above.</li>
 <li><strong>The oracle is myopic.</strong> It is the best single next experiment, not the
 best sequence, which is precisely why beating it is possible.</li>
 </ul>
@@ -551,21 +602,7 @@ def main() -> None:
     parser.add_argument("--out", type=str, default="results/report.html")
     args = parser.parse_args()
 
-    rows, _, _ = load(args.results)
-    grouped = by_tag(rows)
-    passing = [t for t, g in grouped.items() if any(r["passed"] for r in g)]
-    best_tag = max(grouped, key=lambda t: min(gaps(grouped[t])) if gaps(grouped[t]) else -99)
-
     page = build(args.results)
-    page = page.replace("{stats}", "".join([
-        stat(len(rows), "runs", f"{len(grouped)} configurations"),
-        stat(f"{min(gaps(grouped[best_tag])):+.2f}", "best worst-seed gap",
-             "1.00 = greedy oracle", tone="ok"),
-        stat(len(passing), "configs with a passing seed", "all use the per-node scorer",
-             tone="ok"),
-        stat("0", "of 54 flat-network configs passed", "stages 1–4", tone="bad"),
-    ]))
-
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(page)

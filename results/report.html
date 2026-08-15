@@ -240,6 +240,33 @@ at identical settings does not.</figcaption>
 learned not to give up, and nothing about where to intervene.</figcaption>
 </figure>
 
+<div class="stage"><span class="stage-num">GATE 1</span><h2>A check that stopped holding</h2></div>
+<div class="prose">
+<p>The environment is supposed to satisfy one exact property: the fraction of problems
+solvable <em>without</em> intervening must equal the fraction of graphs alone in their
+Markov equivalence class. That number is computable from the graph space, so it is a
+prediction, not a vibe. It was checked at d=3, passed, and thereafter assumed.</p>
+</div>
+
+<div class="table-wrap"><table><thead><tr><th class="a-left">size</th><th class="a-right">target</th><th class="a-right">n_obs = 1,000</th><th class="a-right">n_obs = 5,000</th><th class="a-right">n_obs = 20,000</th></tr></thead><tbody><tr><td class="a-left">d=4</td><td class="a-right">0.1087</td><td class="a-right ok">0.085 OK</td><td class="a-right ok">0.085 OK</td><td class="a-right ok">0.090 OK</td></tr><tr><td class="a-left">d=5</td><td class="a-right">0.0893</td><td class="a-right bad">0.040 MISSES</td><td class="a-right ok">0.060 OK</td><td class="a-right ok">0.075 OK</td></tr><tr><td class="a-left">d=6</td><td class="a-right">0.0810</td><td class="a-right bad">0.025 MISSES</td><td class="a-right bad">0.050 MISSES</td><td class="a-right ok">0.060 OK</td></tr></tbody></table></div>
+
+<div class="callout correction">
+<span class="tag">Correction</span>
+<p>At the default 1,000 observational samples the gate <strong>fails at d=5</strong> — the
+primary reporting size — and fails badly at d=6. Larger graphs have more parameters to
+estimate from the same data, so the posterior never concentrates enough to identify even the
+graphs that are identifiable in principle. Every d=5 result on this page, the headline
+included, ran with an observational phase shorter than the design intends.</p>
+<p>What survives: gap-closed is measured against random and greedy baselines evaluated in
+the <em>same</em> environment, so the ranking, the flat-versus-per-node comparison and the
+ablation all hold. What does not: the claim that the environment matches its specification,
+and any comparison of <em>absolute</em> difficulty across sizes. A replication at
+gate-passing sample sizes is running.</p>
+<p>This is the same failure shape that cost this project its previous round — a check
+performed once, under one setting, then assumed. It belongs in the training script as a
+per-run precondition, not as a gate someone remembers to run.</p>
+</div>
+
 <div class="stage"><span class="stage-num">CAVEATS</span><h2>What this does not show</h2></div>
 <div class="prose">
 <ul>
@@ -256,6 +283,9 @@ passes by construction for those arms and is vacuous there. Recorded before the 
 existed, because a vacuous metric produced a retracted result earlier in this project.</li>
 <li><strong>Seed counts are small</strong> — three for most arms, five for the headline
 ones. The minimum across seeds is reported everywhere, never the mean.</li>
+<li><strong>d=6 is not reported.</strong> Its runs use n_obs=1000, where the gate misses
+by the widest margin, so any number from them would describe an environment further from
+specification than the ones above.</li>
 <li><strong>The oracle is myopic.</strong> It is the best single next experiment, not the
 best sequence, which is precisely why beating it is possible.</li>
 </ul>
