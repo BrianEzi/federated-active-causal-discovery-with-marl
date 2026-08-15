@@ -216,7 +216,14 @@ def _ref_fingerprint(env_config, eval_episodes: int) -> str:
     therefore refuses to load unless this fingerprint matches exactly.
     """
     from dataclasses import asdict
-    return json.dumps({"env": asdict(env_config), "eval_episodes": eval_episodes},
+    fields = asdict(env_config)
+    # `include_counts` only changes what `env.observation()` returns, and NO reference
+    # policy calls it -- random draws from its RNG, no_intervention is constant, and both
+    # greedy variants read `result.posterior` directly. So it cannot move the references,
+    # and excluding it lets one cache serve both settings. Every other field can, so every
+    # other field stays in.
+    fields.pop("include_counts", None)
+    return json.dumps({"env": fields, "eval_episodes": eval_episodes},
                       sort_keys=True, default=str)
 
 
