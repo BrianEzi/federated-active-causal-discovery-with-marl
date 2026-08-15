@@ -32,7 +32,13 @@ from sa.policy import PPOAgent, PPOConfig
 from sa.tracking import start_run
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Separated from `main` so a sweep definition can be checked against the REAL parser.
+
+    Sweeps render command lines that nobody reads and that are then executed dozens of
+    times; a mis-rendered flag does not crash, it silently runs a different experiment.
+    Parsing the generated CLI back through this is what makes that detectable in a test.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--d", type=int, default=5)
     parser.add_argument("--observation", type=str, default="edge_marginals",
@@ -93,7 +99,11 @@ def main() -> None:
     ppo_group.add_argument("--shaping_coef", type=float, default=0.0,
                            help="potential-based shaping on posterior entropy; "
                                 "policy-invariant (Ng, Harada & Russell 1999)")
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     space = build_graph_space(args.d)
     oracle = InterventionOracle(space)
