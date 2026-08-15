@@ -33,8 +33,8 @@ import numpy as np
 # Known values, kept here as the single source of truth for the tests that pin
 # enumeration correctness. Sequences: OEIS A003024 (labelled DAGs) and A007984
 # (Markov equivalence classes / CPDAGs).
-N_DAGS = {1: 1, 2: 3, 3: 25, 4: 543, 5: 29281}
-N_MECS = {1: 1, 2: 2, 3: 11, 4: 185, 5: 8782}
+N_DAGS = {1: 1, 2: 3, 3: 25, 4: 543, 5: 29281, 6: 3781503}
+N_MECS = {1: 1, 2: 2, 3: 11, 4: 185, 5: 8782, 6: 1067825}
 
 
 def is_acyclic(adjacency: np.ndarray) -> bool:
@@ -78,6 +78,89 @@ def enumerate_dags(d: int) -> np.ndarray:
         if is_acyclic(a):
             dags.append(a)
     return np.array(dags, dtype=np.int8)
+
+
+def _pair_list(d: int) -> List[Tuple[int, int]]:
+    return list(itertools.combinations(range(d), 2))
+
+
+def enumerate_dags_fast(d: int, chunk: int = 1 << 20) -> np.ndarray:
+    """`enumerate_dags`, vectorised over candidates. Exactly the same output.
+
+    The pure-Python version tests 3^C(d,2) candidates one at a time, which is fine through
+    d=5 (59049 candidates) and hopeless at d=6 (14.3 million -- roughly 28 minutes, paid
+    again by every job that builds the space). This tests a whole chunk of candidates at
+    once with array operations, which brings d=6 down to well under a minute.
+
+    Acyclicity is still Kahn's algorithm, just run on every candidate simultaneously:
+    repeatedly delete all nodes that have no outgoing edge to a surviving node. A graph is
+    acyclic iff nothing survives after `d` rounds, since each round removes at least one
+    node from every acyclic graph.
+    """
+    pairs = _pair_list(d)
+    n_pairs = len(pairs)
+    total = 3 ** n_pairs
+    # Descending weights so candidate `idx` is the same graph `itertools.product` yields
+    # at position `idx` -- its LAST position varies fastest. Matching that exactly matters:
+    # a DAG's index is its identity everywhere else in the codebase, so a different
+    # enumeration order would silently renumber every graph.
+    powers = 3 ** np.arange(n_pairs - 1, -1, -1)
+
+    keep: List[np.ndarray] = []
+    for start in range(0, total, chunk):
+        idx = np.arange(start, min(start + chunk, total), dtype=np.int64)
+        digits = (idx[:, None] // powers[None, :]) % 3      # [c, n_pairs] in {0, 1, 2}
+
+        a = np.zeros((len(idx), d, d), dtype=bool)
+        for k, (i, j) in enumerate(pairs):
+            a[:, i, j] = digits[:, k] == 1
+            a[:, j, i] = digits[:, k] == 2
+
+        alive = np.ones((len(idx), d), dtype=bool)
+        for _ in range(d):
+            # has_out[c, i]: node i still points at some surviving node.
+            has_out = (a & alive[:, None, :]).any(axis=2)
+            alive &= has_out          # sinks (no outgoing edge) are deleted
+        acyclic = ~alive.any(axis=1)
+
+        if acyclic.any():
+            keep.append(a[acyclic].astype(np.int8))
+
+    return np.concatenate(keep) if keep else np.zeros((0, d, d), dtype=np.int8)
+
+
+def mec_ids_fast(dags: np.ndarray) -> np.ndarray:
+    """[N] Markov equivalence class id for every DAG, computed with array operations.
+
+    Same criterion as `mec_signature` (Verma & Pearl 1990: equal skeleton and equal
+    v-structures), but the signature is packed into integer bit-codes rather than nested
+    frozensets, so millions of graphs can be grouped with one `np.unique`. Building 3.78
+    million frozenset pairs in Python is both slow and memory-hungry.
+
+    Bit layout: one bit per unordered pair for the skeleton, and one bit per candidate
+    triple (i -> k <- j, i < j) for the v-structures, spread across as many uint64 words
+    as needed.
+    """
+    a = np.asarray(dags) > 0
+    n, d = a.shape[0], a.shape[1]
+
+    bits: List[np.ndarray] = []
+    for i, j in _pair_list(d):
+        bits.append(a[:, i, j] | a[:, j, i])                       # skeleton
+    for k in range(d):
+        others = [x for x in range(d) if x != k]
+        for i, j in itertools.combinations(others, 2):
+            # Unshielded collider only: if i and j are adjacent the pattern carries no
+            # orientation information (see `v_structures`).
+            bits.append(a[:, i, k] & a[:, j, k] & ~a[:, i, j] & ~a[:, j, i])
+
+    n_words = (len(bits) + 63) // 64
+    codes = np.zeros((n, n_words), dtype=np.uint64)
+    for b, bit in enumerate(bits):
+        codes[:, b // 64] |= bit.astype(np.uint64) << np.uint64(b % 64)
+
+    _, inverse = np.unique(codes, axis=0, return_inverse=True)
+    return inverse.reshape(-1).astype(np.int32)
 
 
 def skeleton(adjacency: np.ndarray) -> FrozenSet[FrozenSet[int]]:
@@ -163,16 +246,25 @@ class GraphSpace:
         return np.flatnonzero(self.mec_id == self.mec_id[dag_index])
 
 
-def build_graph_space(d: int) -> GraphSpace:
-    """Enumerate all DAGs on `d` nodes and group them into equivalence classes."""
-    dags = enumerate_dags(d)
-    signatures: Dict[object, int] = {}
-    mec_id = np.empty(len(dags), dtype=np.int32)
-    for idx, a in enumerate(dags):
-        sig = mec_signature(a)
-        if sig not in signatures:
-            signatures[sig] = len(signatures)
-        mec_id[idx] = signatures[sig]
+def build_graph_space(d: int, fast: bool = True) -> GraphSpace:
+    """Enumerate all DAGs on `d` nodes and group them into equivalence classes.
+
+    `fast=False` selects the straightforward per-graph implementation. It is kept as the
+    reference the vectorised path is tested against, not as a fallback: the two must agree
+    exactly, and `tests/sa/test_graphs.py` asserts that they do.
+    """
+    if fast:
+        dags = enumerate_dags_fast(d)
+        mec_id = mec_ids_fast(dags)
+    else:
+        dags = enumerate_dags(d)
+        signatures: Dict[object, int] = {}
+        mec_id = np.empty(len(dags), dtype=np.int32)
+        for idx, a in enumerate(dags):
+            sig = mec_signature(a)
+            if sig not in signatures:
+                signatures[sig] = len(signatures)
+            mec_id[idx] = signatures[sig]
     mec_sizes = np.bincount(mec_id)
     return GraphSpace(d=d, dags=dags, mec_id=mec_id, mec_sizes=mec_sizes)
 

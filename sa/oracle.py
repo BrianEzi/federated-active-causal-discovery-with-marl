@@ -38,6 +38,11 @@ import numpy as np
 from sa.graphs import GraphSpace, descendants
 
 
+# Graphs whose transitive closure is computed in one block. 250k x d x d booleans is
+# ~9 MB at d=6.
+_CLOSURE_CHUNK = 250_000
+
+
 class InterventionOracle:
     """Scores candidate intervention targets by expected information gain.
 
@@ -50,18 +55,30 @@ class InterventionOracle:
         d = space.d
         # [n_dags, d] group label: which descendant-set signature each DAG has from each
         # node. Two DAGs sharing a label at node i are indistinguishable by do(X_i).
+        # Computed for every graph at once, in chunks. The transitive closure is the same
+        # Floyd-Warshall as `graphs.descendants`, just run on a block of graphs
+        # simultaneously; a Python loop over graphs costs minutes once d reaches 6, where
+        # there are 3.78 million of them. Chunked because the intermediate is [chunk, d, d]
+        # booleans and the full array would be held twice over.
+        codes = np.empty((space.n_dags, d), dtype=np.int64)
+        adjacency = np.asarray(space.dags) > 0.5
+        bit = (1 << np.arange(d)).astype(np.int64)
+        for start in range(0, space.n_dags, _CLOSURE_CHUNK):
+            block = slice(start, start + _CLOSURE_CHUNK)
+            reach = adjacency[block].copy()
+            for k in range(d):
+                reach |= reach[:, :, k][:, :, None] & reach[:, k, :][:, None, :]
+            # Pack each row of the reachability matrix into one integer, so two graphs
+            # share a descendant set from `node` exactly when their codes are equal.
+            codes[block] = reach.astype(np.int64) @ bit
+
         signatures = np.empty((space.n_dags, d), dtype=np.int32)
-        lookups: list = [dict() for _ in range(d)]
-        for g, dag in enumerate(space.dags):
-            reach = descendants(dag)
-            for node in range(d):
-                key = reach[node].tobytes()
-                table = lookups[node]
-                if key not in table:
-                    table[key] = len(table)
-                signatures[g, node] = table[key]
+        self.n_groups = []
+        for node in range(d):
+            groups, inverse = np.unique(codes[:, node], return_inverse=True)
+            signatures[:, node] = inverse.reshape(-1)
+            self.n_groups.append(len(groups))
         self.signatures = signatures
-        self.n_groups = [len(t) for t in lookups]
 
     def scores(self, posterior: np.ndarray) -> np.ndarray:
         """[d] expected information gain from intervening on each node, in nats.

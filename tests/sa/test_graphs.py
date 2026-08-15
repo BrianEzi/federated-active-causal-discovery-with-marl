@@ -153,3 +153,39 @@ def test_descendants_is_transitive_and_strict():
 
 def test_descendants_of_empty_graph_is_empty():
     assert not descendants(np.zeros((3, 3))).any()
+
+
+# --- the vectorised construction path -----------------------------------------------
+#
+# `build_graph_space(fast=True)` is what every job actually runs; the per-graph version is
+# kept solely as the thing it is checked against. These tests are the check. They matter
+# because the vectorised path renumbers nothing only by careful construction: a DAG's index
+# is its identity everywhere else in the codebase, and an enumeration-order change would
+# silently relabel every graph while every count still looked correct.
+
+@pytest.mark.parametrize("d", [2, 3, 4, 5])
+def test_fast_enumeration_is_byte_identical_to_the_reference(d):
+    assert np.array_equal(build_graph_space(d, fast=True).dags,
+                          build_graph_space(d, fast=False).dags), (
+        f"d={d}: vectorised enumeration produced a different graph ORDER, which would "
+        f"renumber every DAG index in the project"
+    )
+
+
+@pytest.mark.parametrize("d", [2, 3, 4])
+def test_fast_mec_grouping_induces_the_same_partition(d):
+    """Class *labels* may be numbered differently; the partition must be identical."""
+    fast = build_graph_space(d, fast=True).mec_id
+    ref = build_graph_space(d, fast=False).mec_id
+    assert np.array_equal(fast[:, None] == fast[None, :], ref[:, None] == ref[None, :])
+
+
+def test_fast_path_reproduces_the_known_counts_at_d6():
+    """d=6 exists only via the vectorised path -- the per-graph version needs ~28 minutes.
+
+    Both counts are externally known (OEIS A003024 and A007984), so this is a genuine
+    check against an outside source rather than against our own other implementation.
+    """
+    space = build_graph_space(6)
+    assert space.n_dags == N_DAGS[6] == 3781503
+    assert space.n_mecs == N_MECS[6] == 1067825

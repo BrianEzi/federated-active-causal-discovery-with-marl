@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import pickle
 import time
 
 import numpy as np
@@ -39,6 +41,11 @@ def main() -> None:
     parser.add_argument("--out", type=str, default=None)
     parser.add_argument("--tag", type=str, default="",
                         help="free-text label recorded in the output, e.g. the sweep arm")
+    parser.add_argument("--ref_cache", type=str, default=None,
+                        help="reuse reference-policy traces from this file, computing and "
+                             "saving them if it does not exist")
+    parser.add_argument("--refs_only", action="store_true",
+                        help="compute and cache the references, then stop (no training)")
 
     # -- environment levers -----------------------------------------------------------
     env_group = parser.add_argument_group("environment")
@@ -77,17 +84,34 @@ def main() -> None:
     # configuration rather than cached across the sweep, because environment levers
     # (budget, n_obs, prior, ...) move the baselines too -- gap-closed is only meaningful
     # against baselines measured in the SAME environment.
-    refs = {}
+    #
+    # At d=6 a single posterior update takes ~0.7s, which puts the four references at
+    # roughly two hours -- far too much to repeat for every seed. `--ref_cache` computes
+    # them once and shares them, which is safe precisely because they are deterministic
+    # given the environment config and the fixed seed 99.
+    refs = _load_ref_cache(args.ref_cache, env_config, args.eval_episodes)
+    if refs is None:
+        refs = {}
+        for name in ("random", "greedy_oracle", "edge_marginal_greedy", "no_intervention"):
+            t0 = time.time()
+            refs[name] = run_episodes(env_config, baselines[name], args.eval_episodes,
+                                      seed=99, space=space, oracle=oracle)
+            print(f"  {name:<22} computed ({time.time() - t0:.0f}s)")
+        _save_ref_cache(args.ref_cache, env_config, args.eval_episodes, refs)
+    else:
+        print(f"  references loaded from {args.ref_cache}")
+
     reference_metrics = {}
-    for name in ("random", "greedy_oracle", "edge_marginal_greedy", "no_intervention"):
-        t0 = time.time()
-        refs[name] = run_episodes(env_config, baselines[name], args.eval_episodes,
-                                  seed=99, space=space, oracle=oracle)
-        solved = float(np.mean([t.identified for t in refs[name]]))
+    for name, traces in refs.items():
+        solved = float(np.mean([t.identified for t in traces]))
         cost = float(np.mean([t.n_interventions if t.identified else args.budget
-                              for t in refs[name]]))
+                              for t in traces]))
         reference_metrics[name] = {"solve_rate": solved, "mean_cost": cost}
-        print(f"  {name:<22} solve={solved:.2f} cost={cost:.2f} ({time.time() - t0:.0f}s)")
+        print(f"  {name:<22} solve={solved:.2f} cost={cost:.2f}")
+
+    if args.refs_only:
+        print("--refs_only: references cached, stopping before training")
+        return
 
     random_ref = refs["random"]
     # A condition-B agent is compared against the edge-marginal greedy policy, not the
@@ -166,6 +190,47 @@ def main() -> None:
         with open(args.out, "w") as f:
             json.dump(payload, f, indent=2, default=float)
         print(f"  written to {args.out}")
+
+
+def _ref_fingerprint(env_config, eval_episodes: int) -> str:
+    """Everything the reference traces depend on.
+
+    The references are baseline policies run in a specific environment, so reusing a cache
+    built under different settings would silently compare an agent against the wrong
+    opponent -- and gap-closed would look like a result rather than a bug. The cache
+    therefore refuses to load unless this fingerprint matches exactly.
+    """
+    from dataclasses import asdict
+    return json.dumps({"env": asdict(env_config), "eval_episodes": eval_episodes},
+                      sort_keys=True, default=str)
+
+
+def _load_ref_cache(path, env_config, eval_episodes):
+    if not path or not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        cached = pickle.load(f)
+    if cached.get("fingerprint") != _ref_fingerprint(env_config, eval_episodes):
+        raise SystemExit(
+            f"reference cache {path} was built for a different configuration.\n"
+            f"Delete it or point --ref_cache elsewhere; reusing it would compare the "
+            f"agent against baselines measured in another environment."
+        )
+    return cached["refs"]
+
+
+def _save_ref_cache(path, env_config, eval_episodes, refs) -> None:
+    if not path:
+        return
+    payload = {"fingerprint": _ref_fingerprint(env_config, eval_episodes), "refs": refs}
+    # Written to a unique temporary name and renamed, so a task that reads the cache while
+    # another is still writing it sees either the old file or the complete new one, never
+    # a half-written pickle. Array tasks start together and would otherwise race.
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "wb") as f:
+        pickle.dump(payload, f)
+    os.replace(tmp, path)
+    print(f"  references cached to {path}")
 
 
 def _serialisable(metrics: dict) -> dict:

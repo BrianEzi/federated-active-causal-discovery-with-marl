@@ -30,6 +30,11 @@ import numpy as np
 from sa.graphs import GraphSpace
 
 
+# Rows of the DAG array converted to float64 at once when accumulating edge marginals.
+# 250k x d x d float64 is ~72 MB at d=6, which is the memory/overhead trade-off.
+_MARGINAL_CHUNK = 250_000
+
+
 class PosteriorEngine:
     """Computes exact posteriors over a `GraphSpace`, reusing local scores.
 
@@ -56,11 +61,25 @@ class PosteriorEngine:
             lookup.append({s: i for i, s in enumerate(sets)})
 
         # [N, d] index of each DAG's parent set for each node.
+        #
+        # Built by bitmask rather than by looping over graphs: at d=6 there are 3.78
+        # million DAGs, and a Python loop over them costs minutes on every job that
+        # constructs the engine. Each node's parent set is a subset of the other d-1
+        # nodes, so it encodes as a (d-1)-bit integer, and a lookup table of size 2^(d-1)
+        # -- 32 entries at d=6 -- turns the whole thing into one gather per node.
         self.parent_set_ids = np.empty((space.n_dags, d), dtype=np.int32)
-        for g, dag in enumerate(space.dags):
-            for node in range(d):
-                parents = tuple(int(p) for p in np.flatnonzero(dag[:, node] > 0.5))
-                self.parent_set_ids[g, node] = lookup[node][parents]
+        adjacency = np.asarray(space.dags) > 0.5
+        for node in range(d):
+            others = [k for k in range(d) if k != node]
+            mask_to_index = np.empty(1 << len(others), dtype=np.int32)
+            for parents, index in lookup[node].items():
+                bits = sum(1 << others.index(p) for p in parents)
+                mask_to_index[bits] = index
+
+            masks = np.zeros(space.n_dags, dtype=np.int64)
+            for position, parent in enumerate(others):
+                masks |= adjacency[:, parent, node].astype(np.int64) << position
+            self.parent_set_ids[:, node] = mask_to_index[masks]
 
         self.n_parent_sets = max(len(s) for s in self.parent_sets)
 
@@ -114,7 +133,16 @@ def edge_marginals(space: GraphSpace, posterior: np.ndarray) -> np.ndarray:
     very different posteriors can share edge marginals -- which is exactly the cost the
     experiment is designed to measure.
     """
-    return np.tensordot(posterior, space.dags.astype(np.float64), axes=(0, 0))
+    # Accumulated in chunks because the obvious one-liner upcasts the whole int8 DAG array
+    # to float64 first: 3.78 million graphs at d=6 is a 1.1 GB temporary allocated on every
+    # single call. Chunking bounds it to a few tens of megabytes at no cost in accuracy.
+    d = space.d
+    total = np.zeros((d, d), dtype=np.float64)
+    for start in range(0, space.n_dags, _MARGINAL_CHUNK):
+        block = slice(start, start + _MARGINAL_CHUNK)
+        total += np.tensordot(posterior[block],
+                              space.dags[block].astype(np.float64), axes=(0, 0))
+    return total
 
 
 def mec_posterior(space: GraphSpace, posterior: np.ndarray) -> np.ndarray:
