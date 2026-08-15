@@ -73,6 +73,21 @@ def zeta(a: np.ndarray, d: int) -> np.ndarray:
     return a
 
 
+def moebius_transpose(a: np.ndarray, d: int) -> np.ndarray:
+    """In-place SUPERSET-sum over the last axis of length `2^d`.
+
+    The adjoint of `zeta`. Zeta is the linear map `alpha(B) = sum over P subset B of w(P)`,
+    so its transpose sends a cotangent on `alpha` back to one on `w` by summing over every
+    superset: `wbar(P) = sum over B superset P of alphabar(B)`. Same butterfly, addition
+    running the other way.
+    """
+    for bit in range(d):
+        a = a.reshape(-1, 2, 1 << bit)
+        a[:, 0, :] += a[:, 1, :]
+        a = a.reshape(-1, 1 << d)
+    return a
+
+
 def partition_function(alpha: np.ndarray, d: int) -> Tuple[float, float]:
     """Robinson's sink recurrence. Returns `(Z, peak)`.
 
@@ -80,6 +95,16 @@ def partition_function(alpha: np.ndarray, d: int) -> Tuple[float, float]:
     diagnostic. Once `peak / Z` approaches `1/eps` (~4.5e15) the answer has no significant
     digits left, and it is much better to know that number than to meet it as a silently
     wrong result.
+    """
+    f, peak = partition_table(alpha, d)
+    return float(f[(1 << d) - 1]), peak
+
+
+def partition_table(alpha: np.ndarray, d: int) -> Tuple[np.ndarray, float]:
+    """The full `f(A)` table, not just `f(V)`.
+
+    The backward pass needs every intermediate, so it is returned rather than recomputed.
+    `2^d` floats is nothing next to the `O(3^d)` work that produced them.
     """
     f = np.zeros(1 << d, dtype=np.float64)
     f[0] = 1.0
@@ -100,7 +125,7 @@ def partition_function(alpha: np.ndarray, d: int) -> Tuple[float, float]:
             peak = max(peak, abs(product))
             S = (S - 1) & A
         f[A] = total
-    return float(f[(1 << d) - 1]), float(peak)
+    return f, float(peak)
 
 
 class DPPosterior:
@@ -168,19 +193,29 @@ class DPPosterior:
         which is how a single edge marginal is obtained: `P(parent -> child) = Z_forced / Z`.
         The shifts are identical in both runs and so cancel in that ratio.
         """
+        full, shift = self._weights_masked(log_w, force=force)
+        return zeta(full, self.d), shift
+
+    def _weights_masked(self, log_w: np.ndarray,
+                        force: Optional[Tuple[int, int]] = None
+                        ) -> Tuple[np.ndarray, float]:
+        """`[d, 2^d]` weights in MASK order, per-node shifts applied.
+
+        Entries whose mask is not a legal parent set for that node -- anything containing
+        the node itself -- stay at exactly zero, which is what makes the mask-order array
+        safe to zeta-transform directly.
+        """
         d = self.d
         shifts = log_w.max(axis=1)
-        alpha = np.exp(log_w - shifts[:, None])
+        weights = np.exp(log_w - shifts[:, None])
         if force is not None:
             child, parent = force
-            keep = (self.scorer.parent_masks[child] >> parent) & 1
-            alpha[child] = alpha[child] * keep
+            weights[child] = weights[child] * ((self.scorer.parent_masks[child] >> parent) & 1)
 
         full = np.zeros((d, 1 << d), dtype=np.float64)
-        # Scatter from parent-set order into mask order, then subset-sum in place.
         for node in range(d):
-            full[node, self.scorer.parent_masks[node]] = alpha[node]
-        return zeta(full, d), float(shifts.sum())
+            full[node, self.scorer.parent_masks[node]] = weights[node]
+        return full, float(shifts.sum())
 
     # -- quantities ---------------------------------------------------------------------
 
@@ -222,6 +257,116 @@ class DPPosterior:
                 Zf, _ = partition_function(a, d)
                 out[parent, child] = Zf / Z
         return out
+
+    # -- one-pass edge marginals --------------------------------------------------------
+
+    def edge_marginals_onepass(self, log_w: np.ndarray,
+                               check: bool = False) -> np.ndarray:
+        """[d, d] edge marginals from ONE forward and ONE backward pass.
+
+        Same quantity as `edge_marginals`, obtained without re-running the DP `d(d-1)`
+        times. `out[u, v] = P(u -> v | data)`.
+
+        **The idea.** `Z` is a polynomial in the parent-set weights `w`, and it is
+        *multilinear*: every DAG contributes `prod_i w_i(Pa_i)`, which uses each node's
+        weights exactly once. So
+
+            c_v(P) := dZ / dw_v(P)
+
+        is the total weight of everything *except* node `v`'s own choice, summed over all
+        DAGs in which `v`'s parents are exactly `P`. Hence `w_v(P) c_v(P)` is the posterior
+        mass of that choice, and
+
+            P(u -> v)  =  ( sum over P containing u of w_v(P) c_v(P) ) / Z.
+
+        All `d * 2^(d-1)` derivatives come out of one reverse-mode sweep through the same
+        recurrence that produced `Z`, because reverse-mode AD costs a constant multiple of
+        the forward pass regardless of how many inputs there are. That is the whole saving:
+        `O(d * 3^d)` in place of `O(d^2 * 3^d)`.
+
+        This is exact — algebra, not approximation — and the acceptance test in
+        `tests/test_dp.py` pins it against enumeration at d=4,5,6 rather than against
+        `edge_marginals`, so the two implementations cannot agree on a shared error.
+
+        `check=True` verifies Euler's identity `sum_P w_v(P) c_v(P) == Z` for every node.
+        It holds because `Z` has degree exactly 1 in each node's weights, and it is a
+        strong internal test: a misindexed backward pass fails it immediately. Off by
+        default because it is only meaningful once, not every environment step.
+        """
+        d = self.d
+        w_full, _ = self._weights_masked(log_w)
+        alpha = zeta(w_full.copy(), d)
+        f, _ = partition_table(alpha, d)
+        Z = f[(1 << d) - 1]
+        if Z <= 0.0:
+            raise FloatingPointError(
+                f"subset DP lost all precision at d={d} (Z={Z:.3e}); see "
+                "log_partition_diagnostic.")
+
+        alpha_bar = self._backward(alpha, f)
+        w_bar = moebius_transpose(alpha_bar, d)
+
+        mass = w_full * w_bar                      # [d, 2^d] posterior mass per choice
+        if check:
+            totals = mass.sum(axis=1)
+            if not np.allclose(totals, Z, rtol=1e-8):
+                raise AssertionError(
+                    f"Euler identity violated: sum_P w_v(P) dZ/dw_v(P) = {totals} != Z={Z}")
+
+        # numer[u, v] = sum over masks containing u of mass[v, mask].
+        bits = ((np.arange(1 << d)[:, None] >> np.arange(d)[None, :]) & 1).astype(np.float64)
+        return (bits.T @ mass.T) / Z
+
+    def _backward(self, alpha: np.ndarray, f: np.ndarray) -> np.ndarray:
+        """Reverse-mode sweep through the sink recurrence. Returns `dZ/dalpha`.
+
+        Sets are visited in DECREASING order, which is the reverse of the forward pass:
+        `f(A)` depends only on strictly smaller sets, so by the time `A` is reached its own
+        cotangent has received every contribution it will ever get.
+
+        The per-node factors use prefix/suffix products rather than dividing the full
+        product by one term. Division would be shorter and is what the derivation suggests,
+        but `alpha_i(rest)` can underflow to zero for a small `rest` under a sharply peaked
+        score, and the resulting `inf` would propagate silently into a marginal that still
+        looks like a probability.
+        """
+        d = self.d
+        full = (1 << d) - 1
+        f_bar = np.zeros(1 << d, dtype=np.float64)
+        f_bar[full] = 1.0
+        alpha_bar = np.zeros((d, 1 << d), dtype=np.float64)
+        popcount = np.array([bin(m).count("1") for m in range(1 << d)])
+
+        for A in range(full, 0, -1):
+            g = f_bar[A]
+            if g == 0.0:
+                continue
+            S = A
+            while S:
+                rest = A ^ S
+                members = []
+                b = S
+                while b:
+                    low = b & -b
+                    members.append(low.bit_length() - 1)
+                    b ^= low
+                k = len(members)
+
+                values = [alpha[j, rest] for j in members]
+                prefix = [1.0] * (k + 1)
+                for i in range(k):
+                    prefix[i + 1] = prefix[i] * values[i]
+                suffix = [1.0] * (k + 1)
+                for i in range(k - 1, -1, -1):
+                    suffix[i] = suffix[i + 1] * values[i]
+
+                signed = g * (1.0 if popcount[S] & 1 else -1.0)
+                f_bar[rest] += signed * prefix[k]
+                weighted = signed * f[rest]
+                for i, j in enumerate(members):
+                    alpha_bar[j, rest] += weighted * prefix[i] * suffix[i + 1]
+                S = (S - 1) & A
+        return alpha_bar
 
     def log_prob_dag(self, log_w: np.ndarray, adjacency: np.ndarray,
                      log_z: Optional[float] = None) -> float:

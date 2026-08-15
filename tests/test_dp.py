@@ -94,6 +94,94 @@ def test_true_dag_probability_matches_enumeration(d):
 
 
 # --------------------------------------------------------------------------------------
+# Block 2 acceptance test: one-pass edge marginals
+# --------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("d", [3, 4, 5, 6])
+def test_onepass_marginals_match_enumeration(d):
+    """Pinned against ENUMERATION, not against `edge_marginals`.
+
+    Comparing the two DP routes to each other would pass if they shared a mistake in the
+    weights, the prior term or the parent-set indexing -- everything except the recurrence
+    itself. Enumeration is the only reference that does not share code with either.
+    """
+    samples, intervened = _data(500, d, seed=d + 40, intervene=[0, 2] if d > 2 else [0])
+    _, engine, posterior, _ = _reference(d, samples, intervened, uniform_prior)
+    exact = engine.edge_marginals(posterior)
+
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="uniform")
+    onepass = dp.edge_marginals_onepass(dp.log_weights(samples, intervened), check=True)
+
+    assert np.abs(exact - onepass).max() < 1e-9
+    assert np.all(np.diag(onepass) == 0.0)
+
+
+def test_onepass_agrees_with_constrained_runs_under_a_non_uniform_prior():
+    """The prior enters the backward pass through the same weights as the forward one; a
+    prior applied on only one side would still look right at p=0.5, where it is zero."""
+    d = 5
+    samples, intervened = _data(400, d, seed=44, intervene=[3])
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="erdos_renyi", p=0.25)
+    log_w = dp.log_weights(samples, intervened)
+    assert np.abs(dp.edge_marginals(log_w)
+                  - dp.edge_marginals_onepass(log_w)).max() < 1e-12
+
+
+def test_euler_identity_holds_for_every_node():
+    """`sum_P w_v(P) dZ/dw_v(P) == Z`, because Z has degree exactly one in each node's
+    weights -- every DAG picks exactly one parent set per node.
+
+    This is the internal check that a misindexed backward pass cannot survive, and it
+    needs no ground truth, so it remains available at d where enumeration does not.
+    """
+    for d in (4, 6, 8):
+        rng = np.random.default_rng(d)
+        samples = rng.normal(size=(300, d))
+        dp = DPPosterior.for_prior(d, BGeScore(d), kind="erdos_renyi", p=0.35)
+        log_w = dp.log_weights(samples, np.zeros((300, d)))
+        dp.edge_marginals_onepass(log_w, check=True)   # raises AssertionError if violated
+
+
+def test_onepass_is_faster_than_constrained_runs_at_d6():
+    """The pre-registered block 2 acceptance threshold: >= 5x at d=6.
+
+    A timing test is ordinarily a bad test, but the whole justification for adding a second
+    implementation of a quantity that already worked is the speedup. If it is not there,
+    the extra code is a liability and this should fail rather than pass quietly.
+    """
+    import time
+    d = 6
+    samples, intervened = _data(400, d, seed=6, intervene=[1])
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="uniform")
+    log_w = dp.log_weights(samples, intervened)
+
+    dp.edge_marginals_onepass(log_w)          # warm any first-call cost
+    t0 = time.perf_counter()
+    dp.edge_marginals(log_w)
+    slow = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    dp.edge_marginals_onepass(log_w)
+    fast = time.perf_counter() - t0
+    assert slow / fast >= 5.0, f"only {slow / fast:.1f}x -- measured 6.4x on 2026-08-16"
+
+
+def test_moebius_transpose_is_the_adjoint_of_zeta():
+    """<zeta(w), y> == <w, moebius_transpose(y)> for random vectors.
+
+    Pins the one line the backward pass depends on most and the one that would be easiest
+    to write with the addition running the wrong way -- a bug that leaves every marginal
+    in [0, 1] and merely wrong.
+    """
+    from sa.dp import moebius_transpose, zeta
+    d = 5
+    rng = np.random.default_rng(0)
+    w = rng.normal(size=(1, 1 << d))
+    y = rng.normal(size=(1, 1 << d))
+    assert float((zeta(w.copy(), d) @ y.T).item()) == pytest.approx(
+        float((w @ moebius_transpose(y.copy(), d).T).item()), rel=1e-12)
+
+
+# --------------------------------------------------------------------------------------
 # Priors: the DP must be scoring the SAME model, not a similar one
 # --------------------------------------------------------------------------------------
 

@@ -1483,3 +1483,67 @@ so `for_prior` raises rather than silently scoring a different model. A quietly-
 reweighting would produce a plausible-looking posterior under the wrong prior, which is
 the hardest class of bug to notice; a second test pins that scale_free really does differ
 from ER, so the refusal cannot become spurious without a test failing.
+
+## 2026-08-16 (01:1x) — Block 2: edge marginals in one pass
+
+[DECIDED] The route taken is **reverse-mode automatic differentiation of the DP**, not the
+Koivisto & Sood forward/backward construction that `prototypes/README.md` suggested
+searching for. K&S compute all-edge posteriors in `O(2^d d^2)`, but under an
+**order-modular** prior — a different model, known to bias toward some structures — and
+switching priors to gain speed would have quietly changed what is being inferred.
+
+The AD route needs no such trade. `Z` is *multilinear* in the parent-set weights: each DAG
+contributes `prod_i w_i(Pa_i)`, using every node's weights exactly once. So
+`c_v(P) = dZ/dw_v(P)` is the total weight of every DAG in which `v`'s parents are exactly
+`P`, divided by that choice's own weight, and
+
+    P(u -> v) = ( sum over P containing u of w_v(P) c_v(P) ) / Z.
+
+Reverse-mode gives all `d * 2^(d-1)` derivatives for a constant multiple of one forward
+pass, whatever the number of inputs — `O(d * 3^d)` in place of `O(d^2 * 3^d)`. Same prior,
+same model, same recurrence.
+
+[MEASURED] Correct against enumeration at d=3,4,5,6 (max difference 8.3e-17), pinned
+against **enumeration rather than against `edge_marginals`** so a shared error in weights,
+prior or indexing cannot cancel:
+
+| d | constrained `d(d-1)` runs | one pass | speedup |
+|---|---|---|---|
+| 3 | 1.1 ms | 3.2 ms | 0.3x |
+| 4 | 2.6 ms | 0.8 ms | 3.4x |
+| 5 | 9.7 ms | 1.9 ms | 5.1x |
+| 6 | 41.7 ms | 6.6 ms | **6.4x** |
+| 7 | 178.6 ms | 17.1 ms | 10.4x |
+| 8 | 741.8 ms | 53.6 ms | 13.8x |
+
+**Block 2 acceptance test PASSES** (>= 5x at d=6 was the pre-registered threshold; 6.4x).
+The speedup grows with `d`, as it must — the saving is exactly the factor `d(d-1)` of
+repeated runs. At d=3 the one-pass version is *slower*, which is the honest shape of a
+constant-factor overhead on a problem with 25 graphs in it, and is left as measured.
+
+[MEASURED] Full posterior update (score table + all edge marginals), the per-environment-
+step cost:
+
+| d | score table | marginals | total |
+|---|---|---|---|
+| 7 | 9.3 ms | 17.1 ms | **26 ms** |
+| 8 | 13.1 ms | 53.6 ms | 67 ms |
+| 9 | 20.9 ms | 174.7 ms | 196 ms |
+| 10 | 37.4 ms | 544.9 ms | 582 ms |
+| 11 | 74.9 ms | 2575 ms | 2.65 s |
+
+d=7 at 26 ms/step is cheaper than d=5 was under enumeration two days ago. The practical
+ceiling moved from d=6 to roughly **d=9-10** for training, and d=11 for one-off analysis.
+
+[MEASURED] Euler's identity `sum_P w_v(P) dZ/dw_v(P) == Z` holds for every node at
+d=4,6,8. This is worth more than it looks: it is a correctness check that needs **no ground
+truth**, so it survives past d=6 where enumeration does not, and no misindexed backward
+pass can pass it. It runs under `check=True` in the tests and is off in the hot path.
+
+[CORRECTED] The prototype README's projection — "~1 s at d=8, ~3.5 s at d=9, ~14 s at
+d=10" for the constrained route, capping d at roughly 8 — measured out at 742 ms for d=8,
+so the projection was about right. The one-pass version replaces those with 54 ms and
+175 ms. The cap it described is gone.
+
+[MEASURED] Numerical conditioning is unaffected: cancellation growth stays at 0.88-0.97 at
+every d from 3 to 11, so the alternating recurrence is nowhere near losing precision.
