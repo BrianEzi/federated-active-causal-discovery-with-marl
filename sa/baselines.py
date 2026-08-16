@@ -18,7 +18,7 @@ from typing import Optional
 import numpy as np
 
 from sa.env import PASS_ACTION, CausalDiscoveryEnv
-from sa.oracle import InterventionOracle
+from sa.oracle import InterventionOracle, SamplingOracle
 from sa.posterior import edge_marginals
 
 
@@ -72,6 +72,38 @@ class GreedyOraclePolicy:
         self.rng = np.random.default_rng(self._seed if seed is None else seed)
 
     def __call__(self, env: CausalDiscoveryEnv, result) -> int:
+        scores, best = self.oracle.best_targets(result.posterior)
+        if scores.max() <= 1e-9:
+            return PASS_ACTION
+        return int(self.rng.choice(np.flatnonzero(best)))
+
+
+class GreedyOracleDPPolicy:
+    """`GreedyOraclePolicy` on the enumeration-free path.
+
+    Identical decision rule -- highest expected information gain, pass when nothing is
+    informative, random tie-breaking -- but reading a sampled oracle instead of an
+    enumerated one, because at d=7 there is no DAG list to compute descendant sets over.
+    The two agree on 95% of choices at d=5 and differ mainly on near-ties, where the exact
+    oracle is itself indifferent; see docs/SA_EXPERIMENT_LOG.md for the regret against an
+    ideal-sampling floor.
+
+    `result.posterior` here is the `[d, 2^(d-1)]` log-weight table, not a distribution over
+    graphs -- see `sa/env_dp.py`.
+    """
+
+    def __init__(self, dp, n_draws: int = 4000, seed: int = 0):
+        self.oracle = SamplingOracle(dp, n_draws=n_draws, seed=seed)
+        self._seed = seed
+        self.rng = np.random.default_rng(seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """See `RandomPolicy.reset` -- tie-breaking must be reproducible across runs."""
+        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+        self.oracle.seed = self._seed if seed is None else seed
+        self.oracle._calls = 0
+
+    def __call__(self, env, result) -> int:
         scores, best = self.oracle.best_targets(result.posterior)
         if scores.max() <= 1e-9:
             return PASS_ACTION
