@@ -1949,3 +1949,26 @@ roughly 20x cheaper per step than the d=6 runs that produced the current headlin
 against a target of 0.0779), which is the intended behaviour -- the gate rejects an
 under-powered environment, and confirms n_obs=20000 is required at d=7 as the standalone
 gate job found at 02:28.
+
+## 2026-08-16 20:47 -- d=7 n_obs sweep submitted (job 152604)
+
+[DECIDED] Submitted `submit_sa_d7_nobs.sh` to Myriad as job-array 152604.1-9. Grid is
+n_obs in {5000, 10000, 20000} x seeds {0,1,2}, n_obs varying fastest so a partial grid
+still yields complete seed sets at the smaller settings.
+
+Prediction registered before the numbers exist (also in the script's header comments):
+gap closed decayed monotonically to parity (+1.001) at d=7 because greedy's *absolute*
+cost fell to 1.94 interventions while n_obs was held at 20000 -- there is no horizon to
+plan over. Lowering n_obs should lengthen the horizon and re-open the gap, UNLESS GATE 1
+fails first, which is itself the result: it would mean the window in which the task is
+both well-posed and non-myopic has closed at d=7.
+
+The n_obs=20000 arm deliberately duplicates the three completed runs (+1.001/+1.017/
++0.994) as an internal replication check with freshly computed references. If it does not
+reproduce, the cross-n_obs comparison is not trustworthy either and nothing else in the
+sweep should be read.
+
+Cluster housekeeping: the pull was blocked by untracked `results/d7/` and
+`results/gates_dp/gates_d7.json` on the cluster (the same files had since been committed
+locally). Backed up to `~/sa_results_backup/` and moved aside to `~/sa_stale/` rather than
+deleted; cluster now at 57ad42d.
