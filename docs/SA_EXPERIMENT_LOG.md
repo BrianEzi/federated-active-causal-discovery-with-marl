@@ -1676,3 +1676,67 @@ against this number.
 environment step for step at d=4 and d=5 on shared seeds: identical SCM draws, max
 |true_mass difference| 1.1e-12, max |edge marginal difference| 2.8e-12, and every episode
 flag (`identified`, `done`, `is_singleton`) equal at all 47 compared steps. Runs at d=7.
+
+## 2026-08-16 (05:00) — Block 5: GATE-M3 measured. T3 is dead.
+
+[MEASURED] Exhaustive enumeration over the masked 6-node space for all three candidate
+topologies. Not sampled — this is a computation, not an estimate (T2 capped at 200,000 of
+its 1,553,727 graphs for the ambiguity pass only).
+
+| topology | DAGs | conf. A | conf. B | conf. either | mean bidirected | classes | singleton frac |
+|---|---|---|---|---|---|---|---|
+| T1 (2/2/2) | 96,255 | 0.251 | 0.251 | **0.439** | 0.501 | 30,414 | 0.318 |
+| T2 (1/1/4) | 1,553,727 | 0.360 | 0.363 | **0.593** | 1.321 | 145,964 | 0.761 |
+| T3 (no private parents of exposed) | 6,912 | 0.000 | 0.000 | **0.000** | 0.000 | 3,872 | 0.413 |
+
+Where the residual ambiguity sits — the share of within-class ambiguous edges by position:
+
+| topology | interior | private-exposed (the boundary) | exposed-exposed |
+|---|---|---|---|
+| T1 | 0.281 | **0.669** | 0.050 |
+| T2 | 0.000 | 0.574 | 0.426 |
+| T3 | 0.267 | **0.000** | 0.733 |
+
+[MEASURED] **Latent confounding is real and substantial under the default topology.** In
+43.9% of T1's graphs at least one agent's view contains an unobserved common cause, so a
+per-agent DAG posterior is misspecified on nearly half the instances. It is not
+overwhelming either — the mean number of induced bidirected edges is 0.50, so where it
+happens it is usually a single confounded pair.
+
+Agent A and agent B come out at 0.2506 each, identical to four decimal places. They have
+symmetric roles in T1, so this is a check on the measurement rather than a finding: an
+asymmetry would have meant a bug in the latent projection.
+
+[DECIDED] **T3 is rejected.** It does exactly what it was designed to do — zero confounding
+by construction — but the same constraint that removes the confounding removes the
+boundary: **0.0% of T3's ambiguity is on private-exposed edges**, against 66.9% in T1.
+Forbidding private parents of exposed nodes leaves private-exposed edges able to run in one
+direction only, so their orientation is never in question. What remains is 73.3%
+exposed-exposed and 26.7% interior — a problem each agent can largely solve alone, with
+nothing at the boundary to coordinate about.
+
+So T3 buys a well-specified local model by deleting the phenomenon the two-agent case
+exists to study. That is not a trade worth making, and the escape hatch written into the
+overnight plan ("if confounding is severe, fall back to T3") **does not exist**. The real
+options are T1 with confounding acknowledged and handled, or a different constraint
+entirely.
+
+[MEASURED] T2 (1 private node each, 4 exposed) is worse on both counts: *more* confounding
+(59.3%, and 1.32 bidirected edges — over twice T1's) and less structure to find, with 76.1%
+of its classes already singletons against T1's 31.8%. Its interior ambiguity is 0.000 for a
+trivial reason worth stating so it is not over-read: with one private node per agent there
+are no interior edges to be ambiguous about.
+
+[DECIDED] **T1 stays the default**, now on measured grounds rather than as an initial
+guess: it has the highest share of difficulty at the boundary (0.669), the least
+confounding of the two viable options, and a singleton fraction of 0.318 that leaves most
+instances genuinely requiring intervention.
+
+[DECIDED] The consequence for the design is now a real research question rather than a
+risk to be dodged: **on 44% of instances an agent's local DAG model is wrong, and the only
+way for it to be right is to learn something about a variable it is not allowed to see.**
+That is a precise, structural reason why coordination is necessary rather than merely
+helpful — which is a stronger motivation for the federated setting than anything in the
+design doc so far. Whether to handle it with MAG/PAG machinery, or to let the agents remain
+misspecified and measure what that costs, is a scoping decision for the morning; the
+measurement supporting either choice now exists.
