@@ -1972,3 +1972,88 @@ Cluster housekeeping: the pull was blocked by untracked `results/d7/` and
 `results/gates_dp/gates_d7.json` on the cluster (the same files had since been committed
 locally). Backed up to `~/sa_results_backup/` and moved aside to `~/sa_stale/` rather than
 deleted; cluster now at 57ad42d.
+
+## 2026-08-16 21:00-22:00 -- d=7 n_obs sweep results, and what they actually mean
+
+[MEASURED] Job 152604 completed in ~1h (not the 8h budgeted). 9/9 tasks, no errors.
+
+Replication check FIRST, as pre-registered. n_obs=20000 gap closed: 1.001 / 1.080 / 0.986,
+median 1.001, against the original 1.001 / 1.017 / 0.994, median 1.001. Reproduces. The
+cross-n_obs comparison is therefore readable.
+
+    n_obs   median gap   GATE 1 passes   greedy cost   random cost
+     5000       1.130         1 / 3          2.35-2.73     4.73-5.06
+    10000       1.043         2 / 3          2.09-2.23     4.64-4.92
+    20000       1.001         3 / 3          1.94-2.09     4.51-4.64
+
+The predicted DIRECTION is confirmed: lowering n_obs raises gap closed above parity, and
+greedy's absolute cost rises, which is a genuine horizon effect. But GATE 1 fails in
+exactly the arms where the agent looks best, which is the caveat the prediction named.
+
+[MEASURED] Step-0 diagnostic (scripts/step0_diagnostic.py, 400 episodes per setting)
+separates the two readings. Measured BEFORE any agent acts:
+
+    n_obs    skeleton error   orientation error   true mass   GATE 1
+     2000        0.979              0.196           0.154     0.0450
+     5000        0.666              0.176           0.178     0.0475
+    10000        0.451              0.161           0.206     0.0675
+    20000        0.307              0.153           0.223     0.0725
+    40000        0.231              0.148           0.236     0.0825
+
+Skeleton error ratio 5000/20000 = **2.17**, which is over the pre-registered threshold of
+2.0. By the decision rule fixed before the numbers existed, this reads as **SKELETON**:
+the low-n_obs arms are not measuring better planning, they are measuring a task that has
+partly reverted to structure search. Orientation error moves only 0.176 -> 0.153 across
+the same range, so almost all the extra uncertainty at low n_obs is skeletal.
+
+[DECIDED] The +1.130 at n_obs=5000 is NOT claimed as evidence that the agent out-plans the
+myopic oracle. The headline stays parity at d=7. Recording this rather than taking the
+better-looking number, because the rule was fixed in advance precisely to stop that.
+
+[CORRECTED] A design assumption that was never measured: EnvConfig's comment says n_obs is
+set so the agent's job is "orient within the class rather than also find the skeleton".
+At d=7 that is only approximately true even at n_obs=20000 -- expected skeleton error is
+0.307, and still 0.231 at 40000. It is not zero at any setting tested. The framing should
+be softened in the write-up rather than repeated as though exact.
+
+## 2026-08-16 -- the acyclicity exchange buys almost nothing
+
+[MEASURED] Structural version (scripts/exchange_value.py), uniform over legal joint
+hypotheses, exact enumeration:
+
+    (1,1,2)  pruned  1.0%   bits gained 0.014  of 4 disclosed
+    (1,1,3)  pruned  2.0%   bits gained 0.029  of 9 disclosed
+    (2,2,2)  pruned  3.1%   bits gained 0.045  of 4 disclosed
+
+[MEASURED] Data-conditioned version (scripts/exchange_value_data.py), per-agent BGe
+posteriors over each agent's own window, 200 episodes per cell, n_obs swept DOWN into the
+regime where agents are individually uncertain:
+
+    n_obs     (1,1,2) cyclic mass     (1,1,3) cyclic mass
+       50         0.0009                  0.0040
+      100         0.0010                  0.0042
+      200         0.0020                  0.0024
+      500         0.0000                  0.0026
+     1000         0.0005                  0.0025
+     5000         0.0000                  --
+
+[CORRECTED] **My prediction was wrong and the reframing it supported is withdrawn.** I
+predicted posterior-weighted cyclic mass would exceed the uniform 1-3% because a cyclic
+combination needs both agents to posit private routings. It does not: it stays at or below
+0.4% everywhere, and does not grow as the agents become more uncertain. Sweeping n_obs down
+to 50 was the strongest form of the test and it still fails.
+
+Earlier today I argued the |X|^2-bit exchange should be reframed from a safety net into an
+inference tool, with the entropy it removes as the "bits out" against the bits disclosed.
+That is now measured and the yield is ~0.005 bits per disclosed bit. The exchange is a
+**correctness device, not an inference device**, which is what MA_DESIGN section 5
+originally said. The reframing is retracted.
+
+One caveat kept rather than dropped: the per-episode MAXIMUM cyclic mass reaches 0.24 at
+(1,1,3). So the check is near-free on average but occasionally decisive, which is exactly
+the profile of a correctness guard. That strengthens keeping it and weakens selling it.
+
+[MEASURED] Bidirected-edge rate at (1,1,2) is 6.3% -- 13 graphs of 207, always the same
+pair. The confounding mechanism the two-agent case exists to study is close to absent
+there. (1,1,3) gives 13.4% and three shared pairs. Starting topology is an open decision
+for the user; the evidence now favours (1,1,3).
