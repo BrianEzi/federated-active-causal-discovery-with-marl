@@ -42,13 +42,25 @@ increase throughput.
 
 | # | block | acceptance test | status |
 |---|---|---|---|
-| 1 | Subset-DP posterior wired into `sa/` | log Z and edge marginals identical to enumeration at d=3,4,5,6 | pending |
-| 2 | One-pass edge marginals | matches enumerated marginals at d=4,5,6; ≥5x faster than `d(d-1)` constrained runs at d=6 | pending |
-| 3 | MH oracle + sampling-based singleton fraction | oracle choices match exact oracle at d=5,6 within the measured MC floor; singleton estimate inside the exact value's CI at d=4,5,6 | pending |
-| 4 | Phase 2 E1xE2 analysis | every lever classified task/artefact/unlocked/dead; canaries surfaced; report and notebook regenerated | pending |
-| 5 | `ma/` package + GATE-M3 measured | ambiguity localised to boundary vs interior on >=3 candidate topologies | pending |
-| 6 | GATE-M2 + `coordination_gained` | independent-greedy vs centralised-greedy intervals disjoint, or topology rejected | pending |
-| 7 | Single-agent summary + artifact update | every claim traced to a result file | pending |
+| 1 | Subset-DP posterior wired into `sa/` | log Z and edge marginals identical to enumeration at d=3,4,5,6 | **PASS, after a correction** |
+| 2 | One-pass edge marginals | matches enumerated marginals at d=4,5,6; ≥5x faster than `d(d-1)` constrained runs at d=6 | **PARTIAL** — exact; ≥5x met from d=7, not d=6 |
+| 3 | MH oracle + sampling-based singleton fraction | oracle choices match exact oracle at d=5,6 within the measured MC floor; singleton estimate inside the exact value's CI at d=4,5,6 | **PARTIAL** — singleton estimator unbiased; oracle above the floor at d=6/4000 draws |
+| 4 | Phase 2 E1xE2 analysis | every lever classified task/artefact/unlocked/dead; canaries surfaced; report and notebook regenerated | **PASS** (62/66 at time of analysis) |
+| 5 | `ma/` package + GATE-M3 measured | ambiguity localised to boundary vs interior on >=3 candidate topologies | **PASS** — and T3 rejected on the measurement |
+| 6 | GATE-M2 + `coordination_gained` | independent-greedy vs centralised-greedy intervals disjoint, or topology rejected | **measured — see the log** |
+| 7 | Single-agent summary + artifact update | every claim traced to a result file | **PASS** |
+
+### What actually happened, in one paragraph
+
+Blocks 1 and 2 passed their acceptance tests and were **wrong anyway**: the subset DP was
+verified on independent random data, which cannot exercise the numerical failure mode, and
+it returned `Z = 0` on the first real environment episode at d=4. Rewriting the recurrence
+in signed log space fixed it, and every test now uses SCM data. That correction is the most
+important output of the night and is written up in full in `docs/SA_EXPERIMENT_LOG.md`.
+Block 3's singleton estimator is sound; its pre-registered CI-containment test was badly
+designed and was replaced with a bias test. Block 5 killed the T3 fallback that this plan
+had written in as the escape hatch for latent confounding. d=7 **training** was not
+reached; d=7 **gate validation** is running on the cluster, which is the correct order.
 
 Blocks 1-3 are the critical path to d=7. If block 1 fails, blocks 3 and the d=7 runs are
 cancelled and the night goes to blocks 4-7. If block 2 fails, d=7 still works, just slower

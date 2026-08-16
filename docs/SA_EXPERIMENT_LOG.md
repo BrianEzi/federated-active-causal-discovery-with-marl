@@ -1791,3 +1791,95 @@ both an unconverged policy entropy and an unstable spread across seeds.
 [TODO] Re-run once tasks 63-66 land, to complete the four incomplete cells. The verdict for
 those four levers is currently unknown, not "dead" — `analyse_phase2` refuses to classify a
 partial grid, which is the guard added on 2026-08-15 after it biased toward keeping depth 1.
+
+## 2026-08-16 (07:00) — d=6 gates on the DP path: the control passes
+
+[MEASURED] `scripts/gates_dp.py` at d=6, n_obs=20000, 600 episodes for GATE 1 and 300 per
+policy for GATE 2. This is the **control task**: at d=6 both gates are also computable by
+enumeration, so a disagreement here would invalidate the d=7 run whatever it said.
+
+| gate | measured | reference | verdict |
+|---|---|---|---|
+| GATE 1 | observational rate 0.0800, CI [0.0583, 0.1017] | sampled target 0.0824, CI [0.0802, 0.0844] | **PASS** |
+| GATE 2 | greedy 1.823 steps, CI [1.663, 2.000] | random 3.730 steps, CI [3.440, 4.020] | **PASS**, disjoint |
+
+The sampled singleton target of 0.0824 (CI [0.0802, 0.0844]) contains the **exact
+enumerated value 0.08095**, so the enumeration-free GATE 1 target agrees with the
+enumerated one at the only size where both exist. The observational rate 0.0800 also matches
+the 0.0600 measured by the enumerated pipeline on 2026-08-15 within its interval.
+
+[CORRECTED] Runtime estimate was badly wrong in the safe direction: the submit script
+projected ~55 min per task from an oracle cost of 0.77 s x 3000 calls. Actual: **4.4
+minutes**. The projection assumed every episode runs to the full budget of 10 steps, but
+greedy identifies in 1.8 steps on average, so the oracle is consulted about a fifth as
+often as budgeted for. Worth noting because the same reasoning inflated the d=7 estimate,
+and it is the *third* runtime projection this project has got wrong.
+
+[NOTE] d=7 (array task 2) is queued behind Phase 2 and had not started at hand-off.
+
+## 2026-08-16 (07:05) — Block 6: GATE-M2, and what it actually decomposes
+
+[MEASURED] Exact posterior over T1's masked space (96,255 DAGs enumerated), 80 episodes,
+budget 10 interventions, inference held centralised in both arms so that only *who chooses,
+on what information* varies.
+
+| arm | interventions to identify | CI | solve rate |
+|---|---|---|---|
+| centralised | **1.74** | [1.56, 1.93] | 1.00 |
+| independent | **2.52** | [2.29, 2.81] | 1.00 |
+
+`coordination_gained` = **+0.787 interventions**, intervals disjoint. **GATE-M2 passes.**
+
+[CORRECTED] The first run of this gate **failed**: centralised 2.80 against independent
+2.64, i.e. coordination appeared slightly *harmful*. The cause was a flaw in my own
+implementation, not a property of the topology — the centralised arm chose two targets at
+once from a single `argsort`, scoring the second against a belief that still assumed the
+first had not been run. That is a strictly weaker chooser than the sequential greedy the
+docstring claimed. Fixed to pick one target per round and re-plan, with budgets still
+matched in interventions rather than rounds.
+
+[DECIDED] **Both numbers are worth keeping, because together they decompose the result**,
+and the decomposition is more interesting than the gate:
+
+- **Matched cadence, information advantage only** (the batch version): centralised 2.80 vs
+  independent 2.64 — no gain. Simply *knowing* what the other agent knows, while still
+  having to commit to both interventions simultaneously, buys nothing here.
+- **Adding sequencing** (the fixed version): centralised 1.74 vs independent 2.52 — a clear
+  gain.
+
+So under T1 the value of coordination is **almost entirely the ability to sequence
+experiments and re-plan between them**, not the shared information per se. That is a
+sharper claim than "coordination helps", and it points the two-agent design at turn-taking
+and negotiation over the shared exposed nodes rather than at belief-sharing protocols.
+
+[NOTE] The honest caveat, stated rather than buried: the passing comparison differs in
+**two** ways at once — shared information *and* re-planning cadence — so +0.787 is an upper
+bound on what coordination is worth, and the batch figure is the matched-cadence lower
+bound. A clean isolation would give the independent arm the same re-planning cadence, which
+is not possible without letting the agents act in turn, which is itself a coordination
+mechanism. That circularity is worth noting in the write-up.
+
+[MEASURED] The confounded fraction in the sampled episodes was 0.388 against the enumerated
+0.439 — consistent, and a useful cross-check that the episode sampler is drawing from the
+masked space correctly.
+
+## 2026-08-16 (07:15) — Night summary
+
+**Delivered.** Subset-DP posterior in signed log space, exact and verified against
+enumeration on environment data at d=3-6 (blocks 1-2, after a serious correction). MH
+sampler, sampling oracle and an enumeration-free GATE 1 target (block 3). `sa/env_dp.py`,
+pinned step for step against the enumerated environment. Phase 2 analysis: no lever is a
+task lever (block 4). `ma/` package with GATE-M3 measured and T3 rejected (block 5).
+GATE-M2 measured and decomposed (block 6). Thesis-ready single-agent summary (block 7).
+d=6 gates on the DP path, passing, as the control for d=7. Test suite 358 -> 443.
+
+**Not delivered.** d=7 *training*. The infrastructure is complete and verified and the d=7
+gate job is queued, but wiring the DP path through `baselines`/`evaluate`/`run_experiment`
+and running three seeds did not fit alongside the log-space rewrite. This is the right
+outcome rather than a shortfall: the rewrite was mandatory, and launching d=7 training on
+the arithmetic that returned `Z = 0` would have produced another retraction.
+
+**The single most important thing learned.** Two of the night's three serious errors were
+in the *verification*, not the implementation: testing a component through a consumer, and
+testing on data that cannot exercise the failure mode. Both produced clean passing test
+suites over broken code. The standing rules now carry both.
