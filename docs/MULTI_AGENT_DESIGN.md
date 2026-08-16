@@ -1,3 +1,13 @@
+> **SUPERSEDED (2026-08-16) — see `docs/MA_DESIGN.md` for the plan of record.**
+>
+> The topology sections below (T1/T2/T3, and the `Z1 — X1 — X2 — Z2` boundary framing) are
+> retained for the reasoning that led to the current design, including the parts now
+> rejected: T3 (removes confounding but drops shared-edge ambiguity to 0%), the (1,1,1)
+> minimal case (same failure by a different route), and the two-system data model
+> (thinner coordination surface, and privacy holds trivially rather than being measured).
+>
+> Kept rather than deleted, per the standing practice of keeping nulls and self-corrections.
+
 # Federated multi-agent active causal discovery — design
 
 Working document, started 2026-08-15, while the single-agent Phase 2 sweep runs. Records
