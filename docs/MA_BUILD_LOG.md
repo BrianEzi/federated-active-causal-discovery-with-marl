@@ -154,3 +154,28 @@ it does not need to: it can *condition* on the clean regime, which is valid infe
 Implementation is deliberately the simple one: where clean rows exist the agent uses only
 those. A joint two-regime score would be strictly better and is the obvious next
 improvement; conditioning on a subset is correct but wasteful.
+
+### GATE 4 passes once the regime bit exists
+
+    A's identification rate, CONFOUNDED episodes (n=38)
+        solo          0.000  [0.000, 0.092]   mass 0.0000
+        partner       0.000  [0.000, 0.092]   mass 0.0000
+        oracle-clamp  0.974  [0.865, 0.995]   mass 0.8636
+        oracle-vary   0.000  [0.000, 0.092]   mass 0.0000
+
+    A's identification rate, UNCONFOUNDED episodes (n=362, control)
+        solo          0.845     partner  0.843
+        oracle-clamp  0.994     oracle-vary  0.823
+
+`oracle-vary` sitting at exactly 0.000 alongside `oracle-clamp` at 0.974 is the cleanest
+single demonstration of the mode finding: identical policy, identical target, identical
+budget, differing only in whether the intervened value varies.
+
+Worth stating rather than glossing: clamping also helps on UNCONFOUNDED episodes, 0.994
+against 0.845. Removing a variance source the agent cannot model is useful generally, not
+only when it creates a bidirected edge. So the clamp is not a pure coordination signal, and
+any claim that a learned policy "clamps to help its partner" must show clamping is
+*selective* to confounded episodes rather than merely present.
+
+That is why the training script pre-registers the selectivity test (P2) as the one that
+matters, and treats a uniform clamp rate as the weaker result it is.
