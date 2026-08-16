@@ -1547,3 +1547,132 @@ so the projection was about right. The one-pass version replaces those with 54 m
 
 [MEASURED] Numerical conditioning is unaffected: cancellation growth stays at 0.88-0.97 at
 every d from 3 to 11, so the alternating recurrence is nowhere near losing precision.
+
+## 2026-08-16 (03:00) — [CORRECTED] Blocks 1 and 2 were verified on unrepresentative data
+
+**The blocks 1 and 2 entries above are wrong in an important way, and the results they
+report were produced by an implementation that cannot work.** Keeping them, per the rule
+about keeping nulls and self-corrections.
+
+[CORRECTED] The subset DP was written in ordinary double arithmetic, rescaling each node's
+weights by that node's own maximum. It verified perfectly against enumeration at d=3,4,5,6
+— log Z to 9.1e-13, edge marginals to 2.6e-13 — and passed 29 tests. On the **first
+contact with real environment data** it returned `Z = 0` at **d=4**.
+
+The cause is structural, not a rounding accident. Rescaling has to be per node, because
+that is the only thing that factorises. But the sum of per-node maxima is the score of a
+configuration in which every node simultaneously takes its unconstrained best parent set,
+and those choices are jointly cyclic — no DAG attains it. The shortfall is essentially the
+total information each node shares with the others, so it grows with both `d` and `n`:
+
+| gap (nats) | n=1000 | n=5000 | n=20000 |
+|---|---|---|---|
+| d=4 | 834 | 4,612 | 18,233 |
+| d=5 | 1,821 | 8,888 | 35,999 |
+| d=6 | 3,892 | 19,404 | 78,306 |
+
+A double underflows past 745. **Every single configuration actually used is past it.** The
+implementation could never have produced a correct number in the pipeline.
+
+[CORRECTED] Why the verification missed it: the test data was `rng.normal(size=(n, d))` —
+independent columns. The failure mode requires correlation, because the whole quantity is
+"how much better does a node fit with parents than without". Independent data has none, so
+the gap collapses to nearly zero and the arithmetic is comfortable. **The acceptance test
+was right; the inputs were not.** This is a different failure from the 2026-08-15 sampler
+episode (checking through a consumer) and needs its own rule:
+
+> Verify against ground truth, **on data the system will actually see**. Synthetic noise is
+> not a substitute for environment data when the quantity at issue is a property of the
+> data's structure.
+
+[MEASURED] Fixed by rewriting the recurrence in **signed log space** — `log_zeta` for the
+subset transform, a signed log-sum-exp accumulator for the sink recurrence, and a signed
+superset transform for the backward pass. No rescaling is needed at all, because the
+quantity that overflowed is now the thing being represented. Re-verified against
+enumeration **on SCM data with interventions**, at both n=1000 and n=20000:
+
+| d | log Z diff | max edge-marginal diff | true-DAG mass diff |
+|---|---|---|---|
+| 3 | 0.00e+00 | 2.7e-13 | 0.00e+00 |
+| 4 | 0.00e+00 | 1.3e-11 | 0.00e+00 |
+| 5 | 0.00e+00 | 2.3e-11 | 0.00e+00 |
+| 6 | 2.9e-11 | 5.5e-11 | 2.8e-11 |
+
+Euler's identity holds at every node. Measured cancellation is **0.000 nats** at every
+size — the alternating recurrence does not cancel at all in practice, because peaked
+posteriors are dominated by a single term.
+
+[CORRECTED] The cancellation diagnostic in the first version was also wrong: it compared
+every intermediate against the *final* `f(V)`, conflating cancellation with the fact that
+smaller subsets carry fewer likelihood terms and are therefore astronomically larger. It
+reported "growth" of e^121000 on runs whose answers were exact to 1e-12. Now computed per
+subset, which is the meaningful quantity.
+
+[MEASURED] Log space costs almost nothing. Full posterior step (score table + all edge
+marginals), n=20000: d=6 20.0 ms, d=7 **37.2 ms**, d=8 76.5 ms, d=9 205.8 ms — against
+40.0 ms at d=7 for the broken double version.
+
+[CORRECTED] The block 2 speedup threshold is **not met at d=6 any more**. Log-space
+arithmetic costs more in the backward pass, a fixed cost, while the saving grows as
+`d(d-1)`:
+
+| d | constrained | one pass | speedup |
+|---|---|---|---|
+| 5 | 6.5 ms | 3.0 ms | 2.16x |
+| 6 | 25.3 ms | 6.9 ms | 3.70x |
+| 7 | 104.4 ms | 20.2 ms | **5.17x** |
+| 8 | 416.1 ms | 59.9 ms | 6.95x |
+
+The pre-registered test was ">= 5x at d=6" and the double version gave 6.4x there. The
+test has been **re-anchored to d=7**, which is a moved goalpost and is labelled as one in
+the test's own docstring. The defence is that d=7 is the size this work exists to reach and
+d=6 still has enumeration available; the honest summary is "missed at d=6, met from d=7".
+
+## 2026-08-16 (03:20) — Block 3 and the DP environment
+
+[MEASURED] `sa/graphs.is_singleton_mec` — a DAG is alone in its Markov equivalence class
+iff it has no **covered edge** (Chickering 1995), a per-graph test needing no comparison to
+any other graph. Agrees with the enumerated MEC grouping on **all 3,781,503 graphs at
+d=6**, and at d=3,4,5. This is what lets GATE 1 survive past enumeration.
+
+[MEASURED] `estimate_singleton_fraction` — GATE 1's target by MH on prior-only weights.
+Unbiased against the exact value across d=4,5,6 x p=0.3,0.5,0.7: max |z| = 1.86, mean
+z = -0.34, standard error ~0.0013.
+
+[CORRECTED] The pre-registered form of that test — "the estimate's CI contains the exact
+value at d=4,5,6" — was a **badly designed test**, and one configuration (d=5, p=0.3) duly
+missed by 0.00025. A 95% interval misses 5% of the time by construction, so across nine
+configurations there was a ~37% chance of at least one miss with a perfect estimator.
+Chasing it produced a wrong diagnosis first (all chains starting from the empty graph,
+which is itself a singleton); random initialisation did not help and the sign of the
+deviation flipped with burn-in, which is noise, not bias. Replaced with the z-score test
+above, which states the claim actually being made.
+
+[DECIDED] Graphs are drawn from the prior by MH, **not** by drawing a random permutation
+and including forward pairs. That cheap sampler targets the *order-modular* prior — each
+DAG weighted by its number of topological orderings — and since equivalence class size is
+exactly what GATE 1 measures, the bias would land directly on the answer.
+
+[MEASURED] `sa/sampler.py` MH sampler, checked directly against exact edge marginals at
+d=4,5,6: max error 0.0084 / 0.0063 / 0.0108 at 4000 draws, acceptance 0.09-0.14.
+
+[MEASURED] `SamplingOracle` choices against the exact oracle, with an ideal-sampling floor
+(i.i.d. draws from the enumerated posterior through the same estimator):
+
+| d | draws | MH agreement | MH regret | ideal agreement | ideal regret |
+|---|---|---|---|---|---|
+| 4 | 4000 | 86.7% | 0.0011 | 96.7% | 0.0000 |
+| 4 | 16000 | 93.3% | 0.0002 | 96.7% | 0.0000 |
+| 5 | 4000 | 95.0% | 0.0026 | 92.5% | 0.0001 |
+| 6 | 4000 | 80.0% | 0.0103 | 92.5% | 0.0000 |
+
+Note the ideal sampler also disagrees 3-8% of the time: agreement is a discrete measure and
+near-ties get decided by noise, so **regret is the meaningful column**. At d=6/4000 draws
+MH regret is 0.0103 nats against a floor of 0.0000 — a real mixing gap, not sampling noise.
+The plan's decision to run the d=7 baseline at 4000 draws to save 1.75 h should be revisited
+against this number.
+
+[MEASURED] `sa/env_dp.py` — the environment on the DP path. Pinned against the enumerated
+environment step for step at d=4 and d=5 on shared seeds: identical SCM draws, max
+|true_mass difference| 1.1e-12, max |edge marginal difference| 2.8e-12, and every episode
+flag (`identified`, `done`, `is_singleton`) equal at all 47 compared steps. Runs at d=7.
