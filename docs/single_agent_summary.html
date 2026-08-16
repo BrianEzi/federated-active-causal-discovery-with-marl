@@ -578,6 +578,7 @@
         </thead>
         <tbody>
           <tr><td><em>d</em> = 6</td><td class="num">3,781,503</td><td class="num">20 ms</td><td><span class="chip pass">verified</span> agrees to 1e&minus;11</td></tr>
+          <tr><td><em>d</em> = 6 &middot; gates</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td><span class="chip pass">both pass</span> control for <em>d</em>=7</td></tr>
           <tr><td><em>d</em> = 7</td><td class="num">1.14 &times; 10<sup>9</sup></td><td class="num">37 ms</td><td>no list can be built</td></tr>
           <tr><td><em>d</em> = 8</td><td class="num">7.8 &times; 10<sup>11</sup></td><td class="num">77 ms</td><td>no list can be built</td></tr>
           <tr><td><em>d</em> = 9</td><td class="num">1.2 &times; 10<sup>15</sup></td><td class="num">206 ms</td><td>no list can be built</td></tr>
@@ -712,7 +713,25 @@
       allowed to see. That is a precise structural reason why coordination is
       <em>necessary</em> rather than merely helpful.
     </p>
-    <p class="source">Sources: <code>ma/topology.py</code>, <code>ma/confounding.py</code>, <code>results/gate_m3.json</code></p>
+
+    <h4>And coordination is worth sequencing, not sharing</h4>
+    <p>
+      A second gate asks whether coordination buys anything at all: two agents choosing
+      independently from their own local views, against one centralised chooser, with inference
+      held identical and budgets matched in interventions. Centralised needs
+      <strong>1.74</strong> interventions against <strong>2.52</strong>, intervals disjoint.
+    </p>
+    <p>
+      The interesting part is a decomposition that emerged from getting it wrong first. When
+      the centralised chooser had to commit to both interventions <em>simultaneously</em> &mdash;
+      matching the independent agents&rsquo; cadence, so that only the shared information
+      differed &mdash; it did <strong>not</strong> win: 2.80 against 2.64. The advantage appears
+      only once it can re-plan between interventions. So under this topology the value of
+      coordination is almost entirely the ability to <em>sequence</em> experiments, not the
+      shared belief, which points the design at turn-taking over the shared nodes rather than at
+      belief-sharing protocols.
+    </p>
+    <p class="source">Sources: <code>ma/topology.py</code>, <code>ma/confounding.py</code>, <code>ma/coordination.py</code>, <code>results/gate_m3.json</code>, <code>results/gate_m2.json</code></p>
   </section>
 
   <footer>
