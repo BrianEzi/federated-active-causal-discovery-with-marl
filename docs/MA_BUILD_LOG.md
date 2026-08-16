@@ -179,3 +179,64 @@ any claim that a learned policy "clamps to help its partner" must show clamping 
 
 That is why the training script pre-registers the selectivity test (P2) as the one that
 matters, and treats a uniform clamp rate as the weaker result it is.
+
+---
+
+## Training: independent PPO did NOT learn to coordinate
+
+3 seeds, 6000 episodes each, evaluated on 500 held-out episodes against shared references.
+
+              overall   confounded   unconfounded   clamp rate
+    random     0.392       0.027         0.455         0.458
+    greedy     0.568       0.000         0.667         0.000
+    learned s0 0.366       0.000         0.430         0.012
+    learned s1 0.398       0.000         0.467         0.263
+    learned s2 0.364       0.000         0.427         0.000
+
+**All three pre-registered predictions failed.**
+
+  P1 (learned beats greedy) -- FAILED. Learned is worse everywhere, 0.36-0.40 against 0.568.
+  P2 (clamps selectively on confounded episodes) -- FAILED. Seed 1, the only seed that kept
+     clamping at all, clamps slightly LESS on confounded episodes (0.232) than unconfounded
+     (0.269). Seeds 0 and 2 drove clamping to ~0.
+  P3 (level with greedy on unconfounded) -- FAILED. Learned is well below greedy there too.
+
+Confounded solve rate is **0.000 across all three seeds**. The coordination behaviour that
+GATE 4 proved is available -- 0.974 when B clamps deliberately -- was not found by learning.
+
+### Why: the payoff is non-monotone, and the gradient near zero points the wrong way
+
+Measured directly, sweeping the probability that B clamps its private node each round:
+
+    disclose_regime   p(clamp)   A solves | confounded   A solves | unconfounded
+        False           any          0.000                    ~0.82
+        True            0.00         0.000                     0.815
+        True            0.25         0.393                     0.721
+        True            0.50         0.750                     0.919
+        True            1.00         1.000                     0.991
+
+Read the unconfounded column. Going from never clamping to clamping a quarter of the time
+**costs** 0.815 -> 0.721. Only past roughly half does it recover and then exceed the
+baseline. So a learner starting from near-zero clamping sees a negative gradient, and the
+large payoff sits on the far side of a valley it has no reason to cross.
+
+**[FINDING] The cause is my own regime rule, not PPO.** I implemented "where clean rows
+exist, use only those" and documented it as *correct but wasteful*. It is worse than
+wasteful: when B clamps occasionally, A throws away 2000 good observational rows in favour
+of a few hundred clean ones, and on the 85% of episodes where A is not confounded that is a
+straight loss. The rule creates the valley.
+
+The fix is the improvement I already flagged and deferred: score BOTH regimes jointly for a
+shared DAG rather than conditioning on one. Then clean rows are added information instead of
+a replacement, occasional clamping is weakly positive, and the valley should disappear.
+
+This is a real result either way -- "the coordinated equilibrium exists but independent
+learners with a terminal reward cannot reach it under a subset-conditioning belief" -- but
+it should be re-run with the joint score before anyone concludes anything about PPO.
+
+### Caveat on the p=1.0 row
+
+"B always clamps its private node" maximises A's identification (1.000) and is also best for
+A on unconfounded episodes. But B spends its entire budget doing it, so B's own
+identification is not measured in that sweep. The genuine joint optimum has to trade the two,
+and I have not measured B's side of it. Do not read 1.000 as a solved game.
