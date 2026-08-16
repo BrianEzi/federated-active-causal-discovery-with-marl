@@ -122,3 +122,57 @@ def sample(
             samples[:, node] = parent_contribution + noise
 
     return samples, intervened
+
+
+def sample_multi(
+    params: SCMParams,
+    n: int,
+    rng: np.random.Generator,
+    intervene_nodes=(),
+    intervene_scale: float = 2.0,
+) -> tuple:
+    """As `sample`, but with SEVERAL nodes intervened on at once.
+
+    Needed for the two-agent case, where both agents act in the same round on one shared
+    system (docs/MA_DESIGN.md section 7: separate budgets, simultaneous experiments, no
+    collision rule). Two agents choosing the same node is not an error -- it is one
+    intervention that both of them asked for, and it is handled here by the set semantics
+    rather than by an arbitration rule.
+
+    Kept as a separate function rather than folded into `sample` so that every existing
+    single-agent result stays byte-identical.
+    """
+    d = params.d
+    # `intervene_nodes` may be a plain iterable of node ids (all sharing
+    # `intervene_scale`) or a mapping node -> scale. A scale of 0.0 CLAMPS the node to a
+    # constant; a positive scale RANDOMISES it. The distinction is not cosmetic:
+    #
+    #   randomising  keeps the node varying, which is what lets an intervention reveal
+    #                its descendants' dependence on it (see `sample`), but leaves it an
+    #                active source of variance for everything it points into;
+    #   clamping     removes it as a variance source entirely, which is the only way to
+    #                cut a confounding path through it.
+    #
+    # Measured 2026-08-16: with scale 2.0 or 1.0 a do() on the confounder restores 0.0%
+    # of a confounded agent's identification; at scale 0.1 or 0.0 it restores ~18% and
+    # lifts mean posterior mass on the truth from 0.0000 to 0.39.
+    if isinstance(intervene_nodes, dict):
+        targets = {int(k): float(v) for k, v in intervene_nodes.items()}
+    else:
+        targets = {int(v): float(intervene_scale) for v in intervene_nodes}
+    samples = np.zeros((n, d))
+    intervened = np.zeros((n, d))
+
+    for node in topological_order(params.adjacency):
+        node = int(node)
+        if node in targets:
+            scale = targets[node]
+            samples[:, node] = (rng.normal(0.0, scale, n) if scale > 0.0
+                                else np.zeros(n))
+            intervened[:, node] = 1.0
+        else:
+            parent_contribution = samples @ params.weights[:, node]
+            noise = rng.normal(0.0, params.noise_scales[node], n)
+            samples[:, node] = parent_contribution + noise
+
+    return samples, intervened

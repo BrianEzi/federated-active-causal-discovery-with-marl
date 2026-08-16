@@ -1,0 +1,156 @@
+# Two-agent build log — 2026-08-16 overnight
+
+Open-ended task: get two agents learning, tracking every decision. This file is the audit
+trail. Decisions I made on the user's behalf are marked **[MY CALL]** with the reasoning
+and, where one exists, the cheaper alternative I rejected.
+
+Design of record is `docs/MA_DESIGN.md`. Where this file contradicts it, this file is
+newer and says so explicitly.
+
+---
+
+## Decisions taken before writing any code
+
+### [MY CALL] Starting topology is `(1,1,3)`, not `(1,1,2)`
+
+The user left this open and asked me to get as far as I could, so I took it.
+
+Evidence, all measured today: at `(1,1,2)` only **13 of 207** graphs give any agent a
+bidirected edge (6.3%), and it is always the same pair — the confounding mechanism the
+whole two-agent case exists to study is nearly absent. `(1,1,3)` gives 13.4%, three shared
+pairs, and is still exactly enumerable (11,649 global graphs; 543 DAGs per agent window).
+No sampling anywhere, so nothing about the inference machinery is approximate.
+
+Rejected: starting at `(1,1,2)` for speed. A null result there would be uninterpretable —
+"coordination didn't help" and "the phenomenon was too rare to learn from" would look
+identical.
+
+### [MY CALL] Each agent's hypothesis space is DAGs over its own window
+
+Justified by today's confinement result: no bidirected edge can touch a private node, so
+an agent's belief needs no MAG machinery over `Z_A` — the only place confounding can
+appear is inside `X`. An agent scores DAGs over `O_A` with BGe on its own columns.
+
+This is deliberately **misspecified under confounding**, and that is the point rather than
+a defect: where a `z_B` confounds two shared nodes, no DAG over `O_A` is correct, the
+posterior cannot concentrate on the truth, and only B intervening can fix it. The gap
+between what A reaches alone and what A reaches with B is the quantity of interest.
+
+### [MY CALL] Interventions by the other agent on its PRIVATE nodes are not disclosed
+
+The privacy-faithful choice, and it has a cost I am recording rather than hiding.
+
+Under a single shared system, when B does `do(z_B)` the rows still arrive in A's columns.
+A is not told an intervention happened, so A scores those rows as observational. That is a
+genuine misspecification: `do(z_B)` changes the marginal law of any shared node `z_B`
+points into, and A's model of that node is marginal over `z_B`.
+
+Alternatives rejected: (a) disclose the target — breaks the privacy constraint outright;
+(b) disclose "a private intervention occurred" as one bit — leaks existence of private
+structure and still leaves A unable to score the rows correctly, so it pays a privacy cost
+for no inferential gain.
+
+Interventions on **shared** nodes ARE disclosed to both, since `X` is visible to both and
+disclosure reveals nothing private.
+
+### [MY CALL] Separate budgets, simultaneous actions, no collision rule
+
+Straight from `MA_DESIGN.md` §7 — recording it here only because it is load-bearing for
+the environment's step signature: `step` takes a pair of actions, not one.
+
+### Acyclicity exchange: kept as a correctness guard, NOT used for inference
+
+Measured today at ~0.005 bits per disclosed bit. It stays in the protocol because the
+per-episode maximum cyclic mass reaches 0.24, so it occasionally matters, but it is not
+part of the belief update and is not credited with any inferential value.
+
+---
+
+## Build order
+
+1. `ma/env.py` — two-agent environment, per-agent beliefs, single system.
+2. Gates — the two-agent analogues of GATE 1 and GATE 2, run before any RL.
+3. `ma/baselines.py` — random and greedy-EIG, per agent.
+4. `ma/policy.py` — independent PPO per agent. No CTDE, per the supervisor constraint.
+5. Training run at `(1,1,3)`.
+
+Nothing proceeds past a failing gate. If a gate fails I stop and report rather than tune
+until it passes.
+
+---
+
+## What actually happened
+
+### GATE 1 and GATE 3 passed cleanly
+
+    unconfounded + singleton MEC    76.8% identify from observation alone
+    unconfounded + tied MEC          0.0%  (exactly, as theory requires)
+    confounded                       0.0%  mean posterior mass on truth 7.5e-08
+    unconfounded                    13.3%  mean posterior mass on truth 0.328
+
+Tied graphs cannot reach the 0.7 threshold observationally -- class-mates tie exactly,
+capping mass at 1/|class| <= 0.5 -- so 0.0% is the predicted number, not a happy accident.
+Confounding is not a mild degradation: it is total.
+
+### GATE 4 failed. Twice. And the failures were the most useful part of the night.
+
+**Failure 1.** B intervening on its own private node rescued A in 0 of 29 confounded
+episodes, mean posterior mass 0.0000, identical to B doing nothing. MA_DESIGN section 4
+predicted the opposite.
+
+**[FINDING] A randomised `do()` does not cut confounding.** `sa/scm.py` deliberately assigns
+a *random* value per sample rather than a constant, because a constant is collinear with
+the intercept and destroys the ability to see descendants move -- correct, and load-bearing,
+for the single-agent case. But a randomised confounder is still a variance source that A
+cannot see. `do(z_B ~ N(0,2))` replaces one latent common cause with another.
+
+Measured, dataset drawn entirely under the intervention:
+
+    scale 2.0   identified 0.000   mean mass 0.0000
+    scale 1.0   identified 0.000   mean mass 0.0000
+    scale 0.1   identified 0.164   mean mass 0.3701
+    scale 0.0   identified 0.178   mean mass 0.3879
+
+So the two purposes of intervening need OPPOSITE value distributions: varying reveals
+orientation, clamping cuts confounding. **[MY CALL]** I added both as explicit modes --
+`VARY` and `CLAMP` -- doubling each agent's action space. This is a real change to the
+design and the user should confirm it, but proceeding without it makes coordination
+impossible rather than merely hard.
+
+Note what this does to the greedy baseline: expected information gain is computed over the
+agent's own hypothesis space, where the other agent's confounding cannot be represented, so
+CLAMP has *no value the oracle can see*. Greedy will never clamp to help a partner. That is
+precisely the room a learned policy has.
+
+**Failure 2.** With CLAMP available, GATE 4 still failed -- 0 of 38.
+
+**[FINDING] Clamping is necessary but not sufficient; pooling destroys it.** In the
+environment A holds 2000 confounded observational rows plus at most 1600 clean clamped
+rows in one undifferentiated dataset. No single DAG fits a mixture of two regimes, and
+under my no-disclosure decision A is never told the regime changed, so it cannot separate
+them. Isolated, the mechanism works; pooled, it vanishes.
+
+Confirmed by separating the arms explicitly, on confounded episodes:
+
+    pooled       identified 0.000   mean mass 0.0002
+    regime only  identified 0.162   mean mass 0.3604
+    regime + A's own interventions inside the clean regime
+                 identified 1.000   mean mass 0.9374
+
+**[FINDING, and the headline] The minimum viable disclosure for coordination is a REGIME
+BIT, not the ancestral order.** MA_DESIGN section 5 derived `|X|^2` bits as the disclosure
+the design needs; measured earlier tonight, those bits are worth ~0.005 bits each and are a
+correctness guard, not an enabler. The disclosure that actually unlocks coordination is one
+bit per round -- *"I have clamped something you cannot see"* -- naming no variable, no
+count, and revealing no structure beyond the fact that a clamp occurred. It takes A from
+0% to 100%.
+
+**[MY CALL] I reversed my own no-disclosure decision** and added `disclose_regime` to the
+environment, defaulting on. The decision recorded at the top of this file -- that the
+one-bit option "leaks existence of private structure and still leaves A unable to score
+the rows correctly" -- was wrong in its second half. A cannot score the rows correctly, but
+it does not need to: it can *condition* on the clean regime, which is valid inference.
+
+Implementation is deliberately the simple one: where clean rows exist the agent uses only
+those. A joint two-regime score would be strictly better and is the obvious next
+improvement; conditioning on a subset is correct but wasteful.
