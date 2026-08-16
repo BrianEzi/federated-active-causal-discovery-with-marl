@@ -222,13 +222,24 @@ def test_onepass_is_faster_than_constrained_runs():
     log_w = dp.log_weights(samples, intervened)
 
     dp.edge_marginals_onepass(log_w)          # warm any first-call cost
-    t0 = time.perf_counter()
-    dp.edge_marginals(log_w)
-    slow = time.perf_counter() - t0
-    t0 = time.perf_counter()
-    dp.edge_marginals_onepass(log_w)
-    fast = time.perf_counter() - t0
-    assert slow / fast >= 5.0, f"only {slow / fast:.1f}x"
+
+    # Median of repeats, not a single pair of timings. A single measurement made this
+    # test genuinely flaky: measured over 12 repeats on 2026-08-16 the ratio spans
+    # 4.82x to 6.28x with a median of 5.40x, so a lone sample falls below 5.0 a
+    # noticeable fraction of the time and the suite fails for no reason. The threshold
+    # is deliberately NOT lowered to accommodate the noise -- the claim being defended
+    # is "at least 5x at d=7", and the fix is to measure it less noisily.
+    ratios = []
+    for _ in range(5):
+        t0 = time.perf_counter()
+        dp.edge_marginals(log_w)
+        slow = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        dp.edge_marginals_onepass(log_w)
+        fast = time.perf_counter() - t0
+        ratios.append(slow / fast)
+    speedup = float(np.median(ratios))
+    assert speedup >= 5.0, f"only {speedup:.1f}x (samples: {[f'{r:.1f}' for r in ratios]})"
 
 
 def test_signed_transpose_is_the_adjoint_of_log_zeta():
