@@ -44,7 +44,9 @@ class DPCausalDiscoveryEnv:
     """Same environment, belief held as a log-weight table instead of a DAG list."""
 
     def __init__(self, config: EnvConfig, burn_in: int = 20_000,
-                 steps_between_episodes: int = 500):
+                 thin: int = 25,
+                 pool_size: int = 2048, pool_seed: int = 0,
+                 graph_pool: Optional[np.ndarray] = None):
         if config.prior not in ("uniform", "erdos_renyi"):
             raise ValueError(
                 f"prior {config.prior!r} is not modular and cannot be represented on the "
@@ -55,14 +57,30 @@ class DPCausalDiscoveryEnv:
             kind=config.prior, p=config.prior_p)
 
         # True graphs are drawn from the prior by MH, since there is no list to index into
-        # and no closed-form sampler for the Erdos-Renyi prior *over DAGs*. One persistent
-        # chain is advanced between episodes rather than restarted, which avoids paying
-        # burn-in every reset; `steps_between_episodes` sets how far consecutive episodes'
-        # graphs are decorrelated. See `estimate_singleton_fraction` for why the obvious
-        # permutation sampler is the wrong distribution.
-        self._graph_chain: Optional[np.ndarray] = None
+        # and no closed-form sampler for the Erdos-Renyi prior *over DAGs*. See
+        # `estimate_singleton_fraction` for why the obvious permutation sampler targets the
+        # wrong distribution.
+        #
+        # They are drawn ONCE into a fixed pool, and `reset(seed=s)` indexes that pool.
+        # This is not an optimisation -- it is required for the comparison to mean
+        # anything. Advancing a single chain between episodes makes the true graph depend
+        # on how many resets happened earlier, so the agent, the random baseline and the
+        # greedy baseline would each face a *different* graph on "episode 7" and the
+        # measured gap would be partly the luck of the draw.
+        #
+        # The cost is that episodes resample from a finite pool rather than from the prior
+        # itself. With 2048 graphs against 1.1 billion at d=7 they are all distinct, and
+        # any episode-averaged statistic is an unbiased estimate of the prior's. The pool
+        # is re-drawn per run seed, so that residual sits inside the seed spread already
+        # being reported rather than hiding as a constant offset.
+        # Passed in by `sa/backend.py` so that the training env, the evaluation envs and
+        # every reference env share ONE pool. Building it per environment cost 4.1 million
+        # MH steps each and dominated the whole run.
+        self._pool: Optional[np.ndarray] = graph_pool
+        self._pool_size = pool_size
+        self._pool_seed = pool_seed
         self._burn_in = burn_in
-        self._steps_between = steps_between_episodes
+        self._thin = thin
 
         self._rng: Optional[np.random.Generator] = None
         self.true_adjacency: Optional[np.ndarray] = None
@@ -76,16 +94,20 @@ class DPCausalDiscoveryEnv:
 
     # -- prior sampling ---------------------------------------------------------------
 
-    def _next_true_graph(self, rng: np.random.Generator) -> np.ndarray:
-        if self._graph_chain is None:
-            draws, _ = mh_sample(self.dp.log_prior_term, self.dp._mask_to_index,
-                                 self.config.d, 1, burn_in=self._burn_in, thin=1, rng=rng)
-            self._graph_chain = draws[0]
-        draws, _ = mh_sample(self.dp.log_prior_term, self.dp._mask_to_index, self.config.d,
-                             1, burn_in=self._steps_between, thin=1, rng=rng,
-                             init=self._graph_chain)
-        self._graph_chain = draws[0]
-        return self._graph_chain.copy()
+    def _build_pool(self) -> np.ndarray:
+        """Draw the episode graphs once, from the prior, with a fixed seed."""
+        draws, _ = mh_sample(
+            self.dp.log_prior_term, self.dp._mask_to_index, self.config.d,
+            self._pool_size, burn_in=self._burn_in, thin=self._thin,
+            rng=np.random.default_rng([self._pool_seed, 0xC0FFEE]))
+        return draws
+
+    def graph_for(self, seed: int) -> np.ndarray:
+        """The true graph for a given episode seed. A pure function of the seed, which is
+        what lets two policies be compared on identical episodes."""
+        if self._pool is None:
+            self._pool = self._build_pool()
+        return self._pool[int(seed) % len(self._pool)].astype(np.int8)
 
     # -- episode lifecycle --------------------------------------------------------------
 
@@ -97,7 +119,7 @@ class DPCausalDiscoveryEnv:
         cfg = self.config
 
         if force_adjacency is None:
-            self.true_adjacency = self._next_true_graph(self._rng)
+            self.true_adjacency = self.graph_for(0 if seed is None else seed)
         else:
             self.true_adjacency = np.asarray(force_adjacency, dtype=np.int8)
 

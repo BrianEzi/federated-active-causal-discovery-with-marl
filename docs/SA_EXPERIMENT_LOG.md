@@ -1883,3 +1883,69 @@ the arithmetic that returned `Z = 0` would have produced another retraction.
 in the *verification*, not the implementation: testing a component through a consumer, and
 testing on data that cannot exercise the failure mode. Both produced clean passing test
 suites over broken code. The standing rules now carry both.
+
+## 2026-08-16 (midday) — d=7 wiring, and two silent-failure bugs
+
+[CORRECTED] **The subset DP could never have worked on real data.** Documented in full in
+`sa/dp.py`, recorded here because it is the most serious error of the last two days and it
+passed every test I had written.
+
+The plain-arithmetic version rescaled each node's weights by that node's own maximum. The
+sum of per-node maxima is the score of a configuration where every node takes its
+unconstrained best parent set -- and those choices are jointly **cyclic**, so no DAG attains
+it. The shortfall is the information each node shares with the others, and it grows with
+both d and n:
+
+| gap (nats) | n=1000 | n=5000 | n=20000 |
+|---|---|---|---|
+| d=4 | 834 | 4,612 | 18,233 |
+| d=5 | 1,821 | 8,888 | 35,999 |
+| d=6 | 3,892 | 19,404 | 78,306 |
+
+A double underflows past 745, so **every** configuration in use returns `Z = 0`. It first
+appeared as `Z = 0` at d=4 -- the easiest case in the project.
+
+Blocks 1 and 2 verified it against enumeration at d=3,4,5,6 and it agreed to 1e-13. Those
+tests fed **independent normal columns**, where nodes share no information, the gap is
+~0, and the failure cannot occur. A causal discovery environment produces correlated data
+by construction, so the test inputs were the one kind of data the code will never see.
+
+[DECIDED] Rewritten in signed log space, where no rescaling is needed at all. Re-verified on
+**environment** data at d=3,4,5,6 and n_obs=1000 and 20000: log Z, all edge marginals and
+P(true DAG | data) agree with enumeration to <= 5.5e-11. Every test in `tests/test_dp.py`
+now builds its data from `CausalDiscoveryEnv` rather than from `rng.normal`.
+
+[CORRECTED] The cancellation diagnostic was also wrong, in a way that would have masked the
+above. It compared every intermediate against the FINAL `f(V)`, but smaller subsets carry
+far fewer likelihood terms and are astronomically larger, so it reported a "growth" of
+e^121000 on runs whose answers were exact to 1e-12. Now computed per subset; reads 0.000
+everywhere at d=3-6.
+
+[MEASURED] Standing lesson, added to the two from 2026-08-15: **verifying against ground
+truth is not enough if the inputs are unrepresentative.** Two of the three serious errors in
+this stretch were in the checking, not the code, and both produced a fully green suite.
+
+[CORRECTED] `--force_dp` used `action="store_true"`, whose default is **False, not None**.
+`Backend` reads `force_dp is None` as "choose automatically", so an absent flag meant
+"force the ENUMERATED path", and at d=7 that begins enumerating 1.14 billion DAGs. It hung
+with no output rather than failing. `Backend` now refuses enumeration above d=6 with a
+message naming the likely cause.
+
+[DECIDED] Added `EdgeMarginalGreedyDPPolicy`. The d=4/5/6 headline numbers are scored
+against `edge_marginal_greedy` -- a greedy opponent restricted to the *same lossy belief*
+the agent uses -- so that the comparison isolates policy quality from belief quality. The DP
+path had only the full-posterior greedy, and scoring d=7 against that would have changed
+what the headline measures halfway along the size axis. Implemented by noting the
+independent-edge product is **modular**, so it is expressible as a log-weight table the
+existing DP and sampler consume unchanged; rejection sampling was rejected because only
+~1 in 4000 independent-edge draws is acyclic at d=7. Verified: the rebuilt approximate
+posterior matches the enumerated one to 7.6e-13 at d=4 and 3.9e-12 at d=5.
+
+[MEASURED] Per-step belief cost on the DP path, at the sample size actually used
+(n_obs=20000): **d=6 21 ms, d=7 40 ms**. The enumerated path at d=6 was 846 ms. So d=7 is
+roughly 20x cheaper per step than the d=6 runs that produced the current headline.
+
+[MEASURED] d=7 smoke run end-to-end at n_obs=2000: GATE 1 correctly **FAILS** (0.0167
+against a target of 0.0779), which is the intended behaviour -- the gate rejects an
+under-powered environment, and confirms n_obs=20000 is required at d=7 as the standalone
+gate job found at 02:28.

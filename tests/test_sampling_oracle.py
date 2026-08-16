@@ -209,3 +209,72 @@ def test_sampled_oracle_is_reproducible_from_its_seed():
     first = SamplingOracle(dp, n_draws=2000, seed=11).scores(log_w)
     second = SamplingOracle(dp, n_draws=2000, seed=11).scores(log_w)
     assert np.array_equal(first, second)
+
+
+# --------------------------------------------------------------------------------------
+# The edge-marginal greedy opponent on the DP path
+# --------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("d", [4, 5])
+def test_independent_edge_belief_matches_the_enumerated_one(d):
+    """The opponent that makes d=7 comparable with d=4/5/6.
+
+    Checked on the BELIEF rather than on the choices, because the belief is pure algebra
+    -- the independent-edge product is modular, so building it as a log-weight table must
+    reproduce the enumerated distribution exactly, not approximately. Any tolerance here
+    would hide a real error; the Monte Carlo slack belongs to the oracle, which is tested
+    separately.
+    """
+    from sa.baselines import EdgeMarginalGreedyDPPolicy, EdgeMarginalGreedyPolicy
+    from sa.env import CausalDiscoveryEnv, EnvConfig
+    from sa.posterior import PosteriorEngine
+
+    space = build_graph_space(d, fast=True)
+    env = CausalDiscoveryEnv(EnvConfig(d=d, n_obs=1500, budget=5), space=space)
+    result = env.reset(seed=1)
+    env.step(0)
+    result = env.step(1)
+
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="erdos_renyi", p=0.5)
+    log_w = dp.log_weights(env.samples, env.intervened)
+
+    expected = EdgeMarginalGreedyPolicy(space, seed=0).approximate_posterior(result.posterior)
+    table = EdgeMarginalGreedyDPPolicy(dp, n_draws=100, seed=0).approximate_belief(log_w)
+
+    engine = PosteriorEngine(space, BGeScore(d))
+    rebuilt = table.ravel()[engine._flat_ids].sum(axis=1)
+    rebuilt = np.exp(rebuilt - rebuilt.max())
+    rebuilt /= rebuilt.sum()
+    assert np.abs(expected - rebuilt).max() < 1e-9
+
+
+def test_independent_edge_weights_are_modular():
+    """Every DAG's weight must factorise per node, which is what lets the DP and the
+    sampler consume the approximation without a graph list. If it did not factorise the
+    table would be silently wrong rather than raising."""
+    from sa.dp import independent_edge_log_weights
+    d = 4
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="uniform")
+    rng = np.random.default_rng(0)
+    marginals = rng.uniform(0.05, 0.95, size=(d, d))
+    np.fill_diagonal(marginals, 0.0)
+    table = independent_edge_log_weights(marginals, dp.scorer, d)
+
+    for node in range(d):
+        for i, parents in enumerate(dp.scorer.parent_sets[node]):
+            expected = sum(
+                np.log(marginals[j, node]) if j in parents else np.log1p(-marginals[j, node])
+                for j in range(d) if j != node)
+            assert table[node, i] == pytest.approx(expected, abs=1e-12)
+
+
+def test_both_greedy_baselines_exist_on_both_paths():
+    """A missing baseline name fails only AFTER the expensive references are computed, and
+    silently changes which opponent the headline is measured against."""
+    from sa.backend import Backend
+    from sa.env import EnvConfig
+    required = {"random", "greedy_oracle", "edge_marginal_greedy", "no_intervention"}
+    enumerated = Backend(EnvConfig(d=4), force_dp=False).make_baselines()
+    sampled = Backend(EnvConfig(d=4), force_dp=True).make_baselines()
+    assert required <= set(enumerated)
+    assert required <= set(sampled)

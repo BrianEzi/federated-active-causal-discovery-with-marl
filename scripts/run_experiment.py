@@ -27,6 +27,7 @@ from sa.evaluate import (
 )
 from sa.gates import collect_canaries
 from sa.graphs import build_graph_space
+from sa.backend import Backend
 from sa.oracle import InterventionOracle
 from sa.policy import PPOAgent, PPOConfig
 from sa.tracking import start_run
@@ -99,26 +100,49 @@ def build_parser() -> argparse.ArgumentParser:
     ppo_group.add_argument("--shaping_coef", type=float, default=0.0,
                            help="potential-based shaping on posterior entropy; "
                                 "policy-invariant (Ng, Harada & Russell 1999)")
+    # default=None, NOT the store_true default of False. False would mean "force the
+    # ENUMERATED path", which at d=7 means enumerating 1.14 billion DAGs -- a hang, then an
+    # out-of-memory kill on a compute node, with no error message pointing at the flag.
+    parser.add_argument("--force_dp", action="store_true", default=None,
+                        help="use the subset-DP path even where enumeration is possible; "
+                             "the d=6 control that validates any d=7 result")
+    parser.add_argument("--oracle_draws", type=int, default=4000,
+                        help="MH draws per sampled-oracle call (DP path only). 4000 gives "
+                             "0.0103 nats regret at d=6 against an ideal-sampling floor")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
 
-    space = build_graph_space(args.d)
-    oracle = InterventionOracle(space)
+    env_config_for_backend = EnvConfig(
+        d=args.d, budget=args.budget, n_obs=args.n_obs, n_int=args.n_int,
+        identify_threshold=args.identify_threshold, prior=args.prior,
+        prior_p=args.prior_p, intervene_scale=args.intervene_scale,
+        include_counts=args.include_counts,
+    )
+    # Enumerated below d=7, subset DP at and above it -- see sa/backend.py. `--force_dp`
+    # exists so the DP path can be run at d=6, where the enumerated answer also exists and
+    # can be compared against it. That control is what makes a d=7 number believable.
+    backend = Backend(env_config_for_backend, force_dp=args.force_dp,
+                      oracle_draws=args.oracle_draws, seed=args.seeds[0])
+    space = backend.space
+    oracle = backend.oracle
     env_config = EnvConfig(
         d=args.d, budget=args.budget, n_obs=args.n_obs, n_int=args.n_int,
         identify_threshold=args.identify_threshold, prior=args.prior,
         prior_p=args.prior_p, intervene_scale=args.intervene_scale,
         include_counts=args.include_counts,
     )
-    baselines = make_baselines(space, seed=0)
+    baselines = backend.make_baselines(seed=0)
 
-    print(f"d={args.d}  observation={args.observation}  "
-          f"{space.n_dags} DAGs / {space.n_mecs} classes")
+    print(backend.describe() + f"  observation={args.observation}")
+    if args.observation not in backend.observation_kinds:
+        raise SystemExit(
+            f"observation={args.observation!r} is unavailable on this path; "
+            f"choose from {backend.observation_kinds}")
 
-    gate1 = _check_gate1(env_config, space, args.gate1_episodes)
+    gate1 = _check_gate1(env_config, space, args.gate1_episodes, backend=backend)
     if gate1 is not None:
         status = "OK" if gate1["passed"] else "FAILS"
         print(f"  GATE 1 {status}: observational-only rate {gate1['rate']:.4f} "
@@ -152,10 +176,14 @@ def main() -> None:
     refs = _load_ref_cache(args.ref_cache, env_config, args.eval_episodes)
     if refs is None:
         refs = {}
-        for name in ("random", "greedy_oracle", "edge_marginal_greedy", "no_intervention"):
+        # Driven by what the backend actually offers, not a fixed list: the DP path has no
+        # `edge_marginal_greedy` yet, and a hardcoded name fails only AFTER the expensive
+        # references have already been computed.
+        for name in baselines:
             t0 = time.time()
             refs[name] = run_episodes(env_config, baselines[name], args.eval_episodes,
-                                      seed=99, space=space, oracle=oracle)
+                                      seed=99, space=space, oracle=oracle,
+                                      backend=backend)
             print(f"  {name:<22} computed ({time.time() - t0:.0f}s)")
         _save_ref_cache(args.ref_cache, env_config, args.eval_episodes, refs)
     else:
@@ -205,6 +233,7 @@ def main() -> None:
                       arch=args.arch, layers=args.layers,
                       seed=seed),
             space=space,
+            backend=backend,
         )
         history = agent.train()
         # Kept in full: the entropy and solve-rate trajectories are how a collapse is
@@ -219,9 +248,11 @@ def main() -> None:
         per_seed_time = time.time() - t0
 
         deterministic = evaluate(env_config, agent.as_policy(True), random_ref, greedy_ref,
-                                 args.eval_episodes, seed=99, space=space, oracle=oracle)
+                                 args.eval_episodes, seed=99, space=space, oracle=oracle,
+                           backend=backend)
         sampled = evaluate(env_config, agent.as_policy(False), random_ref, greedy_ref,
-                           args.eval_episodes, seed=99, space=space, oracle=oracle)
+                           args.eval_episodes, seed=99, space=space, oracle=oracle,
+                           backend=backend)
         verdict = check_criteria(deterministic, sampled)
         verdict["seed"] = seed
         verdict["train_seconds"] = per_seed_time
@@ -292,8 +323,14 @@ def main() -> None:
             "args": vars(args),
             "tag": args.tag,
             "provenance": _provenance(),
-            "space": {"d": args.d, "n_dags": space.n_dags, "n_mecs": space.n_mecs,
-                      "singleton_fraction": space.singleton_fraction},
+            # On the DP path there is no enumerated space, so the counts that describe it
+            # do not exist. Recorded as null rather than omitted, so a reader can tell
+            # "not applicable on this path" from "forgot to record it".
+            "space": ({"d": args.d, "n_dags": space.n_dags, "n_mecs": space.n_mecs,
+                       "singleton_fraction": space.singleton_fraction}
+                      if space is not None else
+                      {"d": args.d, "n_dags": None, "n_mecs": None,
+                       "singleton_fraction": None, "path": "subset_dp"}),
             "references": reference_metrics,
             # Recorded on every run so a result can never be read without its validity
             # check alongside. This gate was pinned once at d=3 and silently stopped
@@ -310,7 +347,7 @@ def main() -> None:
         print(f"  written to {args.out}")
 
 
-def _check_gate1(env_config, space, n_episodes: int):
+def _check_gate1(env_config, space, n_episodes: int, backend=None):
     """Does the environment satisfy GATE 1 -- is intervening actually necessary?
 
     The fraction of DAGs alone in their Markov equivalence class is exactly the fraction of
@@ -328,12 +365,26 @@ def _check_gate1(env_config, space, n_episodes: int):
     from sa.gates import bootstrap_ci, run_policy
 
     outcome = run_policy(env_config, no_intervention_policy, n_episodes, seed=7,
-                         space=space)
+                         space=space, backend=backend)
     rate = float(np.mean(outcome["identified"]))
     low, high = bootstrap_ci(outcome["identified"], seed=7)
-    target = space.singleton_fraction
-    return {"rate": rate, "ci": [low, high], "target": target,
-            "passed": bool(low <= target <= high), "n_episodes": n_episodes}
+    if space is not None:
+        target = space.singleton_fraction
+        target_ci = None
+    else:
+        # No DAG list: the target is estimated from prior samples via the covered-edge
+        # test. It carries its own interval, so the gate must account for BOTH -- the
+        # measured rate's uncertainty and the target's -- rather than treating an
+        # estimate as if it were exact.
+        from sa.gates import estimate_singleton_fraction
+        estimate = estimate_singleton_fraction(
+            env_config.d, p=env_config.prior_p, seed=7)
+        target = estimate["estimate"]
+        target_ci = list(estimate["ci"])
+    passed = (bool(low <= target <= high) if target_ci is None
+              else bool(low <= target_ci[1] and target_ci[0] <= high))
+    return {"rate": rate, "ci": [low, high], "target": target, "target_ci": target_ci,
+            "passed": passed, "n_episodes": n_episodes}
 
 
 def _ref_fingerprint(env_config, eval_episodes: int) -> str:

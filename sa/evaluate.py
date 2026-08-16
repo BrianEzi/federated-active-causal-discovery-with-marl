@@ -46,15 +46,20 @@ class EpisodeTrace:
 
 def run_episodes(config: EnvConfig, policy: Callable, n_episodes: int = 300,
                  seed: int = 0, space=None,
-                 oracle: Optional[InterventionOracle] = None) -> List[EpisodeTrace]:
+                 oracle: Optional[InterventionOracle] = None,
+                 backend=None) -> List[EpisodeTrace]:
     """Run `policy` and record everything the criteria need.
 
     The oracle scores each action *as it is taken*, against the posterior the agent
     actually held at that moment -- not against a reconstruction afterwards.
     """
-    env = CausalDiscoveryEnv(config, space=space)
-    if oracle is None:
-        oracle = InterventionOracle(env.space)
+    if backend is not None:
+        env = backend.make_env()
+        oracle = backend.oracle if oracle is None else oracle
+    else:
+        env = CausalDiscoveryEnv(config, space=space)
+        if oracle is None:
+            oracle = InterventionOracle(env.space)
     # Stateful policies carry an RNG that would otherwise advance between runs, making the
     # same policy score differently each time it is evaluated. Reset it so a reference run
     # and an evaluation run of the same policy are identical by construction.
@@ -68,7 +73,11 @@ def run_episodes(config: EnvConfig, policy: Callable, n_episodes: int = 300,
             identified=result.identified,
             n_interventions=0,
             passed_early=False,
-            mec_size=result.info["mec_size"],
+            # -1 on the DP path: class size needs the equivalence class, which needs the
+            # DAG list. Only used for diagnostic breakdowns, never for a pass/fail number,
+            # so it degrades rather than blocking. `is_singleton` -- the part GATE 1 reads
+            # -- is a local test and is available at every d.
+            mec_size=result.info.get("mec_size", -1),
             is_singleton=result.info["is_singleton"],
         )
         while not result.done:
@@ -249,9 +258,10 @@ def action_histogram(traces: List[EpisodeTrace], d: int) -> List[float]:
 
 def evaluate(config: EnvConfig, agent_policy: Callable, random_ref: List[EpisodeTrace],
              greedy_ref: List[EpisodeTrace], n_episodes: int = 300, seed: int = 0,
-             space=None, oracle: Optional[InterventionOracle] = None) -> Dict:
+             space=None, oracle: Optional[InterventionOracle] = None,
+             backend=None) -> Dict:
     """Full metric set for one policy against pre-computed references."""
-    traces = run_episodes(config, agent_policy, n_episodes, seed, space, oracle)
+    traces = run_episodes(config, agent_policy, n_episodes, seed, space, oracle, backend)
     steps = mean_interventions_when_solved(traces)
     costs = episode_costs(traces, config.budget)
     return {

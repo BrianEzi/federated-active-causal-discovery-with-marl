@@ -173,3 +173,44 @@ def make_baselines(space, seed: int = 0) -> dict:
         "greedy_oracle": GreedyOraclePolicy(space, seed=seed),
         "edge_marginal_greedy": EdgeMarginalGreedyPolicy(space, seed=seed),
     }
+
+
+class EdgeMarginalGreedyDPPolicy:
+    """`EdgeMarginalGreedyPolicy` on the enumeration-free path.
+
+    The opponent a condition-B agent is scored against, and therefore the policy that makes
+    a d=7 number comparable with the d=4/5/6 curve. Scoring the agent against the
+    full-posterior greedy instead would change what the headline measures halfway along the
+    size axis -- conflating "worse policy" with "lossier belief" at d=7 only, exactly the
+    conflation this baseline exists to prevent.
+
+    Same two steps as the enumerated version: rebuild the independent-edge approximation to
+    the belief, then score it with the greedy information-gain rule. Both steps are done
+    without a DAG list -- the approximation because it is modular (see
+    `sa.dp.independent_edge_log_weights`), the scoring because the oracle samples.
+    """
+
+    def __init__(self, dp, n_draws: int = 4000, seed: int = 0):
+        self.dp = dp
+        self.oracle = SamplingOracle(dp, n_draws=n_draws, seed=seed)
+        self._seed = seed
+        self.rng = np.random.default_rng(seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """See `RandomPolicy.reset` -- tie-breaking and the oracle's draws must both be
+        reproducible, or a reference run and an evaluation run of the same policy differ."""
+        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+        self.oracle.seed = self._seed if seed is None else seed
+        self.oracle._calls = 0
+
+    def approximate_belief(self, log_w: np.ndarray) -> np.ndarray:
+        """The independent-edge approximation, as a log-weight table the oracle can read."""
+        from sa.dp import independent_edge_log_weights
+        marginals = self.dp.edge_marginals_onepass(log_w)
+        return independent_edge_log_weights(marginals, self.dp.scorer, self.dp.d)
+
+    def __call__(self, env, result) -> int:
+        scores, best = self.oracle.best_targets(self.approximate_belief(result.posterior))
+        if scores.max() <= 1e-9:
+            return PASS_ACTION
+        return int(self.rng.choice(np.flatnonzero(best)))

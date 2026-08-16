@@ -301,18 +301,29 @@ def action_to_env(action_index: int, d: int) -> int:
 class PPOAgent:
     """Trains and acts. `as_policy()` yields a callable usable by `sa.evaluate`."""
 
-    def __init__(self, env_config: EnvConfig, ppo_config: PPOConfig, space=None):
+    def __init__(self, env_config: EnvConfig, ppo_config: PPOConfig, space=None,
+                 backend=None):
         self.env_config = env_config
         self.cfg = ppo_config
+        self.backend = backend
         torch.manual_seed(ppo_config.seed)
-        self.env = CausalDiscoveryEnv(env_config, space=space)
+        self.env = (backend.make_env() if backend is not None
+                    else CausalDiscoveryEnv(env_config, space=space))
 
         self.d = env_config.d
         self.n_actions = self.d + 1 if ppo_config.allow_pass else self.d
         # Normaliser for the shaping potential: entropy of a uniform posterior, so phi
         # lands in [-1, 0] regardless of d and shaping_coef means the same thing at every
         # problem size.
-        self._max_entropy = float(np.log(self.env.space.n_dags))
+        # None on the DP path: the potential is the entropy of a distribution over
+        # graphs, and that array does not exist at d=7. Shaping measured dead in the
+        # Phase 2 sweep, so this refuses rather than quietly optimising something else.
+        self._max_entropy = (backend.max_entropy if backend is not None
+                             else float(np.log(self.env.space.n_dags)))
+        if ppo_config.shaping_coef and self._max_entropy is None:
+            raise ValueError(
+                "shaping_coef requires the enumerated posterior, which does not exist on "
+                "the subset-DP path. Measured 'dead' in the Phase 2 sweep; set it to 0.")
         self.obs_dim = self.env.observation_dim[ppo_config.observation]
         if ppo_config.arch == "pernode":
             if ppo_config.observation != "edge_marginals":
@@ -376,7 +387,10 @@ class PPOAgent:
 
             while not result.done:
                 obs = self._observe()
-                potential = self._potential(result)
+                # Only when it will be used. Computing it unconditionally costs an entropy
+                # over the whole DAG space every step, and on the DP path there is no such
+                # array at all -- so the unused value was a crash rather than mere waste.
+                potential = self._potential(result) if self.cfg.shaping_coef else 0.0
                 action, logp, value = self.act(obs)
                 result = self.env.step(action_to_env(action, self.d))
 

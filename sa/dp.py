@@ -505,3 +505,46 @@ class DPPosterior:
                 raise ValueError(f"node {node} is its own parent -- not a DAG")
             total += log_w[node, index]
         return float(total - log_z)
+
+
+def independent_edge_log_weights(marginals: np.ndarray, scorer, d: int) -> np.ndarray:
+    """`[d, 2^(d-1)]` log weights for the independent-edge approximation to a posterior.
+
+    This is the belief the `edge_marginal_greedy` baseline reasons with: every edge treated
+    as an independent Bernoulli at its marginal probability, renormalised over DAGs. It is
+    exactly what edge marginals discard -- the correlations between edges -- so the gap
+    between that baseline and the full-posterior greedy measures the cost of the
+    compression, and it is the fair opponent for an agent whose observation is edge
+    marginals.
+
+    The point of building it as a *log-weight table* rather than a distribution over graphs
+    is that the independent-edge product is **modular**: a DAG's weight factorises into a
+    term per (node, parent set), because whether edge `j -> i` is present depends only on
+    `i`'s parent set. So the same subset DP and the same MH sampler consume it unchanged,
+    and no DAG list is needed. Renormalisation over DAGs is then automatic -- both the DP
+    and the sampler only ever put mass on acyclic graphs.
+
+    Rejection sampling was the obvious alternative and is not viable: at d=7 only about one
+    in four thousand independent-edge draws is acyclic when the marginals are diffuse.
+    """
+    marginals = np.clip(np.asarray(marginals, dtype=np.float64), 1e-9, 1 - 1e-9)
+    log_present = np.log(marginals)
+    log_absent = np.log1p(-marginals)
+
+    out = np.zeros((d, scorer.n_parent_sets), dtype=np.float64)
+    for node in range(d):
+        # bits[k, j] = 1 when j is in parent set k of `node`.
+        bits = ((scorer.parent_masks[node][:, None] >> np.arange(d)[None, :]) & 1
+                ).astype(np.float64)
+        # The self term is excluded explicitly. It is tempting to let it vanish on its own
+        # -- no parent set contains `node`, and `marginals[node, node]` is 0 -- but the
+        # clip above moves that 0 to 1e-9, so "absent" contributes log1p(-1e-9) per node
+        # instead of exactly zero. Harmless (a constant offset per row cancels under
+        # normalisation) but it makes the table not literally the product it claims to be,
+        # and a test comparing against the definition catches the difference.
+        present = log_present[:, node].copy()
+        absent = log_absent[:, node].copy()
+        present[node] = 0.0
+        absent[node] = 0.0
+        out[node] = bits @ present + (1.0 - bits) @ absent
+    return out
