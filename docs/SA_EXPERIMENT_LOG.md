@@ -1740,3 +1740,54 @@ helpful — which is a stronger motivation for the federated setting than anythi
 design doc so far. Whether to handle it with MAG/PAG machinery, or to let the agents remain
 misspecified and measure what that costs, is a scoping decision for the morning; the
 measurement supporting either choice now exists.
+
+## 2026-08-16 (05:20) — Block 4: Phase 2 E1xE2. Every lever is an artefact or dead.
+
+[MEASURED] 62 of 66 configurations complete (tasks 63-66 still running; the four
+incomplete cells are `NEGCONTROL_n_obs_1000`, `include_counts_False`, `no_pass_True` and
+`shaping_coef_0.1`, each missing its `flat` arm). Baselines, median gap closed over 3 seeds:
+
+| architecture | baseline | seed range |
+|---|---|---|
+| per-node | **+1.155** | +1.144 to +1.241 |
+| flat | **-1.190** | -1.837 to -1.155 |
+
+[MEASURED] Classification of all 28 fully-measured lever settings, effect = median gap
+closed minus that architecture's own baseline, threshold 0.5:
+
+| verdict | count |
+|---|---|
+| task (moves under both) | **0** |
+| unlocked (per-node only) | **0** |
+| artefact (flat only) | **20** |
+| dead (neither) | 8 |
+
+[MEASURED] **The headline is the per-node column, and it is a null in the strongest
+possible sense.** Across 13 levers spanning learning rate (1e-4 to 1e-3), budget (10 to
+40), training length (2,000 to 12,000 episodes), batch size, entropy coefficient, discount,
+hidden width, step cost, identification threshold, intervention scale, samples per
+intervention, and both graph priors, **the largest effect on the working architecture is
+0.288** — and that one is `identify_threshold_0.9`, where a harder success criterion
+plausibly *should* cost something. Every other lever moves the result by less than 0.2.
+
+The same levers move the flat network by up to **-6.866** (`lr_0.0001`), -4.821
+(`budget_40`) and -4.084 (`identify_threshold_0.9`).
+
+[DECIDED] The interpretation is that the +1.1 gap-closed result **is not a
+hyperparameter-tuning artefact**. It survives every lever tried, at every setting tried.
+The apparent hyperparameter sensitivity in the overnight sweep was the flat network being
+pushed around; it was measuring the architecture's failure, not the task.
+
+This is the most useful thing Phase 2 could have returned, and it is worth stating plainly
+in the thesis: the single-agent result is robust to the entire hyperparameter surface that
+was swept, so the comparison against greedy rests on the architecture and the environment
+rather than on tuning.
+
+[MEASURED] Canaries: 48 fired across 62 configurations — G1 entropy 24, G4 seed spread 21,
+G5 gate 1 recorded 3 (one of which is the negative control, firing as designed). These are
+concentrated on the flat arm, which is expected: a network that cannot express the task has
+both an unconverged policy entropy and an unstable spread across seeds.
+
+[TODO] Re-run once tasks 63-66 land, to complete the four incomplete cells. The verdict for
+those four levers is currently unknown, not "dead" — `analyse_phase2` refuses to classify a
+partial grid, which is the guard added on 2026-08-15 after it biased toward keeping depth 1.
