@@ -282,3 +282,35 @@ def descendants(adjacency: np.ndarray) -> np.ndarray:
     for k in range(d):  # Floyd-Warshall transitive closure; d is tiny.
         reach |= reach[:, k][:, None] & reach[k, :][None, :]
     return reach
+
+
+def is_singleton_mec(draws: np.ndarray) -> np.ndarray:
+    """[n] bool: is each DAG alone in its Markov equivalence class?
+
+    Tested **locally, per graph**, with no reference to any other graph -- which is what
+    makes GATE 1's target computable at `d` where the DAG list does not exist.
+
+    An edge `u -> v` is *covered* when `Pa(v) \ {u} == Pa(u)`: parent and child have
+    identical parents otherwise. Chickering (1995) shows reversing a covered edge yields a
+    Markov-equivalent DAG, and that covered-edge reversals connect the whole equivalence
+    class. So a DAG is alone in its class **iff it has no covered edge** -- one scan over
+    `d^2` pairs, rather than grouping millions of graphs by skeleton and v-structures.
+
+    `draws` is `[n, d, d]` with `draws[k, i, j]` truthy when `i -> j` is present in graph
+    `k`; a single `[d, d]` adjacency is accepted too.
+    """
+    a = np.asarray(draws) > 0.5
+    single = a.ndim == 2
+    if single:
+        a = a[None]
+    d = a.shape[1]
+    bits = (1 << np.arange(d)).astype(np.int64)
+
+    # parent_mask[k, v] = bitmask of v's parents in graph k.
+    parent_mask = a.astype(np.int64).transpose(0, 2, 1) @ bits
+
+    # covered[k, u, v]: edge u->v is present AND Pa(v) minus u equals Pa(u).
+    covered = a & ((parent_mask[:, None, :] & ~bits[None, :, None])
+                   == parent_mask[:, :, None])
+    out = ~covered.any(axis=(1, 2))
+    return bool(out[0]) if single else out

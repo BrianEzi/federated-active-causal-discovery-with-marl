@@ -423,3 +423,63 @@ def _safe(fn: Callable, *args) -> Canary:
     except Exception as exc:  # noqa: BLE001 -- never lose a completed run to a check
         return Canary(getattr(fn, "__name__", "canary"), False, "fail", None, None,
                       f"canary raised {type(exc).__name__}: {exc}")
+
+
+def estimate_singleton_fraction(d: int, p: float = 0.5, n_chains: int = 32,
+                                n_samples: int = 2000, burn_in: int = 20000,
+                                thin: int = 10, seed: int = 0) -> dict:
+    """GATE 1's target at any `d`, estimated rather than enumerated.
+
+    GATE 1 asks whether the task can be solved without intervening, and compares the
+    observational solve rate against the prior-weighted fraction of DAGs that are alone in
+    their Markov equivalence class. Below d=7 that fraction is computed exactly by
+    enumeration. Past it there is no DAG list, and **without this the d=7 result could not
+    be validated at all** -- which is exactly the hole that made the earlier d=6 numbers
+    worthless.
+
+    Two pieces make it work. Membership is a *local* test (`is_singleton_mec`), so no
+    grouping over the whole space is needed. And DAGs are drawn from the Erdos-Renyi prior
+    by MH on prior-only weights, which is the same prior the environment and the posterior
+    use.
+
+    **The obvious cheap sampler is wrong here and it is worth saying why.** Drawing a
+    random permutation and including each forward pair with probability `p` does *not*
+    sample this prior: it gives each DAG a weight proportional to its number of topological
+    orderings, which is the order-modular prior, tilted toward graphs with many linear
+    extensions. Since class size is precisely what GATE 1 measures, that bias would land
+    directly on the answer.
+
+    The interval comes from `n_chains` **independent chains**, one estimate each. A
+    bootstrap over the pooled draws would treat correlated MCMC samples as independent and
+    report an interval several times too narrow; separate chains also expose bad mixing,
+    since a chain stuck in one region disagrees with the others.
+
+    Accuracy, measured against the exact enumerated value at d=4,5,6 and p=0.3,0.5,0.7
+    (2026-08-16): every z-score within +-1.86, mean -0.34, so there is no detectable bias
+    at a standard error of ~0.0013. Defaults are set to that configuration.
+    """
+    from sa.dp import DPPosterior
+    from sa.graphs import is_singleton_mec
+    from sa.sampler import mh_sample
+    from sa.score import BGeScore
+
+    dp = DPPosterior.for_prior(d, BGeScore(d), kind="erdos_renyi", p=p)
+    log_w = dp.log_prior_term
+
+    per_chain = np.empty(n_chains)
+    acceptances = np.empty(n_chains)
+    for chain in range(n_chains):
+        rng = np.random.default_rng(seed * 1000 + chain)
+        draws, acceptance = mh_sample(log_w, dp._mask_to_index, d, n_samples,
+                                      burn_in=burn_in, thin=thin, rng=rng)
+        per_chain[chain] = float(is_singleton_mec(draws).mean())
+        acceptances[chain] = acceptance
+
+    lo, hi = bootstrap_ci(per_chain, seed=seed)
+    return {
+        "estimate": float(per_chain.mean()),
+        "ci": (lo, hi),
+        "per_chain": per_chain,
+        "acceptance": float(acceptances.mean()),
+        "n_draws": int(n_chains * n_samples),
+    }

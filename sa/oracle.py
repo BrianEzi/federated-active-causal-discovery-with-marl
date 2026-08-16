@@ -43,7 +43,125 @@ from sa.graphs import GraphSpace, descendants
 _CLOSURE_CHUNK = 250_000
 
 
-class InterventionOracle:
+def _partition_entropy(labels: np.ndarray, weights: np.ndarray, n_groups: int) -> float:
+    """H of the outcome partition, in nats -- the expected information gain of one target.
+
+    `labels[k]` is which descendant-set group hypothesis `k` falls into and `weights[k]` is
+    its posterior mass (or `1/n_draws` for sampled hypotheses). Zero when every plausible
+    graph agrees, however unexplored the node looks.
+    """
+    mass = np.bincount(labels, weights=weights, minlength=n_groups)
+    mass = mass[mass > 0]
+    return float(-np.sum(mass * np.log(mass)))
+
+
+class _OracleChoices:
+    """Turning per-target scores into a choice, and scoring someone else's choice.
+
+    Shared verbatim by the enumerated and sampled oracles so that comparing them measures
+    the belief representation and nothing else. Subclasses supply `scores(belief)`; what
+    `belief` is differs between them (an enumerated posterior, or a log-weight table) and
+    is documented on each.
+    """
+
+    def best_targets(self, belief, tol: float = 1e-9) -> Tuple[np.ndarray, np.ndarray]:
+        """Returns `(scores, best_mask)`. Ties are returned as a set, not an argmax --
+        tied targets are genuinely equivalent, and marking one arbitrarily correct would
+        make the metric measure floating-point ordering."""
+        scores = self.scores(belief)
+        return scores, scores >= scores.max() - tol
+
+    def best_action(self, belief, rng: Optional[np.random.Generator] = None) -> int:
+        """A single greedy choice, breaking ties uniformly at random.
+
+        Random tie-breaking rather than lowest-index: the DAG space is enumerated in a
+        fixed order, so always taking the first tied node would give the oracle a
+        systematic and entirely arbitrary preference.
+        """
+        _, best = self.best_targets(belief)
+        candidates = np.flatnonzero(best)
+        if rng is None:
+            return int(candidates[0])
+        return int(rng.choice(candidates))
+
+    def score_choice(self, chosen: int, belief) -> Dict[str, float]:
+        """Score an agent's chosen target against the oracle.
+
+        `informative` is the field that matters and the one whose absence caused a
+        retracted result. When every legal target ties at zero the oracle has no
+        preference, so *any* choice is trivially "optimal" and counting it as a success
+        measures nothing. Aggregate `is_optimal` only over steps where `informative` is
+        true; a rate computed over all steps is the metric that reported 99.4-100% while
+        being 93-98% vacuous.
+        """
+        scores, best = self.best_targets(belief)
+        best_score = float(scores.max())
+        chosen_score = float(scores[int(chosen)])
+        informative = best_score > 1e-9
+        return {
+            "informative": float(informative),
+            "is_optimal": float(bool(best[int(chosen)])),
+            "score": chosen_score,
+            "best_score": best_score,
+            "regret": max(0.0, best_score - chosen_score),
+        }
+
+
+class SamplingOracle(_OracleChoices):
+    """The same oracle, over sampled DAGs instead of an enumerated list.
+
+    **Why sampling is unavoidable here, when the DP handles everything else.** The oracle
+    groups hypotheses by the descendant set of the intervention target. Reachability is a
+    property of whole paths, not of any single node's parent set, so it does not decompose
+    and the subset DP has no way to express it -- unlike `Z` and the edge marginals, which
+    it produces exactly. Drawing DAGs and computing descendants per draw is the way through.
+
+    **Affordable because it is an evaluation-only cost.** The oracle builds the greedy
+    reference and scores the agent's actions; it is never in the training loop. So it runs
+    on a few hundred evaluation episodes, not six thousand training ones.
+
+    `belief` for this class is the `[d, 2^(d-1)]` log-weight table from
+    `DPPosterior.log_weights`, not a posterior over graphs -- there is no such array at the
+    sizes this exists for.
+
+    Accuracy is a *measured* property, not an assumption: see `tests/test_sampling_oracle.py`,
+    which pins its choices against the exact oracle at d=4,5,6.
+    """
+
+    def __init__(self, dp, n_draws: int = 4000, burn_in: int = 5000, thin: int = 10,
+                 seed: int = 0):
+        self.dp = dp
+        self.d = dp.d
+        self.n_draws = n_draws
+        self.burn_in = burn_in
+        self.thin = thin
+        self.seed = seed
+        self._calls = 0
+
+    def scores(self, belief: np.ndarray) -> np.ndarray:
+        """[d] expected information gain from intervening on each node, in nats."""
+        from sa.sampler import descendant_codes, mh_sample
+
+        # A fresh stream per call, derived from the run seed, so a sequence of oracle
+        # queries is reproducible from `seed` alone rather than depending on how many
+        # times the oracle happened to be consulted earlier in the episode.
+        rng = np.random.default_rng([self.seed, self._calls])
+        self._calls += 1
+
+        draws, _ = mh_sample(belief, self.dp._mask_to_index, self.d, self.n_draws,
+                             burn_in=self.burn_in, thin=self.thin, rng=rng)
+        codes = descendant_codes(draws)
+        weights = np.full(draws.shape[0], 1.0 / draws.shape[0])
+
+        out = np.zeros(self.d)
+        for node in range(self.d):
+            _, inverse = np.unique(codes[:, node], return_inverse=True)
+            inverse = inverse.reshape(-1)
+            out[node] = _partition_entropy(inverse, weights, inverse.max() + 1)
+        return out
+
+
+class InterventionOracle(_OracleChoices):
     """Scores candidate intervention targets by expected information gain.
 
     Descendant signatures depend only on the graph space, so they are computed once at
@@ -87,53 +205,7 @@ class InterventionOracle:
         experiment cannot discriminate, however unexplored that node looks.
         """
         posterior = np.asarray(posterior, dtype=np.float64)
-        out = np.zeros(self.space.d)
-        for node in range(self.space.d):
-            mass = np.bincount(
-                self.signatures[:, node], weights=posterior, minlength=self.n_groups[node]
-            )
-            mass = mass[mass > 0]
-            out[node] = float(-np.sum(mass * np.log(mass)))
-        return out
-
-    def best_targets(self, posterior: np.ndarray, tol: float = 1e-9) -> Tuple[np.ndarray, np.ndarray]:
-        """Returns `(scores, best_mask)`. Ties are returned as a set, not an argmax --
-        tied targets are genuinely equivalent, and marking one arbitrarily correct would
-        make the metric measure floating-point ordering."""
-        scores = self.scores(posterior)
-        return scores, scores >= scores.max() - tol
-
-    def best_action(self, posterior: np.ndarray, rng: Optional[np.random.Generator] = None) -> int:
-        """A single greedy choice, breaking ties uniformly at random.
-
-        Random tie-breaking rather than lowest-index: the DAG space is enumerated in a
-        fixed order, so always taking the first tied node would give the oracle a
-        systematic and entirely arbitrary preference.
-        """
-        _, best = self.best_targets(posterior)
-        candidates = np.flatnonzero(best)
-        if rng is None:
-            return int(candidates[0])
-        return int(rng.choice(candidates))
-
-    def score_choice(self, chosen: int, posterior: np.ndarray) -> Dict[str, float]:
-        """Score an agent's chosen target against the oracle.
-
-        `informative` is the field that matters and the one whose absence caused a
-        retracted result. When every legal target ties at zero the oracle has no
-        preference, so *any* choice is trivially "optimal" and counting it as a success
-        measures nothing. Aggregate `is_optimal` only over steps where `informative` is
-        true; a rate computed over all steps is the metric that reported 99.4-100% while
-        being 93-98% vacuous.
-        """
-        scores, best = self.best_targets(posterior)
-        best_score = float(scores.max())
-        chosen_score = float(scores[int(chosen)])
-        informative = best_score > 1e-9
-        return {
-            "informative": float(informative),
-            "is_optimal": float(bool(best[int(chosen)])),
-            "score": chosen_score,
-            "best_score": best_score,
-            "regret": max(0.0, best_score - chosen_score),
-        }
+        return np.array([
+            _partition_entropy(self.signatures[:, node], posterior, self.n_groups[node])
+            for node in range(self.space.d)
+        ])
