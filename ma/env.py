@@ -37,6 +37,7 @@ import numpy as np
 from ma.topology import Topology
 from sa.graphs import build_graph_space
 from sa.scm import sample_multi, sample_scm_params
+from ma.score_regimes import JOINT_CONF, RegimeScorer
 from sa.score import BGeScore
 
 PASS_ACTION = -1
@@ -68,6 +69,18 @@ class MAConfig:
     # 0% and 100% rescue of a confounded agent, and therefore not optional if coordination
     # is to be possible at all. See docs/MA_BUILD_LOG.md.
     disclose_regime: bool = True
+    # How an agent scores data spanning two regimes. Measured 2026-08-17 over 300 episodes:
+    #
+    #   rule        unconfounded curve over p(clamp)   confounded payoff
+    #   pooled      0.815 0.838 0.804 0.808            +0.000
+    #   subset      0.815 0.454 0.708 0.956            +0.931   <- the valley
+    #   joint       0.815 0.852 0.841 0.856            +0.000
+    #   joint_conf  0.244 0.686 0.908 0.982            +0.690
+    #
+    # JOINT_CONF is the only rule that is both monotone (a learner can climb) and pays off
+    # under confounding. It costs baseline accuracy when nobody clamps -- 0.244 against
+    # 0.815 -- which is the honest price of admitting confounding might be present.
+    score_rule: str = JOINT_CONF
     weight_range: tuple = (0.5, 2.0)
     noise_range: tuple = (0.5, 1.5)
 
@@ -113,6 +126,8 @@ class AgentView:
         ]
         self.score = BGeScore(self.k)
         self.log_prior = np.zeros(self.n_dags)   # uniform over DAGs, matching prior_p=0.5
+        self.regime_scorer = RegimeScorer(
+            self, [self.pos[node] for node in self.shared])
 
     def true_index(self, global_adjacency: np.ndarray) -> int:
         """Index of the agent's TRUE induced DAG -- the global graph restricted to its
@@ -125,7 +140,8 @@ class AgentView:
         return int(matches[0])
 
     def posterior(self, samples: np.ndarray, known_intervened: np.ndarray,
-                  clean: Optional[np.ndarray] = None) -> np.ndarray:
+                  clean: Optional[np.ndarray] = None,
+                  rule: Optional[str] = None) -> np.ndarray:
         """Exact posterior over the agent's DAGs, from its own columns only.
 
         `known_intervened` is `[n, k]` and marks only the interventions this agent has
@@ -141,6 +157,11 @@ class AgentView:
         # both regimes jointly. Deliberate -- a joint two-regime score would be the better
         # estimator, and it is the obvious next improvement, but conditioning on a subset
         # is correct inference and keeps the claim clean.
+        if rule is not None:
+            return self.regime_scorer.log_posterior(
+                samples, known_intervened,
+                np.zeros(len(samples), dtype=bool) if clean is None else clean, rule)
+
         if clean is not None and clean.any():
             samples = samples[clean]
             known_intervened = known_intervened[clean]
@@ -290,7 +311,8 @@ class TwoAgentEnv:
     def _update_beliefs(self) -> None:
         for name, view in self.views.items():
             self.beliefs[name] = view.posterior(
-                self.samples[:, view.nodes], self.known[name], self.clean[name])
+                self.samples[:, view.nodes], self.known[name], self.clean[name],
+                rule=self.config.score_rule)
 
     def true_mass(self, name: str) -> float:
         return float(self.beliefs[name][self.true_index[name]])

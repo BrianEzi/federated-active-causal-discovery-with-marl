@@ -295,3 +295,47 @@ Matches the pre-registered predictions so far: JOINT removes the valley but gain
 confounded episodes, because the dirty regime still prefers a structure that mimics the
 confounding and carries most of the rows. Only JOINT_CONF has both properties. Treat these
 numbers as a smoke test, not a result — only 2 confounded episodes.
+
+## Full comparison, 300 episodes (29 confounded, 271 unconfounded)
+
+    rule          unconfounded curve over p(clamp)   valley?     confounded payoff
+    pooled        0.815 0.838 0.804 0.808            no          +0.000
+    subset        0.815 0.454 0.708 0.956            YES -0.362  +0.931
+    joint         0.815 0.852 0.841 0.856            no          +0.000
+    joint_conf    0.244 0.686 0.908 0.982            no          +0.690
+
+Both pre-registered predictions held.
+
+**JOINT alone is not enough, and this is the informative negative.** It removes the valley
+exactly as expected -- clean rows are added rather than substituted -- but the confounded
+payoff is *identically zero* at every clamp probability. The reason is the one predicted:
+the dirty regime still prefers a structure that mimics the confounding, and it carries most
+of the rows, so sharing a structure across regimes just lets the dirty regime win. Fixing
+the gradient does not fix the target.
+
+**JOINT_CONF has both properties.** Monotone on unconfounded episodes (0.244 -> 0.982) and a
++0.690 payoff on confounded ones. Modelling confounding explicitly, as a flag per shared
+pair, is what makes the clean regime able to *disambiguate* rather than merely *outvote*.
+
+That the confinement result is what makes this tractable is worth stating plainly: without
+it the hypothesis space would be MAGs and the score would not decompose. With it, S ranges
+over 3 pairs and the whole space is 4344 exact hypotheses.
+
+### Two caveats, both against my own conclusion
+
+1. **JOINT_CONF costs a lot when nobody clamps**: 0.244 against 0.815 for the other rules.
+   That is the honest price of admitting confounding might be present, and it is a real
+   cost, not a presentational one. If a learner never discovers clamping, JOINT_CONF leaves
+   it strictly worse off than the rule it replaces. The gradient is favourable everywhere,
+   which is why I still prefer it, but this is a genuine trade and the user may disagree.
+
+2. **The valley detector flagged POOLED with "worst step -0.033"**, which is noise: n=271
+   gives a standard error near 0.024, so a 0.033 step is well inside sampling variation. My
+   +/-0.02 tolerance is too tight for this sample size. POOLED's curve is flat, not valleyed.
+   Recording it because an automated pass/fail that fires on noise is exactly the kind of
+   thing that later gets quoted as a finding.
+
+### [MY CALL] JOINT_CONF is now the environment default
+
+`MAConfig.score_rule`, defaulting to `joint_conf`. Belief update cost went 0.02s -> 0.05s
+per step, which is acceptable. Retraining with it is running now.
