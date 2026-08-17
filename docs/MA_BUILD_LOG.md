@@ -240,3 +240,58 @@ it should be re-run with the joint score before anyone concludes anything about 
 A on unconfounded episodes. But B spends its entire budget doing it, so B's own
 identification is not measured in that sweep. The genuine joint optimum has to trade the two,
 and I have not measured B's side of it. Do not read 1.000 as a solved game.
+
+---
+
+# 2026-08-17 morning — the joint two-regime score
+
+One-hour box, unsupervised. Goal: build the scoring rule flagged last night as the fix for
+the valley, and measure whether it works.
+
+## Four rules, compared on identical episodes
+
+Built `ma/score_regimes.py` with all four so the choice is settled by measurement:
+
+  POOLED      one dataset, one score, regime bit ignored (pre-disclosure behaviour)
+  SUBSET      clean rows only where they exist (what the env does now; makes the valley)
+  JOINT       same structure both regimes, independent parameters, log-scores added
+  JOINT_CONF  DAG + a subset S of shared PAIRS marked confounded; S applied to the dirty
+              regime only, as an added edge oriented along the DAG's own topological order
+
+JOINT_CONF is only tractable because of the confinement result — every bidirected edge has
+both endpoints in `X`, so S ranges over 3 pairs at `(1,1,3)`, giving 543 x 8 = 4344 exact
+hypotheses. Marginalising S out returns a posterior over DAGs.
+
+**[MY CALL] JOINT_CONF does not reduce to POOLED when no clean rows exist.** The other three
+do. Without clean data an agent genuinely cannot separate a real shared edge from a
+confounding artefact, and the rule exists to represent that rather than assume it away. The
+consequence is intended and visible: JOINT_CONF starts LOWER at p(clamp)=0 because it
+spreads mass over hypotheses the other rules silently exclude. What it buys is that clamping
+then resolves the ambiguity, which is a much steeper gradient towards the coordinated
+behaviour. Recording it because it is a real modelling choice, not a detail — it trades
+baseline accuracy for a learning signal, and the user may prefer the other trade.
+
+## Two bugs found and fixed while building
+
+1. **Global log-sum-exp underflowed whole rows to `-inf`.** Marginalising S used one global
+   shift, so every entry of a weaker DAG's row underflowed to zero and `log(0)` deleted the
+   hypothesis outright instead of ranking it. Now shifted per row. This would have silently
+   removed exactly the hypotheses that are hardest to distinguish.
+
+2. **The `JOINT_CONF` branch ignored the empty-regime fallback.** `groups` was computed and
+   then not used on that path, so the fallback was dead code and the p(clamp)=0 behaviour
+   was accidental rather than chosen. Restructured so the branch is explicit, and the
+   choice above is now deliberate.
+
+## Early signal (n=20, too small to conclude from — full run at n=300 in flight)
+
+    rule          unconfounded curve over p(clamp)      confounded payoff
+    pooled        0.667 0.722 0.722 0.778   no valley        +0.000
+    subset        0.667 0.556 0.667 1.000   VALLEY           +1.000
+    joint         0.667 0.722 0.833 0.833   no valley        +0.000
+    joint_conf    0.167 0.667 0.944 1.000   no valley        +0.500
+
+Matches the pre-registered predictions so far: JOINT removes the valley but gains nothing on
+confounded episodes, because the dirty regime still prefers a structure that mimics the
+confounding and carries most of the rows. Only JOINT_CONF has both properties. Treat these
+numbers as a smoke test, not a result — only 2 confounded episodes.
