@@ -204,6 +204,38 @@ class IndependentPPO:
                       "entropy": float(entropy.item())}
         return losses
 
+    def save(self, path) -> None:
+        """Persist both agents' networks and the config needed to rebuild them.
+
+        Without this a trained pair is unrecoverable once the process exits, and the
+        cross-rule evaluation -- score a policy trained under one belief rule against
+        another -- would mean retraining every arm from scratch. The rule the policy was
+        TRAINED under is stored alongside, because evaluating a policy under a different
+        rule is the whole point and mixing the two up silently would be easy.
+        """
+        from pathlib import Path
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({
+            "nets": {name: self.nets[name].state_dict() for name in self.names},
+            "obs_dims": {name: self.env.observation_dim(name) for name in self.names},
+            "n_actions": {name: self.env.n_actions(name) for name in self.names},
+            "hidden": self.cfg.hidden,
+            "seed": self.cfg.seed,
+            "trained_under_rule": self.env_config.score_rule,
+            "topology": self.env_config.topology.name,
+        }, path)
+
+    def load(self, path) -> dict:
+        """Restore both agents' networks. Returns the stored metadata so a caller can check
+        which rule the policy was trained under before scoring it."""
+        payload = torch.load(path, weights_only=False)
+        for name in self.names:
+            self.nets[name].load_state_dict(payload["nets"][name])
+            self.nets[name].eval()
+        return {k: v for k, v in payload.items() if k != "nets"}
+
     def train(self, verbose: bool = True) -> List[dict]:
         cfg = self.cfg
         history = []

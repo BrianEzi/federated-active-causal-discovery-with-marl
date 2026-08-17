@@ -401,3 +401,21 @@ contention only changed wall-clock.
    A per-clamp cost, or a shaped signal for clamping only when the agent's own belief shows
    an unresolved shared-pair ambiguity, are the obvious candidates. The second risks
    hand-coding the answer and should be treated carefully.
+
+### Checkpointing added (blocker for the cross-rule evaluation)
+
+`ma_train.py` never persisted the trained networks, so the three JOINT_CONF pairs from the
+run above are gone and the cross-rule evaluation -- score a policy trained under one belief
+rule against another -- would have meant retraining every arm from scratch.
+
+`IndependentPPO.save` / `.load` now store both agents' state dicts plus the rule the pair
+was TRAINED under, and `ma_train.py` writes one checkpoint per seed. The trained-under rule
+is stored deliberately: evaluating a policy under a different rule is the entire point of
+the comparison, and silently mixing the two would be very easy to do.
+
+Verified by round-trip: weights restore exactly into a freshly-constructed agent with a
+different seed.
+
+The three existing JOINT_CONF policies are NOT recoverable -- they were trained before this
+existed. The cross-rule evaluation will need one retraining pass per rule, and that is a
+cost of my own omission, not of the experiment.

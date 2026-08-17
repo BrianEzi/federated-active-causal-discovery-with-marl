@@ -123,6 +123,9 @@ def main():
     ap.add_argument("--n_int", type=int, default=200)
     ap.add_argument("--budget", type=int, default=6)
     ap.add_argument("--out", default="results/ma/train.json")
+    ap.add_argument("--checkpoint_dir", default="results/ma/checkpoints",
+                    help="Where to persist each seed's trained pair, so the cross-rule "
+                         "evaluation does not require retraining.")
     args = ap.parse_args()
 
     topology = Topology("(1,1,3)", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
@@ -147,11 +150,15 @@ def main():
         ppo = MAPPOConfig(total_episodes=args.train_episodes, seed=seed)
         agent = IndependentPPO(config, ppo)
         history = agent.train(verbose=True)
+        checkpoint = (Path(args.checkpoint_dir) /
+                      f"{config.score_rule}_seed{seed}.pt")
+        agent.save(checkpoint)
         evaluation = evaluate_learned(agent, config, args.eval_episodes, seed=99)
         per_seed.append({
             "seed": seed,
             "train_seconds": time.perf_counter() - t0,
             "eval": evaluation,
+            "checkpoint": str(checkpoint),
             "history_tail": history[-10:],
         })
         e = evaluation["all"]
