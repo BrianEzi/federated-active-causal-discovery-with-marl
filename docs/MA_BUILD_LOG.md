@@ -339,3 +339,65 @@ over 3 pairs and the whole space is 4344 exact hypotheses.
 
 `MAConfig.score_rule`, defaulting to `joint_conf`. Belief update cost went 0.02s -> 0.05s
 per step, which is acceptable. Retraining with it is running now.
+
+## Retraining under JOINT_CONF — coordination is learned, stability is not
+
+3 seeds, 6000 episodes, 400 held-out eval episodes (61 confounded, 339 unconfounded).
+References scored under the SAME rule, so this is internally like-for-like.
+
+                 overall   confounded            unconfounded   clamp (conf/unconf)
+    random        0.268    0.049 [0.017,0.135]      0.307        0.477
+    greedy        0.190    0.000 [0.000,0.059]      0.224        0.000
+    learned s0    0.380    0.213 [0.129,0.331]      0.410        0.891 / 0.834
+    learned s1    0.560    0.344 [0.237,0.470]      0.599        0.870 / 0.835
+    learned s2    0.165    0.115 [0.057,0.218]      0.174        0.952 / 0.958
+    median        0.380    0.213
+
+**[RESULT] The coordination result is robust across seeds.** Every seed solves confounded
+episodes at a rate whose 95% interval excludes greedy's 0.000, and two of three exclude
+random's 0.049. Under SUBSET last night every seed scored exactly 0.000 there and clamping
+collapsed towards zero. The clamp behaviour is now the dominant action, 84-96%.
+
+This is the first evidence that the coordinated behaviour is reachable by learning and not
+only by a hand-built oracle arm.
+
+### Three things that must be said against it
+
+1. **Overall performance is unstable.** 0.165 / 0.380 / 0.560 across seeds. Seed 2 lands
+   BELOW random (0.268). A median of 0.380 against greedy's 0.190 is a real gain, but with
+   a spread that wide, three seeds is not enough to quote a number.
+
+2. **Selectivity (P2) essentially failed.** Clamp differences confounded-minus-unconfounded
+   are +0.057, +0.036, **-0.006**. The agents learned to clamp; they did not learn *when*.
+   Seed 2 clamps 95.7% of the time on episodes where clamping is pointless, spends its
+   budget on it, and takes 5.72 steps to seeds 0 and 1's ~5.0. Over-clamping is the failure
+   mode, and it is the direct explanation for seed 2 being the worst arm.
+
+   This matches the p(clamp)=1.0 optimum in the scoring sweep, so clamping always is not
+   irrational — but it means the result is "learned that clamping helps", NOT "learned to
+   help its partner when its partner needs it". The stronger claim is not supported.
+
+3. **The references moved, and cross-rule comparison is invalid.** Greedy fell from 0.568
+   under SUBSET to 0.190 under JOINT_CONF, because JOINT_CONF costs baseline accuracy when
+   nobody clamps (0.815 -> 0.244 in the scoring sweep). So this is a beat of greedy WITHIN
+   the new belief model, not a beat of last night's greedy. Quoting 0.380 against 0.568
+   would be wrong. A cross-rule evaluation -- policies trained under one rule, scored under
+   another -- is needed before any of this goes in the thesis.
+
+### Process error, recorded
+
+I declared the first training launch dead and started a second. It was not dead; I read its
+log seconds after launch, before anything had flushed. Both ran for ~15 hours competing for
+CPU, which is why seed 1 reports 875 minutes of "training time" against seed 0's 47 and
+seed 2's 34. **The per-seed timings in this run are meaningless** and should not be used for
+any cost claim. The results themselves are unaffected -- the seeds are independent and the
+contention only changed wall-clock.
+
+### Next, in priority order
+
+1. Cross-rule evaluation, to make the greedy comparison honest.
+2. More seeds -- the spread demands it before any number is quoted.
+3. Attack over-clamping: it is the difference between "clamping helps" and "coordination".
+   A per-clamp cost, or a shaped signal for clamping only when the agent's own belief shows
+   an unresolved shared-pair ambiguity, are the obvious candidates. The second risks
+   hand-coding the answer and should be treated carefully.
