@@ -85,6 +85,47 @@ class RegimeScorer:
         self.pairs: List[Tuple[int, int]] = list(combinations(self.shared_positions, 2))
         self.n_subsets = 1 << len(self.pairs)
         self.orders = [_topological_order(dag) for dag in view.dags]
+        self._build_index()
+
+    def _build_index(self) -> None:
+        """Precompute every (hypothesis, node) -> parent-set slot, once.
+
+        The scoring loop was 543 x 8 x 4 Python iterations per belief update, rebuilding
+        parent-set tuples and hashing them each time. All of that is a pure function of the
+        graph space, so it is hoisted here and the per-update work becomes two array
+        gathers. Nothing about the arithmetic changes -- `tests/test_score_regimes.py`
+        asserts the fast path reproduces the slow one exactly.
+        """
+        view = self.view
+        k = self.k
+        # Canonical slot for a (node, parent-set): node * 2^(k-1) + packed parent bits,
+        # with the node's own bit removed from the packing so the space is exactly the
+        # k * 2^(k-1) distinct local scores.
+        self.n_slots = k * (1 << (k - 1))
+        self.slot_parents: List[Tuple[int, ...]] = [()] * self.n_slots
+        self.slot_node = np.zeros(self.n_slots, dtype=np.int64)
+
+        def slot(node: int, parents) -> int:
+            bits = 0
+            for parent in parents:
+                shifted = parent if parent < node else parent - 1
+                bits |= 1 << shifted
+            index = node * (1 << (k - 1)) + bits
+            self.slot_parents[index] = tuple(sorted(parents))
+            self.slot_node[index] = node
+            return index
+
+        self.clean_slots = np.zeros((view.n_dags, k), dtype=np.int64)
+        for i in range(view.n_dags):
+            for node in range(k):
+                self.clean_slots[i, node] = slot(node, view.parents[i][node])
+
+        self.dirty_slots = np.zeros((view.n_dags, self.n_subsets, k), dtype=np.int64)
+        for i in range(view.n_dags):
+            for subset in range(self.n_subsets):
+                parents = self._dirty_parents(i, subset)
+                for node in range(k):
+                    self.dirty_slots[i, subset, node] = slot(node, parents[node])
 
     # -- parent sets ---------------------------------------------------------------
 
@@ -152,31 +193,29 @@ class RegimeScorer:
         else:
             groups = None                        # JOINT_CONF handled below
 
+        def slot_scores(tag: str, rows: np.ndarray) -> np.ndarray:
+            """All k * 2^(k-1) local scores for one regime, as a flat array."""
+            out = np.zeros(self.n_slots)
+            for index in range(self.n_slots):
+                out[index] = local(tag, rows, int(self.slot_node[index]),
+                                   self.slot_parents[index])
+            return out
+
         n_dags = self.view.n_dags
         if groups is not None:
             log_post = np.zeros(n_dags)
-            for i in range(n_dags):
-                total = 0.0
-                for tag, rows in groups:
-                    for node in range(self.k):
-                        total += local(tag, rows, node, self.view.parents[i][node])
-                log_post[i] = total
+            for tag, rows in groups:
+                log_post += slot_scores(tag, rows)[self.clean_slots].sum(axis=1)
             return _normalise(log_post)
 
         # JOINT_CONF: score every (DAG, confounded-subset) pair, then marginalise S out.
-        table = np.full((n_dags, self.n_subsets), -np.inf)
-        for i in range(n_dags):
-            clean_term = sum(local("clean", clean, node, self.view.parents[i][node])
-                             for node in range(self.k))
-            for subset in range(self.n_subsets):
-                dirty_parents = self._dirty_parents(i, subset)
-                dirty_term = sum(local("dirty", dirty_rows, node, dirty_parents[node])
-                                 for node in range(self.k))
-                # Uniform prior over subsets. A sparsity prior favouring fewer confounded
-                # pairs would be defensible and is NOT applied, because it would bias the
-                # comparison towards finding no confounding, which is the thing being
-                # measured.
-                table[i, subset] = clean_term + dirty_term
+        clean_scores = slot_scores("clean", clean)
+        dirty_scores = slot_scores("dirty", dirty_rows)
+        table = (clean_scores[self.clean_slots].sum(axis=1)[:, None]
+                 + dirty_scores[self.dirty_slots].sum(axis=2))
+        # Uniform prior over subsets. A sparsity prior favouring fewer confounded pairs
+        # would be defensible and is NOT applied, because it would bias the comparison
+        # towards finding no confounding, which is the thing being measured.
 
         # Row-wise log-sum-exp. A single global shift underflows every entry of the
         # weaker rows to zero and then log(0) = -inf, which silently deletes hypotheses

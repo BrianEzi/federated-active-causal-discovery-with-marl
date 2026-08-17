@@ -419,3 +419,30 @@ different seed.
 The three existing JOINT_CONF policies are NOT recoverable -- they were trained before this
 existed. The cross-rule evaluation will need one retraining pass per rule, and that is a
 cost of my own omission, not of the experiment.
+
+---
+
+# 2026-08-18 overnight — cross-rule evaluation and over-clamping
+
+Unsupervised, full night. Plan set before starting, in priority order given by the user's
+own list: (1) cross-rule evaluation, (2) more seeds, (3) attack over-clamping.
+
+## First: made the experiments affordable
+
+`RegimeScorer` was 543 x 8 x 4 Python iterations per belief update, rebuilding parent-set
+tuples and hashing them every time. All of that is a pure function of the graph space, so it
+is now precomputed once into a `(hypothesis, node) -> slot` index and a belief update is two
+array gathers. Step cost 0.05s -> 0.022s, a 2.3x speedup that roughly doubles how many
+experiments fit in the night.
+
+**Verified rather than assumed.** `tests/test_score_regimes.py` keeps the straightforward
+implementation as a reference and asserts the fast path reproduces it to 1e-12 across all
+four rules and three clamp regimes -- compared over the WHOLE posterior, not the mass on the
+truth, because a bug that shuffles low-mass hypotheses would be invisible to a summary
+statistic. Also asserts the slot packing never collides (a collision would silently score
+one hypothesis as another) and that JOINT_CONF marginalises the confounded-subset dimension
+rather than maximising it.
+
+One test bug found and fixed while writing it: the helper drew B's non-clamping actions
+uniformly, which hits "clamp my private node" about 1/8 of the time, so the
+"no clean rows" fixture was not actually clean. The scorer was fine; the test was wrong.
