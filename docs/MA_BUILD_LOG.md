@@ -493,3 +493,59 @@ which is why I cut the queue from 16 runs to 6, was wrong. It counted the refere
 evaluations (random and greedy over 400 episodes) as if they were training. Actual training
 is ~7 minutes per seed. The scope cut was made on a bad measurement, and once the current
 queue finishes there is room to put the dropped phases back.
+
+## Cross-rule evaluation — the blocker, resolved, and my prediction was wrong
+
+Every policy scored under every belief rule, same episodes. Medians over 3 seeds.
+
+CONFOUNDED solve rate      scored under:   subset    joint_conf
+    random                                  0.016        0.049
+    greedy                                  0.000        0.000
+    subset-trained policy                   0.000        0.000
+    joint_conf-trained policy               0.016      **0.262**
+
+ALL episodes               scored under:   subset    joint_conf
+    random                                  0.370        0.268
+    greedy                                  0.542        0.190
+    subset-trained policy                   0.290        0.113
+    joint_conf-trained policy               0.033        0.495
+
+**X1 confirmed.** Greedy is 0.000 on confounded episodes under every rule. It never clamps,
+so no belief rule can hand it clean rows to condition on. The failure is structural, not a
+scoring artefact.
+
+**X2 FALSIFIED, and this is the important one.** I predicted a JOINT_CONF-trained policy
+would keep most of its confounded advantage when scored under SUBSET, because the behaviour
+earning it -- clamping -- produces clean rows SUBSET can also use. It does not: 0.262 drops
+to **0.016**, and its overall rate collapses to **0.033**, far below random's 0.370. The
+policy clamps 88% of the time, and under SUBSET clamping means discarding every
+observational row for a handful of clean ones. The same behaviour that is near-optimal under
+one belief model is catastrophic under the other.
+
+**X3 confirmed.** A SUBSET-trained policy gains nothing from being scored under JOINT_CONF
+(0.000 confounded, and 0.290 -> 0.113 overall). It never learned to clamp, and JOINT_CONF
+without clean rows is strictly worse than the alternatives.
+
+### What this actually licenses me to claim
+
+I had been heading towards "the rule change bought a learning signal rather than an
+inference advantage". That framing is now dead. The honest version:
+
+  **Performance is a property of the (policy, belief rule) PAIR, not of either alone.**
+  Neither component transfers. A policy trained under one rule is worse than random under
+  the other, and a rule without a matching policy is worse than the rule it replaced --
+  greedy drops 0.542 -> 0.190 simply by switching the belief model.
+
+The claim that survives is the one the matrix was designed to support, read DOWN a column
+with the belief model held fixed:
+
+  **Under JOINT_CONF, the learned policy reaches 0.262 on confounded episodes where greedy
+  reaches 0.000, random 0.049, and a policy trained under the other rule 0.000.**
+
+That is a fair comparison and it stands. What it is NOT is evidence that the agents learned
+a generally better experimental strategy. They learned a strategy that is co-adapted to a
+particular belief model, and outside it that strategy is actively harmful.
+
+For the thesis this is a better result than the one I predicted, because it is specific: the
+belief representation and the policy have to be designed together, and the "coordination" on
+display is inseparable from the inference machinery that makes clamping legible.
