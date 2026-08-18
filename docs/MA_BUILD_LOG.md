@@ -603,3 +603,42 @@ inferred from an aggregate rate.
    a worse policy. The clamp-cost sweep still in the queue was designed to discourage a
    behaviour that turns out to be correct, so its result should be read as "what does a
    price on the RIGHT behaviour destroy" rather than "does the price fix over-clamping".
+
+## Clamp-cost 0.15: total collapse, and it exposes a reward-design fragility
+
+    seed   solve   confounded   clamp rate   mean steps   final entropy
+      0    0.005      0.000        0.000        0.99          0.003
+      1    0.010      0.000        0.000        1.01          0.003
+      2    0.005      0.000        0.000        0.99          0.003
+
+    (default arm, same rule, no clamp cost: solve ~0.47, mean steps ~5.1)
+
+Not merely "clamps less" -- the agents **stop acting entirely**. Mean episode length 1.0 and
+policy entropy 0.003 means both learned to PASS on the first move, which ends the episode at
+zero reward. They prefer a guaranteed 0 to a costly attempt.
+
+This confirms the retraction above from the other direction: a price on clamping does not
+refine the behaviour, it removes it, and removing it takes everything else with it. Under
+JOINT_CONF without clean rows the belief model is poor by construction (0.244 against 0.815
+in the scoring sweep), so once clamping is priced out there is no path to the terminal reward
+worth paying step costs for. **Clamping is load-bearing, not incidental.**
+
+### [GAP] The two-agent training has no under-acting canary
+
+The single-agent work carries a `no_under_acting` check precisely because step costs plus a
+hard-to-reach terminal reward create a give-up attractor, and it fired usefully there. The
+two-agent trainer has no equivalent, so this run reported "clamp_fraction 0.000" as though it
+were a behavioural finding when the real story was "both agents passed immediately". I read
+the numbers correctly only because mean_steps happened to be in the eval output.
+
+That is a hole in the harness, not just in this run. A `mean_steps` floor should be a
+first-class canary on every two-agent result, and until it is, any low clamp rate here needs
+checking against episode length before it is interpreted.
+
+### Consequence for the 0.05 arm
+
+Part 2 runs clamp_cost 0.05. Given 0.15 collapses to pure passing, 0.05 is now the more
+informative point: it distinguishes "any price destroys it" from "there is a price at which
+clamping becomes selective". Registering the expectation before it runs -- I expect partial
+degradation rather than collapse, because 0.05 doubles the cost of a clamped action rather
+than quadrupling it, but after two wrong framings tonight I hold that loosely.
