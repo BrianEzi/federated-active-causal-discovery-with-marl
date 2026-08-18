@@ -446,3 +446,33 @@ rather than maximising it.
 One test bug found and fixed while writing it: the helper drew B's non-clamping actions
 uniformly, which hits "clamp my private node" about 1/8 of the time, so the
 "no clean rows" fixture was not actually clean. The scorer was fine; the test was wrong.
+
+## Reconsidering "over-clamping" — it may be the wrong diagnosis
+
+I reported the 2026-08-17 result as "learned to clamp but not *when*", reading the 84-96%
+clamp rate as indiscriminate. On reflection that framing is probably wrong, and it matters
+because it points at the wrong fix.
+
+From the scoring sweep, p(clamp)=1.0 was the best setting for agent A on **both** confounded
+and unconfounded episodes. So having your partner clamp constantly is genuinely optimal from
+the receiving side, and a high clamp rate is not by itself irrational.
+
+What a per-agent clamp rate cannot see is that **a clamping agent is not experimenting**. It
+spends its budget holding a variable still for someone else and learns nothing about its own
+graph. If both agents clamp in the same round, the round is wasted for both. Seed 2 --
+clamp 0.957, solve 0.165, below random -- looks exactly like that.
+
+So the coordinated solution is not "clamp less", it is **role differentiation**: one agent
+clamps while the other experiments, and they swap. That is a property of the JOINT action
+distribution and is invisible to the per-agent rates I have been quoting.
+
+`scripts/ma_role_analysis.py` measures it against the right null -- two agents clamping
+independently at their own observed marginal rates. Two agents each clamping 90% of the time
+with no coordination give P(exactly one clamps) = 0.18, so anything near that is "both clamp
+a lot" rather than "they take turns". Pre-registered expectation: seeds 0 and 1 above the
+independence baseline, seed 2 at or below it. If ALL seeds sit at the baseline, no
+differentiation is being learned and the coordination claim is weaker than I have stated.
+
+The clamp-cost sweep in tonight's queue is still worth running -- it is the minimal
+non-circular pressure against wasted rounds -- but this diagnostic is what will say whether
+the cost is even addressing the right failure.
