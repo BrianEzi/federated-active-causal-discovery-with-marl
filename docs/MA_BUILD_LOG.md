@@ -549,3 +549,57 @@ particular belief model, and outside it that strategy is actively harmful.
 For the thesis this is a better result than the one I predicted, because it is specific: the
 belief representation and the policy have to be designed together, and the "coordination" on
 display is inseparable from the inference machinery that makes clamping legible.
+
+## Role differentiation: measured, and my framing was wrong for the second time
+
+    policy              clampA  clampB  P(both)  P(one)  indep    diff    alt   solve
+    joint_conf_seed0     0.695   0.903    0.650   0.297  0.343  -0.046  0.231   0.507
+    joint_conf_seed1     0.917   0.761    0.729   0.220  0.282  -0.062  0.179   0.497
+    joint_conf_seed2     0.807   0.995    0.806   0.191  0.195  -0.005  0.014   0.440
+    subset_seed{0,1,2}   ~0      0.000    0.000     --     --   +0.000  0.000   ~0.29
+
+Differentiation is NEGATIVE in every seed: the agents clamp *together* more often than two
+independent clampers at the same marginal rates would. Alternation is low. By the
+pre-registered reading that is "both clamp a lot", not "they take turns", and my expectation
+that seeds 0 and 1 would sit above the baseline is falsified.
+
+But the premise behind that expectation was wrong, so the test was aimed at the wrong thing.
+I assumed simultaneous clamping wastes the round for both. What do they actually clamp?
+
+    policy              both-clamp rounds   both clamp their OWN private node
+    joint_conf_seed0            644                       0.992
+    joint_conf_seed1            751                       0.995
+    joint_conf_seed2            816                       0.999
+
+    A clamps its own private node on 100.0% / 100.0% / 99.8% of its clamps; B on 98.6% /
+    99.5% / 100.0%.
+
+**Simultaneous clamping is mutual service, not waste.** A's hidden set is exactly `{z_B}`
+and B's is `{z_A}`. So when both clamp their own private node, each one is cutting precisely
+the confounder the OTHER cannot see, and both get clean rows in the same round. Taking turns
+would be strictly worse -- it would leave one agent's confounding intact every round.
+
+### The strongest form of the result
+
+Clamping your own private node does **nothing for you**. A's rows are clean only when `z_B`
+is clamped; A clamping `z_A` leaves A's own regime bit false and removes a variance source A
+was not confounded by. The entire benefit accrues to the partner -- an agent A cannot see,
+whose belief it has no access to, whose observations it never receives.
+
+And the agents do it essentially always, learned from a shared scalar reward alone, with no
+CTDE, no communication channel beyond the one-bit regime flag, and no term in the reward
+that names helping.
+
+That is the coordination claim in its strongest available form, and unlike the earlier
+framings it is supported by a direct measurement of what the policies do rather than
+inferred from an aggregate rate.
+
+### Two framings of mine now retracted
+
+1. **"Over-clamping is the failure mode."** Wrong. High clamp rates are the coordinated
+   solution, not a pathology. Seed 2's poor overall score (clamp 0.995, solve 0.440) is the
+   weakest of the three but is still well above greedy under the same rule.
+2. **"They should learn role differentiation / take turns."** Wrong, and it would have been
+   a worse policy. The clamp-cost sweep still in the queue was designed to discourage a
+   behaviour that turns out to be correct, so its result should be read as "what does a
+   price on the RIGHT behaviour destroy" rather than "does the price fix over-clamping".
