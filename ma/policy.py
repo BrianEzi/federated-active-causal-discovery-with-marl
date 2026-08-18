@@ -54,6 +54,17 @@ class MAPPOConfig:
     episodes_per_update: int = 16
     total_episodes: int = 4000
     step_cost: float = 0.05
+    # Extra cost charged ONLY for a clamp, on top of step_cost. Zero by default, which is
+    # what the 2026-08-17 runs used.
+    #
+    # Why it exists: those runs learned to clamp (84-96%) but not WHEN -- clamp rates on
+    # confounded and unconfounded episodes differed by +0.057/+0.036/-0.006. Seed 2 clamped
+    # 95.7% even where clamping is pointless and finished below random. A price on clamping
+    # is the minimal, non-circular way to make indiscriminate clamping costly: it does not
+    # tell the agent when to clamp, it only makes clamping-always a worse policy than
+    # clamping-when-it-pays. The rejected alternative was shaping on unresolved shared-pair
+    # ambiguity, which hand-codes the answer the experiment is meant to measure.
+    clamp_cost: float = 0.0
     seed: int = 0
 
 
@@ -138,8 +149,10 @@ class IndependentPPO:
                 # SHARED terminal reward, per-agent step cost. See the module docstring.
                 team = 1.0 if result.info["both_identified"] else 0.0
                 for name in self.names:
-                    target, _ = self.env.views[name].actions[chosen[name]]
-                    cost = cfg.step_cost if target != -1 else 0.0
+                    target, mode = self.env.views[name].actions[chosen[name]]
+                    cost = 0.0
+                    if target != -1:
+                        cost = cfg.step_cost + (cfg.clamp_cost if mode == "clamp" else 0.0)
                     buf[name]["obs"].append(observations[name])
                     buf[name]["act"].append(chosen[name])
                     buf[name]["logp"].append(logps[name])

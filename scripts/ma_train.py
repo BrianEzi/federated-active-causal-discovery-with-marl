@@ -122,6 +122,11 @@ def main():
     ap.add_argument("--n_obs", type=int, default=2000)
     ap.add_argument("--n_int", type=int, default=200)
     ap.add_argument("--budget", type=int, default=6)
+    ap.add_argument("--score_rule", default=None,
+                    help="Belief rule to TRAIN under. Defaults to MAConfig's default.")
+    ap.add_argument("--clamp_cost", type=float, default=0.0)
+    ap.add_argument("--tag", default=None,
+                    help="Checkpoint filename tag; defaults to the score rule.")
     ap.add_argument("--out", default="results/ma/train.json")
     ap.add_argument("--checkpoint_dir", default="results/ma/checkpoints",
                     help="Where to persist each seed's trained pair, so the cross-rule "
@@ -130,7 +135,11 @@ def main():
 
     topology = Topology("(1,1,3)", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
-                      budget=args.budget)
+                      budget=args.budget,
+                      **({"score_rule": args.score_rule} if args.score_rule else {}))
+    tag = args.tag or config.score_rule
+    print(f"[config] rule={config.score_rule} clamp_cost={args.clamp_cost} tag={tag}",
+          flush=True)
 
     references = {}
     for kind in ("random", "greedy"):
@@ -147,11 +156,11 @@ def main():
     per_seed = []
     for seed in args.seeds:
         t0 = time.perf_counter()
-        ppo = MAPPOConfig(total_episodes=args.train_episodes, seed=seed)
+        ppo = MAPPOConfig(total_episodes=args.train_episodes, seed=seed,
+                          clamp_cost=args.clamp_cost)
         agent = IndependentPPO(config, ppo)
         history = agent.train(verbose=True)
-        checkpoint = (Path(args.checkpoint_dir) /
-                      f"{config.score_rule}_seed{seed}.pt")
+        checkpoint = Path(args.checkpoint_dir) / f"{tag}_seed{seed}.pt"
         agent.save(checkpoint)
         evaluation = evaluate_learned(agent, config, args.eval_episodes, seed=99)
         per_seed.append({
