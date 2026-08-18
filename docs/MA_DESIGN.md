@@ -1,4 +1,38 @@
-# Two-agent design — plan of record, 2026-08-16
+# Two-agent design -- plan of record, 2026-08-16
+
+> ## AMENDED 2026-08-18 -- read this first
+>
+> Four things in this document have since been **measured and found wrong**. The design is
+> otherwise intact; these are corrections, not a rewrite. Full evidence and the audit trail
+> are in `docs/MA_BUILD_LOG.md`.
+>
+> 1. **Section 3's confounding rates are ~3x overcounts.** `ma/confounding.py` flags any pair
+>    with a hidden common *source*, a strict superset of true bidirected edges: where the pair
+>    is also ancestrally related the MAG carries a directed edge instead. True rates are
+>    **6.3% / 13.4% / 9.0%** at (1,1,2) / (1,1,3) / (2,2,2), not 22.7% / 43.8% / 43.9%. Use
+>    `ma/projection.py::bidirected_pairs`.
+>
+> 2. **Section 9's starting topology (1,1,2) was abandoned.** On the corrected rates only 13
+>    of 207 graphs give any agent a bidirected edge, always the same pair -- too rare to learn
+>    from. Work is at **(1,1,3)**.
+>
+> 3. **Section 5's `|X|^2` ancestral-order disclosure is not what enables coordination.**
+>    Measured structurally and posterior-weighted, it is worth **~0.005 bits per bit
+>    disclosed** -- a correctness guard, not an inference tool. What unlocks coordination is a
+>    single **regime bit** per round ("I clamped something you cannot see"), which moves a
+>    confounded agent from 0.000 to 0.974. My reframing of section 5 as a pruning device is
+>    retracted; the original safety-net reading was right.
+>
+> 4. **Section 4's claim that the rescue needs "no disclosure at all" is false**, for two
+>    compounding reasons. A *randomised* `do()` does not cut confounding -- it swaps one
+>    invisible common cause for another -- so interventions now have two modes, `VARY` and
+>    `CLAMP`. And even clamping rescues nothing while the agent pools clean and confounded
+>    rows, because no DAG fits a mixture. Both had to be fixed before GATE 4 would pass.
+>
+> **New result this document never anticipated:** confounding is *confined to the shared
+> set* -- no bidirected edge can touch a private node (proved, verified exhaustively). That
+> is what keeps a per-agent belief a plain DAG plus one flag per shared pair, leaving the
+> score decomposable and the subset DP reusable.
 
 Supersedes the topology sections of `docs/MULTI_AGENT_DESIGN.md` (T1/T2/T3). That document
 is kept for the reasoning that led here, including the parts now rejected.
