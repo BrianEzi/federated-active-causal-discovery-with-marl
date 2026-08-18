@@ -107,11 +107,28 @@ def _evaluate(env, config, choose, episodes, seed) -> dict:
             "clamp_fraction": float(np.mean([r["clamp_fraction"] for r in subset])),
         }
 
-    return {
+    stats = {
         "all": slice_stats(rows),
         "confounded": slice_stats([r for r in rows if r["confounded"]]),
         "unconfounded": slice_stats([r for r in rows if not r["confounded"]]),
     }
+    # UNDER-ACTING CANARY. Carried over from the single-agent work, where step costs plus a
+    # hard-to-reach terminal reward create a give-up attractor and this check fired usefully.
+    # The two-agent trainer lacked it, and the clamp_cost=0.15 run on 2026-08-18 reported
+    # "clamp_fraction 0.000" as though it were a behavioural result when both agents were in
+    # fact passing on move one -- mean_steps 0.99, entropy 0.003. A rate computed over
+    # actions that were never taken is not a rate.
+    mean_steps = stats["all"]["mean_steps"] if stats["all"] else 0.0
+    stats["canary_under_acting"] = {
+        "mean_steps": mean_steps,
+        "threshold": 1.5,
+        "ok": bool(mean_steps >= 1.5),
+        "detail": ("agents are acting" if mean_steps >= 1.5 else
+                   f"UNDER-ACTING: mean episode length {mean_steps:.2f} -- the agents are "
+                   f"passing rather than experimenting, so per-action rates below are "
+                   f"computed over almost no actions and mean nothing"),
+    }
+    return stats
 
 
 def main():
@@ -177,6 +194,9 @@ def main():
             "checkpoint": str(checkpoint),
             "history_tail": history[-10:],
         })
+        canary = evaluation["canary_under_acting"]
+        if not canary["ok"]:
+            print(f"[seed {seed}] CANARY: {canary['detail']}", flush=True)
         e = evaluation["all"]
         print(f"[seed {seed}] learned: solve {e['solve_rate']:.3f} "
               f"steps {e['mean_steps']:.2f} clamp {e['clamp_fraction']:.3f}", flush=True)
