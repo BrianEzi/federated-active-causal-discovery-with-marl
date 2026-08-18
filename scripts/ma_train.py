@@ -156,6 +156,12 @@ def main():
     per_seed = []
     for seed in args.seeds:
         t0 = time.perf_counter()
+        # CPU time as well as wall clock. On 2026-08-18 a seed reported 46188 wall seconds
+        # (12.8 hours) inside a phase whose checkpoint mtimes were 7 minutes apart -- the
+        # machine suspended and resumed, and Windows' perf_counter keeps counting through
+        # sleep. process_time excludes suspended time, so a disagreement between the two is
+        # now visible in the record rather than silently quoted as a cost.
+        c0 = time.process_time()
         ppo = MAPPOConfig(total_episodes=args.train_episodes, seed=seed,
                           clamp_cost=args.clamp_cost)
         agent = IndependentPPO(config, ppo)
@@ -166,6 +172,7 @@ def main():
         per_seed.append({
             "seed": seed,
             "train_seconds": time.perf_counter() - t0,
+            "train_cpu_seconds": time.process_time() - c0,
             "eval": evaluation,
             "checkpoint": str(checkpoint),
             "history_tail": history[-10:],

@@ -476,3 +476,20 @@ differentiation is being learned and the coordination claim is weaker than I hav
 The clamp-cost sweep in tonight's queue is still worth running -- it is the minimal
 non-circular pressure against wasted rounds -- but this diagnostic is what will say whether
 the cost is even addressing the right failure.
+
+## Timing anomaly, diagnosed
+
+`train_subset.json` reports per-seed training times of 428s, 403s and **46188s** -- the last
+being 12.8 hours inside a phase that took about 20 minutes end to end. The checkpoint mtimes
+settle it: 07:57:10, 08:03:58, 08:10:36, i.e. ~7 minutes per seed, all three consistent.
+
+Cause: the machine suspended and resumed, and Windows' `perf_counter` keeps counting through
+sleep. `ma_train.py` now records `train_cpu_seconds` from `process_time` alongside the wall
+clock, so the two disagreeing is visible in the record instead of a suspended laptop being
+quoted as a compute cost.
+
+**Consequence I should act on rather than just note:** my "~40 minutes per seed" estimate,
+which is why I cut the queue from 16 runs to 6, was wrong. It counted the reference
+evaluations (random and greedy over 400 episodes) as if they were training. Actual training
+is ~7 minutes per seed. The scope cut was made on a bad measurement, and once the current
+queue finishes there is room to put the dropped phases back.
