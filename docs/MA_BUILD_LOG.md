@@ -669,3 +669,86 @@ it: an agent cannot tell whether its PARTNER is confounded -- that fact lives en
 partner's window. Clamping unconditionally may simply be the optimal policy available to an
 agent with no way to know when it is needed. If so, "learned to clamp but not when" was
 never a fair criticism, because "when" is not observable from where the agent stands.
+
+---
+
+# Final overnight results, 2026-08-19
+
+## Ten seeds at the default setting
+
+    seed    all    conf   clamp  steps
+       0  0.497   0.279   0.879   5.07
+       1  0.495   0.197   0.870   5.16
+       2  0.407   0.262   0.894   5.18
+       3  0.328   0.197   0.653   4.87
+       4  0.225   0.164   0.975   5.71
+       5  0.215   0.098   0.960   5.59
+       6  0.297   0.246   0.976   5.44
+       7  0.005   0.000   0.000   0.99   <- CANARY FIRED (under-acting)
+       8  0.182   0.082   0.984   5.70
+       9  0.405   0.164   0.702   4.70
+
+    all episodes: median 0.312, mean 0.306, sd 0.154
+    confounded:   median 0.180, mean 0.169, sd 0.088
+    confounded beats greedy (0.000) in 9/10 seeds and random (0.049) in 9/10
+
+**The headline, at n=10 rather than n=3:** confounded solve rate median **0.180** against
+greedy **0.000** and random **0.049**. This is the claim that survives everything measured
+tonight.
+
+**Instability is real and quantified.** One seed in ten (seed 7) collapses into passing
+immediately -- solve 0.005, mean episode length 0.99 -- with no clamp cost applied at all.
+The under-acting canary added earlier tonight caught it automatically, which is the whole
+point of adding it. The three-seed spread I could not interpret on 2026-08-17 was not
+mysterious: this training is bimodal, mostly landing near 0.2-0.5 with an occasional total
+collapse.
+
+## The full cross-rule matrix
+
+    CONFOUNDED       scored under:   subset   joint_conf     n
+    random                            0.016      0.049       1
+    greedy                            0.000      0.000       1
+    subset-trained                    0.000      0.000       3
+    joint_conf-trained                0.000      0.180      10
+    jc + clamp cost 0.05              0.000      0.148       3
+    jc + clamp cost 0.15              0.000      0.000       3
+
+    ALL              scored under:   subset   joint_conf
+    random                            0.370      0.268
+    greedy                            0.542      0.190
+    subset-trained                    0.290      0.113
+    joint_conf-trained                0.022      0.312
+    jc + clamp cost 0.05              0.025      0.247
+    jc + clamp cost 0.15              0.020      0.005
+
+Every joint_conf-trained policy scores **0.000 confounded and ~0.02 overall** under SUBSET --
+far below random's 0.370. The co-adaptation finding from the 3-seed matrix holds at 10 seeds
+and is if anything stronger.
+
+## Role structure, all 19 policies
+
+    group              n   clampA  clampB  P(both)    diff   solve
+    joint_conf        10    0.862   0.898    0.729  -0.002   0.317
+    jc+cost 0.05       3    0.989   0.603    0.603  -0.004   0.253
+    jc+cost 0.15       3    0.000   0.000    0.000  +0.000   0.007
+    subset-trained     3    0.025   0.000    0.000  +0.000   0.290
+
+Differentiation is ~0 or negative everywhere: no turn-taking, as established, because
+simultaneous mutual clamping is the better structure.
+
+Note `jc+cost 0.05` broke the symmetry -- A clamps 0.989, B only 0.603. A modest price
+produced an ASYMMETRIC equilibrium where one agent bears more of the altruistic cost. With
+n=3 that is a suggestion rather than a finding, but it is the only sign all night of the two
+agents adopting distinct roles, and it appeared exactly where clamping was made costly. Worth
+a targeted run.
+
+## What I would do next
+
+1. **The instability is the biggest threat to the result.** 1-in-10 total collapse, and an
+   sd of 0.154 on a median of 0.312. Entropy regularisation or a warmup that delays the step
+   cost are the obvious candidates. Nothing else should be tuned until this is understood.
+2. **Chase the asymmetric equilibrium at clamp cost 0.05** with more seeds. If a small price
+   reliably produces role specialisation, that is a genuinely new result rather than a tax.
+3. **Do NOT pursue selectivity further.** Three separate attempts tonight say clamping is
+   near-universally correct here, and an agent cannot observe whether its partner is
+   confounded, so "clamp only when needed" may be unattainable in principle in this setup.
