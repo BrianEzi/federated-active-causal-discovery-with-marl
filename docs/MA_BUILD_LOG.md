@@ -642,3 +642,30 @@ informative point: it distinguishes "any price destroys it" from "there is a pri
 clamping becomes selective". Registering the expectation before it runs -- I expect partial
 degradation rather than collapse, because 0.05 doubles the cost of a clamped action rather
 than quadrupling it, but after two wrong framings tonight I hold that loosely.
+
+## Clamp-cost dose-response: no price produces selectivity
+
+    clamp_cost   solve (median)   confounded      clamp rate   mean steps
+       0.00           0.495       0.20-0.28        ~0.89          5.1
+       0.05           0.247       0.08-0.25        0.79-0.99      5.3     canary OK
+       0.15           0.007       0.000            0.000          1.0     total inaction
+
+My registered expectation for 0.05 was "partial degradation rather than collapse", and that
+is what happened -- but the interesting part is WHICH thing degraded. The clamp rate barely
+moves (0.89 -> ~0.90). What falls is the solve rate, roughly by half.
+
+So the price does not make clamping selective. It taxes a behaviour the agents keep doing
+anyway, because clamping remains individually correct under this belief model, and the tax
+comes straight out of the score. Then somewhere between 0.05 and 0.15 the arithmetic flips
+and the whole episode stops being worth attempting, giving the passing collapse.
+
+**There is no intermediate regime where clamping becomes discriminating.** That is the
+substantive finding, and it closes the "attack over-clamping" line rather than advancing it:
+over-clamping was never the problem (see the mutual-service result above), so pricing it can
+only destroy value. Recorded as a null with the mechanism, not filed away.
+
+The remaining honest question about selectivity is different, and this sweep cannot answer
+it: an agent cannot tell whether its PARTNER is confounded -- that fact lives entirely in the
+partner's window. Clamping unconditionally may simply be the optimal policy available to an
+agent with no way to know when it is needed. If so, "learned to clamp but not when" was
+never a fair criticism, because "when" is not observable from where the agent stands.
