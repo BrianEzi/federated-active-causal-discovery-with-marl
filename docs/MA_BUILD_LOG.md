@@ -752,3 +752,69 @@ a targeted run.
 3. **Do NOT pursue selectivity further.** Three separate attempts tonight say clamping is
    near-universally correct here, and an agent cannot observe whether its partner is
    confounded, so "clamp only when needed" may be unattainable in principle in this setup.
+
+## 2026-08-19 -- PHASE 0 and PHASE 1 complete
+
+### Phase 0: reference frozen
+
+`scripts/ma_freeze_reference.py` -> `tests/fixtures/ma_reference_posteriors.npz`
+(100 episodes, 4 rounds, both agents, all four rules, 14.2 MB).
+
+Stores the belief INPUTS (samples, known, clean) as well as the 543-vector outputs. A
+fixture holding only posteriors would let a Phase 1 bug hide behind a differently-sampled
+dataset.
+
+Actions are a seeded UNIFORM policy, not greedy. Greedy never clamps (measured today,
+clamp_fraction 0.000), so a greedy-driven fixture would contain zero clean rows and would
+exercise exactly one branch of the four rules.
+
+[GATE PASSED] Two independent captures are bit-identical (sha256 fc47a423b76c24d6).
+
+### Phase 1: the DP belief
+
+`ma/belief_dp.py` + `tests/ma/test_belief_dp.py`. 10 tests, all passing.
+
+[GATE PASSED] Edge marginals AND true-DAG probability match the frozen enumerated fixture
+to < 1e-10 for pooled, subset and joint.
+[GATE PASSED] k=10 window completes -- 4.2e18 DAGs, where enumeration is not slow but
+impossible. The DP has bought what it was chosen for.
+[GATE PASSED] Confinement asserted, not assumed.
+
+[CORRECTED, and it is a wart in the OLD code, not the DP] **joint_conf was never modular.**
+`RegimeScorer._dirty_parents` orients each confounding edge "along the DAG's topological
+order", but a DAG has many topological orders and `_topological_order` picks one by an
+arbitrary tie-break (lowest available index). For two shared nodes INCOMPARABLE in the DAG
+the orientation is therefore decided by node numbering, and the two orientations score
+differently under BGe. So the hypothesis being scored depended on an implementation detail.
+
+That is also exactly what breaks modularity: node v's dirty parent set depends on the DAG's
+global order rather than on v's own parents, so no per-(node, parent-set) table expresses it.
+
+[DECIDED] Reformulated: make the orientation part of the hypothesis and marginalise it out.
+A hypothesis is (DAG H, set P of ORDERED pairs declared confounding), P's edges required
+present in H; clean regime scores H minus P, dirty regime scores H. Modular for fixed P, so
+3^(pairs) DP passes. Gains: acyclicity free (the DP only emits DAGs), no arbitrary
+tie-break, confinement preserved. Cost 3^pairs vs 2^pairs -- 27 vs 8 at |X|=3.
+
+Consequence: the Phase 1 gate SPLITS. pooled/subset/joint held to 1e-10; joint_conf cannot
+be, because it is deliberately a different hypothesis space. Checked for internal
+consistency instead, and to be compared to the old rule by MEASUREMENT, not identity.
+
+[MEASURED] Only 25 of the 27 assignments are usable. The three shared pairs of |X|=3 form a
+triangle and its 2 cyclic orientations admit no acyclic completion. Left in, they make the
+DP's alternating inclusion-exclusion cancel to an exactly zero partition function -- which
+is how they were found, via FloatingPointError rather than a wrong number.
+
+[CORRECTED, mine] First run of the gate failed at 9.5e-01 on the true-DAG probability. My
+bug: `DPPosterior.log_prob_dag`'s third argument is `log_z`, not `k`. Passing k=4 subtracts
+a constant instead of normalising, and produces a plausible-looking probability rather than
+an obvious error. Fixed and commented at the call site.
+
+### Still open before Phase 2
+
+- The joint_conf old-vs-new comparison is a MEASUREMENT that has not been run yet. Until it
+  is, no claim about which rule is better under the new formulation.
+- Regime bit still needs Mirco's ruling (draft written 2026-08-19).
+- User direction: test WITH and WITHOUT the regime bit, running the with-bit arm first, on
+  the view that the bit is necessary for coordination to work at all. The without-bit arm is
+  then the control that quantifies exactly what the bit buys.
