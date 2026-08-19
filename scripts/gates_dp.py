@@ -39,7 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--d", type=int, default=7)
     parser.add_argument("--n_obs", type=int, default=20000)
     parser.add_argument("--n_int", type=int, default=100)
-    parser.add_argument("--budget", type=int, default=10)
+    # GATE 2 asks whether CHOICES matter, so it must run where choice quality still
+    # affects the outcome. Discrimination peaks at budget 2-3 and is gone by 16.
+    parser.add_argument("--budget", type=int, default=3)
     parser.add_argument("--prior_p", type=float, default=0.5)
     parser.add_argument("--threshold", type=float, default=0.7)
     parser.add_argument("--episodes", type=int, default=300)

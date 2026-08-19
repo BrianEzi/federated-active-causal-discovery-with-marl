@@ -43,7 +43,14 @@ class EnvConfig:
     # rate at ~14% against a theoretical target of 16%.
     n_obs: int = 1000
     n_int: int = 100           # samples drawn per intervention
-    budget: int = 10           # maximum interventions per episode
+    # Maximum interventions per episode. Lowered 10 -> 5 on 2026-08-19, and the reason is
+    # a measurement rather than a preference: the greedy-vs-random gap is ENTIRELY a
+    # budget-scarcity phenomenon. At d=5/n_obs=20000 it is +0.390 at budget 2, +0.180 at
+    # 4, +0.015 at 8, and 0.000 by 16 -- both arms sit at 0.99. Budget 10 is past the point
+    # where choice quality affects the outcome at all, which is why every earlier sweep
+    # found budget to be a null and why GATE 2 would pass trivially there.
+    # Gates run tighter still, at 2-3, where discrimination peaks. See results/budget/.
+    budget: int = 5
     # Chosen to sit safely above every Markov-equivalence tie cap. A class of size k caps
     # each member at 1/k, so a size-2 class reaches exactly 0.5 -- a 0.5 threshold could
     # therefore declare an unbroken tie "identified". 0.7 cannot be reached while any tie

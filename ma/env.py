@@ -60,7 +60,10 @@ class MAConfig:
     topology: Topology
     n_obs: int = 2000
     n_int: int = 200
-    budget: int = 8               # PER AGENT -- separate budgets, not a shared pool
+    # PER AGENT -- separate budgets, not a shared pool. Lowered 8 -> 5 on 2026-08-19 to
+    # match the single-agent operating point, for the same measured reason: above ~8 the
+    # budget stops binding and every arm converges, so the comparison measures nothing.
+    budget: int = 5
     identify_threshold: float = 0.7
     prior_p: float = 0.5
     intervene_scale: float = 2.0     # used by VARY; CLAMP always uses 0.0
