@@ -2166,3 +2166,69 @@ Note also that a long horizon does not by itself create planning value: separate
 components require separate interventions but do not interact, so their order is irrelevant
 and greedy is optimal over them. Planning value lives only WITHIN one chain component, which
 is the ceil(log2 omega) term and smaller still.
+
+## 2026-08-19 -- the uncertainty decomposition, built and validated
+
+Replaces the retracted skeleton/orientation measures. Observational data identifies a DAG
+only up to its Markov equivalence class, so partition graph space by class and apply the
+chain rule:
+
+    H(G) = H(E) + H(G|E)      H(E) = which class (observation reduces this)
+                              H(G|E) = which member (ONLY interventions reduce this)
+
+`sa/uncertainty.py`, tested in `tests/test_uncertainty.py` (8 tests, all passing).
+
+[MEASURED] **Correctness.** The chain-rule residual is ~1e-15, and `h_within` is computed
+directly rather than by subtraction so the agreement is a real check. Independently, score
+equivalence predicts a closed form for step 0, H(G|E) = SUM_c p_c log2|c|, which the
+implementation reproduces to 1e-6. The mirror test also passes: that closed form must STOP
+holding once an intervention lands, and it does.
+
+[MEASURED] **U1 -- the split separates what it claims to separate.** Step-0 values, averaged
+over 150 episodes:
+
+    d   n_obs      H(G)    H(E)   H(G|E)
+    4     200     3.400   1.477    1.923
+    4    1000     2.776   0.824    1.952
+    4   20000     2.404   0.302    2.101
+    5     200     4.828   2.759    2.068
+    5    1000     3.667   1.496    2.171
+    5   20000     2.742   0.505    2.237
+
+A hundredfold increase in observational data cuts H(E) by 5x and leaves H(G|E) **flat** (it
+drifts slightly UP, because as mass concentrates on the true class the average of log|c| is
+taken over that class rather than over all of them). This is the clean version of the claim
+the retracted metric was reaching for, and it is exactly the behaviour the theory demands.
+
+[MEASURED] **U2 -- it ranks policies, but only per intervention.**
+
+    d   policy            start   removed   per-intervention   interventions
+    4   greedy_oracle     1.970     1.898        1.289             1.67
+    4   random            1.970     1.908        0.941             2.46
+    4   no_intervention   1.970     0.000        0.000             0.93
+    5   greedy_oracle     2.086     2.003        1.196             2.03
+    5   random            2.086     2.004        0.788             3.31
+
+Total bits removed does NOT discriminate -- greedy and random both end up removing ~1.9-2.0
+bits, because both eventually solve the episode. Bits removed PER INTERVENTION separates
+them cleanly (1.29 vs 0.94 at d=4; 1.20 vs 0.79 at d=5). So the useful statistic is the
+efficiency, not the total, and reporting the total would have shown nothing.
+
+The no-intervention control removes exactly 0.000 addressable bits, as it must.
+
+[MEASURED] **U3 -- weak, and the weakness is itself the finding.** Correlation between
+addressable bits at step 0 and interventions used is only +0.34 (d=4) and +0.21 (d=5).
+
+The reason is quantitative and matters: addressable uncertainty varies more than tenfold
+across episodes (0.05 to 4.51 bits at d=4) while interventions needed barely varies at all
+(1.67 on average, mostly one or two). **A single intervention removes roughly 1.2-1.3 bits,
+which is most of a typical episode's entire addressable budget.** That is the same fact the
+ceil(log2 d) horizon argument states combinatorially, now measured in bits: experiments here
+are enormously informative relative to the size of the task, so there is nothing left to
+sequence.
+
+[DECIDED] The decomposition is adopted. It is baseline-free -- no oracle appears anywhere in
+its definition -- which matters given the d=7 oracle was found to be degraded, and every
+score defined against that oracle inherited the problem. It also gives the graded version of
+GATE 1 that was missing: "how many bits of intervention-addressable uncertainty does this
+environment contain" rather than the binary "is intervention ever necessary".
