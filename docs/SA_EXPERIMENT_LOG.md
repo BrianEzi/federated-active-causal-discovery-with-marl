@@ -2286,3 +2286,33 @@ sharper rather than messier:
 So clamping is not merely an action whose benefit lands elsewhere -- it costs the clamping
 agent real experimental power. That is what makes the learned clamping behaviour a genuine
 sacrifice rather than a free gift.
+
+## 2026-08-19 -- two-agent redo: rulings and one falsified hypothesis
+
+[DECIDED, user] Interventions are hard, with the value drawn from N(0, sigma^2). "Atomic
+only" was clarified to mean "hard only, no soft interventions" -- which the randomised value
+satisfies. Both VARY and CLAMP survive.
+
+[DECIDED, user] Per-agent belief moves from exact 543-DAG enumeration to the subset DP.
+Exact, O(k 2^k), scales to windows of k ~ 15-20. Federation keeps the window small even as
+the world grows, so this is the right axis.
+
+[CORRECTED] I predicted the SUBSET-rule valley would vanish at n_obs=100, reasoning it came
+from discarding thousands of observational rows. WRONG, and in the wrong direction: the
+valley DEEPENS, from -0.094 at n_obs=2000 to -0.432 at n_obs=100.
+
+  300 episodes, n_obs=100, n_int=100, (1,1,3). Unconfounded identification vs p(clamp):
+    pooled      0.790 0.775 0.786 0.815   no valley   confounded payoff +0.138
+    subset      0.790 0.358 0.624 0.900   VALLEY      confounded payoff +0.828
+    joint       0.790 0.834 0.849 0.849   no valley   confounded payoff +0.103
+    joint_conf  0.221 0.723 0.875 0.945   no valley   confounded payoff +0.621
+
+  The valley is not caused by discarding rows. It is caused by the clean SUBSET being small
+  and noisy at low clamp probability. Lowering n_obs makes every rule data-poorer, so the
+  clean subset gets relatively worse. My causal story was backwards.
+
+[DECIDED] JOINT_CONF is retained -- the only rule that is both valley-free and pays off
+under confounding. Its p=0 deficit (0.221 vs 0.790) is deliberate: with no clean data an
+agent genuinely cannot separate a confounded pair from a directed edge.
+
+Raw: results/ma/regime_scoring_nobs100.json. Statement: docs/MA_PROBLEM_STATEMENT.md.
