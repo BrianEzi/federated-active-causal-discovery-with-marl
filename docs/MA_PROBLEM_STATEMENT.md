@@ -186,11 +186,20 @@ dominated; the shared scalar is the minimum that makes cooperation rational.
 
 Three conditions, all required:
 
-1. **Private recovery** — each agent recovers its own private substructure as a DAG.
-2. **Shared recovery** — each agent recovers the shared structure to **CPDAG** resolution
-   (orientation within an equivalence class is not required where it is not identifiable).
+1. **Private recovery** — each agent recovers, to **full DAG orientation**, every edge
+   *involving* one of its private variables. That means both private–private edges and the
+   **boundary edges between its private nodes and the shared set**. These are identifiable
+   without help precisely because the agent holds intervention authority over its own
+   private nodes.
+2. **Shared recovery** — each agent recovers the shared–shared structure to **CPDAG**
+   resolution. Only these edges are relaxed, because only these may require the partner.
 3. **Global consistency** — the union of the two agents' recovered structures resolves to
-   the true global graph.
+   the true global graph, and is acyclic.
+
+The split *is* the federation claim: **each agent is self-sufficient inside its own region,
+and the shared boundary is the only place coordination is required.** Part 1 is therefore
+non-vacuous at `(1,1,3)` — each agent has one private node with **3 boundary edges** to the
+shared set, and every one of them must be correctly oriented.
 
 Condition 3 is a real constraint, not a formality: two locally-correct agents that agree
 edge-for-edge on `X` can still union into a **cyclic** graph. Acyclicity of the union is

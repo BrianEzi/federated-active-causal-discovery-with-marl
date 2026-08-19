@@ -186,7 +186,12 @@ first, and that is the honest scaling statement to put in the thesis.
 ## Open items not on the critical path
 
 - **`n_obs` and `n_int` sweeps** **[U6]** — parallel to phases 3–4, no dependency.
-- **Budget** — the sweep running now; feeds the Phase 3 gate design.
+- **Budget — SETTLED [U, 2026-08-19]: train at 8–10.** The two gates want opposite
+  budgets: GATE 2 (discrimination) peaks at 2–3 and is dead by 16, while GATE 3
+  (coordination) cannot register anything below 5 because a confounded episode needs an
+  agent to spend moves clamping for its partner AND moves experimenting on itself. Training
+  follows GATE 3, because coordination is the thesis and discrimination is already
+  established single-agent. Both are reported.
 - **The regime bit needs Mirco's ruling** **[U13]**. It is load-bearing for Phase 2's
   disclosure protocol, so if he rejects it the design changes at Phase 2, not later. Draft
   email written 2026-08-19.

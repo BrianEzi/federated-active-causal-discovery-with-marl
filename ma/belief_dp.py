@@ -82,6 +82,15 @@ RULES = (POOLED, SUBSET, JOINT, JOINT_CONF)
 NEG_INF = -np.inf
 
 
+def _log_sum_exp(values: np.ndarray) -> float:
+    values = np.asarray(values, dtype=float)
+    finite = values[np.isfinite(values)]
+    if len(finite) == 0:
+        return NEG_INF
+    top = finite.max()
+    return float(top + np.log(np.exp(finite - top).sum()))
+
+
 class WindowBeliefDP:
     """Exact belief over one agent's window, without enumerating DAGs.
 
@@ -278,27 +287,67 @@ class WindowBeliefDP:
         log_zs: List[float] = []
         log_ps: List[float] = []
         for assignment in self.assignments:
-            # An assignment REQUIRES its edges to be present, so a DAG lacking one of them
-            # simply has no mass under that assignment -- not an error, a zero.
-            required_present = all(
-                adjacency[u, v] for edge in assignment if edge is not None
-                for u, v in (edge,))
+            # THE CAUSAL ANSWER IS H MINUS THE CONFOUNDING EDGES, NOT H.
+            #
+            # In this formulation a hypothesis is (DAG H, ordered set P declared
+            # confounding), where P's edges must be PRESENT in H and are stripped again
+            # for the clean regime. So H is the augmented structure and the causal claim
+            # is `H \ P`. Asking for P(H == truth) therefore asks the wrong question: a
+            # confounded pair is not a real edge, so the true DAG contains none of P's
+            # edges and picks up mass ONLY under the empty assignment -- exactly the
+            # hypothesis that refuses to model the confounding.
+            #
+            # Measured consequence before this fix: on confounded episodes the affected
+            # agent's true mass was EXACTLY 0.000 at every budget, which read as a failure
+            # of coordination (GATE 3) when it was a failure of bookkeeping.
+            candidate = adjacency.copy()
+            cyclic = False
+            for edge in assignment:
+                if edge is None:
+                    continue
+                u, v = edge
+                if candidate[v, u]:            # reversing an existing edge -> cycle
+                    cyclic = True
+                    break
+                candidate[u, v] = True
             log_w = self._assignment_weights(clean_table, dirty_table, assignment)
             if not np.isfinite(log_w).any():
                 continue
-            log_z = float(self.dp.log_partition(log_w))
-            log_zs.append(log_z)
-            log_ps.append(float(self.dp.log_prob_dag(log_w, adjacency, log_z))
-                          if required_present else NEG_INF)
+            log_zs.append(float(self.dp.log_partition(log_w)))
+            # UNNORMALISED weight of the candidate, not its per-assignment probability.
+            #
+            # Combining per-assignment probabilities and then reweighting by Z means
+            # dividing by each Z and multiplying it straight back, which throws away
+            # precision and -- worse -- trusts every individual Z. The signed sink
+            # recurrence is least reliable exactly on the heavily masked tables an
+            # assignment produces, and a single underestimated Z makes log_prob_dag come
+            # out POSITIVE. Measured before this fix: "probabilities" of 1e131.
+            #
+            # Ratio of sums, computed once in log space, needs only the TOTAL of the Zs.
+            log_ps.append(NEG_INF if cyclic
+                          else self._log_dag_weight(log_w, candidate))
 
         if not log_zs:
             return 0.0
-        log_zs_arr = np.asarray(log_zs)
-        shift = log_zs_arr.max()
-        weights = np.exp(log_zs_arr - shift)
-        weights /= weights.sum()
-        probs = np.exp(np.asarray(log_ps))
-        return float(np.dot(weights, probs))
+        numerator = _log_sum_exp(np.asarray(log_ps))
+        denominator = _log_sum_exp(np.asarray(log_zs))
+        if not np.isfinite(denominator) or not np.isfinite(numerator):
+            return 0.0
+        return float(np.exp(min(numerator - denominator, 0.0)))
+
+    def _log_dag_weight(self, log_w: np.ndarray, adjacency: np.ndarray) -> float:
+        """Unnormalised log weight of one DAG under a weight table."""
+        total = 0.0
+        for node in range(self.k):
+            mask = int(np.dot(adjacency[:, node], 1 << np.arange(self.k)))
+            index = self.dp._mask_to_index[node, mask]
+            if index < 0:
+                return NEG_INF
+            value = log_w[node, index]
+            if not np.isfinite(value):
+                return NEG_INF
+            total += float(value)
+        return total
 
     # -- diagnostics --------------------------------------------------------------------
 
