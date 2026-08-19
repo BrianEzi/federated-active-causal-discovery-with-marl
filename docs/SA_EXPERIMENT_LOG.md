@@ -2121,3 +2121,48 @@ unaffected -- they use the enumerated oracle, not the sampler.
 Not yet known: whether a well-mixed oracle actually SOLVES episodes faster, or only scores
 higher on its own criterion. Fixing the settings and re-running the d=7 references is the
 first thing to do.
+
+## 2026-08-19 -- the planning ceiling, measured
+
+[MEASURED] Two-step lookahead against the myopic oracle, paired on identical episodes, 300
+episodes each.
+
+    d    one-step   two-step   saving          MEC>=4 subset      >=3-step subset (BIASED)
+    4      1.627      1.523    +0.103 [-0.011,+0.218]  +0.087 (n=161)   +1.591 (n=22)
+    5      1.893      1.830    +0.063 [-0.035,+0.161]  +0.090 (n=177)   +0.740 (n=50)
+
+**Planning value is not detectable.** Both confidence intervals include zero. Conditioning
+on a property fixed before either policy moves -- the true graph's Markov equivalence class
+size -- the saving is +0.09 interventions, essentially nothing.
+
+[CORRECTED] The large savings on ">=3-step episodes" (+1.59, +0.74) are **biased and should
+not be quoted**. Selecting episodes where the ONE-STEP arm took three or more moves
+conditions on that arm having done badly, so regression to the mean inflates the apparent
+two-step gain. The unbiased conditioning on MEC size gives +0.09, not +1.59. I nearly
+reported the biased figure as the headline.
+
+[CORRECTED] Two implementation bugs preceded these numbers, both caught because the result
+was structurally impossible -- a deeper search cannot be worse than a shallower one under
+the same model:
+
+  1. **Wrong objective.** Maximised EIG(v) + E[max_w EIG(w)], i.e. total information over two
+     steps. That is bounded by current entropy, so identifying now and deferring score
+     alike, and the argmax could prefer to defer. Result: two-step 4.53 vs one-step 1.60 at
+     d=4. Information is not the goal; finishing is.
+  2. **Deterministic termination.** Treated max(belief) >= threshold as certain termination.
+     The environment ends when mass on the TRUE graph passes the threshold, which no policy
+     can see; a belief concentrated at 0.8 ends the episode only 80% of the time. Treating
+     it as certain let the deeper search concentrate mass onto wrong graphs. Result:
+     two-step 2.17 vs one-step 1.89 at d=5, significantly WORSE.
+
+[DECIDED] Together with the theoretical argument -- interventions needed scales as
+ceil(log2 d) even in the worst case (a complete graph, no v-structures, chain component
+= the whole graph), while exact inference dies around d ~ 15-20 -- the conclusion is that
+**the single-agent design cannot pose a planning problem at any d we can compute exactly**.
+The parity result at d=7 is not a failure of the agent. It is the only outcome the design
+admitted.
+
+Note also that a long horizon does not by itself create planning value: separate chain
+components require separate interventions but do not interact, so their order is irrelevant
+and greedy is optimal over them. Planning value lives only WITHIN one chain component, which
+is the ceil(log2 omega) term and smaller still.

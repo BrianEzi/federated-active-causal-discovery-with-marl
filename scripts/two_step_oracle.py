@@ -130,16 +130,19 @@ class TwoStepOracle:
 
 
 def run(policy, env, cfg, episodes, seed):
-    lens, solved = [], 0
+    lens, solved, mec = [], 0, []
     for ep in range(episodes):
         r = env.reset(seed=seed * 10_000 + ep)
         if hasattr(policy, "reset"):
             policy.reset(seed=seed * 977 + ep)
+        # A property of the TRUE graph, fixed before either policy acts. Used for
+        # conditioning instead of episode length -- see the note in main().
+        mec.append(int(r.info["mec_size"]))
         n = 0
         while not r.done and n < cfg.budget:
             r = env.step(policy(env, r)); n += 1
         lens.append(n); solved += bool(r.identified)
-    return np.array(lens), solved / episodes
+    return np.array(lens), solved / episodes, np.array(mec)
 
 
 def main():
@@ -160,27 +163,38 @@ def main():
         two = TwoStepOracle(backend.space, threshold=cfg.identify_threshold, seed=0)
 
         t0 = time.perf_counter()
-        l1, s1 = run(one, env, cfg, args.episodes, seed=1)
-        l2, s2 = run(two, env, cfg, args.episodes, seed=1)
+        l1, s1, mec = run(one, env, cfg, args.episodes, seed=1)
+        l2, s2, _ = run(two, env, cfg, args.episodes, seed=1)
         # Paired comparison: identical episodes, so the difference is per-episode.
         diff = l1 - l2
         se = diff.std(ddof=1) / np.sqrt(len(diff))
+        # CONDITIONING MATTERS. Selecting episodes where the ONE-STEP arm took >=3 moves
+        # conditions on that arm doing badly, so regression to the mean inflates the
+        # apparent two-step gain. Reported, but flagged as biased. The honest conditioning
+        # uses a property of the true graph fixed before either policy moves: the size of
+        # its Markov equivalence class, which is what determines how much orientation work
+        # is left after observation.
         deep = l1 >= 3
+        big_mec = mec >= 4
         row = {
             "d": d, "episodes": args.episodes,
             "one_step_mean": float(l1.mean()), "two_step_mean": float(l2.mean()),
             "one_step_solved": s1, "two_step_solved": s2,
             "mean_saving": float(diff.mean()), "se": float(se),
             "ci": [float(diff.mean() - 1.96 * se), float(diff.mean() + 1.96 * se)],
-            "saving_on_long_episodes": float(diff[deep].mean()) if deep.any() else None,
+            "saving_on_long_episodes_BIASED": float(diff[deep].mean()) if deep.any() else None,
             "n_long_episodes": int(deep.sum()),
+            "saving_on_large_mec": float(diff[big_mec].mean()) if big_mec.any() else None,
+            "n_large_mec": int(big_mec.sum()),
+            "mean_mec_size": float(mec.mean()),
             "seconds": time.perf_counter() - t0,
         }
         rows.append(row)
         print(f"d={d}: one-step {l1.mean():.3f}  two-step {l2.mean():.3f}  "
               f"saving {diff.mean():+.3f} [{row['ci'][0]:+.3f}, {row['ci'][1]:+.3f}]  "
-              f"(on >=3-step episodes: {row['saving_on_long_episodes']}, "
-              f"n={row['n_long_episodes']})  [{row['seconds']:.0f}s]", flush=True)
+              f"| MEC>=4: {row['saving_on_large_mec']} (n={row['n_large_mec']}) "
+              f"| >=3-step [biased]: {row['saving_on_long_episodes_BIASED']} "
+              f"(n={row['n_long_episodes']})  [{row['seconds']:.0f}s]", flush=True)
 
     out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"args": vars(args), "rows": rows}, indent=2))
