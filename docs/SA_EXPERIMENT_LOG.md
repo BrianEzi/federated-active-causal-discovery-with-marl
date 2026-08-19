@@ -2316,3 +2316,41 @@ under confounding. Its p=0 deficit (0.221 vs 0.790) is deliberate: with no clean
 agent genuinely cannot separate a confounded pair from a directed edge.
 
 Raw: results/ma/regime_scoring_nobs100.json. Statement: docs/MA_PROBLEM_STATEMENT.md.
+
+## 2026-08-19 -- budget sweep, greedy vs random, SA and MA (200 episodes/arm)
+
+[CORRECTED] "Budget is largely a metric artifact and must not be read as a lever" was the
+right measurement with the wrong interpretation. The greedy-vs-random gap is ENTIRELY a
+budget-scarcity effect, and budget 10-40 sits inside the flat region where nothing matters.
+
+  greedy minus random, solve rate:
+    d=5 n_obs=20000   +0.390 @b2   +0.180 @b4   +0.015 @b8   +0.005 @b16
+    d=5 n_obs=100     +0.290 @b2   +0.245 @b4   +0.035 @b8   +0.005 @b16
+    d=7 n_obs=20000   +0.500 @b2   +0.365 @b4   +0.100 @b8    0.000 @b16
+
+[DECIDED] Operating point moved: default budget 10 -> 5, MA per-agent 8 -> 5, gates now run
+at 2-3 where discrimination peaks. At budget 10 GATE 2 would pass trivially with both arms
+at 0.99 -- it would have measured nothing.
+
+[MEASURED] Greedy has an IRREDUCIBLE FAILURE SET. At d=7 n_obs=100 the curves cross: greedy
+0.530 vs random 0.235 at budget 3, but greedy plateaus at 0.905 while random climbs to
+0.960. ~9% of episodes are never solved by the myopic oracle at ANY budget. More budget does
+not fix it, so it is a failure of myopia, not of sample size. This is the clearest headroom
+above greedy found so far, and it is a better target than the two-step planning gain
+(+0.103 / +0.063, CIs spanning zero).
+
+[MEASURED] Dimension buys more headroom than data scarcity. At budget 8, d=5 -> d=7 keeps a
+gap of 0.100; n_obs 20000 -> 100 at d=5 leaves only 0.035. Grow the graph, do not starve it.
+
+[MEASURED] The greedy oracle NEVER clamps -- 0.000 at both n_obs settings. Correct behaviour
+for a one-step objective (clamping is strictly worse for your own next-step gain), and it is
+fatal: greedy solves 0.190 overall from budget 3 onward and EXACTLY 0.000 on confounded
+episodes at every budget. Random (clamps ~0.50 by construction) reaches 0.755 / 0.444.
+
+[CORRECTED] This sweep CANNOT answer whether budget tightness suppresses clamping the way a
+clamp price does -- a flaw in my design, not in the result. Neither baseline's clamp rate is
+behavioural: random's is ~0.50 by construction, greedy's is 0.00 by objective, and both are
+constant across every budget and both n_obs. Only a learned policy can respond to budget
+pressure. Question stays open until Phase 5.
+
+Raw: results/budget/budget_sweep.json. Report: results/budget/budget_report.html.
