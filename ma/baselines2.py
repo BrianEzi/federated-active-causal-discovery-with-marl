@@ -79,14 +79,19 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
     space = _Window.get(window.k)
     clean = np.asarray(clean, dtype=bool)
 
-    def per_dag(table: np.ndarray, extra_parents=None) -> np.ndarray:
+    def per_dag(table: np.ndarray, strip=None) -> np.ndarray:
+        """Total log score of every DAG under one local-score table.
+
+        `strip[node]` names parents to REMOVE before the lookup -- the confounding edges,
+        which belong to the dirty regime only.
+        """
         out = np.zeros(space.n_dags)
         for i, dag in enumerate(space.dags):
             total = 0.0
             for node in range(window.k):
                 parents = tuple(np.flatnonzero(dag[:, node]).tolist())
-                if extra_parents is not None:
-                    parents = tuple(sorted(set(parents) | extra_parents[node]))
+                if strip is not None and strip[node]:
+                    parents = tuple(p for p in parents if p not in strip[node])
                 total += table[node, belief.scorer.lookup[node][parents]]
             out[i] = total
         return out
@@ -108,7 +113,21 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
             for v, parents in enumerate(required):
                 for u in parents:
                     ok &= space.dags[:, u, v] > 0
-            clean_part = per_dag(clean_table)
+            # THE CLEAN REGIME MUST NOT BE CREDITED FOR THE CONFOUNDING EDGES.
+            #
+            # A hypothesis is (DAG H, confounding set P) where P's edges are present in H
+            # and STRIPPED AGAIN for the clean regime -- clean rows are the ones with no
+            # hidden variable transmitting variance, so the confounding edge should not be
+            # there at all. `WindowBeliefDP._assignment_weights` reads the clean table at
+            # `parents \ P` for exactly this reason; scoring at the full parent set makes
+            # the confounded hypothesis fit the clean data too well.
+            #
+            # This disagreed with the DP by 3.55e-02 and was invisible until a test forced
+            # a genuine clean/dirty split: with no clean rows the clean table is all zeros
+            # (the empty-regime guard), so stripping changes nothing and the two paths
+            # agreed to 1e-12. The same lesson as the subset-DP sampler -- test data that
+            # cannot exercise the branch proves nothing about it.
+            clean_part = per_dag(clean_table, strip=required)
             dirty_part = per_dag(dirty_table)
             row = clean_part + dirty_part
             row[~ok] = -np.inf
