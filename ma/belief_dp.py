@@ -261,6 +261,45 @@ class WindowBeliefDP:
         weights /= weights.sum()
         return np.tensordot(weights, np.asarray(marginals), axes=(0, 0))
 
+    def joint_conf_dag_probability(self, samples: np.ndarray, known_intervened: np.ndarray,
+                                   clean: np.ndarray, adjacency: np.ndarray) -> float:
+        """P(this DAG | data) with confounding marginalised out.
+
+        Not obtainable from `log_prob_dag`, which needs a single weight table: joint_conf is
+        a MIXTURE over confounding assignments, so the DAG's mass is the Z-weighted average
+        of its mass under each. Written out rather than approximated because the true DAG's
+        mass is exactly what the identification threshold reads.
+        """
+        clean = np.asarray(clean, dtype=bool)
+        clean_table = self.local_table(samples, known_intervened, clean)
+        dirty_table = self.local_table(samples, known_intervened, ~clean)
+        adjacency = np.asarray(adjacency) > 0.5
+
+        log_zs: List[float] = []
+        log_ps: List[float] = []
+        for assignment in self.assignments:
+            # An assignment REQUIRES its edges to be present, so a DAG lacking one of them
+            # simply has no mass under that assignment -- not an error, a zero.
+            required_present = all(
+                adjacency[u, v] for edge in assignment if edge is not None
+                for u, v in (edge,))
+            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
+            if not np.isfinite(log_w).any():
+                continue
+            log_z = float(self.dp.log_partition(log_w))
+            log_zs.append(log_z)
+            log_ps.append(float(self.dp.log_prob_dag(log_w, adjacency, log_z))
+                          if required_present else NEG_INF)
+
+        if not log_zs:
+            return 0.0
+        log_zs_arr = np.asarray(log_zs)
+        shift = log_zs_arr.max()
+        weights = np.exp(log_zs_arr - shift)
+        weights /= weights.sum()
+        probs = np.exp(np.asarray(log_ps))
+        return float(np.dot(weights, probs))
+
     # -- diagnostics --------------------------------------------------------------------
 
     @property

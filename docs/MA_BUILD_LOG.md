@@ -821,3 +821,56 @@ an obvious error. Fixed and commented at the call site.
   (This reverses the earlier with-bit-first ordering. The reasoning is better: the no-bit
   arm is also the SIMPLER system, so it fails in fewer ways, and a broken baseline is much
   easier to diagnose than a broken treatment.)
+
+## 2026-08-19 -- PHASES 2 to 6 implemented
+
+New modules, all on the DP belief:
+
+  ma/env2.py        Phase 2 environment. n_obs=1000 (not 100), budget=5 per agent,
+                    disclose_regime=False by DEFAULT -- the no-bit arm is the baseline.
+  ma/baselines2.py  Phase 4. pass / random_vary / random_clamp / forced_clamp / greedy.
+  ma/policy2.py     Phase 5. Independent PPO, no CTDE, shared scalar reward.
+  ma/evaluate2.py   Phase 6. The three-part [U14] criterion.
+  scripts/ma_gates2.py  Phase 3. GATE 1, 2, 3.
+
+[MEASURED] Cross-validation of joint_conf. `enumerated_posterior` reconstructs the full
+543-vector posterior from the DP's OWN local score tables, and its implied edge marginals
+match `WindowBeliefDP.edge_marginals` to 1.065e-12 over 6 episodes x 2 agents. Two
+independent code paths through the reformulated rule agree. This matters because the DP
+path could not be checked against the frozen fixture for joint_conf -- the hypothesis space
+deliberately changed -- so this is the substitute check.
+
+[CORRECTED, mine] I reintroduced the global-log-sum-exp bug in `enumerated_posterior` on
+the first attempt: a single global shift underflows the weaker DAGs to zero, log(0) = -inf,
+and hypotheses are deleted rather than ranked. Caught by a divide-by-zero warning, not by a
+wrong number. Fixed to a PER-DAG shift. This is the third time this exact bug has appeared
+in this project; it is now commented as such at all three sites.
+
+[DECIDED] The greedy oracle ENUMERATES, and the limit is explicit (MAX_ENUMERATED_K = 5,
+raising a message that names the reason). It needs a full window posterior for its
+descendant-partition criterion, and no trustworthy DP posterior sampler exists -- the MH
+sampler is under-mixed at 5.8% acceptance and its settings are an admitted stopgap. The
+oracle is a REFERENCE POINT, not part of the method, so it does not need to scale. Stated
+rather than hidden.
+
+[NOTE] Greedy is structurally INDIFFERENT between VARY and CLAMP: both cut the target's
+incoming edges, so both induce the same descendant partition and the same one-step gain.
+The tie-break therefore decides, which is the mechanism behind the measured
+clamp_fraction 0.000. This is now documented in the class that causes it.
+
+[DECIDED] Phase 6 credit set. A DAG counts as a correct answer when it (a) matches the
+truth on every edge touching a private node -- identifiable, since the agent may intervene
+on its own private nodes -- and (b) lies in the truth's Markov equivalence class. The union
+of both agents' MAP graphs is then checked for ACYCLICITY and global equivalence. Union is
+by OR, the permissive choice: it can create cycles but never hide them, so the check sees
+the worst case.
+
+[MEASURED, smoke only] 8 evaluation episodes after a 32-episode PPO run: success 0.500
+against threshold_identified 0.375, union_acyclic 1.000. The three-part criterion is more
+permissive than the raw threshold, as intended -- it credits equivalence-class members the
+threshold rejects. Not a result; a sign the plumbing is connected.
+
+[OPEN] At (1,1,3) each agent has ONE private node, so "recovers its private substructure as
+a DAG" is VACUOUS -- there are no private-private edges to get right. The criterion is
+implemented generally and only becomes meaningful at |Z| >= 2. Worth stating before any
+claim leans on part 1 of [U14].
