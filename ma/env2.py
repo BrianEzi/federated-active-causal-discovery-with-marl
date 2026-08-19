@@ -224,13 +224,27 @@ class TwoAgentEnv2:
         rule = cfg.score_rule
         if rule == JOINT_CONF:
             # joint_conf has no single log_weights table -- it is a mixture over confounding
-            # assignments -- so the true DAG's mass is read from the mixture directly.
+            # assignments -- so the true DAG's mass is read from the mixture directly. The
+            # TRUE confounded pairs are passed in because identification requires getting
+            # the confounding right as well as the causal edges; see the method docstring
+            # for the two wrong criteria that preceded this one.
             return float(window.belief.joint_conf_dag_probability(
                 self.samples[:, window.nodes], self.known[name], clean,
-                window.induced(self.true_adjacency)))
+                window.induced(self.true_adjacency),
+                confounded_pairs=self._confounded_positions(name)))
         return float(np.exp(window.belief.log_prob_dag(
             self.samples[:, window.nodes], self.known[name], clean, rule,
             window.induced(self.true_adjacency))))
+
+    def _confounded_positions(self, name: str):
+        """Truly confounded shared pairs, as WINDOW positions.
+
+        Read from the generating graph via the latent projection, so it is ground truth and
+        never visible to the agent -- it is used only to score identification."""
+        from ma.projection import bidirected_pairs
+        window = self.windows[name]
+        pairs = bidirected_pairs(self.true_adjacency, tuple(window.nodes))
+        return tuple((window.pos[u], window.pos[v]) for u, v in pairs)
 
     # -- observation and result ---------------------------------------------------------
 

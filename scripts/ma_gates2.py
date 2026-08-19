@@ -134,6 +134,29 @@ def main(argv=None) -> dict:
                          "disclose_regime": args.disclose_regime}}
 
     # -- GATE 1 --------------------------------------------------------------------------
+    # RUN UNDER A DAG-ONLY RULE, and this is the resolution of three failed attempts rather
+    # than a convenience.
+    #
+    # GATE 1 asks a question about the ENVIRONMENT -- is the task solvable without acting?
+    # Its target is the prior-weighted fraction of windows alone in their Markov equivalence
+    # class, which is derived under a DAG model. `joint_conf` does not use a DAG model: its
+    # hypotheses are (DAG, confounding set) pairs, and WITHOUT CLEAN ROWS THE CONFOUNDING
+    # LABEL IS UNFALSIFIABLE -- any extra edge can be added and called confounding for the
+    # price of a BGe penalty. So observational-only identification under joint_conf is near
+    # zero BY DESIGN, and comparing it to a DAG-derived target measures the rule, not the
+    # environment.
+    #
+    # Measured, all three criteria tried, unconfounded episodes against a target of 0.0402:
+    #   P(H == truth)                    0.0256   too harsh   (confounded agent always 0)
+    #   P(H \ P == truth)                0.2387   leak        (unfalsifiable labels credited)
+    #   P(H \ P == truth AND P correct)  0.0000   too harsh   (must rule out 24 rivals blind)
+    # Under `pooled`, a genuine DAG model, the same environment gives 0.0547 against 0.0442.
+    #
+    # So the gate runs on `pooled`. What joint_conf does to identification is a separate
+    # question, measured separately, and not a property of the environment.
+    gate1_env = TwoAgentEnv2(MA2Config(
+        topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
+        disclose_regime=args.disclose_regime, score_rule="pooled"))
     # CONDITIONED ON UNCONFOUNDED EPISODES, and this is a correction to the gate rather
     # than a convenience. A confounded window is a latent projection, not a DAG, so its
     # true DAG is NOT identifiable from observational data at any sample size -- measured
@@ -143,18 +166,18 @@ def main(argv=None) -> dict:
     # confounded fraction.
     observational, unconfounded_only = [], []
     for episode in range(args.episodes):
-        result = env.reset(seed=args.seed * 7919 + episode)
-        confounded = (bool(bidirected_pairs(env.true_adjacency,
-                                            env.topology.observed_by("A")))
-                      or bool(bidirected_pairs(env.true_adjacency,
-                                               env.topology.observed_by("B"))))
+        result = gate1_env.reset(seed=args.seed * 7919 + episode)
+        confounded = (bool(bidirected_pairs(gate1_env.true_adjacency,
+                                            gate1_env.topology.observed_by("A")))
+                      or bool(bidirected_pairs(gate1_env.true_adjacency,
+                                               gate1_env.topology.observed_by("B"))))
         observational.append(float(result.info["both_identified"]))
         if not confounded:
             unconfounded_only.append(float(result.info["both_identified"]))
     pooled_rate = float(np.mean(observational))
     observational = np.asarray(unconfounded_only)
     rate, ci = float(observational.mean()), bootstrap_ci(observational, seed=args.seed)
-    target = singleton_fraction(env, args.draws, args.seed)
+    target = singleton_fraction(gate1_env, args.draws, args.seed)
     passed1 = bool(ci[0] <= target["estimate"] <= ci[1]
                    or target["ci"][0] <= rate <= target["ci"][1])
     side = "leak (too easy)" if rate > target["estimate"] else "power (cannot concentrate)"

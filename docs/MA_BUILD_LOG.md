@@ -887,3 +887,63 @@ match on every edge INCIDENT to a private node, in both directions (`dag[p, :]` 
 `dag[:, p]`), which is the boundary-inclusive version. So the code was right and the note
 was wrong. At (1,1,3) part 1 is therefore NOT vacuous: each agent has 3 boundary edges to
 get fully oriented.
+
+## 2026-08-19 (evening) -- identification criterion, three attempts
+
+The joint_conf identification criterion was wrong twice before it was right, and the
+sequence is worth keeping because each failure looked like a different problem.
+
+[CORRECTED #1] `P(H == truth)` -- TOO HARSH. A hypothesis is (DAG H, confounding set P)
+with P's edges REQUIRED PRESENT in H, so a confounded pair shows up as an edge in H that is
+labelled confounding. The true DAG contains no such edge, so it took mass only under the
+empty assignment -- the single hypothesis that refuses to model the confounding. Result:
+EXACTLY 0.000 for the affected agent on every confounded episode at every budget. This read
+as a GATE 3 coordination failure for two runs before I traced it.
+
+[CORRECTED #2] `P(H \ P == truth)` -- TOO GENEROUS, and it produced a GATE 1 LEAK of 0.2387
+against a target of 0.0402. With no clean rows the confounding label is UNFALSIFIABLE: any
+extra edge may be added and called confounding for the price of a BGe complexity penalty,
+and every such superset maps back to the same base graph. Also exposed an overflow --
+normalising per assignment trusts each masked table's Z, and the signed sink recurrence is
+least reliable exactly there, producing "probabilities" of 1e131. Now a ratio of sums in
+log space, which needs only the total.
+
+[CORRECTED #3] `P(H \ P == truth AND P correct)` -- 0.0000 observationally. Demanding the
+right confounding set with no clean data means ruling out 24 rival assignments blind.
+
+[DECIDED] The criterion in the code is #3, because it is what [U14] actually asks: an agent
+that cannot tell a confounded pair from a causal edge has not recovered the structure.
+Orientation of the modelling edge is not part of the claim -- both orientations express the
+same "u and v share a hidden cause" -- so both are credited.
+
+[DECIDED] GATE 1 now runs under `pooled`, a genuine DAG model, NOT under joint_conf.
+GATE 1 asks a question about the ENVIRONMENT: is the task solvable without acting? Its
+target is a DAG-derived quantity (the singleton-MEC fraction). joint_conf is not a DAG
+model, and its observational identification is near zero by design, so comparing the two
+measures the RULE rather than the environment. Under pooled the same environment gives
+0.0547 against a target of 0.0442.
+
+    criterion                        unconfounded obs-only    target
+    P(H == truth)                          0.0256            0.0402
+    P(H \ P == truth)                      0.2387            0.0402   <- leak
+    P(H \ P == truth AND P correct)        0.0000            0.0402
+    pooled (DAG model)                     0.0547            0.0442   <- the right test
+
+## Performance work
+
+[MEASURED] Two optimisations to the belief update, both verified against the 1e-10 gates:
+  - local score tables were computed TWICE per refresh (once by joint_conf_marginals, once
+    by joint_conf_dag_probability). Cached. ~15%.
+  - `local_score` recomputes sufficient statistics on every call, so local_table made 16
+    full O(n k^2) passes per node -- 64 per table at k=4 -- where 4 suffice. Switched to
+    `local_score_from_stats` with one pass per node.
+  After both, `local_score` no longer appears in the profile's top ten at all; the cost is
+  now entirely the 25 DP passes (edge_marginals_onepass, ~70% of an episode).
+
+[MEASURED, NULL] Pruning negligible assignments does NOTHING at |X| = 3. All 25 carry more
+than 1e-14 of the mass (top weights 1.0, 0.500, 0.500, 0.025, 0.018, 0.012...). The guard is
+kept because it is nearly free and should matter at |X| = 4 with 729 assignments, but that
+is an expectation and is NOT measured. It must not be cited as a speedup.
+
+[NOTE] Absolute timings taken this evening are contaminated -- gate runs were competing for
+CPU throughout. Relative profiles are still informative; wall-clock numbers are not.
