@@ -64,6 +64,8 @@ def main(argv=None) -> dict:
         # different problem from one that sampled it and could not exploit it.
         "first_success_episode": ppo.first_success_episode,
         "final_entropy": history[-1]["entropy"] if history else None,
+        # Full trace, so the report can plot learning curves rather than parsing stdout.
+        "history": history,
         "arms": {},
     }
 

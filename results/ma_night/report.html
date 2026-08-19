@@ -1,0 +1,259 @@
+<title>Two Agents, One Bit</title>
+<style>
+:root {
+  --ground:#F5F6F4; --surface:#FFFFFF; --ink:#15181C; --muted:#5F666E; --rule:#DCE0DE;
+  --learned:#1F7A8C; --random:#B3446C; --greedy:#7A6FF0;
+  --good:#2E7D5B; --bad:#C0392B; --track:#EAEDEB;
+  --note-bg:#F3F0E9; --note-line:#B08A3E;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#111417; --surface:#181C20; --ink:#E8EAE7; --muted:#98A0A8; --rule:#2A2F34;
+    --learned:#4FB3C7; --random:#E07BA4; --greedy:#A99BFF;
+    --good:#5FBF92; --bad:#E8776B; --track:#23282D;
+    --note-bg:#221E15; --note-line:#C9A25A;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#111417; --surface:#181C20; --ink:#E8EAE7; --muted:#98A0A8; --rule:#2A2F34;
+  --learned:#4FB3C7; --random:#E07BA4; --greedy:#A99BFF;
+  --good:#5FBF92; --bad:#E8776B; --track:#23282D;
+  --note-bg:#221E15; --note-line:#C9A25A;
+}
+* { box-sizing:border-box; }
+body {
+  background:var(--ground); color:var(--ink); margin:0; padding:0 20px 6rem;
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  font-size:17px; line-height:1.62;
+}
+.wrap { max-width:47rem; margin:0 auto; }
+header { padding:4.5rem 0 2.5rem; border-bottom:1px solid var(--rule); }
+.eyebrow {
+  font-family:ui-monospace,"Cascadia Code","SF Mono",Menlo,monospace;
+  font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+  margin:0 0 1rem;
+}
+h1 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:clamp(2.1rem,5vw,3rem); font-weight:700; letter-spacing:-.025em;
+  line-height:1.08; margin:0 0 1rem; text-wrap:balance;
+}
+.standfirst { font-size:1.16rem; color:var(--muted); margin:0; text-wrap:pretty; }
+h2 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:1.5rem; font-weight:650; letter-spacing:-.018em; margin:3.4rem 0 .4rem;
+  text-wrap:balance;
+}
+h3 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:1.06rem; font-weight:650; margin:2rem 0 .3rem;
+}
+p { margin:.85rem 0; }
+code {
+  font-family:ui-monospace,"Cascadia Code","SF Mono",Menlo,monospace; font-size:.88em;
+  background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+  padding:.08em .34em;
+}
+figure { margin:1.5rem 0; padding:1rem 1rem .5rem; background:var(--surface);
+  border:1px solid var(--rule); border-radius:10px; overflow-x:auto; }
+figcaption { font-family:system-ui,sans-serif; font-size:12.5px; color:var(--muted);
+  margin-bottom:.6rem; }
+figcaption strong { color:var(--ink); font-weight:650; }
+.chart { width:100%; height:auto; display:block; }
+.grid { stroke:var(--rule); stroke-width:1; }
+.tick { font-family:ui-monospace,Menlo,monospace; font-size:10px; fill:var(--muted); }
+.ty { text-anchor:end; } .tx { text-anchor:middle; }
+.axis { font-family:ui-monospace,Menlo,monospace; font-size:10px; fill:var(--muted);
+  letter-spacing:.05em; }
+.track { fill:var(--track); }
+.ci { stroke:var(--ink); stroke-width:2; opacity:.45; }
+.blabel { font-family:ui-monospace,Menlo,monospace; font-size:11px; fill:var(--muted);
+  text-anchor:end; }
+.bval { font-family:ui-monospace,Menlo,monospace; font-size:11px; fill:var(--ink);
+  font-variant-numeric:tabular-nums; }
+.median { stroke:var(--random); stroke-width:1.5; stroke-dasharray:5 4; }
+.medlabel { font-family:ui-monospace,Menlo,monospace; font-size:10px; fill:var(--random);
+  text-anchor:end; }
+.thresh { stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; }
+.empty { font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--muted); }
+table { border-collapse:collapse; width:100%; margin:1.3rem 0; font-size:14px;
+  font-variant-numeric:tabular-nums; font-family:system-ui,-apple-system,sans-serif; }
+th,td { padding:.5rem .6rem; text-align:left; border-bottom:1px solid var(--rule);
+  vertical-align:top; }
+thead th { font-family:ui-monospace,Menlo,monospace; font-size:11px; letter-spacing:.04em;
+  color:var(--muted); font-weight:500; }
+td.num { font-family:ui-monospace,Menlo,monospace; font-size:12.5px; }
+td.pass { color:var(--good); font-weight:700; font-family:ui-monospace,Menlo,monospace;
+  font-size:12px; }
+td.fail { color:var(--bad); font-weight:700; font-family:ui-monospace,Menlo,monospace;
+  font-size:12px; }
+.note { background:var(--note-bg); border-left:3px solid var(--note-line);
+  border-radius:0 8px 8px 0; padding:.9rem 1.15rem; margin:1.7rem 0; }
+.note p:first-child { margin-top:0; } .note p:last-child { margin-bottom:0; }
+.note .tag { font-family:ui-monospace,Menlo,monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--note-line); display:block; margin-bottom:.35rem; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem;
+  margin:1.6rem 0; }
+.stat { background:var(--surface); border:1px solid var(--rule); border-radius:10px;
+  padding:.9rem 1rem; }
+.stat .v { font-family:system-ui,sans-serif; font-size:1.7rem; font-weight:700;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums; display:block; }
+.stat .k { font-family:ui-monospace,Menlo,monospace; font-size:10.5px; color:var(--muted);
+  letter-spacing:.06em; text-transform:uppercase; }
+footer { margin-top:4rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+  font-size:13px; color:var(--muted); font-family:system-ui,sans-serif; }
+</style>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Two-agent results &middot; 20 August 2026 &middot; topology (1,1,3)</p>
+  <h1>Two Agents, One Bit</h1>
+  <p class="standfirst">A federated pair recovers a causal graph neither can see in full.
+  One bit of disclosure per round decides whether that is possible at all &mdash; and
+  without it, the confounded case is not merely hard but formally unidentifiable.</p>
+</header>
+
+<h2>The setup, in one paragraph</h2>
+<p>One structural causal model over five variables. Agent A sees its own private variable
+plus three shared ones; agent B sees its private variable plus the same three. Neither sees
+the other's private column. Edges between the two private variables are forbidden in both
+the generator and the prior, because no data either agent could ever collect would bear on
+them. Both act simultaneously, each with its own budget, and every intervention is hard.</p>
+
+<p>Because B's private variable is hidden from A but still causally active, <strong>A's
+window is not a DAG</strong> &mdash; it is a latent projection in which two shared variables
+can appear correlated with no visible cause. We proved, and verified exhaustively, that this
+confounding can only ever touch <em>shared</em> pairs. That is what makes it tractable to
+model rather than merely lament.</p>
+
+<div class="stats">
+  <div class="stat"><span class="v">0</span><span class="k">seeds trained</span></div>
+  <div class="stat"><span class="v">nan</span><span class="k">median success</span></div>
+  <div class="stat"><span class="v">0</span><span class="k">collapsed seeds</span></div>
+  <div class="stat"><span class="v">0</span><span class="k">PPO updates</span></div>
+</div>
+
+<h2>Gates, run before any training</h2>
+<p>Each gate is a check that can fail and stop the work. This discipline exists because it
+was skipped once before and an entire results table had to be discarded.</p>
+<table><thead><tr><th>Gate</th><th>Measured</th><th></th></tr></thead><tbody><tr><td>GATE 1 — the task must require intervening</td><td class="num">0.0394 against a predicted 0.0402</td><td class="pass">PASS</td></tr><tr><td>GATE 2 — choices must matter</td><td class="num">greedy 0.074 vs random 0.147</td><td class="fail">FAIL</td></tr><tr><td>GATE 3 — coordination must be necessary and available</td><td class="num">never-clamp 0.000 vs clamping 0.393, headroom +0.393</td><td class="pass">PASS</td></tr></tbody></table>
+
+<div class="note">
+  <span class="tag">The result that matters</span>
+  <p><strong>GATE 3's lower arm is exactly zero, and the zero is mechanistic.</strong> A pair
+  that never clamps cannot satisfy the success criterion on a confounded episode at any
+  budget, ever &mdash; not because it is inefficient, but because without a clean batch of
+  data the claim &ldquo;these two variables share a hidden cause&rdquo; is
+  <em>unfalsifiable</em>. Any extra edge can be added and labelled confounding for the price
+  of a complexity penalty. Clamping is what makes the claim testable.</p>
+  <p>That is a stronger statement than &ldquo;clamping helps&rdquo;, and it is the concrete
+  argument for the regime bit.</p>
+</div>
+
+<h2>Training</h2>
+<p>Independent PPO, one actor and one critic per agent. No centralised critic, no shared
+parameters, no shared observations. The only coupling is a shared scalar reward, which is
+necessary rather than incidental: a purely self-interested agent has no reason to clamp for
+its partner, so a per-agent reward would make the target behaviour strictly dominated.</p>
+
+<figure>
+  <figcaption><strong>Solve rate during training</strong>, averaged across seeds. Each point
+  is one PPO update of 16 episodes.</figcaption>
+  <p class='empty'>no learning curves recorded</p>
+</figure>
+
+<figure>
+  <figcaption><strong>Policy entropy.</strong> The diagnostic for the known failure mode: a
+  seed whose entropy collapses before the terminal reward is ever sampled degenerates into
+  passing immediately.</figcaption>
+  
+</figure>
+
+<h2>Against the baselines</h2>
+<p>Every comparison holds the belief rule fixed. Cross-rule numbers are void &mdash; a
+policy trained under one scoring rule and evaluated under another collapses below random,
+so performance belongs to the <em>(policy, rule)</em> pair rather than to the policy.</p>
+
+<figure>
+  <figcaption><strong>Success rate by arm</strong>, mean across seeds, bar shows the
+  inter-quartile range. <code>random clamp</code> is the primary floor: a random policy that
+  can clamp, not one whose clamping is incidental.</figcaption>
+  <p class='empty'>no data yet</p>
+</figure>
+
+<figure>
+  <figcaption><strong>Per-seed spread.</strong> Shown as individual points rather than a mean,
+  because the known instability is a minority of seeds collapsing entirely &mdash; an average
+  would hide exactly the thing worth seeing.</figcaption>
+  <p class='empty'>no data yet</p>
+</figure>
+
+<figure>
+  <figcaption><strong>Clamp fraction per seed.</strong> Clamping is a genuine sacrifice: it
+  removes a confounder for the partner at the cost of a far weaker experiment for oneself.
+  A constant carries no information about what drives it.</figcaption>
+  <p class='empty'>no data yet</p>
+</figure>
+
+<h2>Decisions and corrections</h2>
+<p>Recorded because the corrections were more informative than the successes, and because
+each one was found by a measurement rather than by inspection.</p>
+
+<table>
+<thead><tr><th>What changed</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Belief moved from enumeration to a subset DP</td>
+<td>543 graphs per window died at <code>k=6</code>. The DP is exact, matches the frozen
+enumeration to 1e-10, and reaches <code>k=10</code> &mdash; 4.2&times;10<sup>18</sup> graphs,
+where enumeration is not slow but impossible.</td></tr>
+<tr><td>Confounding orientation is marginalised, not tie-broken</td>
+<td>The old rule oriented each confounding edge &ldquo;along the DAG's topological order&rdquo;,
+but a DAG has many such orders and the code picked one by node numbering. Two shared nodes
+that are incomparable had their hypothesis decided by an implementation detail, worth up to
+130 nats.</td></tr>
+<tr><td>Identification requires the confounding claim too</td>
+<td>Three criteria were tried. Requiring the exact graph gave the confounded agent
+<em>exactly zero</em> at every budget. Marginalising the confounding away leaked, because the
+label is unfalsifiable without clean data. The criterion asks for both.</td></tr>
+<tr><td>GATE 1 runs under a DAG-only rule</td>
+<td>Its target is the fraction of windows alone in their equivalence class, a quantity
+derived under a DAG model. Measuring it under the confounding-aware rule tests the rule
+rather than the environment.</td></tr>
+<tr><td>Each agent gets an independent random stream</td>
+<td>Both were built from the same seed, so the two random agents chose the same shared target
+on 78% of rounds against the 19% expected of independent agents. The primary floor was a
+synchronised pair, which wastes one move per round and is easy to beat for the wrong reason.</td></tr>
+<tr><td>Budget set to 8&ndash;10 for training</td>
+<td>The gates want opposite budgets: discrimination peaks at 2&ndash;3 and is gone by 16,
+while coordination registers nothing below 5, because an agent must spend moves clamping for
+its partner <em>and</em> moves experimenting on itself.</td></tr>
+</tbody>
+</table>
+
+<h2>What this does not establish</h2>
+<p>Stated plainly, because a result is only as good as the list of things it is not.</p>
+<ul>
+<li><strong>GATE 2 is unresolved.</strong> The myopic oracle scored below random on
+unconfounded episodes. Two explanations were tested and falsified &mdash; it generates
+<em>more</em> clean data than random, not less &mdash; and the live hypothesis is that two
+greedy agents computing the same objective over overlapping authority collide. Until that is
+settled, the greedy arm is not a trustworthy reference.</li>
+<li><strong>One topology.</strong> Everything here is <code>(1,1,3)</code>. The binding
+constraint on growth is the <em>shared</em> set, not the window: the confounding hypothesis
+space is exponential in the number of shared pairs.</li>
+<li><strong>The no-bit arm is the control and is still running.</strong> Until it lands, the
+value of the regime bit is argued from the gate, not measured end-to-end against a trained
+counterpart.</li>
+<li><strong>Whether the disclosure is admissible is not a technical question.</strong> The bit
+reveals that a hidden variable was fixed, never which one or to what value, and needs no
+central server. Whether that is within the federation constraint is the supervisor's call.</li>
+</ul>
+
+<footer>
+<p>Topology (1,1,3), <code>n_obs</code> 1000, <code>n_int</code> 100, budget 8, identification
+threshold 0.7, Erdős–Rényi prior at p&nbsp;=&nbsp;0.5, belief rule <code>joint_conf</code>.
+Independent PPO, no CTDE. Median first success at episode n/a. Sources:
+<code>ma/env2.py</code>, <code>ma/belief_dp.py</code>, <code>ma/policy2.py</code>,
+<code>scripts/ma_gates2.py</code>; raw data under <code>results/ma_night/</code> and
+<code>results/ma2/</code>.</p>
+</footer>
+</div>
