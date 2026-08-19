@@ -870,7 +870,20 @@ against threshold_identified 0.375, union_acyclic 1.000. The three-part criterio
 permissive than the raw threshold, as intended -- it credits equivalence-class members the
 threshold rejects. Not a result; a sign the plumbing is connected.
 
-[OPEN] At (1,1,3) each agent has ONE private node, so "recovers its private substructure as
-a DAG" is VACUOUS -- there are no private-private edges to get right. The criterion is
-implemented generally and only becomes meaningful at |Z| >= 2. Worth stating before any
-claim leans on part 1 of [U14].
+[CORRECTED, my commentary not the code] I wrote that part 1 of [U14] is "vacuous at
+(1,1,3) because there are no private-private edges". That is the LITERAL reading and it is
+not what was meant. The intended reading, confirmed 2026-08-19: an agent's "private graph"
+is everything involving its private variables -- private-private edges AND the boundary
+edges between its private nodes and the shared set. Those are identifiable to FULL DAG
+resolution precisely because the agent holds intervention authority over its own private
+nodes. Shared-shared edges are the only ones relaxed to CPDAG, because those are what may
+need the partner.
+
+The split is the federation claim itself: each agent is SELF-SUFFICIENT inside its own
+region, and the shared boundary is the only place coordination is required.
+
+`ma/evaluate2.py:credit_set` already implements the intended reading -- it requires an exact
+match on every edge INCIDENT to a private node, in both directions (`dag[p, :]` and
+`dag[:, p]`), which is the boundary-inclusive version. So the code was right and the note
+was wrong. At (1,1,3) part 1 is therefore NOT vacuous: each agent has 3 boundary edges to
+get fully oriented.
