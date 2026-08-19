@@ -2057,3 +2057,67 @@ the profile of a correctness guard. That strengthens keeping it and weakens sell
 pair. The confounding mechanism the two-agent case exists to study is close to absent
 there. (1,1,3) gives 13.4% and three shared pairs. Starting topology is an open decision
 for the user; the evidence now favours (1,1,3).
+
+## 2026-08-19 -- critical review of the step-0 metrics, and a degraded baseline
+
+[CORRECTED] **The step-0 "decomposition" is not a decomposition and one of its conclusions
+was an artifact.** Two ad-hoc error measures were reported side by side as though they
+partitioned the agent's uncertainty. They do not sum to anything, and they are on different
+scales -- skeleton error is a SUM over 21 pairs, orientation error is a MEAN over ~10 edges.
+Normalised per item the impression inverts (0.032/pair vs 0.176/edge).
+
+Worse, orientation error has an irreducible floor: 16.4% of true edges are reversible within
+their Markov equivalence class and can never be oriented from observational data. Measured
+over 150 episodes per setting, pushing n_obs 40x beyond anything previously used:
+
+    n_obs      skeleton err   orientation err
+      5000        0.629           0.188
+     20000        0.267           0.165
+     40000        0.203           0.161
+    200000        0.093           0.154
+
+Skeleton error falls ~7x and is still falling; orientation error falls 1.2x and is
+plateauing well above zero. The claim "orientation error barely moves, therefore the extra
+uncertainty at low n_obs is skeletal" compared a free quantity against a pinned one.
+RETRACTED. The decision it supported still stands on the within-metric skeleton ratio (2.17)
+and on GATE 1 failing at low n_obs, both independent of it.
+
+[MEASURED] **Edge marginals hide joint structural error.** On a worked episode at
+n_obs=20000, every one of the 21 pairwise adjacency marginals agrees with the truth to
+within 0.04, giving a marginal-based skeleton error of ~0.08. But sampling the joint
+posterior shows only **~0.89-0.91** of the mass sits on the true skeleton -- roughly one
+sample in ten has a structurally wrong graph. The error is spread thinly across many
+different wrong skeletons, so no single marginal looks bad. Any metric built from marginals
+alone understates structural uncertainty for this reason.
+
+[MEASURED] **The posterior is not "confidently wrong".** On that episode it places ~0.90 on
+the true Markov equivalence class, and every sample with the right skeleton also had the
+right v-structures. The one edge whose marginal leans the wrong way (P=0.74 on the reverse
+of a true edge) is provably REVERSIBLE -- reversing it preserves acyclicity and all
+v-structures -- so no amount of observational data could orient it. That is precisely the
+uncertainty interventions exist to remove, not an estimator fault.
+
+[CORRECTED -- SERIOUS] **The greedy oracle baseline at d=7 is under-mixed and degraded.**
+The MH sampler is correct asymptotically but not at the settings the oracle ships with
+(n_draws=4000, burn_in=5000, thin=10). Against exact DP marginals:
+
+    draws   burn_in   thin    acceptance   max |MH - exact|
+     4000     20000     20       0.059          0.100
+     4000     50000     50       0.058          0.016
+    50000    100000     20       0.058          0.006
+
+Independent chains at the weaker settings disagree with each other on P(true skeleton) by
+0.79 to 0.91. Consequence, measured over 40 episodes:
+
+    the shipped oracle and a well-mixed oracle choose the SAME target in only 25/40 = 62%
+    of episodes; the shipped choice gives up 0.065 nats of expected information gain on
+    average, and up to 0.74 nats.
+
+**This threatens the headline single-agent result.** Every d=7 number is reported against
+this oracle, so "the agent matches greedy" may mean "the agent matches a greedy oracle that
+is making a materially worse choice in nearly 4 of every 10 rounds". The d<=6 results are
+unaffected -- they use the enumerated oracle, not the sampler.
+
+Not yet known: whether a well-mixed oracle actually SOLVES episodes faster, or only scores
+higher on its own criterion. Fixing the settings and re-running the d=7 references is the
+first thing to do.
