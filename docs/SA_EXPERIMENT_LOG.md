@@ -2495,3 +2495,31 @@ caching does not change draws.
 change and compute their greedy references with the MH oracle. Given 35% target
 disagreement, those references are unreliable and the results scored against them will need
 re-running or an explicit caveat.
+
+
+## 2026-08-19 -- exact vs MH oracle, against an EXACT reference
+
+The v1 measurement scored MH against a long MH chain, which partly begs the question. This
+one uses a 40,000-draw exact sampler as the reference, so no arm is judged by the thing whose
+mixing is in doubt. d=7, n_obs=1000, 60 episodes.
+
+    arm            agreement   mean nats lost   max nats lost
+    mh_50k_50        0.700         0.1116          1.8350
+    exact (4000)     0.883         0.0018          0.0280
+    exact (2000)     0.883         0.0021          0.0381
+
+[MEASURED] The exact oracle gives up 62x less information per episode (0.0018 vs 0.1116
+nats) and its worst case is 65x smaller (0.028 vs 1.835).
+
+[EXPLAINED] Exact agreement is 0.883, not 1.000, and that is the correct behaviour rather
+than a shortfall. 4000 draws against a 40,000-draw reference is still Monte Carlo, so the
+two disagree when two targets are near-tied -- and the measured loss when they do is 0.0018
+nats, i.e. the disagreements land where the choice barely matters. MH's 0.700 agreement
+comes with 0.1116 nats lost, so it disagrees where the choice DOES matter. Agreement rate
+alone would have hidden that distinction; the nats column is what separates them.
+
+[MEASURED, actionable] exact at 2000 draws is indistinguishable from exact at 4000 --
+identical agreement (0.883) and 0.0021 vs 0.0018 nats. The draw count can be HALVED for free.
+Not applied to the queued Myriad jobs (176027/176028), which are already running at 4000;
+resubmitting a third time to save time on a job that is already affordable is not worth the
+churn. Worth taking for any future run.
