@@ -2454,12 +2454,19 @@ read from the paper.
 [MEASURED] The stopgap did not fix the quantity that governs behaviour. At d=7, n_obs=1000,
 60 episodes, against a well-mixed reference:
 
+    old MH     (burn  5k, thin 10):  agreement 0.567   mean 0.2064 nats lost   max 2.1876
     shipped MH (burn 50k, thin 50):  agreement 0.650   mean 0.1130 nats lost   max 1.8222
 
-  The OLD settings disagreed ~38%; the new ones disagree 35%. Raising burn-in tenfold cut
-  the max edge-marginal error from 0.100 to 0.016 and left the DECISION essentially
-  unchanged. We bought a better-looking number, not better behaviour. Marginal error was
-  the wrong thing to measure and I measured it first.
+[CORRECTED, mine] I first reported only the shipped arm and wrote that raising burn-in
+"left the decision essentially unchanged". The completed measurement does not support that.
+The stopgap cut disagreement from 43% to 35% and nearly HALVED the information given up
+(0.2064 -> 0.1130 nats). It helped materially; I was too harsh on it because I had one arm
+in front of me instead of two.
+
+  What stands is the weaker claim, which is still enough to act on: 35% target disagreement
+  is not acceptable in a baseline that every learned result is scored against, and no burn-in
+  setting removes it -- acceptance stays ~5.8% whatever we spend. Marginal error (0.100 ->
+  0.016) flattered the fix because it is not the quantity that governs the oracle's choice.
 
 [DECIDED] `SamplingOracle(method=...)` now defaults to "exact". `method="mh"` retains the
 old path for comparison.
