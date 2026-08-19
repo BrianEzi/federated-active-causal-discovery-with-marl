@@ -28,9 +28,18 @@ So the depth-2 rule minimises expected cost instead:
     cost(belief) = 0                                       if already concentrated
                  = 1 + SUM_g P(g) * cost(belief | g)       otherwise
 
-truncated at depth 2 with a terminal penalty of 1 for "still not finished". "Concentrated"
-uses max posterior mass >= threshold, which is what an oracle can actually evaluate -- it
-cannot see which graph is true.
+truncated at depth 2. TERMINATION IS PROBABILISTIC, and getting that wrong was the second
+bug in this script. The environment ends an episode when the posterior mass on the TRUE
+graph reaches the threshold, and no policy can see which graph is true. What a policy can
+compute is that at most one graph can hold mass >= 0.7, so
+
+    P(episode ends | belief b)  =  max(b)   if max(b) >= threshold, else 0
+
+-- NOT the indicator max(b) >= threshold. A belief concentrated at 0.8 on some graph ends
+the episode only 80% of the time; the other 20% it concentrated on the wrong one and the
+episode continues. Treating that as certain termination made the deeper search prefer
+actions that concentrate mass anywhere, including onto a wrong graph, and produced the
+impossible result of two-step lookahead scoring WORSE than one-step (-0.277 at d=5).
 
 The partition model is the same one the myopic oracle uses, so the two policies differ only
 in lookahead depth.
@@ -56,41 +65,53 @@ from sa.oracle import InterventionOracle, _partition_entropy
 class TwoStepOracle:
     """Exhaustive depth-2 lookahead over the same partition model as the myopic oracle."""
 
-    def __init__(self, space, threshold: float = 0.7, seed: int = 0):
+    def __init__(self, space, threshold: float = 0.7, depth: int = 2, seed: int = 0):
         self.base = InterventionOracle(space)
         self.d = space.d
         self.threshold = threshold
+        self.depth = depth
         self.rng = np.random.default_rng(seed)
 
     def reset(self, seed=None):
         if seed is not None:
             self.rng = np.random.default_rng(seed)
 
-    def _one_step_cost(self, posterior: np.ndarray) -> float:
-        """Expected cost of the best single further intervention, with a penalty of 1 for
-        outcomes that still leave the belief unconcentrated."""
+    def _p_terminate(self, belief: np.ndarray) -> float:
+        top = float(belief.max())
+        return top if top >= self.threshold else 0.0
+
+    def _value(self, belief: np.ndarray, depth: int) -> float:
+        """Expected further interventions from `belief`, looking `depth` moves ahead."""
+        alive = 1.0 - self._p_terminate(belief)
+        if alive <= 1e-12:
+            return 0.0
+        if depth <= 0:
+            return alive            # crude but consistent terminal estimate
         sig = self.base.signatures
         best = np.inf
         for w in range(self.d):
             groups = sig[:, w]
-            cost = 1.0
+            total = 0.0
             for g in range(self.base.n_groups[w]):
                 mask = groups == g
-                mass = posterior[mask].sum()
+                mass = belief[mask].sum()
                 if mass <= 1e-12:
                     continue
-                if (posterior[mask].max() / mass) < self.threshold:
-                    cost += mass          # still not finished -> one more step at least
-            best = min(best, cost)
-        return best
+                sub = np.zeros_like(belief)
+                sub[mask] = belief[mask] / mass
+                total += mass * self._value(sub, depth - 1)
+            best = min(best, total)
+            if best == 0.0:
+                break
+        return alive * (1.0 + best)
 
     def scores(self, posterior: np.ndarray) -> np.ndarray:
-        """Negated expected cost, so that argmax is still the right choice."""
+        """Negated expected cost, so argmax remains the right choice."""
         sig = self.base.signatures
         out = np.zeros(self.d)
         for v in range(self.d):
             groups = sig[:, v]
-            cost = 1.0
+            total = 0.0
             for g in range(self.base.n_groups[v]):
                 mask = groups == g
                 mass = posterior[mask].sum()
@@ -98,10 +119,8 @@ class TwoStepOracle:
                     continue
                 sub = np.zeros_like(posterior)
                 sub[mask] = posterior[mask] / mass
-                if sub.max() >= self.threshold:
-                    continue              # finished after this one intervention
-                cost += mass * self._one_step_cost(sub)
-            out[v] = -cost
+                total += mass * self._value(sub, self.depth - 1)
+            out[v] = -total
         return out
 
     def __call__(self, env, result) -> int:
