@@ -1001,3 +1001,47 @@ BREADTH of intervention rather than depth. That is a hypothesis, not a finding.
 fault: a reference policy that is worse than random may simply be the wrong reference for
 this task. But "my baseline is bad" and "my environment is bad" are exactly the two things a
 gate is supposed to distinguish, so no training runs until it is understood.
+
+## 2026-08-20 (overnight) -- the random baseline was two synchronised agents
+
+[CORRECTED] Every call site built agent A and agent B with the SAME seed
+(`RandomAgent(n, seed=args.seed + 1)` for both). Their action lists are structurally
+parallel -- own private node first, then the shared nodes in the same order -- so identical
+RNG streams meant identical action INDICES, and therefore the same shared target almost
+every round.
+
+    measured collision rate (both agents target the same node):
+        random_clamp, shared seed        0.784
+        random_clamp, per-agent seeds    0.227     <- independent uniform expects ~0.19
+        greedy                           0.352
+
+`random_clamp` is the PRIMARY floor [U16], so this is not cosmetic. A perfectly synchronised
+pair is a different policy: it systematically wastes one of its two moves per round, which
+makes the floor easier to beat for a reason that has nothing to do with choice quality.
+
+Fixed with `_agent_seed(seed, name)`, so A and B get distinct streams from one seed at every
+call site at once.
+
+### The GATE 2 inversion: three explanations tried, two falsified
+
+GATE 2 v5 had greedy at 0.074 BELOW random at 0.147 on unconfounded episodes.
+
+1. "Greedy fails to generate clean rows." FALSIFIED. Greedy clamps its own private node
+   MORE often than random (0.116 vs 0.068) and produces twice the clean rows (40 vs 20).
+2. "Greedy repeats targets, and ruling out 24 rival confounding assignments needs breadth."
+   PARTIALLY SUPPORTED but too small to carry it: 2.10 distinct targets per episode against
+   random's 2.45, repeat rate 0.300 against 0.183.
+3. Criterion decomposition shows the per-agent marginals are nearly IDENTICAL --
+   base-graph-correct mass 0.834 (greedy) vs 0.782 (random), strict mass 0.355 vs 0.363 --
+   so a 2x difference in the JOINT event has to come from the correlation between the two
+   agents, not from either agent alone. Greedy's agents compute the same objective over
+   overlapping authority and collide on 0.352 of rounds against random's 0.227.
+
+That third line is now the live hypothesis, and the synchronised-seed bug means the v5
+GATE 2 numbers were measured against a broken floor anyway. GATE 2 must be re-run before
+anything is concluded from it.
+
+[NOTE] Training runs already in flight (local seeds 0-7, Myriad 176251) began before this
+fix. The LEARNED policy is unaffected -- PPO carries its own RNG and never touches
+`make_baselines` -- but the baseline arms inside those reports are measured against the
+synchronised floor and must be re-evaluated afterwards rather than quoted.

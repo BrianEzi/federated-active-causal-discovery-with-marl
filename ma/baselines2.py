@@ -129,6 +129,24 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
     return weights / weights.sum()
 
 
+
+def _agent_seed(seed: int, name: str) -> int:
+    """Distinct stream per agent.
+
+    A and B were being constructed with the SAME seed at every call site, so their RNGs
+    produced identical sequences. Their action lists are structurally parallel -- own
+    private node first, then the shared nodes in the same order -- so identical indices
+    meant the two agents chose the SAME shared target almost every round. Measured
+    collision rate 0.784 against the ~0.19 expected of two independent uniform agents.
+
+    That is not a cosmetic bug: `random_clamp` is the PRIMARY floor [U16], and a
+    perfectly synchronised pair is a different policy from two independent ones -- it
+    systematically wastes one of the two moves, and it makes the floor easier to beat for
+    the wrong reason.
+    """
+    return int(seed) * 2 + (0 if name == "A" else 1)
+
+
 # -- policies ---------------------------------------------------------------------------
 
 
@@ -154,11 +172,12 @@ class RandomAgent:
     def __init__(self, name: str, seed: int = 0, allow_clamp: bool = True):
         self.name = name
         self.allow_clamp = allow_clamp
-        self._seed = seed
-        self.rng = np.random.default_rng(seed)
+        self._seed = _agent_seed(seed, name)
+        self.rng = np.random.default_rng(self._seed)
 
     def reset(self, seed: Optional[int] = None) -> None:
-        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.name))
 
     def __call__(self, env: TwoAgentEnv2, result) -> int:
         window = env.windows[self.name]
@@ -177,11 +196,12 @@ class ForcedClampAgent:
 
     def __init__(self, name: str, seed: int = 0):
         self.name = name
-        self._seed = seed
-        self.rng = np.random.default_rng(seed)
+        self._seed = _agent_seed(seed, name)
+        self.rng = np.random.default_rng(self._seed)
 
     def reset(self, seed: Optional[int] = None) -> None:
-        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.name))
 
     def __call__(self, env: TwoAgentEnv2, result) -> int:
         window = env.windows[self.name]
@@ -208,8 +228,8 @@ class GreedyAgent:
 
     def __init__(self, name: str, env: TwoAgentEnv2, seed: int = 0):
         self.name = name
-        self._seed = seed
-        self.rng = np.random.default_rng(seed)
+        self._seed = _agent_seed(seed, name)
+        self.rng = np.random.default_rng(self._seed)
         window = env.windows[name]
         self.space = _Window.get(window.k)
         self.candidates = [i for i, (node, mode) in enumerate(window.actions)
@@ -217,7 +237,8 @@ class GreedyAgent:
         self.rule = env.config.score_rule
 
     def reset(self, seed: Optional[int] = None) -> None:
-        self.rng = np.random.default_rng(self._seed if seed is None else seed)
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.name))
 
     def __call__(self, env: TwoAgentEnv2, result) -> int:
         window = env.windows[self.name]
