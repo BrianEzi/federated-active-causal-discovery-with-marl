@@ -68,15 +68,19 @@ def main(argv=None) -> dict:
     started = time.time()
 
     arms = {
-        # The settings the queued Myriad d=7 jobs are using right now.
-        "shipped_50k_50": SamplingOracle(env.dp, n_draws=4000, burn_in=50_000, thin=50,
-                                         seed=args.seed),
-        # The old settings, for the before/after comparison.
-        "old_5k_10": SamplingOracle(env.dp, n_draws=4000, burn_in=5_000, thin=10,
-                                    seed=args.seed),
+        # The settings the queued Myriad d=7 jobs are using.
+        "mh_50k_50": SamplingOracle(env.dp, n_draws=4000, burn_in=50_000, thin=50,
+                                    seed=args.seed, method="mh"),
+        # The new default: independent draws, no burn-in.
+        "exact": SamplingOracle(env.dp, n_draws=4000, seed=args.seed, method="exact"),
+        # Half the draws, to show the exact arm is not just buying agreement with compute.
+        "exact_2000": SamplingOracle(env.dp, n_draws=2000, seed=args.seed,
+                                     method="exact"),
     }
-    reference = SamplingOracle(env.dp, n_draws=20_000, burn_in=200_000, thin=50,
-                               seed=args.seed + 99)
+    # Reference is an EXACT sampler with many draws. Using a long MH chain as the reference
+    # would beg the question -- it would score each arm against the very thing whose mixing
+    # is in doubt.
+    reference = SamplingOracle(env.dp, n_draws=40_000, seed=args.seed + 99, method="exact")
 
     report = {"d": args.d, "n_obs": args.n_obs, "arms": {}}
     for label, oracle in arms.items():

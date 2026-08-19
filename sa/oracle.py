@@ -144,13 +144,29 @@ class SamplingOracle(_OracleChoices):
     # ~172 graphs. The real fix is partition MCMC (Kuipers & Moffa 2017) or exact sampling
     # from the DP; both are pending review.
     def __init__(self, dp, n_draws: int = 4000, burn_in: int = 50_000, thin: int = 50,
-                 seed: int = 0):
+                 seed: int = 0, method: str = "exact"):
+        """`method="exact"` uses `LayeredExactSampler`; `"mh"` keeps structure MCMC.
+
+        DEFAULT CHANGED TO EXACT on 2026-08-19, and the reason is a measurement about
+        DECISIONS rather than about marginals. Raising burn-in 5k->50k cut the max
+        edge-marginal error from 0.100 to 0.016, which looked like a fix. It was not: the
+        oracle still picked a DIFFERENT target from a well-mixed reference chain in 35% of
+        d=7 episodes (agreement 0.650), giving up 0.113 nats on average and up to 1.82.
+        The old settings disagreed ~38%. Ten times the compute bought a better-looking
+        number and left the behaviour essentially unchanged.
+
+        Exact draws are independent by construction, so there is no mixing floor to
+        discover later and no burn-in to tune. See `sa/dag_samplers.py`.
+        """
         self.dp = dp
         self.d = dp.d
         self.n_draws = n_draws
         self.burn_in = burn_in
         self.thin = thin
         self.seed = seed
+        self.method = method
+        if method not in ("exact", "mh"):
+            raise ValueError(f"method must be 'exact' or 'mh', got {method!r}")
         self._calls = 0
 
     def scores(self, belief: np.ndarray) -> np.ndarray:
@@ -163,8 +179,12 @@ class SamplingOracle(_OracleChoices):
         rng = np.random.default_rng([self.seed, self._calls])
         self._calls += 1
 
-        draws, _ = mh_sample(belief, self.dp._mask_to_index, self.d, self.n_draws,
-                             burn_in=self.burn_in, thin=self.thin, rng=rng)
+        if self.method == "exact":
+            from sa.dag_samplers import LayeredExactSampler
+            draws = LayeredExactSampler(self.dp, belief).sample(self.n_draws, rng=rng)
+        else:
+            draws, _ = mh_sample(belief, self.dp._mask_to_index, self.d, self.n_draws,
+                                 burn_in=self.burn_in, thin=self.thin, rng=rng)
         codes = descendant_codes(draws)
         weights = np.full(draws.shape[0], 1.0 / draws.shape[0])
 

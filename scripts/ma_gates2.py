@@ -110,6 +110,14 @@ def main(argv=None) -> dict:
     # Tight on purpose: discrimination peaks at budget 2-3 and is gone by 16.
     ap.add_argument("--budget", type=int, default=3)
     ap.add_argument("--draws", type=int, default=3000)
+    # GATE 3 runs at a LARGER budget than GATE 2, and that is a structural finding rather
+    # than a fudge. The two gates ask opposite questions of the budget: GATE 2 needs it
+    # TIGHT, because greedy-vs-random discrimination peaks at 2-3 and is gone by 16;
+    # GATE 3 needs it LOOSE, because a confounded episode requires an agent to spend moves
+    # clamping for its partner AND moves experimenting on itself. Measured: on confounded
+    # episodes nothing solves at all below budget 5, and random reaches 0.444 only by
+    # budget 16. Running both gates at one budget guarantees one of them is uninformative.
+    ap.add_argument("--gate3_budget", type=int, default=10)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--disclose_regime", action="store_true",
                     help="with-bit arm; default is the no-bit BASELINE")
@@ -179,13 +187,17 @@ def main(argv=None) -> dict:
     # self-defeating and cannot be the coordination ceiling. What is needed is a MIX --
     # clamp some rounds, experiment on others -- which is what random_clamp does and what
     # a learned policy would have to discover.
+    g3_env = TwoAgentEnv2(MA2Config(
+        topology=topology, n_obs=args.n_obs, n_int=args.n_int,
+        budget=args.gate3_budget, disclose_regime=args.disclose_regime))
     never = {n: RandomAgent(n, seed=args.seed + 2, allow_clamp=False) for n in AGENTS}
     forced = {n: RandomAgent(n, seed=args.seed + 3, allow_clamp=True) for n in AGENTS}
-    g3_never = play(env, never, args.episodes, args.seed, only=True)
-    g3_forced = play(env, forced, args.episodes, args.seed, only=True)
+    g3_never = play(g3_env, never, args.episodes, args.seed, only=True)
+    g3_forced = play(g3_env, forced, args.episodes, args.seed, only=True)
     headroom = g3_forced["rate"] - g3_never["rate"]
     passed3 = bool(headroom > 0 and g3_forced["ci"][0] > g3_never["ci"][1])
-    report["gate3"] = {"never_clamp": g3_never, "forced_clamp": g3_forced,
+    report["gate3"] = {"budget": args.gate3_budget,
+                       "never_clamp": g3_never, "forced_clamp": g3_forced,
                        "headroom": headroom, "passed": passed3}
     print(f"GATE 3  confounded (n={g3_never['n']}): never-clamp {g3_never['rate']:.3f} "
           f"vs forced-clamp {g3_forced['rate']:.3f}  headroom {headroom:+.3f}"

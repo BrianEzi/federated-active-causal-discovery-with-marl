@@ -2448,3 +2448,43 @@ delete it. At our sizes (window k=4, single-agent d<=7) the exact sampler covers
 so partition MCMC was only ever the fallback for d past its reach. Fixing it is not on the
 critical path and should not be done by guessing -- it needs the full Kuipers-Moffa move set
 read from the paper.
+
+## 2026-08-19 -- the exact sampler is now the oracle's default
+
+[MEASURED] The stopgap did not fix the quantity that governs behaviour. At d=7, n_obs=1000,
+60 episodes, against a well-mixed reference:
+
+    shipped MH (burn 50k, thin 50):  agreement 0.650   mean 0.1130 nats lost   max 1.8222
+
+  The OLD settings disagreed ~38%; the new ones disagree 35%. Raising burn-in tenfold cut
+  the max edge-marginal error from 0.100 to 0.016 and left the DECISION essentially
+  unchanged. We bought a better-looking number, not better behaviour. Marginal error was
+  the wrong thing to measure and I measured it first.
+
+[DECIDED] `SamplingOracle(method=...)` now defaults to "exact". `method="mh"` retains the
+old path for comparison.
+
+[MEASURED] Cost, per oracle call at d=7, 4000 draws:
+    before caching   exact 25.68s   mh 4.32s     <- exact 6x SLOWER
+    after caching    exact  1.78s   mh 4.58s     <- exact 2.6x FASTER
+
+  The per-state layer distribution and per-node parent-set distribution are pure functions
+  of the weights, so they are identical for every draw; recomputing them per draw was the
+  entire cost. Scores are bit-identical before and after, and a test pins that.
+
+[MEASURED] MH systematically UNDER-estimates the partition entropy on every node:
+    exact [2.102 1.803 2.383 1.216 0.038 2.232 2.064]
+    mh    [1.981 1.747 2.235 0.792 0.034 2.155 1.947]
+  Under-dispersed draws see fewer distinct descendant sets, so the partition looks coarser
+  than it is. The gap is worst where the entropy is largest (node 3: 1.216 vs 0.792), which
+  is precisely where the oracle's choice is being decided.
+
+[NOTE] Tests: tests/sa/test_exact_sampler.py, 11 passing. log Z agreement with the DP's
+signed sink recurrence at d=3,4,5,6 to 1e-9 -- no shared code path, so this is real evidence
+rather than a tautology. Error falls with draw count; every draw acyclic by construction;
+caching does not change draws.
+
+[OPEN, and it affects queued work] Myriad jobs 175665/175666 were submitted BEFORE this
+change and compute their greedy references with the MH oracle. Given 35% target
+disagreement, those references are unreliable and the results scored against them will need
+re-running or an explicit caveat.

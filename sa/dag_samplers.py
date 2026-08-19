@@ -92,6 +92,13 @@ class LayeredExactSampler:
         self.alpha = log_zeta(self._masked_cache, self.d)
         self._memo: Dict[Tuple[int, int], float] = {}
         self._node_cache: Dict[int, List[Tuple[int, float]]] = {}
+        # Draw-independent caches. The layer distribution at a state and the parent-set
+        # distribution for a node are pure functions of the weights, so they are identical
+        # for every draw. Recomputing them per draw made 4000 draws at d=7 take 26 s
+        # against MH's 4 s; caching is what makes the exact sampler affordable in the
+        # oracle's inner loop.
+        self._layer_dist: Dict[Tuple[int, int], Tuple[np.ndarray, np.ndarray]] = {}
+        self._parent_dist: Dict[Tuple[int, int, int], Tuple[np.ndarray, np.ndarray]] = {}
 
     # -- recurrence ---------------------------------------------------------------------
 
@@ -147,24 +154,35 @@ class LayeredExactSampler:
             out[s] = self._sample_one(rng)
         return out
 
+    def _layer_distribution(self, placed: int, previous: int
+                            ) -> Tuple[np.ndarray, np.ndarray]:
+        key = (placed, previous)
+        cached = self._layer_dist.get(key)
+        if cached is not None:
+            return cached
+        free = self.full & ~placed
+        candidates, weights = [], []
+        layer = free
+        while layer:
+            weight = self._layer_weight(layer, placed, previous)
+            if np.isfinite(weight):
+                candidates.append(layer)
+                weights.append(weight + self._remaining(placed | layer, layer))
+            layer = (layer - 1) & free
+        weights = np.asarray(weights)
+        probabilities = np.exp(weights - weights.max())
+        probabilities /= probabilities.sum()
+        result = (np.asarray(candidates, dtype=np.int64), probabilities)
+        self._layer_dist[key] = result
+        return result
+
     def _sample_one(self, rng: np.random.Generator) -> np.ndarray:
         adjacency = np.zeros((self.d, self.d), dtype=bool)
         placed, previous = 0, 0
         layers: List[int] = []
         while placed != self.full:
-            free = self.full & ~placed
-            candidates, weights = [], []
-            layer = free
-            while layer:
-                weight = self._layer_weight(layer, placed, previous)
-                if np.isfinite(weight):
-                    candidates.append(layer)
-                    weights.append(weight + self._remaining(placed | layer, layer))
-                layer = (layer - 1) & free
-            weights = np.asarray(weights)
-            probabilities = np.exp(weights - weights.max())
-            probabilities /= probabilities.sum()
-            layer = candidates[int(rng.choice(len(candidates), p=probabilities))]
+            candidates, probabilities = self._layer_distribution(placed, previous)
+            layer = int(candidates[rng.choice(len(candidates), p=probabilities)])
             layers.append(layer)
             previous, placed = layer, placed | layer
 
@@ -185,22 +203,26 @@ class LayeredExactSampler:
     def _sample_parents(self, node: int, placed: int, previous: int,
                         rng: np.random.Generator) -> int:
         """Draw one parent set for `node` from those allowed by its layer position."""
-        raw = self._node_weights(node)
-        allowed = []
-        values = []
-        for mask, value in raw:
-            if mask & ~placed:
-                continue                                    # a parent not yet placed
-            if previous and not (mask & previous):
-                continue                                    # needs one in the last layer
-            if not previous and mask:
-                continue                                    # first layer has no parents
-            allowed.append(mask)
-            values.append(value)
-        values = np.asarray(values)
-        probabilities = np.exp(values - values.max())
-        probabilities /= probabilities.sum()
-        return int(allowed[int(rng.choice(len(allowed), p=probabilities))])
+        key = (node, placed, previous)
+        cached = self._parent_dist.get(key)
+        if cached is None:
+            allowed, values = [], []
+            for mask, value in self._node_weights(node):
+                if mask & ~placed:
+                    continue                                # a parent not yet placed
+                if previous and not (mask & previous):
+                    continue                                # needs one in the last layer
+                if not previous and mask:
+                    continue                                # first layer has no parents
+                allowed.append(mask)
+                values.append(value)
+            values = np.asarray(values)
+            probabilities = np.exp(values - values.max())
+            probabilities /= probabilities.sum()
+            cached = (np.asarray(allowed, dtype=np.int64), probabilities)
+            self._parent_dist[key] = cached
+        allowed, probabilities = cached
+        return int(allowed[rng.choice(len(allowed), p=probabilities)])
 
     def _node_weights(self, node: int) -> List[Tuple[int, float]]:
         if node not in self._node_cache:
