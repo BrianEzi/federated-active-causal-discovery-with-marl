@@ -2354,3 +2354,42 @@ constant across every budget and both n_obs. Only a learned policy can respond t
 pressure. Question stays open until Phase 5.
 
 Raw: results/budget/budget_sweep.json. Report: results/budget/budget_report.html.
+
+## 2026-08-19 -- why the posterior cannot pass 0.7 at n_obs=100
+
+[MEASURED] d=5, observational data only, 150 episodes per row:
+
+   n_obs   obs-only identified   mean mass on true DAG   max mass EVER reached
+     100         0.000                  0.066                   0.579
+     300         0.033                  0.129                   0.792
+    1000         0.060                  0.193                   0.907
+    3000         0.067                  0.230                   0.935
+   10000         0.073                  0.253                   0.963
+   20000         0.080                  0.265                   0.973
+
+  Asymptotic target (singleton-MEC fraction): 0.0892.
+
+[EXPLAINED] At n_obs=100 the BEST episode of 150 reached 0.579 mass -- the 0.7 threshold is
+not rarely crossed, it is unreachable. GATE 1's target is an ASYMPTOTIC quantity: "singleton
+equivalence class" means identifiable in the infinite-data limit and says nothing about
+finite samples. With 100 rows spread over 543 graphs the likelihood ratio between the true
+DAG and its neighbours cannot concentrate 70% of the mass anywhere. Identifiable in
+principle, unresolvable in practice.
+
+[NOTE] GATE 1 therefore fails on the LOW side at n_obs=100, which is the opposite of the
+leak it was built to catch. The gate is two-sided by construction, so it fires either way --
+correct behaviour, but the failure means something quite different from the d=3 leak.
+
+[DECIDED] Consequences:
+  1. n_obs=100 in docs/MA_PROBLEM_STATEMENT.md needs revisiting; n_obs ~ 300-1000 is the
+     honest window (posterior can concentrate, ~94% of episodes still need interventions).
+  2. The GNN budget sweep runs BOTH n_obs=100 and n_obs=1000, so the gate failure is
+     measured rather than assumed.
+  3. Greedy's "9% irreducible failure set" at d=7/n_obs=100 is now SUSPECT: some of those
+     episodes may not be greedy being blind, but episodes where no intervention sequence
+     reaches 0.7 from that start. Must be separated before claiming it as headroom.
+
+[DECIDED] Moved to Myriad: submit_sa_gnn_budget_refs.sh (14 configs, --refs_only) then
+submit_sa_gnn_budget.sh (42 tasks) held on it. References are ~8.5 s/episode at d=7 and are
+identical across seeds, so computing them per-seed would triple the most expensive part and
+race on the cache file.
