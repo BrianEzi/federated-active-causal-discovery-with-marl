@@ -34,7 +34,7 @@
 #$ -o logs/
 #$ -e logs/
 
-mkdir -p logs ~/.tmp ~/sa_runs/gnn_budget results/gnn_budget
+mkdir -p logs ~/.tmp ~/sa_runs/gnn_budget_exact results/gnn_budget_exact
 source ~/envs/sa_env/bin/activate
 cd /home/ucabbse/marl_sa_fast
 export TMPDIR=~/.tmp OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -63,7 +63,14 @@ python -u -m scripts.run_experiment \
   --eval_episodes 150 --gate1_episodes 200 \
   --oracle_draws 4000 \
   --refs_only \
-  --ref_cache ~/sa_runs/gnn_budget/refs_"${TAG}".pkl \
+  --ref_cache ~/sa_runs/gnn_budget_exact/refs_"${TAG}".pkl \
   --tag "refs_${TAG}"
 
 echo "=== done $(date) ==="
+
+# RESUBMITTED 2026-08-19. The first submission (jobs 175665/175666) computed its greedy
+# references with the MH oracle, which picks a different target from a well-mixed chain in
+# 35% of d=7 episodes (mean 0.113 nats lost, max 1.82). SamplingOracle now defaults to the
+# exact layered sampler, which is both unbiased and 2.6x faster per call. The cache path
+# changed to ~/sa_runs/gnn_budget_exact so the stale MH references cannot be silently
+# reloaded -- they are kept, not deleted, so the two can be compared if that is ever useful.

@@ -30,7 +30,7 @@
 #$ -o logs/
 #$ -e logs/
 
-mkdir -p logs ~/.tmp ~/sa_runs/gnn_budget results/gnn_budget
+mkdir -p logs ~/.tmp ~/sa_runs/gnn_budget_exact results/gnn_budget_exact
 source ~/envs/sa_env/bin/activate
 cd /home/ucabbse/marl_sa_fast
 export TMPDIR=~/.tmp OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
@@ -59,7 +59,7 @@ python -u -m scripts.run_experiment \
   --lr 1e-3 --hidden 256 --episodes_per_update 16 \
   --oracle_draws 4000 \
   --seeds "${SEED}" --tag "${TAG}_s${SEED}" \
-  --ref_cache ~/sa_runs/gnn_budget/refs_"${TAG}".pkl \
-  --out "results/gnn_budget/${TAG}_s${SEED}.json"
+  --ref_cache ~/sa_runs/gnn_budget_exact/refs_"${TAG}".pkl \
+  --out "results/gnn_budget_exact/${TAG}_s${SEED}.json"
 
 echo "=== done $(date) ==="
