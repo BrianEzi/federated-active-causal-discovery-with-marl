@@ -128,7 +128,22 @@ class SamplingOracle(_OracleChoices):
     which pins its choices against the exact oracle at d=4,5,6.
     """
 
-    def __init__(self, dp, n_draws: int = 4000, burn_in: int = 5000, thin: int = 10,
+    # Defaults raised 2026-08-19 after measuring the shipped ones against exact DP
+    # marginals: burn_in=5000/thin=10 gave errors up to 0.10 and picked a DIFFERENT target
+    # from a well-mixed chain in 38% of episodes, giving up 0.065 nats on average. Since
+    # this oracle is the opponent every d=7 result is scored against, that made the
+    # baseline itself unreliable.
+    #
+    # Measured max |MH - exact| marginal error:
+    #     burn 20000 thin 20 -> 0.100
+    #     burn 50000 thin 50 -> 0.016
+    #     burn 100000 thin 20, 50000 draws -> 0.006
+    #
+    # These settings are a STOPGAP, not the principled fix. Acceptance is 5.8% regardless,
+    # because structure-MCMC is the wrong tool for a posterior whose effective support is
+    # ~172 graphs. The real fix is partition MCMC (Kuipers & Moffa 2017) or exact sampling
+    # from the DP; both are pending review.
+    def __init__(self, dp, n_draws: int = 4000, burn_in: int = 50_000, thin: int = 50,
                  seed: int = 0):
         self.dp = dp
         self.d = dp.d

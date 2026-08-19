@@ -2232,3 +2232,57 @@ its definition -- which matters given the d=7 oracle was found to be degraded, a
 score defined against that oracle inherited the problem. It also gives the graded version of
 GATE 1 that was missing: "how many bits of intervention-addressable uncertainty does this
 environment contain" rather than the binary "is intervention ever necessary".
+
+## 2026-08-19 -- two results that change the design
+
+[MEASURED] **No observational data creates a real planning horizon.** d=7, greedy oracle,
+sampler settings raised to the measured-adequate level first:
+
+    n_obs      mean interventions   median   >=3   >=5   solved
+    20000            2.18              2     23%    --    0.99
+        0            4.48              4     92%   30%    0.95
+
+This is the fix for the horizon problem. Interventions must now discover structure as well
+as orient it, and the decomposition shows exactly that: at d=5, H(E) goes 1.54 -> 11.44
+while H(G|E) stays ~2.3. It is the same shift I rejected when the n_obs sweep produced it
+accidentally and asymmetrically; done deliberately, with both arms starting from the same
+belief, it is legitimate -- and it is what most active causal discovery work actually
+studies.
+
+[CORRECTED] **Randomised intervention values ARE necessary. My argument that they were not
+was wrong.**
+
+I claimed the justification in `sa/scm.py` was mistaken -- that a constant-valued
+intervention is fine because Cooper & Yoo pools all rows for non-intervened nodes, so the
+intervened variable still varies across the pool and a child's dependence on it stays
+estimable. Measured:
+
+    d   n_obs   intervene_scale   greedy cost   solved
+    5    1000        2.0              1.900      1.000
+    5    1000        1.0              2.362      0.988
+    5    1000        0.0              3.525      0.925
+    5       2        2.0              2.788      0.963
+    5       2        0.0             12.438      0.475
+    4    1000        2.0              1.363      1.000
+    4    1000        0.0              2.175      0.988
+
+Atomic interventions are much worse -- catastrophically so with little observational data
+(12.44 interventions and a 47.5% solve rate against 2.79 and 96.3%).
+
+Where my reasoning failed: estimability is not the point, information is. A constant
+intervention tells you only that a descendant's mean and variance shifted -- essentially one
+number. A randomised one injects known variance you can measure covariance against, giving
+the full relationship within the interventional regime. The coefficient is estimable either
+way; the randomised experiment is simply far more informative per sample.
+
+[DECIDED] **Keep both intervention modes.** I was about to delete the VARY/CLAMP split as
+an artefact. It is not -- it is a genuine trade-off, and it makes the two-agent story
+sharper rather than messier:
+
+    VARY   more informative about your OWN structure, but leaves a confounder varying and
+           so cuts nothing for your partner
+    CLAMP  removes a confounder for your partner, but is a much weaker experiment for you
+
+So clamping is not merely an action whose benefit lands elsewhere -- it costs the clamping
+agent real experimental power. That is what makes the learned clamping behaviour a genuine
+sacrifice rather than a free gift.
