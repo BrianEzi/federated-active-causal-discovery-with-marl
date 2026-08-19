@@ -815,6 +815,9 @@ an obvious error. Fixed and commented at the call site.
 - The joint_conf old-vs-new comparison is a MEASUREMENT that has not been run yet. Until it
   is, no claim about which rule is better under the new formulation.
 - Regime bit still needs Mirco's ruling (draft written 2026-08-19).
-- User direction: test WITH and WITHOUT the regime bit, running the with-bit arm first, on
-  the view that the bit is necessary for coordination to work at all. The without-bit arm is
-  then the control that quantifies exactly what the bit buys.
+- [DECIDED, user, revised 2026-08-19] Test WITHOUT the regime bit FIRST, then with it.
+  The no-bit arm is the baseline, so the with-bit arm has a clear reference to move against
+  and any bug that shows up in the harder arm can be attributed rather than guessed at.
+  (This reverses the earlier with-bit-first ordering. The reasoning is better: the no-bit
+  arm is also the SIMPLER system, so it fails in fewer ways, and a broken baseline is much
+  easier to diagnose than a broken treatment.)

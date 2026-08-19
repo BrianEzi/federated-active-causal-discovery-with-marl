@@ -188,6 +188,12 @@ first, and that is the honest scaling statement to put in the thesis.
 - **`n_obs` and `n_int` sweeps** **[U6]** — parallel to phases 3–4, no dependency.
 - **Budget** — the sweep running now; feeds the Phase 3 gate design.
 - **The regime bit needs Mirco's ruling** **[U13]**. It is load-bearing for Phase 2's
-  disclosure protocol, so if he rejects it the design changes at Phase 2, not later. Worth
-  asking before Phase 2 starts.
+  disclosure protocol, so if he rejects it the design changes at Phase 2, not later. Draft
+  email written 2026-08-19.
+
+- **Arm order: no-bit FIRST, then with-bit** [U, 2026-08-19]. The no-bit arm is the
+  baseline and the simpler system, so it fails in fewer ways; a broken baseline is far
+  easier to diagnose than a broken treatment, and the with-bit arm then has a clear
+  reference to move against. This also means Phase 5 can start before Mirco replies --
+  the no-bit arm needs no disclosure protocol at all.
 - **Principled MCMC fix** — deferred indefinitely. The DP removes the need up to `k≈15`.
