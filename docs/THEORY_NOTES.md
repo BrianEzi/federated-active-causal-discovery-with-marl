@@ -269,3 +269,46 @@ Short answers worth being able to give without notes.
 - **What is `gap_closed`?** `(random − agent) / (random − greedy)` on episode cost, with
   unsolved episodes charged the full budget so an agent cannot score well by abandoning hard
   instances.
+
+## Training-algorithm alternatives to IPPO (raised 2026-08-19) -- ALL UNVERIFIED
+
+Recorded as leads. Every one needs checking against source before it enters the thesis.
+
+### Sequential Bayesian experimental design as an RL problem
+
+- **Foster, Ivanova, Malik, Rainforth (2021), "Deep Adaptive Design: Amortizing Sequential
+  Bayesian Experimental Design", ICML.** Trains a design policy against a differentiable
+  lower bound (sPCE) on the TOTAL expected information gain across a horizon.
+  *Why it matters*: this is our research question stated as an objective rather than hoped
+  for via reward. It also supplies a dense per-step signal, which attacks the sparse-reward
+  hypothesis behind the 1-in-10 seed collapse.
+- **Blau, Bonilla, Chades, Dezfouli (2022), "Optimizing Sequential Experimental Design with
+  Deep Reinforcement Learning", ICML.** The explicitly RL formulation of the same problem.
+  *Why it matters*: closest published framing to what we are building; determines whether
+  our contribution is the method or the federation of it.
+
+### Reward shaping
+
+- **Ng, Harada, Russell (1999)** -- already cited here for potential-based shaping.
+  *New use*: with potential `Phi(s) = -H(belief)`, the shaped reward is realised information
+  gain per step and the optimal policy is provably unchanged. Greedy EIG then becomes the
+  MYOPIC OPTIMUM OF THE AGENT'S OWN REWARD, which sharpens the headline claim rather than
+  weakening it.
+
+### Independent learners, and the CTDE exclusion
+
+- **de Witt et al. (2020), "Is Independent Learning All You Need in the StarCraft
+  Multi-Agent Challenge?"** Cover for IPPO as a strong baseline rather than a compromise.
+- **Yu et al. (2022), MAPPO**; **Rashid et al. (2018), QMIX**; **Sunehag et al. (2018),
+  VDN**; **Lowe et al. (2017), MADDPG.** All CTDE, all therefore EXCLUDED by the supervisor
+  constraint. Worth citing precisely as the scoped-out set -- a reader will otherwise ask
+  why the obvious cooperative-MARL algorithms are absent.
+- **Foerster et al. (2017), stabilising experience replay for deep MARL.** Relevant if IQL
+  is added as a sample-efficiency arm, since independent Q-learners face non-stationarity.
+
+### Planning
+
+- **Silver & Veness (2010), POMCP.** Available to us -- exact belief update plus a simulator.
+  Deprioritised on our own evidence, not on principle: two-step lookahead saves +0.103 (d=4)
+  and +0.063 (d=5) with CIs spanning zero, and the required horizon grows as log2(d) against
+  an inference wall at d~15-20. The curves never cross.
