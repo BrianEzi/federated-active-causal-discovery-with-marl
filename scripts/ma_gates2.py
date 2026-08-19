@@ -20,10 +20,15 @@ once and a whole results table had to be thrown away.
           gap is entirely a budget-scarcity effect and vanishes by budget ~10, so a slack
           budget would pass this gate while measuring nothing.
 
-  GATE 3  coordination must be necessary AND available. On CONFOUNDED episodes, a
-          never-clamping pair must fail and a forced-clamping pair must succeed. The gap
-          between them is the headroom a learned policy competes for. No gap, no
-          coordination problem, and the two-agent case collapses into two single-agent ones.
+  GATE 3  coordination must be necessary AND available. On CONFOUNDED episodes, a pair that
+          CANNOT clamp (vary-only) must do worse than a pair that can. The gap is the
+          headroom a learned policy competes for. No gap, no coordination problem, and the
+          two-agent case collapses into two single-agent ones.
+
+          The upper arm is a MIXED policy, not an always-clamping one. Always clamping your
+          own private node destroys your own boundary information -- see the comment at the
+          arm itself. That is a finding, not a technicality: pure altruism is dominated, so
+          the coordination problem is one of TIMING, not of willingness.
 
 Usage:
     python scripts/ma_gates2.py --episodes 200 --budget 3
@@ -121,21 +126,37 @@ def main(argv=None) -> dict:
                          "disclose_regime": args.disclose_regime}}
 
     # -- GATE 1 --------------------------------------------------------------------------
-    observational = []
+    # CONDITIONED ON UNCONFOUNDED EPISODES, and this is a correction to the gate rather
+    # than a convenience. A confounded window is a latent projection, not a DAG, so its
+    # true DAG is NOT identifiable from observational data at any sample size -- measured
+    # 0.0000 at n_obs=30000, unchanged from n_obs=3000. The singleton-MEC target is
+    # computed under a DAG model and therefore only predicts the unconfounded subset.
+    # Comparing it to the pooled rate guarantees a spurious failure of exactly the
+    # confounded fraction.
+    observational, unconfounded_only = [], []
     for episode in range(args.episodes):
         result = env.reset(seed=args.seed * 7919 + episode)
+        confounded = (bool(bidirected_pairs(env.true_adjacency,
+                                            env.topology.observed_by("A")))
+                      or bool(bidirected_pairs(env.true_adjacency,
+                                               env.topology.observed_by("B"))))
         observational.append(float(result.info["both_identified"]))
-    observational = np.asarray(observational)
+        if not confounded:
+            unconfounded_only.append(float(result.info["both_identified"]))
+    pooled_rate = float(np.mean(observational))
+    observational = np.asarray(unconfounded_only)
     rate, ci = float(observational.mean()), bootstrap_ci(observational, seed=args.seed)
     target = singleton_fraction(env, args.draws, args.seed)
     passed1 = bool(ci[0] <= target["estimate"] <= ci[1]
                    or target["ci"][0] <= rate <= target["ci"][1])
     side = "leak (too easy)" if rate > target["estimate"] else "power (cannot concentrate)"
     report["gate1"] = {"rate": rate, "ci": ci, "target": target,
+                       "pooled_rate": pooled_rate, "n_unconfounded": len(observational),
                        "passed": passed1, "failure_side": None if passed1 else side}
-    print(f"GATE 1  observational {rate:.4f} CI {ci[0]:.4f}-{ci[1]:.4f}  "
-          f"target {target['estimate']:.4f}  -> {'PASS' if passed1 else 'FAIL: ' + side}",
-          flush=True)
+    print(f"GATE 1  observational (unconfounded, n={len(observational)}) {rate:.4f} "
+          f"CI {ci[0]:.4f}-{ci[1]:.4f}  target {target['estimate']:.4f}  "
+          f"[pooled incl. confounded {pooled_rate:.4f}]  "
+          f"-> {'PASS' if passed1 else 'FAIL: ' + side}", flush=True)
 
     # -- GATE 2 --------------------------------------------------------------------------
     greedy = {n: GreedyAgent(n, env, seed=args.seed) for n in AGENTS}
@@ -150,8 +171,16 @@ def main(argv=None) -> dict:
           f"  -> {'PASS' if passed2 else 'FAIL'}", flush=True)
 
     # -- GATE 3 --------------------------------------------------------------------------
+    # The upper arm is random_clamp, NOT forced_clamp. Measured 2026-08-19: an agent that
+    # clamps its own private node EVERY round never learns that node's parents, because a
+    # constant carries no information about what drives it -- and those boundary edges are
+    # part of its OWN success criterion. Traced directly: A rises 0.368 -> 0.814 while B,
+    # clamping every round, stays at 0.04 and never identifies. So "always clamp" is
+    # self-defeating and cannot be the coordination ceiling. What is needed is a MIX --
+    # clamp some rounds, experiment on others -- which is what random_clamp does and what
+    # a learned policy would have to discover.
     never = {n: RandomAgent(n, seed=args.seed + 2, allow_clamp=False) for n in AGENTS}
-    forced = {n: ForcedClampAgent(n, seed=args.seed + 3) for n in AGENTS}
+    forced = {n: RandomAgent(n, seed=args.seed + 3, allow_clamp=True) for n in AGENTS}
     g3_never = play(env, never, args.episodes, args.seed, only=True)
     g3_forced = play(env, forced, args.episodes, args.seed, only=True)
     headroom = g3_forced["rate"] - g3_never["rate"]

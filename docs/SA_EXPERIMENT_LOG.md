@@ -2393,3 +2393,58 @@ correct behaviour, but the failure means something quite different from the d=3 
 submit_sa_gnn_budget.sh (42 tasks) held on it. References are ~8.5 s/episode at d=7 and are
 identical across seeds, so computing them per-seed would triple the most expensive part and
 race on the cache file.
+
+## 2026-08-19 -- two principled sampler fixes, implemented and compared
+
+Grounded in two papers, both checked before writing code:
+  Talvitie, Vuoksenmaa & Koivisto, "Exact Sampling of DAGs from Modular Distributions",
+    UAI 2019. O~(3^n) preprocessing, O~(2^n) per sample. Precondition: MODULAR weights --
+    which is exactly the form our BGe + modular prior already has.
+  Kuipers & Moffa, "Partition MCMC for Inference on Acyclic Digraphs", JASA 2017
+    (arXiv:1504.05006). Samples ordered partitions; unbiased, unlike order MCMC.
+
+### Exact sampler: WORKS, and is validated independently
+
+`sa/dag_samplers.py:LayeredExactSampler`. Decomposes a DAG by SOURCE LAYERS, which is what
+avoids signed terms: the layer weight is prod_v [alpha_v(U) - alpha_v(U\L)], a difference of
+sums over NESTED sets and therefore non-negative by construction. The DP's own Robinson sink
+recurrence is alternating inclusion-exclusion and its terms can be negative -- negative terms
+cannot be sampled from, which is the whole reason a different decomposition is needed.
+
+[MEASURED] Independent validation: the layered recurrence and the DP's signed sink recurrence
+agree on log Z to 2.3e-13 (d=4) and 4.5e-13 (d=5), sharing no code path.
+
+[MEASURED] Accuracy against exact DP edge marginals, 2000 draws:
+    d=4   mh_old 0.0300   mh_shipped 0.0073   exact 0.0106
+    d=5   mh_old 0.0300   mh_shipped 0.0252   exact 0.0083
+  Convergence at d=6 over 200/500/1000/2000/4000 draws:
+    exact       0.0696 0.0109 0.0099 0.0074 0.0150
+    mh_shipped  0.0489 0.0554 0.0122 0.0078 0.0128
+  Both track 1/sqrt(n) at these sizes. The exact sampler's advantage is NOT raw accuracy
+  here -- it is that its draws are independent by construction, so there is no burn-in to
+  tune, no thinning, no autocorrelation, and no mixing floor to discover later. mh_shipped
+  buys its accuracy with 50k burn-in per call; exact buys it with an O(3^n) table.
+
+### Partition MCMC: NOT WORKING. Do not use it or cite it.
+
+[CORRECTED] First implementation omitted the Hastings proposal ratio. Split and join are not
+symmetric -- a join has one way to merge a pair, the reverse split must choose one of 2^s - 2
+non-empty proper subsets -- so the chain targeted the WRONG distribution and converged
+confidently to it. Max error 0.60 against exact.
+
+[CORRECTED, still broken] Adding the ratio (+log(2^s-2) for split, -log(...) for join, 0 for
+the symmetric swap) did not fix it. Error is still ~0.40-0.50 and, decisively, DOES NOT
+IMPROVE WITH BURN-IN:
+    burn   2000  err 0.4988  acc 0.0105
+    burn  50000  err 0.4338  acc 0.0100
+    burn 400000  err 0.4988  acc 0.0133
+  A slow-mixing chain improves with 200x the burn-in. This does not, so it is a correctness
+  bug, not a mixing problem. The target score and the conditional DAG draw are both verified
+  correct (the same layer recurrence produces the right log Z), so the bug is in the move set
+  or the ratio and I have not found it.
+
+[DECIDED] Ship the exact sampler; mark partition MCMC broken in the docstring rather than
+delete it. At our sizes (window k=4, single-agent d<=7) the exact sampler covers everything,
+so partition MCMC was only ever the fallback for d past its reach. Fixing it is not on the
+critical path and should not be done by guessing -- it needs the full Kuipers-Moffa move set
+read from the paper.
