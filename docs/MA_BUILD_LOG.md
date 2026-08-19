@@ -947,3 +947,57 @@ is an expectation and is NOT measured. It must not be cited as a speedup.
 
 [NOTE] Absolute timings taken this evening are contaminated -- gate runs were competing for
 CPU throughout. Relative profiles are still informative; wall-clock numbers are not.
+
+## 2026-08-19 (late) -- gates v5, and a retraction
+
+    GATE 1  observational (unconfounded, n=507) 0.0394 CI 0.0237-0.0592  target 0.0402  PASS
+    GATE 2  unconfounded: greedy 0.074 CI 0.051-0.096  vs random 0.147 CI 0.118-0.178  FAIL
+    GATE 3  confounded (n=56): never-clamp 0.000  vs clamping 0.393  headroom +0.393    PASS
+
+### GATE 3 passes, and under the strict criterion it is a cleaner result than v4's
+
+v4, under the leaky criterion, gave 0.143 vs 0.571. v5, requiring the confounding claim to
+be correct, gives **0.000 vs 0.393**. The never-clamping arm collapses to exactly zero, which
+is the mechanism made visible: without clean rows the confounding claim is UNFALSIFIABLE, so
+a pair that never clamps cannot in principle satisfy the criterion, at any budget, ever.
+Clamping is what makes the claim testable. That is a much stronger statement than "clamping
+helps".
+
+### [RETRACTED] "The greedy oracle never clamps -- that is the myopic objective behaving
+### correctly." This was an artefact of the baseline's own code.
+
+`ma/baselines.py:GreedyAgentPolicy` builds its action set as
+
+    self.candidate_actions = [view.actions.index((node, VARY)) for node in view.authority]
+
+VARY only. The old greedy COULD NOT CLAMP. Its measured clamp_fraction of 0.000 was true by
+construction, and the comment three lines above it -- "a self-interested agent will therefore
+never clamp to help its partner" -- states the assumption that the measurement then returned.
+I reported that number repeatedly as a discovery about myopic information gain. It was not.
+
+What is actually true, and is the better claim: myopic EIG is INDIFFERENT between VARY and
+CLAMP, because both cut the target's incoming edges and induce the same descendant partition.
+The objective does not determine the mode at all, so behaviour is decided entirely by the
+tie-break. `ma/baselines2.py:GreedyAgent` offers both modes and breaks ties uniformly, giving
+clamp_fraction **0.526**.
+
+### GATE 2 inverts, and I do NOT yet know why
+
+Greedy 0.074 against random 0.147 on unconfounded episodes -- the reference is worse than the
+floor. My first explanation was that greedy fails to generate clean rows. MEASURED, AND IT IS
+WRONG:
+
+    policy         clamps own PRIVATE node   mean clean rows for A
+    greedy               0.116                     40
+    random_clamp         0.068                     20
+
+Greedy clamps its own private node MORE often than random and produces TWICE the clean rows,
+and still scores half as well. So the cause is not clean-data generation. Candidate
+explanations not yet tested: greedy concentrates its interventions on a few high-EIG targets
+(the known repeat-target pathology), and ruling out 24 rival confounding assignments may need
+BREADTH of intervention rather than depth. That is a hypothesis, not a finding.
+
+[DECIDED] GATE 2 is BLOCKED pending that diagnosis. It is not obviously the environment's
+fault: a reference policy that is worse than random may simply be the wrong reference for
+this task. But "my baseline is bad" and "my environment is bad" are exactly the two things a
+gate is supposed to distinguish, so no training runs until it is understood.
