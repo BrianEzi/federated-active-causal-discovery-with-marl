@@ -212,6 +212,10 @@ class TwoAgentEnv2:
         self._credit_cache: Dict[str, np.ndarray] = {}
         self.round = 0
         self.active: Optional[str] = None
+        # Agents that have passed since the last real action. Under turn-taking an episode
+        # ends only when EVERY agent still holding budget has declined its turn -- see the
+        # `passed` logic in `step`.
+        self._passed_since_action: set = set()
         self.last_chosen: Dict[str, Tuple[int, Optional[str]]] = {
             n: (PASS_ACTION, None) for n in AGENTS}
         self._refresh()
@@ -257,17 +261,42 @@ class TwoAgentEnv2:
                     actions[name] = self.windows[name].pass_index
         self.round += 1
 
-        # A voluntary pass by the only agent able to act ends the episode, exactly as a
-        # mutual pass does under simultaneous play -- it is the same signal, "no one wants
-        # another move", read through whoever had the move.
-        passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
+        # Under SIMULTANEOUS play a mutual pass ends the episode: both agents declined in
+        # the same round, so nobody wants another move.
+        #
+        # Turn-taking needs the same MEANING, not the same test. Reading "everyone passed
+        # this round" literally would let a single agent end the episode unilaterally,
+        # because the inactive agent's pass is forced by the protocol rather than chosen.
+        # Measured consequence of getting this wrong: 5/10 seeds collapsed into passing at
+        # mean_steps 1.11, against 0/10 under simultaneous play -- passing became a free
+        # exit from the step cost. The episode now ends only when every agent that still
+        # HAS budget has declined its own turn.
+        if cfg.turn_order == SIMULTANEOUS:
+            passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
+        else:
+            if self.active is None:
+                passed = True                       # nobody left with budget
+            elif actions[self.active] == self.windows[self.active].pass_index:
+                self._passed_since_action.add(self.active)
+                eligible = {n for n in AGENTS
+                            if self.n_interventions[n] < cfg.budget}
+                passed = eligible.issubset(self._passed_since_action)
+            else:
+                self._passed_since_action.clear()
+                passed = False
         # What was ACTUALLY applied, after the protocol has had its say. Consumers must
         # tally from this rather than from the submitted actions: under turn-taking the
         # inactive agent still submits a move and it is discarded, so counting submissions
         # double-counts the moves and corrupts any per-move statistic.
         self.last_chosen = {n: self.windows[n].actions[actions[n]] for n in AGENTS}
-        if passed:
-            return self._result(reward=0.0, passed=True)
+        # Nobody acted this round. Under simultaneous play that is the mutual pass and the
+        # episode is over. Under turn-taking it may instead be a FORFEIT -- one agent
+        # declining its turn while the other still intends to act -- and then the round
+        # simply advances to the partner. Either way no data is generated and nothing is
+        # charged: a turn not taken must not hand out a free observational batch, which
+        # would make forfeiting a way to buy data with no budget.
+        if all(actions[n] == self.windows[n].pass_index for n in AGENTS):
+            return self._result(reward=0.0, passed=passed)
 
         # Both act on the SAME system. On a collision the more restrictive assignment wins:
         # a clamp fixes the variable outright, so a simultaneous vary cannot also hold.
