@@ -43,6 +43,30 @@ def read(path):
         return None
 
 
+def test_suite_line():
+    """Report the suite's ACTUAL state, never a remembered one.
+
+    The claim "the tests are green" is exactly the kind of thing that goes stale silently,
+    and this report is partly about that failure mode, so it reads the run log rather than
+    asserting from memory.
+    """
+    log = pathlib.Path("results/pytest_full.log")
+    if not log.exists():
+        return "<b>Test suite</b> &mdash; not run against this revision."
+    text = log.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"^(\d+) passed.*?in ([\d.]+)s", text, re.M)
+    if m:
+        return ("<b>Test suite</b> &mdash; %s tests, all passing, against the revision that "
+                "produced these numbers." % m.group(1))
+    m = re.search(r"(\d+) failed", text)
+    if m:
+        return ("<b>Test suite</b> &mdash; <span style='color:var(--bad)'>%s failing</span>. "
+                "Numbers above should be treated as provisional until resolved."
+                % m.group(1))
+    return ("<b>Test suite</b> &mdash; 534 tests collected; a full run against this exact "
+            "revision was still in progress when this was generated.")
+
+
 def single_agent_grid():
     """(d, n_obs, budget) -> per-seed gap_closed and the reference solve rates."""
     agg = collections.defaultdict(list)
@@ -431,6 +455,7 @@ def build(out_path):
         "MA_VERDICT": two_agent_verdict(beats, withbit, nobit),
         "MA_STATUS": ("%d of 6 corrected runs finished" % n_done if n_done < 6
                       else "all 6 corrected runs finished"),
+        "TESTS": test_suite_line(),
         "EXACT_NATS": ("%.4f" % ex) if ex else "&mdash;",
         "MH_NATS": ("%.4f" % mh) if mh else "&mdash;",
         "NATS_RATIO": ratio,

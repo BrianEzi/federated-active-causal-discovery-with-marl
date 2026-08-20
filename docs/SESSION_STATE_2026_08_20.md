@@ -29,13 +29,38 @@ only. Supervisor (Mirco) meeting **today at 15:00**; report wanted by 14:45.
 - NOTE: Myriad's checkout has a `git stash` holding earlier result files
   (`cluster results before stepcost pull`). Do not lose it.
 
-## NOT YET DONE — the report
+## SETTLED SINCE THIS CHECKPOINT WAS WRITTEN (afternoon, 20 Aug)
+
+- **The simplest two-agent case works under the corrected metric.** With the regime bit,
+  3/3 seeds: learned 0.467 / 0.327 / 0.500 against a random floor of 0.200 / 0.160 / 0.200,
+  non-overlapping intervals, in roughly half the moves (3.2–4.2 steps vs 7.2–7.6).
+  `results/ma_fixed/withbit_fixed_s*.json`.
+- **GATE 3 re-measured and passes with a WIDER margin**: never-clamp 0.012 vs mixed-clamp
+  0.249, n=169, headroom **+0.237** (was +0.184 at n=38). `results/ma_fixed/gate3_recheck.json`,
+  produced by `scripts/ma_gate3_recheck.py`. The old criterion was suppressing the
+  can-clamp arm more than the cannot-clamp arm — I predicted the opposite sign.
+- **GATE 2's failure independently reproduced**: greedy at or below random on 3/3 seeds
+  (0.151 vs 0.187), different harness and criterion from the gate run.
+- **Disclosure moves the BELIEF, not just the policy.** No-bit random floor ~0.03 against
+  with-bit ~0.19. Each arm must be scored against its own floor; the with-bit/no-bit
+  contrast is NOT a clean learnability test.
+- **The no-bit arm collapses to passing (0.00 steps) even under the corrected metric** —
+  so the collapse was never a measurement artefact. Zero-cost control running locally
+  (`results/ma_fixed/nobit_nocost_fixed_s*.json`).
+- **Single-agent GATE 1 fails in all 42 runs**, always on the BELOW-target side (0.040 vs
+  0.089 at d=5). That is a power problem, not a leak: the comparison stands, absolute
+  identification rates do not.
+- **Report built and published.** `scripts/supervisor_report.py` +
+  `scripts/supervisor_report_template.html` → https://claude.ai/code/artifact/f0ad745e-0a27-44ef-bb53-eba0a4f0db14
+  The stale pre-correction artifact now serves a withdrawal notice pointing at it.
+
+## DONE — the report
 
 The supervisor report was being drafted when this checkpoint was written. Generator and
 template exist and work: `scripts/ma_report.py` + `scripts/ma_report_template.html`.
 An earlier version is published at
 https://claude.ai/code/artifact/8470339a-df3f-4e2f-88b8-213c41f90224
-but **it states the pre-correction interpretation and must be updated or withdrawn.**
+but that URL now serves a **withdrawal notice** instead, pointing at the corrected report.
 
 Recommended framing, agreed with the user: lead with **methodology and corrections**, not
 two-agent numbers. Two seeds is a sanity check, not a result.

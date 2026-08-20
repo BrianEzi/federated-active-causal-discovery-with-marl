@@ -1,0 +1,48 @@
+<title>Withdrawn: Two Agents, One Bit</title>
+<style>
+:root { --ground:#F6F7F5; --ink:#14181B; --muted:#5C6569; --rule:#DBDFDC;
+        --bad:#A6402F; --link:#0E6B77; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ground:#101315; --ink:#E7EAE8; --muted:#98A1A5;
+    --rule:#282D30; --bad:#E88274; --link:#4FB6C4; }
+}
+:root[data-theme="dark"] { --ground:#101315; --ink:#E7EAE8; --muted:#98A1A5;
+  --rule:#282D30; --bad:#E88274; --link:#4FB6C4; }
+* { box-sizing:border-box; }
+body { background:var(--ground); color:var(--ink); margin:0; padding:0 20px 5rem;
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  font-size:17px; line-height:1.62; }
+.wrap { max-width:38rem; margin:0 auto; padding-top:5rem; }
+.tag { font-family:ui-monospace,Consolas,Menlo,monospace; font-size:11px;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--bad);
+  border:1px solid currentColor; border-radius:3px; padding:.2rem .5rem;
+  display:inline-block; margin-bottom:1.4rem; }
+h1 { font-family:system-ui,"Segoe UI",sans-serif; font-size:2.2rem; font-weight:700;
+  letter-spacing:-.025em; line-height:1.1; margin:0 0 1rem; text-wrap:balance; }
+p { margin:1rem 0; }
+a { color:var(--link); }
+ul { padding-left:1.2rem; } li { margin:.5rem 0; }
+.hr { height:1px; background:var(--rule); margin:2.5rem 0; }
+.foot { font-family:system-ui,sans-serif; font-size:13px; color:var(--muted); }
+</style>
+<div class="wrap">
+  <span class="tag">Withdrawn &middot; 20 August 2026</span>
+  <h1>This report has been withdrawn</h1>
+  <p>It reported two-agent training results scored with a success metric that could not be
+  earned on <b>confounded</b> episodes &mdash; the case the two-agent design exists to study.
+  On those episodes the reported rate was structurally 0.000, so every headline figure in it
+  was silently conditioned on the episodes that need no coordination.</p>
+  <p>What that invalidates:</p>
+  <ul>
+    <li>the with-bit and no-bit success rates, and the paired comparison against random;</li>
+    <li>any statement in it about how the two arms compare.</li>
+  </ul>
+  <p>The fault was found and fixed on the morning of 20 August, the affected runs were
+  re-done, and the corrected results &mdash; along with a full account of the bug and the
+  test that now guards against it &mdash; are in the current briefing:</p>
+  <p><a href="https://claude.ai/code/artifact/f0ad745e-0a27-44ef-bb53-eba0a4f0db14">Confounded
+  by Design &rarr;</a></p>
+  <div class="hr"></div>
+  <p class="foot">Kept in place rather than deleted, so that anyone holding a link to the
+  earlier version finds the correction instead of the withdrawn claims.</p>
+</div>
