@@ -162,6 +162,21 @@ Instead you can recurse over **subsets of nodes**. Two families:
   networks", UAI** *(verify)*. Corrects the order-modular bias.
 - **Silander & Myllymäki (2006), "A simple approach for finding the globally optimal
   Bayesian network structure", UAI** *(verify)*. DP for the MAP structure.
+- **Talvitie, Vuoksenmaa & Koivisto (2019), "Exact Sampling of Directed Acyclic Graphs from
+  Modular Distributions", UAI 2019 (Tel Aviv, 22-25 July).** VERIFIED against source
+  2026-08-20: paper exists, authorship and title confirmed, Best Student Paper at UAI 2019.
+  PDF: http://auai.org/uai2019/proceedings/papers/345.pdf ; reference implementation at
+  https://github.com/ttalvitie/modular-dag-sampling
+  CITATION QUIRK worth getting right in the bibliography: the proceedings appear in PMLR
+  volume 115, which carries a **2020** date, so tooling will render it `talvitie20a` while
+  the conference was 2019. Cite the conference year and the volume explicitly.
+  *Why it matters*: this is the basis of `sa/dag_samplers.LayeredExactSampler`. The method
+  samples a DAG exactly from a modular distribution by decomposing over SOURCE LAYERS, which
+  is what lets us avoid the alternating signs that make the subset DP's
+  inclusion-exclusion numerically delicate. It replaced a Metropolis-Hastings sampler that
+  was losing 0.1116 nats against an exact reference, where this one loses 0.0018 -- 62x --
+  and its partition function agrees with our independently derived DP to 1e-13.
+
 - **Robinson's recurrence** for counting labelled DAGs — the sink/inclusion–exclusion
   identity our implementation uses. Search "Robinson counting labelled acyclic digraphs".
 - **Björklund, Husfeldt, Kaski & Koivisto (2007), "Fourier meets Möbius: fast subset
