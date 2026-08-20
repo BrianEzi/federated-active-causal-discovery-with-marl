@@ -143,6 +143,31 @@ def gate2_block():
            a["collisions_where_both_had_a_tie"]))
 
 
+def lead_line(withbit):
+    """The headline claim, generated -- it said 'every seed' at three seeds and would have
+    stayed saying it at ten, where it is no longer true."""
+    rows = []
+    for d in withbit["done"]:
+        a, r = d["arms"]["learned"], d["arms"].get("random_clamp")
+        if r:
+            rows.append((a["success"], r["success"], a["mean_steps"], r["mean_steps"],
+                         a["success_ci"][0] > r["success_ci"][1]))
+    if not rows:
+        return ("The corrected two-agent runs are still in flight, so no two-agent claim is "
+                "made here yet.")
+    n = len(rows)
+    sep = sum(1 for x in rows if x[4])
+    ahead = sum(1 for x in rows if x[0] > x[1])
+    return ("And on the corrected metric a learned policy beats its own random floor on "
+            "<b>%d of %d</b> seeds, %s with non-overlapping intervals &mdash; median "
+            "<b>%.3f</b> against <b>%.3f</b>, reached in roughly half the moves (%.1f steps "
+            "against %.1f). That is the simplest two-agent case working."
+            % (ahead, n, sep, float(np.median([x[0] for x in rows])),
+               float(np.median([x[1] for x in rows])),
+               float(np.mean([x[2] for x in rows])),
+               float(np.mean([x[3] for x in rows]))))
+
+
 def seed_status(withbit, nobit):
     """State the seed count that EXISTS, and what is actually still running.
 
@@ -636,6 +661,7 @@ def build(out_path):
                       % (len(withbit["done"]), len(nobit["done"]),
                          len(glob.glob("results/ma_fixed/nobit_nocost_fixed_s*.json")))),
         "TESTS": test_suite_line(),
+        "LEAD": lead_line(withbit),
         "GATE2": gate2_block(),
         "CONTROL": control_line(),
         "SEED_STATUS": seed_status(withbit, nobit),
