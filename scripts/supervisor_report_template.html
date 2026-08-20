@@ -411,12 +411,11 @@ measuring did not.</p>
 
 
 <h2>Two agents: provisional</h2>
-<p class="sub">{{MA_STATUS}} &mdash; three seeds per arm, 2000 training episodes, budget 8</p>
+<p class="sub">{{MA_STATUS}}</p>
 
 <p>These are the first two-agent numbers whose value on a confounded episode is not
-structurally zero. Treat them as a sanity check on the corrected pipeline rather than a
-result: a handful of seeds is enough to see whether learning happens, and not enough to size
-the effect. {{SEED_STATUS}}</p>
+structurally zero. They are enough to establish <i>that</i> learning happens, and not yet
+enough to size the effect precisely. {{SEED_STATUS}}</p>
 
 <p>The comparison being re-run is the <b>regime bit</b> &mdash; whether telling an agent
 which data-collection regime each sample came from is what makes coordination learnable.
@@ -428,9 +427,9 @@ identifiable at all.</p>
 
 <p>Two consequences. First, cross-arm comparisons of the learned rate are meaningless, and
 each arm is scored against <b>its own</b> random floor throughout. Second, the with-bit /
-no-bit contrast is not the clean test of learnability it was being read as, because it
-confounds a belief effect with a learning effect &mdash; which is what the zero-cost control
-is for.</p>
+no-bit contrast on its own is not the clean test of learnability it was being read as,
+because it mixes a belief effect with a learning effect. Separating them needs a control,
+which has since run &mdash; and its answer is the last section below.</p>
 
 <p>{{MA_VERDICT}}</p>
 

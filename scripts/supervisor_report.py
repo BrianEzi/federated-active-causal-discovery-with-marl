@@ -109,14 +109,10 @@ def seed_status(withbit, nobit):
     """
     counts = "%d with the regime bit and %d without" % (len(withbit["done"]),
                                                         len(nobit["done"]))
-    extra = len(withbit["curves"]) - len(withbit["done"])
-    tail = ""
-    if extra > 0:
-        tail = (" A further %d with-bit seeds are training now, and a twenty-task cluster "
-                "array covers the zero-cost control." % extra)
-    else:
-        tail = " A twenty-task cluster array covers the zero-cost control."
-    return ("Finished so far: <b>%s</b>.%s" % (counts, tail))
+    extra = withbit.get("training", 0) + nobit.get("training", 0)
+    tail = (" A further %d %s training now." % (extra, "is" if extra == 1 else "are")
+            if extra > 0 else "")
+    return "Finished so far: <b>%s</b>.%s" % (counts, tail)
 
 
 def single_agent_grid():
@@ -153,16 +149,31 @@ def curves_from_log(path):
 
 
 def two_agent(arm):
-    """Finished runs plus in-flight curves for one arm."""
+    """Finished runs plus in-flight curves for one arm.
+
+    Curves come from two places because the first seeds were launched by hand and the rest
+    through `scripts/ma_seed_batch.py`, which writes elsewhere. A finished run carries its
+    own history in the JSON; only a run still training needs its log parsed.
+    """
     done = [d for d in (read(p) for p in
                         sorted(glob.glob("results/ma_fixed/" + arm + "_s*.json"))) if d]
+    finished = {d["seed"] for d in done}
     stem = "ma_fixed_s" if arm == "withbit_fixed" else "ma_fixed_nobit_s"
+
     curves = []
-    for seed in range(6):
-        c = curves_from_log("results/" + stem + str(seed) + ".log")
-        if c:
-            curves.append((seed, c))
-    return {"done": done, "curves": curves}
+    for d in done:
+        if d.get("history"):
+            curves.append((d["seed"], d["history"]))
+    for seed in range(24):
+        if seed in finished:
+            continue
+        for path in ("results/%s%d.log" % (stem, seed),
+                     "results/batch_logs/%s_s%d.log" % (arm, seed)):
+            c = curves_from_log(path)
+            if c:
+                curves.append((seed, c))
+                break
+    return {"done": done, "curves": curves, "training": len(curves) - len(done)}
 
 
 # -- svg ---------------------------------------------------------------------------------
@@ -575,8 +586,12 @@ def build(out_path):
         "GATES": gate_block(gates, gate3, withbit),
         "MA_CURVES": ma_curves, "MA_BARS": ma_bars,
         "MA_VERDICT": two_agent_verdict(beats, withbit, nobit),
-        "MA_STATUS": ("%d of 6 corrected runs finished" % n_done if n_done < 6
-                      else "all 6 corrected runs finished"),
+        # Generated, because "three seeds per arm" was true when written and wrong an
+        # hour later.
+        "MA_STATUS": ("%d seeds with the regime bit, %d without, %d zero-cost controls "
+                      "&mdash; 2000 training episodes each, budget 8"
+                      % (len(withbit["done"]), len(nobit["done"]),
+                         len(glob.glob("results/ma_fixed/nobit_nocost_fixed_s*.json")))),
         "TESTS": test_suite_line(),
         "CONTROL": control_line(),
         "SEED_STATUS": seed_status(withbit, nobit),
