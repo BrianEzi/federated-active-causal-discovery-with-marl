@@ -59,12 +59,97 @@ class _Window:
                 self.signatures[i, node] = int(
                     np.dot(reach[node], 1 << np.arange(k)))
         self.n_groups = [len(np.unique(self.signatures[:, n])) for n in range(k)]
+        # MARKOV EQUIVALENCE PARTITION, precomputed. Which class a graph belongs to is a
+        # property of the graph space and never changes, but `credit_set` recomputed
+        # `mec_signature` for all 543 graphs on every call, and `singleton_fraction`
+        # recomputed it once per DRAW. Stored as integer class ids so membership is an
+        # array comparison rather than a set comparison.
+        from sa.graphs import mec_signature
+        lookup: Dict[object, int] = {}
+        self.mec_id = np.zeros(self.n_dags, dtype=np.int64)
+        for i, dag in enumerate(self.dags):
+            sig = mec_signature(dag)
+            if sig not in lookup:
+                lookup[sig] = len(lookup)
+            self.mec_id[i] = lookup[sig]
+        self._sig_to_id = lookup
+        # How many graphs share each class -- `singleton_fraction` needs exactly this.
+        self.mec_size = np.bincount(self.mec_id)
+
+    def id_of(self, adjacency: np.ndarray) -> int:
+        """Class id of an arbitrary graph on this window, or -1 if it is not one."""
+        from sa.graphs import mec_signature
+        return self._sig_to_id.get(mec_signature(adjacency), -1)
 
     @classmethod
     def get(cls, k: int) -> "_Window":
         if k not in cls._cache:
             cls._cache[k] = cls(k)
         return cls._cache[k]
+
+
+
+class _PerDagIndex:
+    """Precomputed `(DAG, node) -> parent-set slot` tables.
+
+    THE MAPPING IS DATA-INDEPENDENT. Which parent set a DAG gives a node is a property of
+    the graph space, not of any dataset, so it can be built once and reused for every
+    episode, every rule, and every belief update. `RegimeScorer._build_index` already did
+    this for the enumerated path and the DP rewrite did not carry it over.
+
+    What it replaces: `per_dag` looped 543 DAGs x 4 nodes in Python, rebuilding a parent
+    tuple with `np.flatnonzero` and doing a dict lookup each time, twice per assignment
+    across 25 assignments -- about 109,000 Python iterations per call, measured at 598 ms.
+    Evaluation ran this twice per episode, so it was roughly 40% of every training job.
+
+    Three tables:
+      `own`        [n_dags, k]                 the DAG's own parent set, per node
+      `stripped`   [n_dags, n_assign, k]       parents MINUS that assignment's confounding
+                                               edges, which is what the CLEAN regime scores
+      `compatible` [n_dags, n_assign]          does the DAG contain the assignment's edges
+    """
+
+    _cache: Dict[tuple, "_PerDagIndex"] = {}
+
+    def __init__(self, k: int, assignments, scorer):
+        space = _Window.get(k)
+        self.k = k
+        self.n_dags = space.n_dags
+        self.n_assign = len(assignments)
+        self.own = np.zeros((space.n_dags, k), dtype=np.int64)
+        self.stripped = np.zeros((space.n_dags, self.n_assign, k), dtype=np.int64)
+        self.compatible = np.ones((space.n_dags, self.n_assign), dtype=bool)
+
+        required = []
+        for assignment in assignments:
+            need = [set() for _ in range(k)]
+            for edge in assignment:
+                if edge is not None:
+                    need[edge[1]].add(edge[0])
+            required.append(need)
+
+        for i, dag in enumerate(space.dags):
+            parents = [tuple(np.flatnonzero(dag[:, node]).tolist()) for node in range(k)]
+            for node in range(k):
+                self.own[i, node] = scorer.lookup[node][parents[node]]
+            for a, need in enumerate(required):
+                ok = True
+                for node in range(k):
+                    if not need[node]:
+                        self.stripped[i, a, node] = self.own[i, node]
+                        continue
+                    if not need[node].issubset(parents[node]):
+                        ok = False
+                    kept = tuple(p for p in parents[node] if p not in need[node])
+                    self.stripped[i, a, node] = scorer.lookup[node][kept]
+                self.compatible[i, a] = ok
+
+    @classmethod
+    def get(cls, k: int, assignments, scorer) -> "_PerDagIndex":
+        key = (k, tuple(assignments))
+        if key not in cls._cache:
+            cls._cache[key] = cls(k, assignments, scorer)
+        return cls._cache[key]
 
 
 def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
@@ -78,23 +163,19 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
     belief = window.belief
     space = _Window.get(window.k)
     clean = np.asarray(clean, dtype=bool)
+    index = _PerDagIndex.get(window.k, belief.assignments, belief.scorer)
+    nodes = np.arange(window.k)
 
-    def per_dag(table: np.ndarray, strip=None) -> np.ndarray:
-        """Total log score of every DAG under one local-score table.
+    def per_dag(table: np.ndarray, slots: Optional[np.ndarray] = None) -> np.ndarray:
+        """Total log score of every DAG, as one gather-and-sum over the precomputed slots.
 
-        `strip[node]` names parents to REMOVE before the lookup -- the confounding edges,
-        which belong to the dirty regime only.
+        `slots` defaults to each DAG's own parent sets; pass an assignment's STRIPPED
+        slots to score the clean regime, which must not be credited for the confounding
+        edges.
         """
-        out = np.zeros(space.n_dags)
-        for i, dag in enumerate(space.dags):
-            total = 0.0
-            for node in range(window.k):
-                parents = tuple(np.flatnonzero(dag[:, node]).tolist())
-                if strip is not None and strip[node]:
-                    parents = tuple(p for p in parents if p not in strip[node])
-                total += table[node, belief.scorer.lookup[node][parents]]
-            out[i] = total
-        return out
+        if slots is None:
+            slots = index.own
+        return table[nodes[None, :], slots].sum(axis=1)
 
     if rule in MODULAR_RULES:
         log_w = belief.log_weights(samples, known, clean, rule)
@@ -103,16 +184,10 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
         clean_table = belief.local_table(samples, known, clean)
         dirty_table = belief.local_table(samples, known, ~clean)
         rows = []
-        for assignment in belief.assignments:
-            required = [set() for _ in range(window.k)]
-            for edge in assignment:
-                if edge is not None:
-                    required[edge[1]].add(edge[0])
-            # A DAG must already contain the assignment's edges to have mass under it.
-            ok = np.ones(space.n_dags, dtype=bool)
-            for v, parents in enumerate(required):
-                for u in parents:
-                    ok &= space.dags[:, u, v] > 0
+        # The DIRTY part is the same for every assignment -- it always reads the DAG's own
+        # parent sets -- so it is computed once rather than 25 times.
+        dirty_part = per_dag(dirty_table)
+        for a, assignment in enumerate(belief.assignments):
             # THE CLEAN REGIME MUST NOT BE CREDITED FOR THE CONFOUNDING EDGES.
             #
             # A hypothesis is (DAG H, confounding set P) where P's edges are present in H
@@ -127,10 +202,9 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
             # (the empty-regime guard), so stripping changes nothing and the two paths
             # agreed to 1e-12. The same lesson as the subset-DP sampler -- test data that
             # cannot exercise the branch proves nothing about it.
-            clean_part = per_dag(clean_table, strip=required)
-            dirty_part = per_dag(dirty_table)
+            clean_part = per_dag(clean_table, index.stripped[:, a, :])
             row = clean_part + dirty_part
-            row[~ok] = -np.inf
+            row[~index.compatible[:, a]] = -np.inf
             rows.append(row)
         stacked = np.vstack(rows)
         # PER-DAG shift, not a global one. A single global shift underflows every entry of

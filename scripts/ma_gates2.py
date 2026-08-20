@@ -62,11 +62,11 @@ def singleton_fraction(env: TwoAgentEnv2, draws: int, seed: int) -> dict:
         alone = True
         for name in AGENTS:
             window = env.windows[name]
-            truth = window.induced(adjacency)
-            target = mec_signature(truth)
-            count = sum(1 for dag in _Window.get(window.k).dags
-                        if mec_signature(dag) == target)
-            if count != 1:
+            space = _Window.get(window.k)
+            # Class SIZE from the precomputed partition. This was a full 543-graph
+            # signature pass per draw per agent -- 10,000 passes at --draws 5000.
+            class_id = space.id_of(window.induced(adjacency))
+            if class_id < 0 or space.mec_size[class_id] != 1:
                 alone = False
                 break
         hits.append(float(alone))

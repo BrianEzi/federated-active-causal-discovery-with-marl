@@ -40,19 +40,19 @@ def credit_set(window, truth: np.ndarray) -> np.ndarray:
     """
     space = _Window.get(window.k)
     private = [window.pos[node] for node in window.private]
-    target = mec_signature(truth)
 
-    mask = np.zeros(space.n_dags, dtype=bool)
-    for i, dag in enumerate(space.dags):
-        if mec_signature(dag) != target:
-            continue
-        ok = True
-        for p in private:
-            if not (np.array_equal(dag[p, :], truth[p, :])
-                    and np.array_equal(dag[:, p], truth[:, p])):
-                ok = False
-                break
-        mask[i] = ok
+    # Equivalence membership is one array comparison against the precomputed partition,
+    # not 543 signature computations per call.
+    mask = space.mec_id == space.id_of(truth)
+    if not mask.any():
+        return mask
+    # Private-incident edges must match EXACTLY -- both the node's row and its column, so
+    # orientation counts, not just adjacency. This is [U14] part 1, and it is boundary
+    # inclusive: at (1,1,3) it pins 3 edges per agent.
+    for p in private:
+        same_row = (space.dags[:, p, :] == truth[p, :]).all(axis=1)
+        same_col = (space.dags[:, :, p] == truth[:, p]).all(axis=1)
+        mask &= same_row & same_col
     return mask
 
 
@@ -67,9 +67,9 @@ def agent_report(env: TwoAgentEnv2, name: str) -> Dict[str, float]:
         env.config.score_rule)
     space = _Window.get(window.k)
 
-    exact = np.array([np.array_equal(dag, truth) for dag in space.dags])
-    equivalent = np.array(
-        [mec_signature(dag) == mec_signature(truth) for dag in space.dags])
+    exact = (space.dags == truth).all(axis=(1, 2))
+    # `mec_signature(truth)` was being recomputed inside a 543-iteration comprehension.
+    equivalent = space.mec_id == space.id_of(truth)
     credit = credit_set(window, truth)
 
     # MAP graph, used for the union check. Ties within an equivalence class are exact under
