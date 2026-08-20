@@ -253,6 +253,65 @@ def smooth(pts, window=7):
     return list(zip(xs[half:half + len(ys)], ys))
 
 
+def paired_dots(groups, ymax=0.62):
+    """One column per seed: learned against its OWN random floor, joined.
+
+    Per-seed bars stop being readable past a handful of runs, and they also hide the thing
+    that matters most here -- the comparison is PAIRED. Each seed's learned policy is scored
+    against the random floor from the same arm and the same episode draw, so the vertical
+    span of each connector is the effect for that seed.
+
+    groups: (arm label, colour, [(seed, learned, random, separated), ...])
+    """
+    groups = [g for g in groups if g[2]]
+    if not groups:
+        return "<p class='empty'>no data yet</p>"
+    total = sum(len(g[2]) for g in groups)
+    h = 250
+    top, height = 24, 150
+    parts = ['<svg viewBox="0 0 %d %d" class="chart" role="img">' % (W, h)]
+    for frac in np.linspace(0, 1, 5):
+        v = frac * ymax
+        y = top + (1 - frac) * height
+        parts.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" class="grid"/>'
+                     % (PAD_L, y, W - PAD_R, y))
+        parts.append('<text x="%d" y="%.1f" class="tick ty">%.2f</text>'
+                     % (PAD_L - 8, y + 4, v))
+    span = (W - PAD_L - PAD_R)
+    step = span / max(total, 1)
+    i = 0
+    for label, colour, rows in groups:
+        x0 = PAD_L + i * step
+        for seed, learned, rand, sep in rows:
+            x = PAD_L + (i + 0.5) * step
+            yl = top + (1 - min(learned / ymax, 1)) * height
+            yr = top + (1 - min(rand / ymax, 1)) * height
+            parts.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" '
+                         'stroke-width="1.4" opacity="%.2f"/>'
+                         % (x, yl, x, yr, colour, 0.85 if sep else 0.35))
+            parts.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s"/>' % (x, yr, "var(--track)"))
+            parts.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="none" stroke="%s" '
+                         'stroke-width="1.2"/>' % (x, yr, "var(--muted)"))
+            parts.append('<circle cx="%.1f" cy="%.1f" r="5" fill="%s"/>' % (x, yl, colour))
+            if not sep:
+                parts.append('<circle cx="%.1f" cy="%.1f" r="8.5" fill="none" stroke="%s" '
+                             'stroke-width="1" stroke-dasharray="2 2" opacity=".7"/>'
+                             % (x, yl, colour))
+            parts.append('<text x="%.1f" y="%d" class="tick tx">%d</text>'
+                         % (x, top + height + 16, seed))
+            i += 1
+        x1 = PAD_L + i * step
+        parts.append('<text x="%.1f" y="%d" class="tick tx">%s</text>'
+                     % ((x0 + x1) / 2, top + height + 36, label))
+        if i < total:
+            parts.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" class="grid"/>'
+                         % (x1, top, x1, top + height))
+    parts.append('<text x="%d" y="%d" class="axis">seed &nbsp;&middot;&nbsp; filled = learned, '
+                 'hollow = the same seed&#39;s own random floor</text>' % (PAD_L, h - 8))
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def bars_ci(rows):
     """rows: (label, value, lo, hi, colour, note)."""
     if not rows:
@@ -337,9 +396,16 @@ def section_two_agent(withbit, nobit):
                        smooth([(r["update"], r["solve_rate"]) for r in c]), 0.85))
     curves = curve_chart(series, ylo=0, yhi=0.8, ylabel="episodes solved during training")
 
-    rows, beats = [], []
+    rows, beats, groups = [], [], []
     for label, colour, pack in (("with regime bit", LEARNED, withbit),
                                 ("no regime bit", RANDOM, nobit)):
+        pairs = []
+        for d in pack["done"]:
+            a, r = d["arms"]["learned"], d["arms"].get("random_clamp")
+            if r:
+                pairs.append((d["seed"], a["success"], r["success"],
+                              a["success_ci"][0] > r["success_ci"][1]))
+        groups.append((label, colour, pairs))
         for d in pack["done"]:
             arm = d["arms"]["learned"]
             # A policy that never moved has no clamp fraction to report -- it is nan, and
@@ -367,7 +433,7 @@ def section_two_agent(withbit, nobit):
                 rows.append(("%s s%d &nbsp;random, never clamps" % (label, d["seed"]),
                              vary["success"], vary["success_ci"][0], vary["success_ci"][1],
                              NONE, ""))
-    return curves, bars_ci(rows), len(withbit["done"]) + len(nobit["done"]), beats
+    return (curves, paired_dots(groups), len(withbit["done"]) + len(nobit["done"]), beats)
 
 
 def two_agent_verdict(beats, withbit, nobit):
