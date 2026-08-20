@@ -161,6 +161,57 @@ def moves_strip(moves, topo) -> str:
     return '<div class="moves">%s</div>' % "".join(rows)
 
 
+def verdict_text(agent) -> str:
+    """What this agent got right, INCLUDING the confounding claim.
+
+    "Exactly right" about the causal graph alone overstates it: identification requires the
+    claim about what is confounded too, and an agent can nail H \ P while putting
+    essentially no mass on the correct P.
+    """
+    causal = ("exactly right" if agent["causal_exact"]
+              else ("right up to Markov equivalence" if agent["equivalent_to_truth"]
+                    else "not recovered"))
+    if not agent["window_is_confounded"]:
+        tail = ("and it correctly claimed no confounding"
+                if agent["confounding_exact"]
+                else "but it invented a confounding pathway that is not there")
+    else:
+        tail = ("and it identified the confounded pair correctly"
+                if agent["confounding_exact"]
+                else "but it got the confounding claim wrong, which is half the answer")
+    return "Causal structure %s, %s." % (causal, tail)
+
+
+def failure_reason(ex) -> str:
+    """WHICH of the three criteria failed. They fail for genuinely different reasons and a
+    case that just says "not solved" hides the most interesting part."""
+    if ex["success"]:
+        return ""
+    A, B = ex["agents"]["A"], ex["agents"]["B"]
+    short = [n for n, a in (("A", A), ("B", B)) if not a["credit_ok"]]
+    if short:
+        who = " and ".join(short)
+        bad_conf = [n for n, a in (("A", A), ("B", B))
+                    if not a["credit_ok"] and not a["confounding_exact"]]
+        why = (" &mdash; its causal graph is right, but it backed the wrong claim about "
+               "what is confounded, and identification requires both"
+               if bad_conf else "")
+        return ("<p class='why'><b>Why it failed:</b> agent %s did not clear the 0.70 "
+                "bar%s.</p>" % (who, why))
+    if not ex["union_acyclic"]:
+        return ("<p class='why'><b>Why it failed:</b> both agents cleared the bar "
+                "individually, but their answers union into a graph with a <b>cycle</b> "
+                "&mdash; each oriented a shared edge differently within the same "
+                "equivalence class.</p>")
+    if not ex["union_equivalent"]:
+        return ("<p class='why'><b>Why it failed:</b> both agents cleared the bar "
+                "individually and the union is acyclic, but the union is <b>not</b> "
+                "equivalent to the true global graph. This is exactly what the third "
+                "criterion exists to catch: two locally defensible answers that do not "
+                "stitch into a globally correct one.</p>")
+    return "<p class='why'><b>Why it failed:</b> see the criteria above.</p>"
+
+
 def case_block(ex, i) -> str:
     topo = ex["topology"]
     truth = np.asarray(ex["true_adjacency"])
@@ -184,9 +235,12 @@ def case_block(ex, i) -> str:
 
     verdict = "solved" if ex["success"] else "not solved"
     tags = []
+    by = ex.get("confounded_by", {})
+    who = [n for n in ("A", "B") if by.get(n)]
+    label = ("no confounding" if not who
+             else "confounded for %s" % (" and ".join(who) if len(who) < 2 else "both"))
     tags.append('<span class="tag %s">%s</span>'
-                % ("conf" if ex["confounded"] else "unconf",
-                   "confounded" if ex["confounded"] else "unconfounded"))
+                % ("conf" if who else "unconf", label))
     tags.append('<span class="tag %s">%s</span>'
                 % ("good" if ex["success"] else "bad", verdict))
 
@@ -209,17 +263,15 @@ def case_block(ex, i) -> str:
       <p class="cap">Dotted circle = a variable B cannot see. %s</p></figure>
   </div>
   %s
+  %s
 </section>""" % (
         ex["seed"] - 900_000, "".join(tags),
         panel(truth, topo),
         agent_panel(A, 1), stat(A),
-        "Exactly right." if A["exact_match"] else
-        ("Right up to Markov equivalence." if A["equivalent_to_truth"]
-         else "Did not recover the structure."),
+        verdict_text(A),
         agent_panel(B, 0), stat(B),
-        "Exactly right." if B["exact_match"] else
-        ("Right up to Markov equivalence." if B["equivalent_to_truth"]
-         else "Did not recover the structure."),
+        verdict_text(B),
+        failure_reason(ex),
         moves_strip(ex["moves"], topo))
 
 

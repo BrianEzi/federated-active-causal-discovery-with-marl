@@ -118,15 +118,32 @@ def describe_agent(env: TwoAgentEnv2, name: str) -> Dict:
         "credit_mass": mass,
         "credit_ok": bool(mass >= env.config.identify_threshold),
         "equivalent_to_truth": bool(mec_signature(causal > 0.5) == mec_signature(truth > 0.5)),
-        "exact_match": bool(np.array_equal(causal, truth.astype(int))),
+        "causal_exact": bool(np.array_equal(causal, truth.astype(int))),
+        # THE CONFOUNDING CLAIM IS PART OF THE ANSWER, NOT AN ANNOTATION ON IT.
+        #
+        # Reporting only whether the causal graph matched overstates the agent: it can get
+        # H \ P exactly right and still be wrong, because identification requires the
+        # claim about WHAT IS CONFOUNDED too. Caught on episode 0 of the first extraction,
+        # where B's MAP causal graph was exact and its mass on (true DAG, true confounding)
+        # was 5e-12 -- a correct failure that the display was about to render as a success.
+        "confounding_exact": bool(
+            {tuple(sorted(p)) for p in claimed}
+            == {tuple(sorted(map(int, p))) for p in pairs}),
+        "window_is_confounded": bool(len(pairs) > 0),
         "map_index": int(d_star),
     }
 
 
 def run_episode(env: TwoAgentEnv2, policies, seed: int) -> Dict:
     result = env.reset(seed=seed)
-    confounded = bool(bidirected_pairs(env.true_adjacency,
-                                       env.topology.observed_by("A")))
+    # PER AGENT. The episode-level flag used to be computed from A's observed set alone and
+    # then labelled "confounded", which mislabels every episode confounded only for B --
+    # the same "a number that means something narrower than its name" failure this project
+    # has been chasing all month, resurfacing in the display layer.
+    confounded_by = {n: bool(bidirected_pairs(env.true_adjacency,
+                                              env.topology.observed_by(n)))
+                     for n in AGENTS}
+    confounded = any(confounded_by.values())
     moves: List[Dict] = []
     while not result.done:
         actions = {n: policies[n](env, result) for n in AGENTS}
@@ -144,6 +161,7 @@ def run_episode(env: TwoAgentEnv2, policies, seed: int) -> Dict:
     return {
         "seed": seed,
         "confounded": confounded,
+        "confounded_by": confounded_by,
         "true_adjacency": np.asarray(env.true_adjacency, dtype=int).tolist(),
         "topology": {"a_private": [int(x) for x in env.topology.a_private],
                      "b_private": [int(x) for x in env.topology.b_private],
