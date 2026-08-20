@@ -67,6 +67,24 @@ def test_suite_line():
             "revision was still in progress when this was generated.")
 
 
+def seed_status(withbit, nobit):
+    """State the seed count that EXISTS, and what is actually still running.
+
+    Written as a generated line rather than prose because "n more are queued" is exactly the
+    kind of claim that is true when written and false an hour later.
+    """
+    counts = "%d with the regime bit and %d without" % (len(withbit["done"]),
+                                                        len(nobit["done"]))
+    extra = len(withbit["curves"]) - len(withbit["done"])
+    tail = ""
+    if extra > 0:
+        tail = (" A further %d with-bit seeds are training now, and a twenty-task cluster "
+                "array covers the zero-cost control." % extra)
+    else:
+        tail = " A twenty-task cluster array covers the zero-cost control."
+    return ("Finished so far: <b>%s</b>.%s" % (counts, tail))
+
+
 def single_agent_grid():
     """(d, n_obs, budget) -> per-seed gap_closed and the reference solve rates."""
     agg = collections.defaultdict(list)
@@ -290,10 +308,14 @@ def section_two_agent(withbit, nobit):
                                 ("no regime bit", RANDOM, nobit)):
         for d in pack["done"]:
             arm = d["arms"]["learned"]
+            # A policy that never moved has no clamp fraction to report -- it is nan, and
+            # printing "nan% of moves were clamps" would be worse than saying what happened.
+            note = ("collapsed into passing &mdash; never acted"
+                    if not np.isfinite(arm["clamp_fraction"])
+                    else "%.2f steps &middot; %.0f%% of moves were clamps"
+                    % (arm["mean_steps"], 100 * arm["clamp_fraction"]))
             rows.append(("%s s%d &nbsp;learned" % (label, d["seed"]), arm["success"],
-                         arm["success_ci"][0], arm["success_ci"][1], colour,
-                         "%.2f steps &middot; %.0f%% of moves were clamps"
-                         % (arm["mean_steps"], 100 * arm["clamp_fraction"])))
+                         arm["success_ci"][0], arm["success_ci"][1], colour, note))
             ref = d["arms"].get("random_clamp")
             if ref:
                 rows.append(("%s s%d &nbsp;random, may clamp" % (label, d["seed"]),
@@ -456,6 +478,7 @@ def build(out_path):
         "MA_STATUS": ("%d of 6 corrected runs finished" % n_done if n_done < 6
                       else "all 6 corrected runs finished"),
         "TESTS": test_suite_line(),
+        "SEED_STATUS": seed_status(withbit, nobit),
         "EXACT_NATS": ("%.4f" % ex) if ex else "&mdash;",
         "MH_NATS": ("%.4f" % mh) if mh else "&mdash;",
         "NATS_RATIO": ratio,
