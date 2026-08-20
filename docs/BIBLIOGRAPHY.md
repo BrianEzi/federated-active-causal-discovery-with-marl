@@ -461,19 +461,88 @@ is now confirmed.** Proposes a federated framework that exchanges *belief update
 raw data, with an intervention-aware aggregation rule covering shared and disparate intervened
 variables.
 
-*Relevance and the point of departure.* This is the closest related work and it is close:
-federated, interventional, belief-passing rather than data-passing. **Two differences to
-establish, and only one is confirmed so far.**
+*Read in full 2026-08-20 (v3, 24 Jun 2023). Every question below is now answered from the
+method, not inferred.* Note the v3 title differs from v1: it is **"FED-CD: Federated Causal
+Discovery from Interventional and Observational Data"**, and the method is called FED-CD,
+not FedCDI. Cite the version you actually read.
 
-1. *Aggregation.* The abstract describes aggregating individual updates. Whether that
-   aggregation requires a coordinating server — which our setting forbids outright — is
-   **not resolvable from the abstract** and must be read out of the method section. If FedCDI
-   does assume an aggregator, that is our sharpest point of departure. If it does not, the
-   distinction has to be found elsewhere and the positioning gets harder.
-2. *Latent confounding across the partition.* Our setting's defining difficulty is that an
-   agent cannot see its partner's private variables, so a shared pair can be confounded by
-   something structurally invisible to it. Whether FedCDI's partition creates the same
-   problem is unknown and is the second thing to check.
+1. **It requires a central server, explicitly.** Section 3: "Our proposed federated setup
+   consists of a central node acting as a server S and K other nodes as clients... Each
+   client is an independent processing unit, and can only communicate with the server."
+   Clients never talk to each other. The server runs `proximity_based_aggregation`
+   (Algorithm 1) and broadcasts the aggregated belief back each round. **This is our
+   sharpest point of departure and it is now confirmed rather than hoped.**
+2. **Every client observes every variable.** Section 3: the observational split is
+   HORIZONTAL, and "we assume that clients are aware of all the dataset features, but might
+   not have access to interventional data corresponding to each random variable." What they
+   call a vertical split concerns only which variables a client may INTERVENE on. There is
+   no restricted observation window anywhere in the paper.
+3. **Latent confounding is assumed away.** Section 3: "we assume causal sufficiency of the
+   CGM, i.e., all common causes of variables are included and observable." The problem that
+   defines our setting does not arise in theirs.
+4. **What is exchanged is a full `N x N` belief matrix** of independent Bernoulli edge
+   probabilities (Definition 4.1), plus the server's aggregated belief on the way back.
+5. **The local discovery method is ENCO** (Lippe et al. 2021), a continuous-optimisation
+   learner; SDI and DCDI are named as alternatives. The contribution is the aggregation
+   rule -- reliability scores computed by flowing hypothetical mass from a client's
+   intervened nodes along paths in the current graph, then softmax-weighted across clients.
+6. **Interventions are never CHOSEN.** The interventional data is given. There is no budget,
+   no design, no policy, no sequential decision at all.
 
-**Reading the abstract is not reading the paper.** Both points above are positioning-critical
-and neither is settled by what has been verified here.
+**Experiments:** `d = 20`, Erdos-Renyi ER-1/2/4/6, categorical data from randomly initialised
+MLPs, SHD against ground truth, 20 seeds; real graphs Sachs, Alarm, Asia; up to ~10 clients.
+Baselines GIES, IGSP, centralised ENCO, and an isolated non-collaborating client.
+
+**Net effect on our positioning -- much better than feared.** FED-CD is *passive* federated
+structure learning with a server, full observability at every client, and causal sufficiency.
+We are *active* experimental design, serverless, with restricted per-agent windows and latent
+confounding induced by exactly that restriction. The overlap is the word "federated". Their
+`d = 20` ER-1..6 setup is a useful precedent for our scaling target, and their
+five-clients-intervening-on-4-of-20-variables setting is the closest thing in the literature
+to our five-agent goal.
+
+### Foster et al. (DAD) and Blau et al. (RL-BOED) — read in full, 20 August 2026
+
+**DAD, read from the PMLR v139 PDF.** The design network `pi_phi` is a **deterministic**
+policy mapping history to the next design in one forward pass. Theorem 1 rewrites the total
+EIG of a *policy* over `T` experiments as a single expectation, which removes intermediate
+posteriors from the objective entirely; Theorem 2 gives the sequential PCE (sPCE) lower
+bound, tight as `L -> infinity` at `O(1/L)`. The optimal policy is shown to be invariant to
+the ORDER of the history, and the architecture is built around that symmetry.
+
+*The limitations are stated by the authors and they matter to us.* The main gradient
+estimator assumes a **continuous design space** and a **reparametrisable, differentiable**
+likelihood. For discrete observations the exact gradient costs `O(|Y|^T)` and is usable only
+when both the number of experiments and the number of outcomes are tiny; otherwise it falls
+back to REINFORCE. **Our design space is discrete by construction** -- which node to
+intervene on -- so DAD is not directly applicable to our problem, and that is a factual
+statement about its assumptions rather than a criticism.
+
+**RL-BOED, read from arXiv:2202.00821v3.** Formulates sequential design as a **Hidden
+Parameter MDP** (Doshi-Velez & Konidaris 2016), because the model parameters are not
+observable at test time and are fixed within an episode. Theorem 1 shows a terminal-reward
+HIP-MDP already optimises sPCE; Section 3.2 then replaces it with a **dense** per-step
+reward (Eq. 13) measuring each experiment's marginal contribution to cumulative EIG, and
+Theorem 2 shows the dense form has the same optimum. Trained with **REDQ** (Chen et al.
+2021) in Pyro + Garage. Their stated advantages over DAD are exactly the three we care
+about: **discrete design spaces**, **black-box non-differentiable likelihoods**, and
+**exploration** -- DAD's policy is deterministic and "a pure exploitation algorithm".
+
+Their NAIVE-RL ablation isolates the reward design: 9.789 against 11.73 for the full method
+on source location at `T = 30`, with DAD at 10.965 and random at 1.624. Same architecture,
+different reward -- so the dense reward is doing real work, not the network.
+
+**What neither paper does, and what that means for our claim.** Neither does *causal
+structure* discovery: their problems are parameter inference (source location, constant
+elasticity of substitution). Neither is federated, neither has restricted observability, and
+neither has more than one agent. So the honest positioning is:
+
+- **Method:** RL for sequential experimental design is Blau et al. We are not claiming it.
+- **Ours:** the federation of it -- multiple agents with disjoint private views, no server,
+  and latent confounding created by the partition itself, which none of the three addresses.
+
+Two specifics worth carrying into the write-up. First, our **discrete** design space is
+precisely the case that motivates RL over DAD, so Blau et al. supports our choice of PPO
+rather than threatening it. Second, DAD's **permutation invariance** of the optimal policy is
+the same structural argument behind our permutation-equivariant per-node scorer, and it
+should be cited there rather than presented as our own idea.
