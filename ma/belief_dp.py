@@ -134,6 +134,11 @@ class WindowBeliefDP:
             a for a in candidates if not self._forces_a_cycle(a)]
         self._table_key: Optional[Tuple[int, int]] = None
         self._table_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        # Per-assignment (log_w, log_z), keyed like the tables. Three callers need these
+        # for the same data in the same step -- marginals, single-DAG mass, and set mass --
+        # and log_partition was being recomputed 25 times per caller.
+        self._assign_key: Optional[Tuple[int, int]] = None
+        self._assign_cache: Optional[List[Tuple[np.ndarray, float]]] = None
 
     def _forces_a_cycle(self, assignment) -> bool:
         """Kahn's algorithm over just the forced confounding edges."""
@@ -209,6 +214,23 @@ class WindowBeliefDP:
                 else:
                     table[node, i] = self.score.local_score_from_stats(node, parents, stats)
         return table
+
+    def assignment_weights_and_z(self, samples: np.ndarray, known_intervened: np.ndarray,
+                                 clean: np.ndarray) -> List[Tuple[np.ndarray, float]]:
+        """`(log_w, log_z)` per surviving assignment, computed once per belief update."""
+        key = (samples.shape[0], int(np.count_nonzero(clean)))
+        if self._assign_key == key and self._assign_cache is not None:
+            return self._assign_cache
+        clean_table, dirty_table = self.tables(samples, known_intervened, clean)
+        out: List[Tuple[np.ndarray, float]] = []
+        for assignment in self.assignments:
+            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
+            if not np.isfinite(log_w).any():
+                out.append((log_w, NEG_INF))
+                continue
+            out.append((log_w, float(self.dp.log_partition(log_w))))
+        self._assign_key, self._assign_cache = key, out
+        return out
 
     # -- modular rules ------------------------------------------------------------------
 
@@ -299,12 +321,9 @@ class WindowBeliefDP:
         # The threshold is far below float64 resolution against a weight of 1, so a
         # dropped assignment cannot move the result -- this is exact to the precision the
         # arithmetic already has, not an approximation with a knob.
-        prepared = []
-        for assignment in self.assignments:
-            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
-            if not np.isfinite(log_w).any():
-                continue
-            prepared.append((float(self.dp.log_partition(log_w)), log_w))
+        prepared = [(z, w) for w, z in
+                    self.assignment_weights_and_z(samples, known_intervened, clean)
+                    if np.isfinite(z)]
         if not prepared:
             return np.zeros((self.k, self.k))
 
@@ -457,11 +476,11 @@ class WindowBeliefDP:
 
         log_zs: List[float] = []
         log_ps: List[float] = []
-        for assignment in self.assignments:
-            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
-            if not np.isfinite(log_w).any():
+        prepared = self.assignment_weights_and_z(samples, known_intervened, clean)
+        for assignment, (log_w, log_z) in zip(self.assignments, prepared):
+            if not np.isfinite(log_z):
                 continue
-            log_zs.append(float(self.dp.log_partition(log_w)))
+            log_zs.append(log_z)
             named = {frozenset(edge) for edge in assignment if edge is not None}
             if named != truth_pairs:
                 continue                    # wrong confounding claim -> no credit

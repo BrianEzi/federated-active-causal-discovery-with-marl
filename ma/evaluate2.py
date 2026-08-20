@@ -57,6 +57,45 @@ def credit_set(window, truth: np.ndarray) -> np.ndarray:
     return mask
 
 
+def credit_candidates(window, truth: np.ndarray) -> np.ndarray:
+    """The credit set, built WITHOUT enumerating the window.
+
+    `credit_set` returns a mask over all 543 window DAGs, which is fine for reporting but
+    puts window enumeration on the path of anything that runs per step. It is also
+    unnecessary: criterion 1 pins every edge INCIDENT TO A PRIVATE NODE to the truth, so
+    the only freedom left is the SHARED-SHARED subgraph.
+
+    So enumerate the shared subgraph alone -- 25 DAGs at |X| = 3 against 543 for the
+    window -- graft each onto the truth's fixed private-incident structure, and keep the
+    ones that are acyclic and Markov equivalent to the truth.
+
+    Cost is exponential in |X| and constant in the window size, which is the same axis the
+    confounding enumeration already costs and the axis the federation boundary keeps small
+    by design. The window may grow to the k the subset DP reaches without this term moving.
+    """
+    from sa.graphs import build_graph_space
+
+    shared = [window.pos[node] for node in window.shared]
+    truth = np.asarray(truth) > 0.5
+    space = build_graph_space(len(shared))
+    target = mec_signature(truth)
+
+    out = []
+    for sub in np.asarray(space.dags, dtype=bool):
+        candidate = truth.copy()
+        # Replace only the shared-shared block; everything touching a private node is
+        # pinned by criterion 1 and must stay exactly as the truth has it.
+        for a, u in enumerate(shared):
+            for b, v in enumerate(shared):
+                if u != v:
+                    candidate[u, v] = sub[a, b]
+        if not is_acyclic(candidate.astype(np.int8)):
+            continue
+        if mec_signature(candidate) == target:
+            out.append(candidate.copy())
+    return np.asarray(out)
+
+
 def agent_report(env: TwoAgentEnv2, name: str) -> Dict[str, float]:
     """Posterior mass on each of the criteria, for one agent."""
     window = env.windows[name]

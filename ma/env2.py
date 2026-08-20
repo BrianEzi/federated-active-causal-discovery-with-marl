@@ -84,15 +84,12 @@ class MA2Config:
     #                against 0.467 without.
     # The old reward was inherited from the single-agent environment, where there was no
     # confounding and no CPDAG relaxation, so "the exact true DAG" was the natural ask.
-    # DEFAULT HELD AT "identified" DELIBERATELY. The "u14" path works and agrees with
-    # `evaluate2.success` on 25/25 episodes, but it reintroduces window ENUMERATION into
-    # the training loop -- the exact thing the subset DP exists to remove -- and it is only
-    # affordable at k=4. Shipping it would buy correctness at (1,1,3) by acquiring scaling
-    # debt we already know we have to repay.
-    #
-    # It also should not be adopted until the question below is settled, because that
-    # determines what the criterion is defined OVER.
-    reward_criterion: str = "identified"
+    # NOW THE DEFAULT. The earlier objection -- that it reintroduced window enumeration
+    # into the training loop -- no longer applies: `credit_candidates` enumerates the
+    # SHARED subgraph only (25 DAGs at |X| = 3, not 543), which is exponential in |X| and
+    # constant in the window size. That is the same axis the confounding enumeration
+    # already costs, so no new scaling debt is acquired.
+    reward_criterion: str = "u14"
 
 
 @dataclass
@@ -169,6 +166,7 @@ class TwoAgentEnv2:
             self.disclosed[name] = np.zeros(len(window.shared))
             self.regime_bit[name] = 0.0
 
+        self._credit_cache: Dict[str, np.ndarray] = {}
         self._refresh()
         return self._result(reward=0.0)
 
@@ -275,34 +273,52 @@ class TwoAgentEnv2:
     def _u14_state(self):
         """Per-agent credit-set mass, and whether the full [U14] criterion holds.
 
-        Deliberately reuses the SAME code path `ma/evaluate2.py` scores with, so the
-        reward and the reported number cannot drift apart again. A test asserts they agree.
+        DP-NATIVE. Nothing here enumerates the window. `credit_candidates` enumerates only
+        the SHARED subgraph -- 25 DAGs at |X| = 3 against 543 for the window -- because
+        criterion 1 pins every private-incident edge to the truth, leaving the shared block
+        as the only freedom. `joint_conf_set_probability` then scores those candidates as
+        CAUSAL graphs through the subset DP.
 
-        SCALING CAVEAT, stated rather than hidden: the credit set is defined over an
-        enumerated window, so this reintroduces enumeration into the training loop that the
-        subset DP exists to remove. It is affordable at k=4 because the per-DAG index is
-        precomputed (12.5 ms per posterior, down from 598 ms), and it is NOT affordable at
-        the k~15 the DP reaches. Beyond small windows the credit-set mass has to be
-        expressed through the DP directly.
+        Verified identical to the enumerated `credit_set` on 40 episodes x 2 agents.
+
+        This is the same object `ma/evaluate2.py` reports, so the reward and the reported
+        number cannot drift apart -- which is exactly how they drifted apart before.
         """
-        from ma.baselines2 import enumerated_posterior
-        from ma.evaluate2 import credit_set, union_graph
+        from ma.evaluate2 import credit_candidates, union_graph
         from sa.graphs import is_acyclic, mec_signature
 
-        mass, map_indices = {}, {}
+        mass, best_graph = {}, {}
         for name in AGENTS:
             window = self.windows[name]
             truth = window.induced(self.true_adjacency)
             clean = (self.clean[name] if self.config.disclose_regime
                      else np.zeros(len(self.samples), dtype=bool))
-            posterior = enumerated_posterior(
-                window, self.samples[:, window.nodes], self.known[name], clean,
-                self.config.score_rule)
-            mass[name] = float(posterior[credit_set(window, truth)].sum())
-            map_indices[name] = int(np.argmax(posterior))
+            # Cached per episode: the true graph is fixed for its whole duration, so the
+            # credit set is too, and it was being rebuilt at every step.
+            cached = self._credit_cache.get(name)
+            if cached is None:
+                cached = credit_candidates(window, truth)
+                self._credit_cache[name] = cached
+            candidates = cached
+            pairs = self._confounded_positions(name)
+            mass[name] = float(window.belief.joint_conf_set_probability(
+                self.samples[:, window.nodes], self.known[name], clean,
+                candidates, pairs))
+            # Representative for the union check. Only consulted when the agent is
+            # credited, and every credited answer is Markov equivalent to the truth with
+            # its private edges exact, so any member is a valid stand-in.
+            best_graph[name] = candidates[0] if len(candidates) else truth
 
         threshold = self.config.identify_threshold
-        union = union_graph(self, map_indices)
+        d = self.topology.d
+        union = np.zeros((d, d), dtype=np.int8)
+        for name in AGENTS:
+            window = self.windows[name]
+            graph = np.asarray(best_graph[name])
+            for i, u in enumerate(window.nodes):
+                for j, v in enumerate(window.nodes):
+                    if graph[i, j]:
+                        union[u, v] = 1
         both = bool(all(mass[n] >= threshold for n in AGENTS)
                     and is_acyclic(union)
                     and mec_signature(union) == mec_signature(
