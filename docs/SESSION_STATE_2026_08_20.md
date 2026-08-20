@@ -1,4 +1,12 @@
-# Session state — 2026-08-20, ~14:00
+# Session state — 2026-08-20
+
+> **SUPERSEDED IN PART.** The supervisor meeting at 15:00 changed the design. Read
+> **`docs/REDESIGN_2026_08_20.md` FIRST** — it records four agreed directives (turn-taking,
+> clamp-only, scaling to ~5 agents / ~30 nodes, and a graph-density fix) and states what each
+> one invalidates. Everything below is still accurate as a record of the SIMULTANEOUS-ACTION
+> protocol, which is now superseded. The two-agent numbers remain valid for that protocol and
+> must not be quoted as though they were turn-taking results.
+, ~14:00
 
 Written as a checkpoint so nothing in flight is lost. Read this first when resuming.
 
