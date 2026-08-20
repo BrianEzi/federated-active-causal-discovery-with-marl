@@ -1438,3 +1438,23 @@ dropped from the baseline set rather than reported as an empty comparison.
 [NOT MEASURED] The smoke runs above used 40-60 training episodes and 20 evaluation episodes.
 They establish that the code path runs end to end and that the units are right. **No
 performance claim of any kind can be read out of them.**
+
+[MEASURED] **Turn-taking costs 0.259 s/episode** at budget 8, n_obs 1000, n_int 100
+(round-robin, 200 training episodes, machine otherwise quiet). Projected 13.7 min per seed
+at 2000 train / 150 eval, so a 4-arm x 10-seed grid is ~1.8 h at 5 concurrent -- more with
+contention. Old simultaneous timings do not transfer: an episode now runs up to 2*budget
+rounds, so it carries roughly twice the belief updates.
+
+[MEASURED, early] **Under round-robin, a random policy that MAY clamp beats one that cannot,
+0.300 [0.180-0.420] against 0.060 [0.000-0.140], non-overlapping at n=50.** These are
+BASELINE arms -- no training -- so the 200-episode training budget of the probe does not
+compromise them. This is the social half of the clamp-only argument reproducing inside the
+new protocol, which is exactly what the simultaneous-action measurement could not establish.
+Wide interval; the grid at 150 eval episodes x 10 seeds will tighten it.
+
+Protocol sanity on the same run: `rounds ~= 2 x steps`, `random_vary` clamps 0.000, `pass`
+terminates in one round.
+
+[RUNNING] Four-arm grid, seeds 0-9, `--disclose_regime`, 2000 train / 150 eval:
+`rr_both`, `rr_clamp` (round-robin, both modes / clamp-only), `rand_both`, `rand_clamp`
+(random turn order). Answers clamp-vs-vary and round-robin-vs-random on shared seeds.

@@ -26,6 +26,11 @@ def main(argv=None):
     ap.add_argument("--step_cost", type=float, default=0.05)
     ap.add_argument("--train_episodes", type=int, default=2000)
     ap.add_argument("--eval_episodes", type=int, default=150)
+    # Protocol and action space are passed through so that an arm name and its settings
+    # travel together. Defaults reproduce the pre-2026-08-20 batches exactly.
+    ap.add_argument("--turn_order", default="simultaneous",
+                    choices=["simultaneous", "round_robin", "random"])
+    ap.add_argument("--clamp_only", action="store_true")
     args = ap.parse_args(argv)
 
     lo, _, hi = args.seeds.partition("-")
@@ -47,9 +52,12 @@ def main(argv=None):
                    "--n_obs", "1000", "--n_int", "100", "--budget", "8",
                    "--train_episodes", str(args.train_episodes),
                    "--eval_episodes", str(args.eval_episodes),
-                   "--step_cost", str(args.step_cost), "--out", out]
+                   "--step_cost", str(args.step_cost),
+                   "--turn_order", args.turn_order, "--out", out]
             if args.disclose_regime:
                 cmd.append("--disclose_regime")
+            if args.clamp_only:
+                cmd.append("--clamp_only")
             log = open("results/batch_logs/%s_s%d.log" % (args.arm, seed), "w")
             running.append((seed, subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT),
                             log, time.time()))
