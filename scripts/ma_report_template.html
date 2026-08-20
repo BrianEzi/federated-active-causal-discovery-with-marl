@@ -168,6 +168,40 @@ its partner, so a per-agent reward would make the target behaviour strictly domi
   {{curve_entropy}}
 </figure>
 
+<h2>The control: the same system without the bit</h2>
+<p>The no-bit arm is identical in every respect &mdash; same environment, same belief rule,
+same budget, same seeds, same number of training episodes. One flag differs: whether an agent
+is told that its partner clamped something it cannot see.</p>
+
+<div class="stats">
+  <div class="stat"><span class="v">{{median}}</span><span class="k">with bit &middot; median</span></div>
+  <div class="stat"><span class="v">{{ctrl_median}}</span><span class="k">no bit &middot; median</span></div>
+  <div class="stat"><span class="v">{{collapsed}}/{{n_seeds}}</span><span class="k">with bit &middot; collapsed</span></div>
+  <div class="stat"><span class="v">{{ctrl_collapsed}}/{{ctrl_n}}</span><span class="k">no bit &middot; collapsed</span></div>
+</div>
+
+<figure>
+  <figcaption><strong>No-bit arm, success by policy.</strong> Note that the BASELINES are
+  unaffected &mdash; they score around 0.52&ndash;0.55 whether or not the bit exists. Only the
+  learned policy collapses.</figcaption>
+  {{ctrl_bars}}
+</figure>
+
+<div class="note">
+  <span class="tag">Read this carefully</span>
+  <p>Without the bit, independent PPO collapsed to passing in <strong>every one of
+  {{ctrl_n}} seeds</strong>: mean steps {{ctrl_steps}}, final policy entropy near zero, a
+  fully deterministic do-nothing policy. With the bit, <strong>no seed collapsed</strong>.</p>
+  <p>But the baselines still score ~0.53 in the no-bit arm, which means <strong>the no-bit
+  task is solvable by acting randomly</strong>. So this is a LEARNING failure, not an
+  impossibility proof, and the honest claim is narrower than the numbers first suggest: the
+  bit is what makes the problem <em>learnable by this method</em>, not what makes it solvable
+  in principle.</p>
+  <p>Blocking the pass action for the first 40 updates did not rescue it &mdash; the policy
+  collapsed again once the block lifted. So &ldquo;passing is too tempting early&rdquo; is
+  ruled out as the explanation.</p>
+</div>
+
 <h2>Against the baselines</h2>
 <p>Every comparison holds the belief rule fixed. Cross-rule numbers are void &mdash; a
 policy trained under one scoring rule and evaluated under another collapses below random,

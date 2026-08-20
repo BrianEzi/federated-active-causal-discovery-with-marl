@@ -223,7 +223,8 @@ def build(seeds: List[dict], gates: dict, log_history: dict) -> dict:
                         axis=0)
         entropy = np.mean([[p["entropy"] for p in h[:length]] for _, h in histories],
                           axis=0)
-        xs = [str(h[i]["update"]) for i in range(length)]
+        first = histories[0][1]
+        xs = [str(first[i]["update"]) for i in range(length)]
         ctx["curve_solve"] = line_chart([("mean solve rate", LEARNED, list(solve))], xs,
                                         ylabel="PPO update")
         ctx["curve_entropy"] = line_chart([("policy entropy", GREEDY, list(entropy))], xs,
@@ -242,13 +243,40 @@ def build(seeds: List[dict], gates: dict, log_history: dict) -> dict:
     return ctx
 
 
+def build_control(control: List[dict]) -> Dict[str, object]:
+    """The no-bit arm. Its value is the contrast, so it gets its own summary."""
+    control = [c for c in control if c.get("arms", {}).get("learned")]
+    if not control:
+        return {"ctrl_n": 0, "ctrl_median": float("nan"), "ctrl_collapsed": 0,
+                "ctrl_bars": "<p class='empty'>control arm not yet available</p>",
+                "ctrl_steps": float("nan")}
+    learned = [c["arms"]["learned"]["success"] for c in control]
+    rows = []
+    for arm, colour in (("learned", LEARNED), ("random_clamp", RANDOM),
+                        ("random_vary", MUTED), ("greedy", GREEDY)):
+        vals = [c["arms"][arm]["success"] for c in control if arm in c["arms"]]
+        if vals:
+            rows.append((arm.replace("_", " "), float(np.mean(vals)),
+                         float(np.min(vals)), float(np.max(vals)), colour))
+    return {
+        "ctrl_n": len(control),
+        "ctrl_median": round(float(np.median(learned)), 3),
+        "ctrl_collapsed": sum(1 for c in control if c.get("collapsed")),
+        "ctrl_steps": round(float(np.mean(
+            [c["arms"]["learned"]["mean_steps"] for c in control])), 2),
+        "ctrl_bars": bars_with_ci(rows),
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="results/ma_night/report.html")
     ap.add_argument("--log", default=None, help="run log to recover curves from")
     args = ap.parse_args()
 
-    seeds = load("results/ma_night/withbit_s*.json") + load("results/ma_train/withbit_s*.json")
+    seeds = (load("results/ma_train/withbit_s*.json")
+             or load("results/ma_night/withbit_s*.json"))
+    control = load("results/ma_train/nobit_s*.json")
     gates = {}
     for candidate in ("results/ma2/gates_withbit_v6.json",
                       "results/ma2/gates_withbit_v5.json"):
@@ -259,6 +287,7 @@ def main() -> None:
     log_history = parse_history_from_log(pathlib.Path(args.log)) if args.log else {}
 
     ctx = build(seeds, gates, log_history)
+    ctx.update(build_control(control))
     template = pathlib.Path("scripts/ma_report_template.html").read_text(encoding="utf-8")
     html = template
     for key, value in ctx.items():
