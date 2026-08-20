@@ -124,8 +124,9 @@ def gate2_block():
         "we tested whether it could be engineered away <i>without communication</i>, by "
         "giving the two agents opposite tie-breaking conventions: A takes the lowest-indexed "
         "tied action, B the highest. Nothing crosses the federation boundary.</p>"
-        "<p><b>It changes nothing</b> &mdash; %.3f against %.3f, and the collision rate "
-        "barely moves. The third measurement says why. A tie-break can only separate two "
+        "<p><b>It does not help</b> &mdash; %.3f against %.3f, intervals overlapping, and "
+        "the collision rate barely moves (%.3f against %.3f). The third measurement says "
+        "why. A tie-break can only separate two "
         "agents where a tie exists, and at the level of <i>which variable to target</i> they "
         "almost never have one: a target-level tie occurs in only <b>%.3f</b> of decisions, "
         "and of %d observed collisions, <b>%d</b> involved a tie for both agents.</p>"
@@ -137,6 +138,7 @@ def gate2_block():
         "needs.</b> That is a result worth having, and it retires greedy as the two-agent "
         "reference rather than leaving the gate open indefinitely.</p>"
         % (g["collision_rate"], r["collision_rate"], gs["rate"], g["rate"],
+           gs["collision_rate"], g["collision_rate"],
            a["fraction_with_a_target_tie"], a["collisions"],
            a["collisions_where_both_had_a_tie"]))
 

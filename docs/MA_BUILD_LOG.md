@@ -1242,3 +1242,44 @@ posterior. That is a property of the no-bit belief, not of any policy in it.
 
 This retires hypothesis "the no-bit arm might learn if acting were free", which had been
 open since 2026-08-19.
+
+[MEASURED] **GATE 2 resolved as a finding: the myopic oracle fails under decentralisation
+because both agents WANT THE SAME EXPERIMENT, not because they collide by coin flip.**
+
+500 attempted episodes, unconfounded only (n=455), budget 3, with the regime bit:
+
+    random          solve 0.062   CI 0.042-0.084    collisions 0.188 of 1339 rounds
+    greedy          solve 0.064   CI 0.042-0.088    collisions 0.372 of 1329 rounds
+    greedy_split    solve 0.040   CI 0.022-0.059    collisions 0.366 of 1330 rounds
+
+    target-level tie in 0.068 of decisions
+    0 of 74 collisions had a tie for BOTH agents
+
+`greedy_split` gives the two agents opposite tie-breaking conventions -- A takes the
+lowest-indexed tied action, B the highest. It uses NO communication: each applies a fixed
+convention to its own action list, so nothing crosses the federation boundary. If the
+collisions were coin flips landing the same way, this fixes them.
+
+It does not. The collision rate moves 0.372 -> 0.366, and solve does not improve.
+
+The argmax diagnostic explains it, and this is the real finding. A tie-break can only
+separate two agents where a tie EXISTS, and at the level of which variable to target they
+almost never have one -- a target-level tie in 6.8% of decisions, and **0 of 74 collisions**
+involved a tie for both agents. The 2-element argmax ACTION set that appears in ~94% of
+rounds is VARY and CLAMP on the SAME node, which is the already-documented indifference
+between modes, not a choice between targets.
+
+So each agent independently computes a UNIQUE best target, and it is the same target,
+because the objective is identical and the shared variables are visible to both. No local
+convention can separate them.
+
+[DECIDED] **Greedy is retired as the two-agent reference.** Random becomes the floor
+everything is scored against. This is not a concession -- it is the honest reading of three
+independent measurements that agree: the gate itself (0.072 vs 0.091), the training
+evaluation on 8 seeds (greedy at or below random on 7 of 8), and this experiment
+(0.064 vs 0.062). Keeping a reference that cannot discriminate would be the error.
+
+[CORRECTED] My own earlier framing, "both greedy agents ... pick the same target and waste
+the round", was right about the behaviour and wrong about the cause. I called it a collision,
+which implies chance. It is systematic agreement. The distinction matters because it decides
+whether the fix is a coordination convention (it is not) or a change of objective (it is).
