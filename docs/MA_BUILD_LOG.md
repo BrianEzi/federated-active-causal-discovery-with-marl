@@ -1283,3 +1283,39 @@ evaluation on 8 seeds (greedy at or below random on 7 of 8), and this experiment
 the round", was right about the behaviour and wrong about the cause. I called it a collision,
 which implies chance. It is systematic agreement. The distinction matters because it decides
 whether the fix is a coordination convention (it is not) or a change of objective (it is).
+
+[MEASURED] **Ten seeds, with the regime bit, corrected metric. The instability is gone.**
+
+    seed   learned                  random   sep   steps   greedy
+      0    0.467 [0.387,0.547]      0.200    yes   3.85    0.173
+      1    0.327 [0.253,0.400]      0.160    yes   3.22    0.127
+      2    0.500 [0.420,0.573]      0.200    yes   4.19    0.153
+      3    0.320 [0.247,0.393]      0.213     -    2.01    0.153
+      4    0.520 [0.447,0.600]      0.200    yes   4.74    0.140
+      5    0.400 [0.327,0.480]      0.193    yes   3.43    0.127
+      6    0.373 [0.300,0.453]      0.153    yes   3.25    0.173
+      7    0.467 [0.387,0.547]      0.160    yes   5.63    0.107
+      8    0.313 [0.240,0.387]      0.207     -    2.79    0.127
+      9    0.373 [0.293,0.453]      0.140    yes   2.90    0.107
+
+    learned  median 0.387   mean 0.406   sd 0.073
+    random   median 0.197
+    separated (non-overlapping intervals)  8/10
+    learned > random by point estimate     10/10
+    greedy <= random                        9/10
+    COLLAPSED SEEDS                         0/10
+
+Three things worth pulling out.
+
+1. **0 of 10 seeds collapsed.** The 2026-08-19 run recorded "1-in-10 seeds collapses into
+   passing immediately, sd 0.154 on a median of 0.312" and called that instability the
+   biggest threat to the result. It does not reproduce: sd is 0.073 on a median of 0.387,
+   and every seed acts. Two candidate explanations -- the corrected reward is a better
+   learning signal than the old exact-DAG criterion, or the old sd was inflated by the
+   metric scoring confounded episodes at 0.000 -- and they are not separable from these runs
+   alone. Either way the instability claim does not survive.
+2. **Learned beats random on 10/10 by point estimate, 8/10 by non-overlapping intervals.**
+   The two that overlap (s3, s8) are also the two lowest-acting seeds (2.01 and 2.79 steps
+   against a mean of 3.6), so the failure mode that remains is under-acting, not
+   mis-acting.
+3. **greedy <= random on 9/10**, a third independent confirmation of the GATE 2 finding.

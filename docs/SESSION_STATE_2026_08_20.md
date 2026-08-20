@@ -50,6 +50,12 @@ only. Supervisor (Mirco) meeting **today at 15:00**; report wanted by 14:45.
 - **Single-agent GATE 1 fails in all 42 runs**, always on the BELOW-target side (0.040 vs
   0.089 at d=5). That is a power problem, not a leak: the comparison stands, absolute
   identification rates do not.
+- **GATE 2 resolved as a finding.** Greedy 0.064 vs random 0.062 at n=455; collisions 0.372
+  vs 0.188. A no-communication tie-break split does NOT fix it, because a target-level tie
+  occurs in 6.8% of decisions and 0 of 74 collisions had one for both agents. The agents
+  agree systematically on a unique best target; they do not collide by chance. **Greedy is
+  retired as the two-agent reference**; random is the floor.
+  `results/ma_fixed/gate2_collision.json`, `scripts/ma_gate2_collision.py`.
 - **Report built and published.** `scripts/supervisor_report.py` +
   `scripts/supervisor_report_template.html` → https://claude.ai/code/artifact/f0ad745e-0a27-44ef-bb53-eba0a4f0db14
   The stale pre-correction artifact now serves a withdrawal notice pointing at it.
@@ -95,9 +101,10 @@ two-agent numbers. Two seeds is a sanity check, not a result.
 ## OPEN / NEXT
 
 1. Corrected two-agent runs at scale (≥20 seeds) — only 2 seeds in flight.
-2. **GATE 2 unresolved.** Greedy is now equal to random, not worse. Live hypothesis: two
-   greedy agents computing the same objective over overlapping authority collide (0.352 of
-   rounds against random's 0.227).
+2. **GATE 2 RESOLVED as a negative finding** (2026-08-20 afternoon). Not collision by
+   chance -- systematic agreement on a unique best target. Greedy retired as the
+   two-agent reference. See the section above and `docs/MA_BUILD_LOG.md`.
+
 3. **Parameter audit** — `step_cost=0.05` is decisive and never swept; `n_int=100` never
    justified; `intervene_scale`, `prior_p`, `identify_threshold` all inherited untested.
    See `docs/CONSOLIDATION_PLAN.md` Phase 5.

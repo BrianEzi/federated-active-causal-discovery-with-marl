@@ -552,7 +552,8 @@ def gate_block(gates, gate3, withbit=None):
                     "the myopic oracle scores <b>%.3f</b> (CI %.3f&ndash;%.3f) against "
                     "random's <b>%.3f</b> (CI %.3f&ndash;%.3f) &mdash; overlapping, so at "
                     "two agents the oracle is <i>not</i> a demonstrably good reference. "
-                    "Unresolved; see below."
+                    "The gate still fails &mdash; but the mechanism has since been "
+                    "measured, and it is not the one we assumed. See below."
                     % (g2["greedy"]["rate"], g2["greedy"]["ci"][0], g2["greedy"]["ci"][1],
                        g2["random_clamp"]["rate"], g2["random_clamp"]["ci"][0],
                        g2["random_clamp"]["ci"][1])
