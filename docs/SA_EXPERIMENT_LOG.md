@@ -2566,3 +2566,50 @@ for a partner, and there the direction REVERSES -- a randomly varying hidden nod
 variance source, so rescue is 0.000 at scale 2.0 and 1.0 and rises only as the scale goes to
 zero, i.e. as the intervention becomes constant. That asymmetry is the real reason the design
 carries both modes, and it is a cleaner justification than the one we had.
+
+## 2026-08-20 -- d=6 recovered from Myriad (job 180127): GATE 1 FAILS, and not for the reason I guessed
+
+20 runs, `d=6`, `n_obs` in {100, 1000}, budget in {2, 3}, seeds 0-4. Space: 3,781,503 DAGs,
+1,067,825 MECs, singleton fraction **0.0810**.
+
+[CORRECTED] **My hypothesis that `n_obs=100` explained the GATE 1 failure was wrong.** It
+fails at BOTH sample sizes, and at `n_obs=1000` the interval excludes the target outright:
+
+    n_obs=100    observational-only rate 0.000  [0.000, 0.000]   target 0.081   FAIL
+    n_obs=1000   observational-only rate 0.025  [0.005, 0.050]   target 0.081   FAIL
+
+[MEASURED] **GATE 1 fails on the LOW side, which is the opposite of a leak.** The d=4 failure
+this project was built to fix was a rate too HIGH -- episodes solved without acting. Here the
+rate is too LOW: graphs whose equivalence class is a singleton, and which are therefore
+identifiable from observation alone in principle, are not being identified.
+
+[HYPOTHESIS, untested] **The 0.7 mass threshold does not scale with `d`.** Identification
+requires >= 0.7 of the posterior on the true DAG. At `d=6` the posterior is spread over 3.78M
+DAGs, so a singleton MEC can be the clear MAP winner and still hold well under 0.7 of the
+mass. If that is right, GATE 1 is failing because of the CRITERION, not the environment, and
+the criterion is `d`-dependent in a way the plan explicitly did not anticipate -- it says
+"fix the threshold once and never tune it". That instruction and scaling are in direct
+conflict, and the conflict has to be resolved before any `d > 5` number means anything.
+
+Cheap test: for singleton-MEC episodes at `d=6` with no interventions, record the posterior
+mass on the true DAG and its RANK. If the rank is 1 while the mass is ~0.3, the threshold is
+the problem.
+
+[NOT BANKED] **The agent beats greedy at `d=6` -- but this cannot be claimed yet.**
+
+    n_obs=1000 budget=2:  gap_closed median 1.227  (1.091-1.318)  beats greedy 5/5
+    n_obs=1000 budget=3:  gap_closed median 1.054  (1.041-1.162)  beats greedy 5/5
+    n_obs=100  budget=3:  gap_closed median 1.273  (1.227-1.455)  beats greedy 5/5
+    n_obs=100  budget=2:  gap_closed median 0.000  (-0.500-2.000) beats greedy 1/5
+
+16 of 20 runs above 1.0, 15/15 in the three non-degenerate cells. **The plan's own rule is
+that a failed GATE 1 stops everything downstream**, so these are held, not banked. They
+become a result only if the threshold diagnosis above is confirmed and GATE 1 re-passes on a
+corrected criterion.
+
+The `n_obs=100 budget=2` cell is degenerate and should not be quoted at all: almost nothing
+is solved, so `gap_closed` divides by a near-zero span and swings -0.5 to 2.0.
+
+[MEASURED] gap_closed FALLS as budget rises (1.227 at b=2 -> 1.054 at b=3, `n_obs=1000`),
+which is the expected shape: more budget lets greedy catch up, so the room for non-myopic
+planning shrinks. Consistent with the whole premise of the single-agent question.
