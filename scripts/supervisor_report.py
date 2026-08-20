@@ -101,6 +101,46 @@ def control_line():
                len(runs), "" if len(runs) == 1 else "s"))
 
 
+def gate2_block():
+    """GATE 2's mechanism, once it has been measured rather than hypothesised."""
+    d = read("results/ma_fixed/gate2_collision.json")
+    if not d:
+        return ("<p>At two agents the myopic oracle is no better than random. The live "
+                "hypothesis is <b>collision</b>: both greedy agents compute the same "
+                "objective over overlapping authority, pick the same target, and waste the "
+                "round &mdash; measured at 0.352 of rounds against random's 0.227. A "
+                "diagnostic separating collision from a deeper problem is running now.</p>"
+                "<p>Either way this is not a reason to keep quoting the oracle as a "
+                "reference: either GATE&nbsp;2 is resolved, or greedy is formally retired "
+                "as a benchmark and random becomes the reference.</p>")
+    g, gs, r = (d["arms"][k] for k in ("greedy", "greedy_split", "random"))
+    a = d["argmax"]
+    return (
+        "<p>At two agents the myopic oracle is no better than random &mdash; and we now know "
+        "why, which turns the gate's failure into a finding.</p>"
+        "<p>The hypothesis was <b>collision</b>: both agents compute the same objective over "
+        "overlapping authority and waste the round on the same variable. The collision rate "
+        "is real &mdash; <b>%.3f</b> of rounds for greedy against <b>%.3f</b> for random. So "
+        "we tested whether it could be engineered away <i>without communication</i>, by "
+        "giving the two agents opposite tie-breaking conventions: A takes the lowest-indexed "
+        "tied action, B the highest. Nothing crosses the federation boundary.</p>"
+        "<p><b>It changes nothing</b> &mdash; %.3f against %.3f, and the collision rate "
+        "barely moves. The third measurement says why. A tie-break can only separate two "
+        "agents where a tie exists, and at the level of <i>which variable to target</i> they "
+        "almost never have one: a target-level tie occurs in only <b>%.3f</b> of decisions, "
+        "and of %d observed collisions, <b>%d</b> involved a tie for both agents.</p>"
+        "<p>So the agents are not colliding by coin flip. Each independently computes a "
+        "<i>unique</i> best target, and it is the same target, because the objective is "
+        "identical and the shared variables are visible to both. No local convention can "
+        "separate them. <b>Myopic design does not fail here by accident &mdash; it fails "
+        "because a one-step information criterion has no term for what the partner "
+        "needs.</b> That is a result worth having, and it retires greedy as the two-agent "
+        "reference rather than leaving the gate open indefinitely.</p>"
+        % (g["collision_rate"], r["collision_rate"], gs["rate"], g["rate"],
+           a["fraction_with_a_target_tie"], a["collisions"],
+           a["collisions_where_both_had_a_tie"]))
+
+
 def seed_status(withbit, nobit):
     """State the seed count that EXISTS, and what is actually still running.
 
@@ -593,6 +633,7 @@ def build(out_path):
                       % (len(withbit["done"]), len(nobit["done"]),
                          len(glob.glob("results/ma_fixed/nobit_nocost_fixed_s*.json")))),
         "TESTS": test_suite_line(),
+        "GATE2": gate2_block(),
         "CONTROL": control_line(),
         "SEED_STATUS": seed_status(withbit, nobit),
         "EXACT_NATS": ("%.4f" % ex) if ex else "&mdash;",

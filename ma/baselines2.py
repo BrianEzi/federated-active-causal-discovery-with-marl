@@ -319,8 +319,31 @@ class GreedyAgent:
     for what the partner needs.
     """
 
-    def __init__(self, name: str, env: TwoAgentEnv2, seed: int = 0):
+    TIE_BREAKS = ("random", "low", "high")
+
+    def __init__(self, name: str, env: TwoAgentEnv2, seed: int = 0,
+                 tie_break: str = "random"):
+        """`tie_break` decides among actions of EQUAL expected gain, and it matters.
+
+        GATE 2 fails: two greedy agents are no better than random, and the live explanation
+        is that they compute the same objective over overlapping authority, pick the same
+        shared target, and waste the round -- measured at 0.352 of rounds against random's
+        0.227.
+
+        If that is the cause, it is fixable WITHOUT communication. Ties are broken over each
+        agent's own action list, so giving the two agents opposite conventions -- A takes the
+        lowest-indexed tied action, B the highest -- makes them diverge whenever their tied
+        sets overlap, using nothing but a fixed asymmetric convention agreed in advance. No
+        observation, parameter or message crosses the federation boundary, so this stays
+        inside the no-central-server constraint.
+
+        This is a DIAGNOSTIC arm, not a proposed method: it tests whether collision is really
+        what breaks myopic design under decentralisation.
+        """
+        if tie_break not in self.TIE_BREAKS:
+            raise ValueError("tie_break must be one of %s" % (self.TIE_BREAKS,))
         self.name = name
+        self.tie_break = tie_break
         self._seed = _agent_seed(seed, name)
         self.rng = np.random.default_rng(self._seed)
         window = env.windows[name]
@@ -348,7 +371,13 @@ class GreedyAgent:
                 self.space.signatures[:, position], posterior,
                 int(self.space.signatures[:, position].max()) + 1)
         best = np.flatnonzero(scores >= scores.max() - 1e-9)
-        return int(self.candidates[int(self.rng.choice(best))])
+        if self.tie_break == "low":
+            slot = int(best[0])
+        elif self.tie_break == "high":
+            slot = int(best[-1])
+        else:
+            slot = int(self.rng.choice(best))
+        return int(self.candidates[slot])
 
 
 def make_baselines(env: TwoAgentEnv2, name: str, seed: int = 0) -> Dict[str, object]:
