@@ -144,7 +144,7 @@ footer { margin-top:4rem; padding-top:1.4rem; border-top:1px solid var(--rule);
 
 <div class="wrap">
 <header>
-  <p class="eyebrow">MSc thesis &middot; supervisor briefing &middot; 20 August 2026, 14:02</p>
+  <p class="eyebrow">MSc thesis &middot; supervisor briefing &middot; 20 August 2026, 14:09</p>
   <h1>Confounded by Design</h1>
   <p class="standfirst">Two agents share a causal system. Neither may see the other's
   private variables, so each one's view is confounded by construction &mdash; and the only
@@ -404,7 +404,7 @@ measuring did not.</p>
 
 
 <h2>Two agents: provisional</h2>
-<p class="sub">10 seeds with the regime bit, 3 without, 2 zero-cost controls &mdash; 2000 training episodes each, budget 8</p>
+<p class="sub">10 seeds with the regime bit, 3 without, 5 zero-cost controls &mdash; 2000 training episodes each, budget 8</p>
 
 <p>These are the first two-agent numbers whose value on a confounded episode is not
 structurally zero. They are enough to establish <i>that</i> learning happens, and not yet
@@ -451,7 +451,7 @@ which has since run &mdash; and its answer is the last section below.</p>
   <i>negative</i> expected value against <span class="mono">0.000</span> for doing nothing.
   <b>Passing is optimal</b>, and an arm that collapses into passing is behaving correctly
   rather than failing to learn.</p>
-  <p><b>The control has now run, and it splits the question cleanly.</b> With the cost set to zero and nothing else changed, the no-bit arm stops collapsing: it takes <b>8.4</b> steps per episode against 0.0, and final policy entropy is <b>1.93</b> against 0.02. So the collapse really was the reward design.</p><p>But it still does not learn anything. Success is <b>0.047</b> against its own random floor of <b>0.053</b> &mdash; indistinguishable. Acting freely and exploring fully, an agent without the regime bit cannot beat random. That is the answer we needed: the step cost explains the <i>collapse</i>, and it does not explain away the <i>bit</i>. Disclosure is doing real work, because without it the belief cannot separate confounding from a genuine shared edge, and no policy can recover what the belief cannot represent. (2 seeds.)</p>
+  <p><b>The control has now run, and it splits the question cleanly.</b> With the cost set to zero and nothing else changed, the no-bit arm stops collapsing: it takes <b>8.3</b> steps per episode against 0.0, and final policy entropy is <b>1.87</b> against 0.02. So the collapse really was the reward design.</p><p>But it still does not learn anything. Success is <b>0.057</b> against its own random floor of <b>0.060</b> &mdash; indistinguishable. Acting freely and exploring fully, an agent without the regime bit cannot beat random. That is the answer we needed: the step cost explains the <i>collapse</i>, and it does not explain away the <i>bit</i>. Disclosure is doing real work, because without it the belief cannot separate confounding from a genuine shared edge, and no policy can recover what the belief cannot represent. (5 seeds.)</p>
   <p>This is the clearest case of a wider problem: several parameters are asserted rather
   than measured, and that audit is scheduled below.</p>
 </div>

@@ -1319,3 +1319,19 @@ Three things worth pulling out.
    against a mean of 3.6), so the failure mode that remains is under-acting, not
    mis-acting.
 3. **greedy <= random on 9/10**, a third independent confirmation of the GATE 2 finding.
+
+[MEASURED] **Zero-cost control at five seeds -- the conclusion holds and tightens.**
+
+    seed  learned  random  steps  entropy  greedy
+      0    0.073   0.080   8.03    1.86    0.060
+      1    0.020   0.027   8.79    2.01    0.013
+      2    0.047   0.047   8.07    1.82    0.040
+      3    0.087   0.100   7.94    1.66    0.087
+      4    0.060   0.047   8.51    1.99    0.060
+
+    learned mean 0.057   random mean 0.060   ahead on 1/5   steps mean 8.27
+
+No seed collapses (8.3 steps, entropy 1.66-2.01, against 0.00 steps and 0.02 entropy at
+step_cost=0.05), and no seed learns anything (ahead of its own floor on 1 of 5, by 0.013).
+Greedy tracks both at 0.013-0.087. Every arm sits in the same 0.02-0.10 band, so the ceiling
+belongs to the no-bit BELIEF and not to any policy in it.
