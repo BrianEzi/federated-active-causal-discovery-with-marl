@@ -2613,3 +2613,55 @@ is solved, so `gap_closed` divides by a near-zero span and swings -0.5 to 2.0.
 [MEASURED] gap_closed FALLS as budget rises (1.227 at b=2 -> 1.054 at b=3, `n_obs=1000`),
 which is the expected shape: more budget lets greedy catch up, so the room for non-myopic
 planning shrinks. Consistent with the whole premise of the single-agent question.
+
+## 2026-08-20 -- the threshold hypothesis is CONFIRMED
+
+`scripts/sa_threshold_diagnostic.py`, 60 singleton-MEC graphs per `d`, observational data
+only, `n_obs=1000`, `prior_p=0.5`. These are graphs that ARE identifiable from observation
+alone, so anything short of identification is the criterion's doing.
+
+    d    mass median   p10     p90     mass >= 0.7   local-max   rank-1
+    3    0.908         0.744   0.944   90.0%         100.0%      100.0%
+    4    0.833         0.603   0.913   75.0%         100.0%       98.3%
+    5    0.755         0.327   0.854   61.7%         100.0%       96.7%
+    6    0.702         0.139   0.803   50.0%          96.7%       --
+
+[MEASURED] **The true graph keeps being FOUND while the mass on it collapses.** It is the
+single best hypothesis in 96.7-100% of episodes at every `d`, but the share of episodes
+clearing 0.7 falls 90% -> 75% -> 61.7% -> 50%. The p10 falls off a cliff: 0.744 at `d=3`
+against 0.139 at `d=6`. **The threshold is what stops being reachable, not the graph.**
+
+[MEASURED] **The numbers reconcile with the `d=6` gate failure.** Predicted GATE 1 rate is
+`singleton_fraction x P(mass >= 0.7 | singleton)` = `0.081 x 0.500` = **0.0405**, against the
+measured 0.025 [0.005, 0.050]. The prediction sits inside the measured interval. The gate
+failure is quantitatively explained.
+
+[CORRECTED] **GATE 1's target is mis-specified for `d > 4`.** It equates the singleton-MEC
+fraction with the observational identification rate, which holds only in the infinite-data
+limit. At finite `n` the identification CRITERION intervenes, and it tightens with `d`
+because the same posterior mass is spread over super-exponentially many DAGs. So GATE 1
+fails at `d=6` on a correct environment.
+
+This puts the original plan's instruction -- "fix the threshold once and never tune it" -- in
+direct conflict with scaling. The instruction was right for its purpose (it stops threshold
+fishing) and wrong as a scaling rule.
+
+[DECIDED, provisional] The fix is to stop asking for mass on an exact DAG. Options, in the
+order I would try them:
+  1. Score the CREDIT SET, as `[U14]` already does for two agents -- mass on graphs Markov
+     equivalent to the truth. Consistent across the project and needs no new threshold.
+  2. Make GATE 1's target the rate achievable by an observational ORACLE under the same
+     criterion, rather than the graph-theoretic singleton fraction. The gate then asks the
+     right question -- "does acting help" -- instead of an unreachable one.
+  3. Scale `n_obs` with `d`. Weakest: it treats the symptom and makes runs more expensive.
+
+[VALIDATION] Two internal checks passed on the same run. The DP and the enumerated posterior
+agree to `2.7e-12` at every `d <= 5`. The cheap `local_max` proxy -- does the true DAG beat
+every single-edge perturbation of itself -- agrees with true rank-1 in 96.7-100% of episodes,
+which is what makes the `d=6` column trustworthy despite enumeration being impossible there.
+
+[HELD] The `d=6` result that the agent beats greedy (`gap_closed` median 1.227 at budget 2,
+1.054 at budget 3, 15/15 non-degenerate) is still not banked, but the reason has changed. It
+is no longer "the environment may be broken" -- the environment is fine. It is that the
+metric those runs were scored against is the same mis-specified one, so they must be
+re-scored on a corrected criterion before the claim can stand.
