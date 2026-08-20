@@ -1094,3 +1094,42 @@ Job 176251 (40 tasks) runs no-bit as tasks 1-20 and with-bit as 21-40, and Myria
 scheduling ~2 tasks at a time, so the with-bit arm would not start for many hours. Submitted
 job **176272**, with-bit only, 20 tasks, so the priority arm runs now. 176251 continues and
 supplies the no-bit control.
+
+
+## 2026-08-20 (midday) -- the REPORTED metric cannot credit a confounded episode
+
+[MEASURED] Random policy, 100 episodes, budget 8, regime bit on:
+
+    U14 reported success | unconfounded   ~0.59 (n=85)
+    U14 reported success | CONFOUNDED      0.000 (n=15)
+
+[EXPLAINED] Same confusion as the reward bug, third occurrence. `enumerated_posterior`
+under joint_conf indexes graphs by **H, the AUGMENTED graph** -- the one containing the
+confounding edges, because the dirty regime reads H's own parents and the assignment
+requires those edges present. `credit_set` then compares H against the true CAUSAL graph.
+
+On a confounded episode the true causal graph contains no confounding edge, so it matches H
+only under the EMPTY assignment -- the single hypothesis that refuses to model the
+confounding, and the one that fits confounded data worst. Every other assignment produces an
+H with an extra edge, which has a different skeleton and therefore a different Markov
+equivalence class, so it is excluded from the credit set.
+
+The metric is therefore structurally incapable of scoring the case the two-agent design
+exists to study. The ~0.50 headline figures are carried ENTIRELY by unconfounded episodes.
+
+[CONSEQUENCE] Every two-agent success number reported so far -- with-bit 0.583, no-bit
+0.055, the paired +0.013 over random -- is an unconfounded-only number wearing a general
+label. The with-bit vs no-bit CONTRAST may still stand, since both arms are scored the same
+way, but nothing about coordination under confounding can be read from them.
+
+[DECIDED] `reward_criterion` default held at "identified". The "u14" path is implemented and
+verified (agrees with evaluate2.success on 25/25 episodes) but NOT adopted: it reintroduces
+window enumeration into the training loop, and it should not be adopted before the question
+below is answered, because that determines what the criterion ranges over.
+
+[OPEN, and it is the design question] Should the success criterion be defined over H (the
+augmented graph) or over H \ P (the causal graph)? The causal graph is what the thesis
+claims to recover, which argues for H \ P plus a correct confounding claim -- exactly the
+criterion adopted for `true_mass`. That would make the reward and the report agree AND make
+confounded episodes scorable. It is the third time this distinction has caused a bug, so it
+belongs in the code's structure rather than in a comment.

@@ -73,6 +73,26 @@ class MA2Config:
     # future moves [U10].
     disclose_shared_targets: bool = True
     step_cost: float = 0.05
+    # WHAT THE AGENT IS ACTUALLY PAID FOR.
+    #   "u14"        the specified success criterion: each agent's posterior mass on its
+    #                CREDIT SET (private-incident edges exact, Markov equivalent on the
+    #                rest) clears the threshold, and the union is acyclic and globally
+    #                equivalent. This is what `ma/evaluate2.py` reports.
+    #   "identified" the previous reward: mass on the EXACT true DAG with the exact
+    #                confounded set. Roughly twice as demanding -- measured with a random
+    #                policy, 0.250 against u14's 0.500 with the regime bit and 0.133
+    #                against 0.467 without.
+    # The old reward was inherited from the single-agent environment, where there was no
+    # confounding and no CPDAG relaxation, so "the exact true DAG" was the natural ask.
+    # DEFAULT HELD AT "identified" DELIBERATELY. The "u14" path works and agrees with
+    # `evaluate2.success` on 25/25 episodes, but it reintroduces window ENUMERATION into
+    # the training loop -- the exact thing the subset DP exists to remove -- and it is only
+    # affordable at k=4. Shipping it would buy correctness at (1,1,3) by acquiring scaling
+    # debt we already know we have to repay.
+    #
+    # It also should not be adopted until the question below is settled, because that
+    # determines what the criterion is defined OVER.
+    reward_criterion: str = "identified"
 
 
 @dataclass
@@ -252,6 +272,43 @@ class TwoAgentEnv2:
             self.samples[:, window.nodes], self.known[name], clean, rule,
             window.induced(self.true_adjacency))))
 
+    def _u14_state(self):
+        """Per-agent credit-set mass, and whether the full [U14] criterion holds.
+
+        Deliberately reuses the SAME code path `ma/evaluate2.py` scores with, so the
+        reward and the reported number cannot drift apart again. A test asserts they agree.
+
+        SCALING CAVEAT, stated rather than hidden: the credit set is defined over an
+        enumerated window, so this reintroduces enumeration into the training loop that the
+        subset DP exists to remove. It is affordable at k=4 because the per-DAG index is
+        precomputed (12.5 ms per posterior, down from 598 ms), and it is NOT affordable at
+        the k~15 the DP reaches. Beyond small windows the credit-set mass has to be
+        expressed through the DP directly.
+        """
+        from ma.baselines2 import enumerated_posterior
+        from ma.evaluate2 import credit_set, union_graph
+        from sa.graphs import is_acyclic, mec_signature
+
+        mass, map_indices = {}, {}
+        for name in AGENTS:
+            window = self.windows[name]
+            truth = window.induced(self.true_adjacency)
+            clean = (self.clean[name] if self.config.disclose_regime
+                     else np.zeros(len(self.samples), dtype=bool))
+            posterior = enumerated_posterior(
+                window, self.samples[:, window.nodes], self.known[name], clean,
+                self.config.score_rule)
+            mass[name] = float(posterior[credit_set(window, truth)].sum())
+            map_indices[name] = int(np.argmax(posterior))
+
+        threshold = self.config.identify_threshold
+        union = union_graph(self, map_indices)
+        both = bool(all(mass[n] >= threshold for n in AGENTS)
+                    and is_acyclic(union)
+                    and mec_signature(union) == mec_signature(
+                        np.asarray(self.true_adjacency)))
+        return mass, both
+
     def _confounded_positions(self, name: str):
         """Truly confounded shared pairs, as WINDOW positions.
 
@@ -282,9 +339,13 @@ class TwoAgentEnv2:
 
     def _result(self, reward: float, passed: bool = False) -> MA2StepResult:
         threshold = self.config.identify_threshold
-        mass = {name: self.true_mass(name) for name in AGENTS}
-        identified = {name: mass[name] >= threshold for name in AGENTS}
-        both = all(identified.values())
+        if self.config.reward_criterion == "u14":
+            mass, both = self._u14_state()
+            identified = {name: mass[name] >= threshold for name in AGENTS}
+        else:
+            mass = {name: self.true_mass(name) for name in AGENTS}
+            identified = {name: mass[name] >= threshold for name in AGENTS}
+            both = all(identified.values())
         out_of_budget = all(self.n_interventions[n] >= self.config.budget
                             for n in AGENTS)
         if both:
