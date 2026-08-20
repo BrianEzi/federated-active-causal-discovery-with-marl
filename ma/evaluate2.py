@@ -28,6 +28,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ma.baselines2 import _Window, enumerated_posterior
+from ma.belief_dp import JOINT_CONF
 from ma.env2 import AGENTS, TwoAgentEnv2
 from sa.graphs import is_acyclic, mec_signature
 
@@ -72,14 +73,38 @@ def agent_report(env: TwoAgentEnv2, name: str) -> Dict[str, float]:
     equivalent = space.mec_id == space.id_of(truth)
     credit = credit_set(window, truth)
 
-    # MAP graph, used for the union check. Ties within an equivalence class are exact under
-    # BGe, so argmax is arbitrary among them -- which is precisely why the CPDAG relaxation
-    # exists and why the union is checked for acyclicity rather than for equality.
-    map_index = int(np.argmax(posterior))
+    if env.config.score_rule == JOINT_CONF:
+        # THE POSTERIOR IS INDEXED BY THE AUGMENTED GRAPH, NOT THE CAUSAL ONE.
+        #
+        # Under joint_conf a hypothesis is (DAG H, confounding set P) with P's edges
+        # present in H, so `posterior[credit].sum()` compares H against the true CAUSAL
+        # graph. On a confounded episode the truth contains no confounding edge, so it
+        # matches only under the empty assignment -- the hypothesis that refuses to model
+        # the confounding -- and the reported success rate was EXACTLY 0.000 on every
+        # confounded episode. The metric could not score the case the design exists for.
+        candidates = space.dags[credit]
+        pairs = env._confounded_positions(name)
+        mass_credit = window.belief.joint_conf_set_probability(
+            env.samples[:, window.nodes], env.known[name], clean, candidates, pairs)
+        # MAP over CAUSAL graphs, restricted to the credit set. Only used for the union
+        # check, and if the agent is not credited then success is already false, so the
+        # restriction costs nothing. Credit sets are small -- they range over the shared
+        # subgraph only -- so this is a handful of lookups.
+        best, map_index = -1.0, int(np.argmax(posterior))
+        for local, index in enumerate(np.flatnonzero(credit)):
+            value = window.belief.joint_conf_dag_probability(
+                env.samples[:, window.nodes], env.known[name], clean,
+                space.dags[index], pairs)
+            if value > best:
+                best, map_index = value, int(index)
+    else:
+        mass_credit = float(posterior[credit].sum())
+        map_index = int(np.argmax(posterior))
+
     return {
         "mass_exact": float(posterior[exact].sum()),
         "mass_equivalent": float(posterior[equivalent].sum()),
-        "mass_credit": float(posterior[credit].sum()),
+        "mass_credit": float(mass_credit),
         "map_index": map_index,
     }
 

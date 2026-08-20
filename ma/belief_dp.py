@@ -421,6 +421,72 @@ class WindowBeliefDP:
             return 0.0
         return float(np.exp(min(numerator - denominator, 0.0)))
 
+    def joint_conf_set_probability(self, samples: np.ndarray,
+                                   known_intervened: np.ndarray, clean: np.ndarray,
+                                   candidates: Sequence[np.ndarray],
+                                   confounded_pairs: Sequence[Tuple[int, int]] = ()
+                                   ) -> float:
+        """P(the CAUSAL graph is one of `candidates`, and the confounding is right | data).
+
+        The set-valued form of `joint_conf_dag_probability`, and it exists because the
+        reported success criterion credits a SET -- every graph Markov equivalent to the
+        truth that also matches it on the private-incident edges.
+
+        THE BUG THIS REPLACES. `evaluate2` was computing credit mass from a posterior
+        indexed by H, the AUGMENTED graph, and comparing H against the true CAUSAL graph.
+        On a confounded episode the truth contains no confounding edge, so it matched only
+        under the empty assignment -- the one hypothesis that refuses to model the
+        confounding -- and every other assignment produced an H with an extra edge, a
+        different skeleton, and therefore a different equivalence class. Measured result:
+        reported success EXACTLY 0.000 on confounded episodes, against ~0.59 unconfounded.
+        The metric could not score the case the whole design exists to study.
+
+        Candidates are CAUSAL graphs. Each is augmented with the assignment's edges before
+        scoring, which is the same correction already applied to the single-graph form.
+
+        Cost is `len(candidates) x len(assignments)` cheap weight lookups plus one partition
+        function per assignment. The candidate set ranges only over the SHARED subgraph --
+        the private-incident edges are pinned by the criterion -- so it is exponential in
+        |X| and not in the window size, the same axis the confounding enumeration already
+        costs. Nothing here reintroduces window enumeration.
+        """
+        clean = np.asarray(clean, dtype=bool)
+        clean_table, dirty_table = self.tables(samples, known_intervened, clean)
+        truth_pairs = {frozenset(pair) for pair in confounded_pairs}
+        candidates = [np.asarray(c) > 0.5 for c in candidates]
+
+        log_zs: List[float] = []
+        log_ps: List[float] = []
+        for assignment in self.assignments:
+            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
+            if not np.isfinite(log_w).any():
+                continue
+            log_zs.append(float(self.dp.log_partition(log_w)))
+            named = {frozenset(edge) for edge in assignment if edge is not None}
+            if named != truth_pairs:
+                continue                    # wrong confounding claim -> no credit
+            for base in candidates:
+                augmented = base.copy()
+                cyclic = False
+                for edge in assignment:
+                    if edge is None:
+                        continue
+                    u, v = edge
+                    if augmented[v, u]:
+                        cyclic = True
+                        break
+                    augmented[u, v] = True
+                if not cyclic:
+                    log_ps.append(self._log_dag_weight(log_w, augmented))
+
+        if not log_zs or not log_ps:
+            return 0.0
+        numerator = _log_sum_exp(np.asarray(log_ps))
+        denominator = _log_sum_exp(np.asarray(log_zs))
+        if not np.isfinite(numerator) or not np.isfinite(denominator):
+            return 0.0
+        return float(np.exp(min(numerator - denominator, 0.0)))
+
     def _log_dag_weight(self, log_w: np.ndarray, adjacency: np.ndarray) -> float:
         """Unnormalised log weight of one DAG under a weight table."""
         total = 0.0
