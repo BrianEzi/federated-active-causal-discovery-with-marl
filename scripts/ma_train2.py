@@ -36,13 +36,18 @@ def main(argv=None) -> dict:
     ap.add_argument("--rule", default="joint_conf")
     ap.add_argument("--potential_shaping", type=float, default=0.0)
     ap.add_argument("--mask_pass_updates", type=int, default=0)
+    # Exposed because it turned out to be the lever that decides whether acting is worth
+    # anything at all. At 0.05 x ~7.7 steps, a random-level policy has expected value
+    # -0.255 against 0.000 for passing, so PASSING IS OPTIMAL and a collapse is correct
+    # behaviour rather than a training failure.
+    ap.add_argument("--step_cost", type=float, default=0.05)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     config = MA2Config(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
-                       score_rule=args.rule)
+                       score_rule=args.rule, step_cost=args.step_cost)
     env = TwoAgentEnv2(config)
     started = time.time()
 
@@ -58,7 +63,8 @@ def main(argv=None) -> dict:
         "config": {"n_obs": args.n_obs, "n_int": args.n_int, "budget": args.budget,
                    "rule": args.rule, "disclose_regime": args.disclose_regime,
                    "train_episodes": args.train_episodes,
-                   "potential_shaping": args.potential_shaping},
+                   "potential_shaping": args.potential_shaping,
+                   "step_cost": args.step_cost},
         "train_seconds": train_seconds,
         # The collapse diagnostic. A seed that never sampled the terminal reward has a
         # different problem from one that sampled it and could not exploit it.
