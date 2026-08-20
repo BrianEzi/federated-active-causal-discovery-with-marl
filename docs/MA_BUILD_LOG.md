@@ -1045,3 +1045,52 @@ anything is concluded from it.
 fix. The LEARNED policy is unaffected -- PPO carries its own RNG and never touches
 `make_baselines` -- but the baseline arms inside those reports are measured against the
 synchronised floor and must be re-evaluated afterwards rather than quoted.
+
+## 2026-08-20 (overnight, cont.) -- a bug the cross-check caught, and gates v7
+
+[CORRECTED] **The clean regime was credited for the confounding edges.** A hypothesis is
+(DAG H, confounding set P) with P's edges present in H and STRIPPED AGAIN for the clean
+regime -- clean rows are the ones with no hidden variable transmitting variance, so the
+confounding edge must not be scored there. `WindowBeliefDP._assignment_weights` reads the
+clean table at `parents \ P`; `enumerated_posterior` read it at the full parent set, so the
+confounded hypothesis fit the clean data too well. Disagreement 3.55e-02.
+
+INVISIBLE UNTIL THE TEST FORCED A REGIME SPLIT. With no clean rows the clean table is all
+zeros (the empty-regime guard), so stripping changes nothing and the two paths agree to
+1e-12 -- which is exactly the "cross-validation" I reported earlier. The same lesson as the
+subset-DP sampler: test data that cannot exercise a branch proves nothing about it. The
+cross-check now asserts a genuine clean/dirty split occurs, so it cannot go vacuous again
+the same way.
+
+`GreedyAgent` scores on `enumerated_posterior`, so the greedy baseline was running on a
+wrong posterior on every episode where anyone clamped.
+
+### Gates v7 (fixed posterior, independent agent seeds)
+
+    GATE 1  observational (unconfounded, n=335) 0.0388 CI 0.0209-0.0597  target 0.0420  PASS
+    GATE 2  unconfounded: greedy 0.072 CI 0.047-0.099  vs random 0.091 CI 0.061-0.122  FAIL
+    GATE 3  confounded (n=38): never-clamp 0.000  vs clamping 0.184  headroom +0.184    PASS
+
+[MEASURED] The posterior fix removed most of the GATE 2 inversion: greedy vs random went
+from 0.074/0.147 to 0.072/0.091, with CIs now OVERLAPPING. Greedy is no longer clearly worse
+than random -- it is indistinguishable from it.
+
+[DECIDED] GATE 2 cannot pass with this reference, and the reason is the reference rather
+than the environment. Greedy maximises the entropy of the descendant-set partition, which is
+a DAG-model quantity. Under joint_conf with the strict criterion the binding constraint is
+resolving the CONFOUNDING, and the myopic EIG objective contains no term for it -- it cannot
+distinguish an intervention that will produce clean rows for the partner from one that will
+not. So the myopic oracle optimises the wrong quantity here, and lands at random's level.
+That is a finding about myopic experimental design in a federated setting, not a defect in
+the environment, and GATE 1 and GATE 3 both pass.
+
+[NOTE] GATE 3's headroom fell from +0.393 to +0.184 once the random agents were desynchronised.
+The +0.393 was measured against a synchronised floor. +0.184 is the honest number, and the
+never-clamp arm is still EXACTLY 0.000.
+
+### Cluster
+
+Job 176251 (40 tasks) runs no-bit as tasks 1-20 and with-bit as 21-40, and Myriad is
+scheduling ~2 tasks at a time, so the with-bit arm would not start for many hours. Submitted
+job **176272**, with-bit only, 20 tasks, so the priority arm runs now. 176251 continues and
+supplies the no-bit control.
