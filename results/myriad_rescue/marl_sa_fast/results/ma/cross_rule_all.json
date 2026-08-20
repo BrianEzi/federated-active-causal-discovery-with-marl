@@ -1,0 +1,1864 @@
+{
+  "args": {
+    "checkpoint_dir": "results/ma/checkpoints",
+    "eval_episodes": 400,
+    "n_obs": 2000,
+    "n_int": 200,
+    "budget": 6,
+    "rules": [
+      "subset",
+      "joint_conf"
+    ],
+    "out": "results/ma/cross_rule_all.json"
+  },
+  "rows": [
+    {
+      "policy": "random",
+      "trained_under": null,
+      "eval_rule": "subset",
+      "seed": null,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.37,
+          "ci": [
+            0.32413116790213314,
+            0.4183421186537838
+          ],
+          "mean_steps": 4.5175,
+          "clamp_fraction": 0.45974999999999994
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.01639344262295082,
+          "ci": [
+            0.002899656114363977,
+            0.08719065627768062
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.4836065573770491
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.4336283185840708,
+          "ci": [
+            0.38190788738698855,
+            0.486836162343266
+          ],
+          "mean_steps": 4.2507374631268435,
+          "clamp_fraction": 0.45545722713864306
+        },
+        "canary_under_acting": {
+          "mean_steps": 4.5175,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "greedy",
+      "trained_under": null,
+      "eval_rule": "subset",
+      "seed": null,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.5425,
+          "ci": [
+            0.49350413540767263,
+            0.5906872901413545
+          ],
+          "mean_steps": 3.635,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.640117994100295,
+          "ci": [
+            0.5877171799970278,
+            0.6893787150168795
+          ],
+          "mean_steps": 3.2094395280235988,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 3.635,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.025,
+          "ci": [
+            0.013634943739762435,
+            0.045402064829934204
+          ],
+          "mean_steps": 5.855,
+          "clamp_fraction": 0.9704166666666667
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.9795081967213115
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.029498525073746312,
+          "ci": [
+            0.016100270416447595,
+            0.053440882115800545
+          ],
+          "mean_steps": 5.828908554572271,
+          "clamp_fraction": 0.968780727630285
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.855,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.025,
+          "ci": [
+            0.013634943739762435,
+            0.045402064829934204
+          ],
+          "mean_steps": 5.8575,
+          "clamp_fraction": 0.9004886363636363
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.9467213114754097
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.029498525073746312,
+          "ci": [
+            0.016100270416447595,
+            0.053440882115800545
+          ],
+          "mean_steps": 5.831858407079646,
+          "clamp_fraction": 0.8921694824349692
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.8575,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.04,
+          "ci": [
+            0.024768847722620668,
+            0.06398278162908555
+          ],
+          "mean_steps": 5.8075,
+          "clamp_fraction": 0.7859772727272727
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.8633879781420765
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.0471976401179941,
+          "ci": [
+            0.029257467511557517,
+            0.07528527175928944
+          ],
+          "mean_steps": 5.772861356932153,
+          "clamp_fraction": 0.7720479127558775
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.8075,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 0.98,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 0.976401179941003,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.98,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.98 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.025,
+          "ci": [
+            0.013634943739762435,
+            0.045402064829934204
+          ],
+          "mean_steps": 0.9975,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.029498525073746312,
+          "ci": [
+            0.016100270416447595,
+            0.053440882115800545
+          ],
+          "mean_steps": 0.9970501474926253,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.9975,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 1.00 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 0.98,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 0.976401179941003,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.98,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.98 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed3",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 3,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.065,
+          "ci": [
+            0.04474017569726697,
+            0.09353582162445521
+          ],
+          "mean_steps": 5.7025,
+          "clamp_fraction": 0.5604572510822511
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.6600418706976083
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.07669616519174041,
+          "ci": [
+            0.05287400212025051,
+            0.11000471504826115
+          ],
+          "mean_steps": 5.648967551622419,
+          "clamp_fraction": 0.5425378947502841
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.7025,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed4",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 4,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 5.88,
+          "clamp_fraction": 0.98
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 1.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 5.8584070796460175,
+          "clamp_fraction": 0.976401179941003
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.88,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed5",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 5,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.0225,
+          "ci": [
+            0.011881448169963291,
+            0.04220312360273175
+          ],
+          "mean_steps": 5.8675,
+          "clamp_fraction": 0.9710416666666666
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.9972677595628414
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02654867256637168,
+          "ci": [
+            0.014028826218525536,
+            0.049678728523956134
+          ],
+          "mean_steps": 5.843657817109144,
+          "clamp_fraction": 0.9663225172074729
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.8675,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed6",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 6,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.0225,
+          "ci": [
+            0.011881448169963291,
+            0.04220312360273175
+          ],
+          "mean_steps": 5.8675,
+          "clamp_fraction": 0.9717424242424244
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.01639344262295082,
+          "ci": [
+            0.002899656114363977,
+            0.08719065627768062
+          ],
+          "mean_steps": 5.918032786885246,
+          "clamp_fraction": 0.9817436661698956
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 5.8584070796460175,
+          "clamp_fraction": 0.969942790739251
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.8675,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed7",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 7,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 0.98,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 0.976401179941003,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.98,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.98 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed8",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 8,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 5.88,
+          "clamp_fraction": 0.97125
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.9822404371584698
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 5.8584070796460175,
+          "clamp_fraction": 0.9692723697148475
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.88,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed9",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 9,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.0775,
+          "ci": [
+            0.05513258958646752,
+            0.10790559172026265
+          ],
+          "mean_steps": 5.705,
+          "clamp_fraction": 0.6522083333333333
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.01639344262295082,
+          "ci": [
+            0.002899656114363977,
+            0.08719065627768062
+          ],
+          "mean_steps": 5.918032786885246,
+          "clamp_fraction": 0.7404371584699453
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.08849557522123894,
+          "ci": [
+            0.06269082553477917,
+            0.12352228279279834
+          ],
+          "mean_steps": 5.666666666666667,
+          "clamp_fraction": 0.6363323500491642
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.705,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.06,
+          "ci": [
+            0.0406476805246611,
+            0.0877234432030579
+          ],
+          "mean_steps": 5.7775,
+          "clamp_fraction": 0.8523449675324676
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.01639344262295082,
+          "ci": [
+            0.002899656114363977,
+            0.08719065627768062
+          ],
+          "mean_steps": 5.934426229508197,
+          "clamp_fraction": 0.921659215101838
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.06784660766961652,
+          "ci": [
+            0.04563157389227676,
+            0.09974634990693548
+          ],
+          "mean_steps": 5.7492625368731565,
+          "clamp_fraction": 0.8398724923061206
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.7775,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.0325,
+          "ci": [
+            0.019089659086961887,
+            0.054804659873739545
+          ],
+          "mean_steps": 5.87,
+          "clamp_fraction": 0.8327030122655122
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.03278688524590164,
+          "ci": [
+            0.009037700815687874,
+            0.11189700776645692
+          ],
+          "mean_steps": 5.983606557377049,
+          "clamp_fraction": 0.8708383601826224
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.032448377581120944,
+          "ci": [
+            0.01821331713594567,
+            0.05716143318606894
+          ],
+          "mean_steps": 5.849557522123894,
+          "clamp_fraction": 0.8258408995134658
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.87,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "subset",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.02,
+          "ci": [
+            0.010168264597915496,
+            0.038963870377777945
+          ],
+          "mean_steps": 5.88,
+          "clamp_fraction": 0.8771780303030303
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.8989071038251365
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.02359882005899705,
+          "ci": [
+            0.012005214681875476,
+            0.045868742270839716
+          ],
+          "mean_steps": 5.8584070796460175,
+          "clamp_fraction": 0.8732680790202915
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.88,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed0",
+      "trained_under": "subset",
+      "eval_rule": "subset",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.3175,
+          "ci": [
+            0.27380100813055436,
+            0.3646711056883291
+          ],
+          "mean_steps": 3.9725,
+          "clamp_fraction": 0.016351190476190477
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 4.262295081967213,
+          "clamp_fraction": 0.025956284153005466
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.3746312684365782,
+          "ci": [
+            0.32478029842330225,
+            0.4272917955116229
+          ],
+          "mean_steps": 3.920353982300885,
+          "clamp_fraction": 0.0146228402865571
+        },
+        "canary_under_acting": {
+          "mean_steps": 3.9725,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed1",
+      "trained_under": "subset",
+      "eval_rule": "subset",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.29,
+          "ci": [
+            0.24769592405093643,
+            0.3362993850009294
+          ],
+          "mean_steps": 3.43,
+          "clamp_fraction": 0.45513816738816737
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 3.1311475409836067,
+          "clamp_fraction": 0.43579234972677594
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.3421828908554572,
+          "ci": [
+            0.2936984779372919,
+            0.394204040310202
+          ],
+          "mean_steps": 3.4837758112094397,
+          "clamp_fraction": 0.4586192732210432
+        },
+        "canary_under_acting": {
+          "mean_steps": 3.43,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed2",
+      "trained_under": "subset",
+      "eval_rule": "subset",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2775,
+          "ci": [
+            0.23589351571381517,
+            0.3233396093530428
+          ],
+          "mean_steps": 4.53,
+          "clamp_fraction": 0.0016666666666666666
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 4.688524590163935,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.3274336283185841,
+          "ci": [
+            0.279654570069806,
+            0.3790799592288556
+          ],
+          "mean_steps": 4.501474926253687,
+          "clamp_fraction": 0.001966568338249754
+        },
+        "canary_under_acting": {
+          "mean_steps": 4.53,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "random",
+      "trained_under": null,
+      "eval_rule": "joint_conf",
+      "seed": null,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2675,
+          "ci": [
+            0.22648167576028763,
+            0.31294170211856387
+          ],
+          "mean_steps": 5.1525,
+          "clamp_fraction": 0.4774791666666667
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.04918032786885246,
+          "ci": [
+            0.016865676835230686,
+            0.1349134279370143
+          ],
+          "mean_steps": 5.885245901639344,
+          "clamp_fraction": 0.4756830601092896
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.30678466076696165,
+          "ci": [
+            0.2600859078995769,
+            0.35781343687071937
+          ],
+          "mean_steps": 5.020648967551622,
+          "clamp_fraction": 0.47780235988200587
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.1525,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "greedy",
+      "trained_under": null,
+      "eval_rule": "joint_conf",
+      "seed": null,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.19,
+          "ci": [
+            0.15457325560638852,
+            0.23132458156541352
+          ],
+          "mean_steps": 5.1375,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 6.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.22418879056047197,
+          "ci": [
+            0.18302496045114372,
+            0.2715336462056914
+          ],
+          "mean_steps": 4.982300884955753,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.1375,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2075,
+          "ci": [
+            0.17063353432585826,
+            0.24993136042495495
+          ],
+          "mean_steps": 5.49,
+          "clamp_fraction": 0.9858570526695527
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.2459016393442623,
+          "ci": [
+            0.15506522999562844,
+            0.36684662905781873
+          ],
+          "mean_steps": 5.475409836065574,
+          "clamp_fraction": 0.9855191256830601
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.20058997050147492,
+          "ci": [
+            0.16142378673156602,
+            0.2464660376071374
+          ],
+          "mean_steps": 5.492625368731564,
+          "clamp_fraction": 0.985917859590426
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.49,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2825,
+          "ci": [
+            0.24060954581038724,
+            0.3285284528504738
+          ],
+          "mean_steps": 5.3325,
+          "clamp_fraction": 0.915693813131313
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.08196721311475409,
+          "ci": [
+            0.035519042911066306,
+            0.177948854241379
+          ],
+          "mean_steps": 5.852459016393443,
+          "clamp_fraction": 0.9512295081967213
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.3185840707964602,
+          "ci": [
+            0.2712544922538437,
+            0.3699792436755185
+          ],
+          "mean_steps": 5.238938053097345,
+          "clamp_fraction": 0.9092994845207234
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.3325,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp005_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2475,
+          "ci": [
+            0.2077422550606482,
+            0.2920616284421905
+          ],
+          "mean_steps": 5.2575,
+          "clamp_fraction": 0.787157196969697
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.14754098360655737,
+          "ci": [
+            0.07961078689389503,
+            0.257234695018951
+          ],
+          "mean_steps": 5.655737704918033,
+          "clamp_fraction": 0.8181073025335319
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.26548672566371684,
+          "ci": [
+            0.22129618292467154,
+            0.3149327927888942
+          ],
+          "mean_steps": 5.185840707964601,
+          "clamp_fraction": 0.7815880039331368
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.2575,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.005,
+          "ci": [
+            0.0013722242215711469,
+            0.018045289972112716
+          ],
+          "mean_steps": 0.995,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.0058997050147492625,
+          "ci": [
+            0.0016193717917004965,
+            0.021252998422415875
+          ],
+          "mean_steps": 0.9941002949852508,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.995,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.99 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.01,
+          "ci": [
+            0.0038954207932788126,
+            0.02542696699440824
+          ],
+          "mean_steps": 1.0125,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.011799410029498525,
+          "ci": [
+            0.004597791073666169,
+            0.029941774719983147
+          ],
+          "mean_steps": 1.0147492625368733,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 1.0125,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 1.01 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "jc_clamp015_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.005,
+          "ci": [
+            0.0013722242215711469,
+            0.018045289972112716
+          ],
+          "mean_steps": 0.995,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.0058997050147492625,
+          "ci": [
+            0.0016193717917004965,
+            0.021252998422415875
+          ],
+          "mean_steps": 0.9941002949852508,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.995,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.99 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed3",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 3,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.3275,
+          "ci": [
+            0.2833392679681935,
+            0.3749425930386963
+          ],
+          "mean_steps": 4.8675,
+          "clamp_fraction": 0.6533167388167388
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.19672131147540983,
+          "ci": [
+            0.11627688559536849,
+            0.3131017848877781
+          ],
+          "mean_steps": 5.459016393442623,
+          "clamp_fraction": 0.7282621294916376
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.35103244837758113,
+          "ci": [
+            0.3021504721627647,
+            0.4032528394540287
+          ],
+          "mean_steps": 4.761061946902655,
+          "clamp_fraction": 0.639830990052229
+        },
+        "canary_under_acting": {
+          "mean_steps": 4.8675,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed4",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 4,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.225,
+          "ci": [
+            0.18680409020181676,
+            0.2684278621280076
+          ],
+          "mean_steps": 5.7075,
+          "clamp_fraction": 0.9746584595959596
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.16393442622950818,
+          "ci": [
+            0.0915591348574295,
+            0.27613074324551673
+          ],
+          "mean_steps": 5.819672131147541,
+          "clamp_fraction": 0.9848484848484848
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.2359882005899705,
+          "ci": [
+            0.19390185965462248,
+            0.2839911381612786
+          ],
+          "mean_steps": 5.687315634218289,
+          "clamp_fraction": 0.972824856231936
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.7075,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed5",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 5,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.215,
+          "ci": [
+            0.17755084865785345,
+            0.25787135648396453
+          ],
+          "mean_steps": 5.5875,
+          "clamp_fraction": 0.9604564393939394
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.09836065573770492,
+          "ci": [
+            0.045863951367309724,
+            0.1984483419752358
+          ],
+          "mean_steps": 5.901639344262295,
+          "clamp_fraction": 0.9598981619473423
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.2359882005899705,
+          "ci": [
+            0.19390185965462248,
+            0.2839911381612786
+          ],
+          "mean_steps": 5.530973451327434,
+          "clamp_fraction": 0.9605568963976043
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.5875,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed6",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 6,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.2975,
+          "ci": [
+            0.25479680042016234,
+            0.34405581902270826
+          ],
+          "mean_steps": 5.4375,
+          "clamp_fraction": 0.9764090909090909
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.2459016393442623,
+          "ci": [
+            0.15506522999562844,
+            0.36684662905781873
+          ],
+          "mean_steps": 5.524590163934426,
+          "clamp_fraction": 0.9679003146216261
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.30678466076696165,
+          "ci": [
+            0.2600859078995769,
+            0.35781343687071937
+          ],
+          "mean_steps": 5.421828908554573,
+          "clamp_fraction": 0.9779401686481333
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.4375,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed7",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 7,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.005,
+          "ci": [
+            0.0013722242215711469,
+            0.018045289972112716
+          ],
+          "mean_steps": 0.995,
+          "clamp_fraction": 0.0
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 1.0,
+          "clamp_fraction": 0.0
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.0058997050147492625,
+          "ci": [
+            0.0016193717917004965,
+            0.021252998422415875
+          ],
+          "mean_steps": 0.9941002949852508,
+          "clamp_fraction": 0.0
+        },
+        "canary_under_acting": {
+          "mean_steps": 0.995,
+          "threshold": 1.5,
+          "ok": false,
+          "detail": "UNDER-ACTING: mean episode length 0.99 -- the agents are passing rather than experimenting, so per-action rates below are computed over almost no actions and mean nothing"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed8",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 8,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.1825,
+          "ci": [
+            0.14772676508161553,
+            0.2233137616991817
+          ],
+          "mean_steps": 5.6975,
+          "clamp_fraction": 0.9843598484848485
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.08196721311475409,
+          "ci": [
+            0.035519042911066306,
+            0.177948854241379
+          ],
+          "mean_steps": 5.983606557377049,
+          "clamp_fraction": 0.981967213114754
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.20058997050147492,
+          "ci": [
+            0.16142378673156602,
+            0.2464660376071374
+          ],
+          "mean_steps": 5.646017699115045,
+          "clamp_fraction": 0.9847903816930365
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.6975,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_extra_seed9",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 9,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.405,
+          "ci": [
+            0.35801711355168203,
+            0.45379028816225736
+          ],
+          "mean_steps": 4.7025,
+          "clamp_fraction": 0.7017026515151515
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.16393442622950818,
+          "ci": [
+            0.0915591348574295,
+            0.27613074324551673
+          ],
+          "mean_steps": 5.459016393442623,
+          "clamp_fraction": 0.7816939890710383
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.44837758112094395,
+          "ci": [
+            0.39630843753940376,
+            0.5016036011396832
+          ],
+          "mean_steps": 4.566371681415929,
+          "clamp_fraction": 0.687308930008045
+        },
+        "canary_under_acting": {
+          "mean_steps": 4.7025,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed0",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.4975,
+          "ci": [
+            0.44875800198627125,
+            0.5462895612167272
+          ],
+          "mean_steps": 5.0725,
+          "clamp_fraction": 0.8790604256854258
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.2786885245901639,
+          "ci": [
+            0.18188396512091543,
+            0.40171668631273205
+          ],
+          "mean_steps": 5.590163934426229,
+          "clamp_fraction": 0.9370673952641165
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.5368731563421829,
+          "ci": [
+            0.4836752395213038,
+            0.589244732850777
+          ],
+          "mean_steps": 4.979351032448378,
+          "clamp_fraction": 0.8686225934013546
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.0725,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed1",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.495,
+          "ci": [
+            0.44628359498707637,
+            0.5438115314189205
+          ],
+          "mean_steps": 5.16,
+          "clamp_fraction": 0.8704293831168832
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.19672131147540983,
+          "ci": [
+            0.11627688559536849,
+            0.3131017848877781
+          ],
+          "mean_steps": 5.770491803278689,
+          "clamp_fraction": 0.8874855108461666
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.5486725663716814,
+          "ci": [
+            0.4954484779605673,
+            0.6008058855705792
+          ],
+          "mean_steps": 5.050147492625369,
+          "clamp_fraction": 0.867360286386835
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.16,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "joint_conf_seed2",
+      "trained_under": "joint_conf",
+      "eval_rule": "joint_conf",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.4075,
+          "ci": [
+            0.3604472385805353,
+            0.4563125999304055
+          ],
+          "mean_steps": 5.185,
+          "clamp_fraction": 0.893719696969697
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.26229508196721313,
+          "ci": [
+            0.16838645195913188,
+            0.38436980328441556
+          ],
+          "mean_steps": 5.426229508196721,
+          "clamp_fraction": 0.8841530054644808
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.4336283185840708,
+          "ci": [
+            0.38190788738698855,
+            0.486836162343266
+          ],
+          "mean_steps": 5.1415929203539825,
+          "clamp_fraction": 0.8954411370340573
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.185,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed0",
+      "trained_under": "subset",
+      "eval_rule": "joint_conf",
+      "seed": 0,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.135,
+          "ci": [
+            0.10496250056538574,
+            0.17198172707238119
+          ],
+          "mean_steps": 4.6225,
+          "clamp_fraction": 0.019154220779220778
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 3.9836065573770494,
+          "clamp_fraction": 0.03083528493364559
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.1592920353982301,
+          "ci": [
+            0.12418479630898796,
+            0.20203465897298487
+          ],
+          "mean_steps": 4.737463126843658,
+          "clamp_fraction": 0.017052318379752008
+        },
+        "canary_under_acting": {
+          "mean_steps": 4.6225,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed1",
+      "trained_under": "subset",
+      "eval_rule": "joint_conf",
+      "seed": 1,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.1125,
+          "ci": [
+            0.0851480200886654,
+            0.14722427637608715
+          ],
+          "mean_steps": 3.9625,
+          "clamp_fraction": 0.5260768398268398
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 3.098360655737705,
+          "clamp_fraction": 0.4540983606557378
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.13274336283185842,
+          "ci": [
+            0.10070742308187583,
+            0.1730096520921988
+          ],
+          "mean_steps": 4.117994100294985,
+          "clamp_fraction": 0.539028719559693
+        },
+        "canary_under_acting": {
+          "mean_steps": 3.9625,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    },
+    {
+      "policy": "subset_seed2",
+      "trained_under": "subset",
+      "eval_rule": "joint_conf",
+      "seed": 2,
+      "stats": {
+        "all": {
+          "n": 400,
+          "solve_rate": 0.1125,
+          "ci": [
+            0.0851480200886654,
+            0.14722427637608715
+          ],
+          "mean_steps": 5.115,
+          "clamp_fraction": 0.0008333333333333333
+        },
+        "confounded": {
+          "n": 61,
+          "solve_rate": 0.0,
+          "ci": [
+            0.0,
+            0.05924591620194442
+          ],
+          "mean_steps": 4.60655737704918,
+          "clamp_fraction": 0.00273224043715847
+        },
+        "unconfounded": {
+          "n": 339,
+          "solve_rate": 0.13274336283185842,
+          "ci": [
+            0.10070742308187583,
+            0.1730096520921988
+          ],
+          "mean_steps": 5.206489675516224,
+          "clamp_fraction": 0.0004916420845624385
+        },
+        "canary_under_acting": {
+          "mean_steps": 5.115,
+          "threshold": 1.5,
+          "ok": true,
+          "detail": "agents are acting"
+        }
+      }
+    }
+  ]
+}

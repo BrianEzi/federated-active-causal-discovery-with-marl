@@ -1,0 +1,36 @@
+=== d=7 n_obs=20000 seed=1 ===
+host node-d00a-100.myriad.ucl.ac.uk  started Sun 16 Aug 21:30:22 BST 2026
+d=7  subset-DP path (no DAG list); oracle by 4000 MH draws  observation=edge_marginals
+  GATE 1 OK: observational-only rate 0.0675 CI 0.0450-0.0925, target 0.0779
+  no_intervention        computed (7s)
+  random                 computed (852s)
+  greedy_oracle          computed (750s)
+  edge_marginal_greedy   computed (802s)
+  references cached to /home/ucabbse/sa_runs/d7nobs/refs_d7_n20000.pkl
+  no_intervention        solve=0.09 cost=18.13
+  random                 solve=0.99 cost=4.51
+  greedy_oracle          solve=0.98 cost=2.00
+  edge_marginal_greedy   solve=0.98 cost=2.09
+
+seed 1 (1422s, final entropy 0.64)
+  gap_closed   +1.080 (sampled +1.032)
+  solve_rate   0.99 (greedy 0.98)
+  cost         1.89 CI 1.66-2.16
+  under_acting 0.000
+  optimal      0.471 (informative 1.00) regret 0.137
+  by_mec       mec_1:+nan(n=0)  mec_2-4:+nan(n=0)  mec_5-inf:+nan(n=0)
+  checks       {'gap_closed': True, 'no_under_acting': True, 'solve_rate': True, 'no_collapse': True}  PASSED=True
+
+=== SUMMARY d=7 edge_marginals ===
+  seeds passing: 1/1
+  gap_closed  min +1.080  median +1.080  max +1.080
+  OVERALL: FAIL
+
+=== CANARIES ===
+  [ok  ] G1 entropy: final entropy 0.644 nats is 31% of the uniform ceiling 2.079; the policy has committed.
+  [ok  ] G2 anchors: anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 4.513 vs 2.087).
+  [ok  ] G3 informative fraction: 99.8% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample.
+  [ok  ] G4 seed spread: only 1 finite seed(s); spread is not defined.
+  [ok  ] G5 gate 1 recorded: observational-only rate 0.0675 against a singleton fraction of 0.0779 -- the task requires intervening.
+  written to results/d7nobs/d7_n20000_s1.json
+=== done Sun 16 Aug 22:34:47 BST 2026 ===

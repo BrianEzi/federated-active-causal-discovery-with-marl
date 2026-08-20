@@ -333,7 +333,7 @@ de Witt et al. is the cover for IPPO being a strong baseline rather than a compr
 
 @article{federated_causal_interventions,
   title   = {Federated Causal Discovery From Interventions},
-  journal = {arXiv:2211.03846}}                              % UNVERIFIED -- closest related work, CHECK
+  journal = {arXiv:2211.03846}}                              % VERIFIED 2026-08-20 -- see below
 ```
 
 **Note:** FedAvg assumes a central server, which our setting forbids — worth stating
@@ -399,12 +399,15 @@ finding that its released code breaks on newer JAX (`PositionalSharding` removed
 @inproceedings{foster2021dad,
   author    = {Foster, Adam and Ivanova, Desi R. and Malik, Ilyas and Rainforth, Tom},
   title     = {Deep Adaptive Design: Amortizing Sequential {B}ayesian Experimental Design},
-  booktitle = {ICML}, year = {2021}}                                    % UNVERIFIED -- CHECK BEFORE CITING
+  booktitle = {Proceedings of the 38th International Conference on Machine Learning},
+  series    = {PMLR}, volume = {139}, pages = {3384--3395}, year = {2021}}   % VERIFIED 2026-08-20
 
 @inproceedings{blau2022rlboed,
   author    = {Blau, Tom and Bonilla, Edwin V. and Chades, Iadine and Dezfouli, Amir},
   title     = {Optimizing Sequential Experimental Design with Deep Reinforcement Learning},
-  booktitle = {ICML}, year = {2022}}                                    % UNVERIFIED -- CHECK BEFORE CITING
+  booktitle = {Proceedings of the 39th International Conference on Machine Learning},
+  series    = {PMLR}, volume = {162}, pages = {2107--2128}, year = {2022},
+  note      = {arXiv:2202.00821}}                                       % VERIFIED 2026-08-20
 ```
 
 **These two matter most for positioning.** They are the closest published framings of our
@@ -423,3 +426,54 @@ the related-work section, not an optional one.
 4. Confirm editions and page numbers for the **STANDARD** book entries.
 5. Fix the Talvitie citation key by hand if the bibliography tool renders `talvitie20a` —
    the conference was 2019, PMLR vol. 115 carries a 2020 date.
+
+---
+
+## Verification pass, 20 August 2026 — the three blocking entries
+
+All three now **VERIFIED** against the publisher record.
+
+**Foster, Ivanova, Malik & Rainforth (2021), _Deep Adaptive Design: Amortizing Sequential
+Bayesian Experimental Design_.** ICML 2021, PMLR **139**:3384–3395; key `foster21a`. Authors
+and title confirmed exactly as recorded. Amortizes sequential BOED: rather than solving a
+design optimisation at every stage, a design network is trained once offline and maps history
+to the next design in a single forward pass, so decisions take milliseconds at deployment.
+
+*Relevance:* this is the standard answer to "why not just run greedy EIG at every step", and
+our claim to beat myopic design has to be positioned against it. Note the difference in
+motivation: DAD amortises for **speed at deployment**; we are after **non-myopia**, which is
+a different axis and worth saying explicitly.
+
+**Blau, Bonilla, Chades & Dezfouli (2022), _Optimizing Sequential Experimental Design with
+Deep Reinforcement Learning_.** ICML 2022 **spotlight**, PMLR **162**:2107–2128,
+arXiv:2202.00821; key `blau22a`. Reduces policy optimisation for sequential design to an MDP
+and solves it with deep RL.
+
+*Relevance:* **the closest published framing of our research question** — RL in place of
+greedy EIG. It therefore decides whether our contribution reads as *the method* or as *the
+federation of it*. The honest position is the latter: the federation, the private/shared
+partition, and the latent confounding it induces are what is new here.
+
+**Abyaneh, Scherrer, Schwab, Bauer, Schölkopf & Mehrjou (2022), _Federated Causal Discovery
+From Interventions_ (FedCDI).** arXiv:2211.03846, submitted 7 Nov 2022, revised 11 Feb 2024;
+arXiv preprint, no published venue recorded. **The author list was previously unrecorded and
+is now confirmed.** Proposes a federated framework that exchanges *belief updates* rather than
+raw data, with an intervention-aware aggregation rule covering shared and disparate intervened
+variables.
+
+*Relevance and the point of departure.* This is the closest related work and it is close:
+federated, interventional, belief-passing rather than data-passing. **Two differences to
+establish, and only one is confirmed so far.**
+
+1. *Aggregation.* The abstract describes aggregating individual updates. Whether that
+   aggregation requires a coordinating server — which our setting forbids outright — is
+   **not resolvable from the abstract** and must be read out of the method section. If FedCDI
+   does assume an aggregator, that is our sharpest point of departure. If it does not, the
+   distinction has to be found elsewhere and the positioning gets harder.
+2. *Latent confounding across the partition.* Our setting's defining difficulty is that an
+   agent cannot see its partner's private variables, so a shared pair can be confounded by
+   something structurally invisible to it. Whether FedCDI's partition creates the same
+   problem is unknown and is the second thing to check.
+
+**Reading the abstract is not reading the paper.** Both points above are positioning-critical
+and neither is settled by what has been verified here.

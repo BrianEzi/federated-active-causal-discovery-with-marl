@@ -1,0 +1,2246 @@
+{
+  "args": {
+    "d": 6,
+    "observation": "edge_marginals",
+    "seeds": [
+      4
+    ],
+    "train_episodes": 4000,
+    "eval_episodes": 150,
+    "out": "results/d6_exact/d6_nobs1000_b2_s4.json",
+    "tag": "d6_nobs1000_b2_s4",
+    "ref_cache": "/home/ucabbse/sa_runs/d6_exact/refs_d6_nobs1000_b2.pkl",
+    "refs_only": false,
+    "require_gate1": false,
+    "gate1_episodes": 200,
+    "wandb_project": null,
+    "wandb_dir": null,
+    "budget": 2,
+    "n_obs": 1000,
+    "n_int": 100,
+    "identify_threshold": 0.7,
+    "prior": "erdos_renyi",
+    "prior_p": 0.5,
+    "intervene_scale": 2.0,
+    "include_counts": true,
+    "entropy_coef": 0.003,
+    "lr": 0.001,
+    "step_cost": 0.05,
+    "hidden": 256,
+    "gamma": 0.99,
+    "episodes_per_update": 16,
+    "no_pass": false,
+    "arch": "pernode",
+    "layers": 1,
+    "shaping_coef": 0.0,
+    "force_dp": null,
+    "oracle_draws": 4000
+  },
+  "tag": "d6_nobs1000_b2_s4",
+  "provenance": {
+    "git_commit": "2e66387e92ffb382ceebdeb74d166b887215dbe3",
+    "python": "3.11.4",
+    "numpy": "1.26.4",
+    "torch": "2.6.0+cpu",
+    "host": "node-d00a-064.myriad.ucl.ac.uk",
+    "finished_utc": "2026-08-20T14:06:53Z"
+  },
+  "space": {
+    "d": 6,
+    "n_dags": 3781503,
+    "n_mecs": 1067825,
+    "singleton_fraction": 0.08095114561590987
+  },
+  "references": {
+    "no_intervention": {
+      "solve_rate": 0.02,
+      "mean_cost": 1.96
+    },
+    "random": {
+      "solve_rate": 0.30666666666666664,
+      "mean_cost": 1.84
+    },
+    "greedy_oracle": {
+      "solve_rate": 0.6666666666666666,
+      "mean_cost": 1.64
+    },
+    "edge_marginal_greedy": {
+      "solve_rate": 0.62,
+      "mean_cost": 1.6933333333333334
+    }
+  },
+  "gate1": {
+    "rate": 0.025,
+    "ci": [
+      0.005,
+      0.05
+    ],
+    "target": 0.08095114561590987,
+    "target_ci": null,
+    "passed": false,
+    "n_episodes": 200
+  },
+  "canaries": [
+    {
+      "name": "G1 entropy",
+      "ok": true,
+      "severity": "warn",
+      "observed": 0.3649285527893776,
+      "threshold": 0.65,
+      "detail": "final entropy 0.710 nats is 36% of the uniform ceiling 1.946; the policy has committed."
+    },
+    {
+      "name": "G2 anchors",
+      "ok": true,
+      "severity": "fail",
+      "observed": 0.0,
+      "threshold": 1e-09,
+      "detail": "anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 1.840 vs 1.693)."
+    },
+    {
+      "name": "G3 informative fraction",
+      "ok": true,
+      "severity": "fail",
+      "observed": 1.0,
+      "threshold": 0.1,
+      "detail": "100.0% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample."
+    },
+    {
+      "name": "G4 seed spread",
+      "ok": true,
+      "severity": "warn",
+      "observed": null,
+      "threshold": 0.5,
+      "detail": "only 1 finite seed(s); spread is not defined."
+    },
+    {
+      "name": "G5 gate 1 recorded",
+      "ok": false,
+      "severity": "fail",
+      "observed": 0.025,
+      "threshold": 0.08095114561590987,
+      "detail": "observational-only rate 0.0250 against a singleton fraction of 0.0810 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended."
+    }
+  ],
+  "per_seed": [
+    {
+      "checks": {
+        "gap_closed": true,
+        "no_under_acting": true,
+        "solve_rate": true,
+        "no_collapse": true
+      },
+      "passed": true,
+      "gap_closed": 1.227272727272728,
+      "under_acting_rate": 0.0,
+      "solve_rate": 0.6,
+      "greedy_solve_rate": 0.62,
+      "sampled_gap_closed": 1.0909090909090915,
+      "seed": 4,
+      "train_seconds": 4556.115521907806,
+      "final_entropy": 0.7101181745529175,
+      "deterministic": {
+        "gap_closed": 1.227272727272728,
+        "solve_rate": 0.6,
+        "greedy_solve_rate": 0.62,
+        "mean_cost": 1.66,
+        "cost_ci": [
+          1.5733333333333333,
+          1.74
+        ],
+        "mean_interventions_when_solved": 1.4333333333333333,
+        "under_acting_rate": 0.0,
+        "mean_regret": 0.09331200114592847,
+        "optimal_rate": 0.5622489959839357,
+        "informative_fraction": 1.0,
+        "by_mec_size": {
+          "mec_1": {
+            "n": 9,
+            "gap_closed": 1.0,
+            "solve_rate": 0.7777777777777778,
+            "mean_interventions": 0.8888888888888888
+          },
+          "mec_2-4": {
+            "n": 62,
+            "gap_closed": 1.222222222222222,
+            "solve_rate": 0.7903225806451613,
+            "mean_interventions": 1.4193548387096775
+          },
+          "mec_5-inf": {
+            "n": 79,
+            "gap_closed": 1.4999999999999913,
+            "solve_rate": 0.43037974683544306,
+            "mean_interventions": 1.9367088607594938
+          }
+        },
+        "repeat_rate": 0.0,
+        "distinct_targets": 1.6938775510204083,
+        "action_histogram": [
+          0.1686746987951807,
+          0.1686746987951807,
+          0.1927710843373494,
+          0.12449799196787148,
+          0.1686746987951807,
+          0.17670682730923695
+        ]
+      },
+      "sampled": {
+        "gap_closed": 1.0909090909090915,
+        "solve_rate": 0.5666666666666667,
+        "greedy_solve_rate": 0.62,
+        "mean_cost": 1.68,
+        "cost_ci": [
+          1.5933333333333333,
+          1.76
+        ],
+        "mean_interventions_when_solved": 1.4352941176470588,
+        "under_acting_rate": 0.0,
+        "mean_regret": 0.10216229919449966,
+        "optimal_rate": 0.5158730158730159,
+        "informative_fraction": 1.0,
+        "by_mec_size": {
+          "mec_1": {
+            "n": 9,
+            "gap_closed": 1.0,
+            "solve_rate": 0.7777777777777778,
+            "mean_interventions": 0.8888888888888888
+          },
+          "mec_2-4": {
+            "n": 62,
+            "gap_closed": 1.111111111111111,
+            "solve_rate": 0.7903225806451613,
+            "mean_interventions": 1.4516129032258065
+          },
+          "mec_5-inf": {
+            "n": 79,
+            "gap_closed": 1.0,
+            "solve_rate": 0.3670886075949367,
+            "mean_interventions": 1.9493670886075949
+          }
+        },
+        "repeat_rate": 0.0,
+        "distinct_targets": 1.7142857142857142,
+        "action_histogram": [
+          0.1626984126984127,
+          0.20634920634920634,
+          0.1626984126984127,
+          0.11507936507936507,
+          0.16666666666666666,
+          0.1865079365079365
+        ]
+      }
+    }
+  ],
+  "training_history": {
+    "4": [
+      {
+        "episodes": 16,
+        "solve_rate": 0.125,
+        "mean_length": 1.5625,
+        "policy_loss": -0.0022583559252475904,
+        "value_loss": 0.12192655354738235,
+        "entropy": 1.945671260356903
+      },
+      {
+        "episodes": 32,
+        "solve_rate": 0.125,
+        "mean_length": 1.625,
+        "policy_loss": -0.0021343221916110267,
+        "value_loss": 0.12382489256560802,
+        "entropy": 1.944397121667862
+      },
+      {
+        "episodes": 48,
+        "solve_rate": 0.1875,
+        "mean_length": 1.3125,
+        "policy_loss": -0.011416617198847234,
+        "value_loss": 0.14400102943181992,
+        "entropy": 1.9396447539329529
+      },
+      {
+        "episodes": 64,
+        "solve_rate": 0.375,
+        "mean_length": 1.1875,
+        "policy_loss": -0.018653050895132472,
+        "value_loss": 0.21034830436110497,
+        "entropy": 1.915166586637497
+      },
+      {
+        "episodes": 80,
+        "solve_rate": 0.375,
+        "mean_length": 1.75,
+        "policy_loss": -0.015449881377019858,
+        "value_loss": 0.20971309393644333,
+        "entropy": 1.859743744134903
+      },
+      {
+        "episodes": 96,
+        "solve_rate": 0.1875,
+        "mean_length": 1.9375,
+        "policy_loss": -0.024765472573738734,
+        "value_loss": 0.13664153590798378,
+        "entropy": 1.784697949886322
+      },
+      {
+        "episodes": 112,
+        "solve_rate": 0.4375,
+        "mean_length": 1.8125,
+        "policy_loss": 0.004188079278562462,
+        "value_loss": 0.26014500111341476,
+        "entropy": 1.688892662525177
+      },
+      {
+        "episodes": 128,
+        "solve_rate": 0.4375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.008526227501189254,
+        "value_loss": 0.23616492003202438,
+        "entropy": 1.585987150669098
+      },
+      {
+        "episodes": 144,
+        "solve_rate": 0.3125,
+        "mean_length": 1.875,
+        "policy_loss": -0.006763334223069961,
+        "value_loss": 0.19271612912416458,
+        "entropy": 1.4504018425941467
+      },
+      {
+        "episodes": 160,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.002357997175844062,
+        "value_loss": 0.2552451826632023,
+        "entropy": 1.3441428542137146
+      },
+      {
+        "episodes": 176,
+        "solve_rate": 0.375,
+        "mean_length": 1.75,
+        "policy_loss": -0.00719374634458525,
+        "value_loss": 0.3438420817255974,
+        "entropy": 1.2986900210380554
+      },
+      {
+        "episodes": 192,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0033019580447151142,
+        "value_loss": 0.25762613862752914,
+        "entropy": 1.0906457901000977
+      },
+      {
+        "episodes": 208,
+        "solve_rate": 0.4375,
+        "mean_length": 2.0,
+        "policy_loss": -0.0067312754690647125,
+        "value_loss": 0.24802305921912193,
+        "entropy": 1.058453530073166
+      },
+      {
+        "episodes": 224,
+        "solve_rate": 0.3125,
+        "mean_length": 1.9375,
+        "policy_loss": -0.00626828391555545,
+        "value_loss": 0.2552225701510906,
+        "entropy": 1.1418783962726593
+      },
+      {
+        "episodes": 240,
+        "solve_rate": 0.375,
+        "mean_length": 1.875,
+        "policy_loss": -0.00889808443219664,
+        "value_loss": 0.22736725583672523,
+        "entropy": 1.2441857159137726
+      },
+      {
+        "episodes": 256,
+        "solve_rate": 0.4375,
+        "mean_length": 1.625,
+        "policy_loss": -0.017270959591350277,
+        "value_loss": 0.2257206328213215,
+        "entropy": 1.2696046233177185
+      },
+      {
+        "episodes": 272,
+        "solve_rate": 0.375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.0008049998801047398,
+        "value_loss": 0.21474263817071915,
+        "entropy": 1.2762657701969147
+      },
+      {
+        "episodes": 288,
+        "solve_rate": 0.25,
+        "mean_length": 1.9375,
+        "policy_loss": -0.013607059019587808,
+        "value_loss": 0.17644519731402397,
+        "entropy": 0.9809845685958862
+      },
+      {
+        "episodes": 304,
+        "solve_rate": 0.375,
+        "mean_length": 1.875,
+        "policy_loss": -0.0024906014286294464,
+        "value_loss": 0.23890482261776924,
+        "entropy": 0.7667600363492966
+      },
+      {
+        "episodes": 320,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.03408604617127109,
+        "value_loss": 0.2517901808023453,
+        "entropy": 0.861729234457016
+      },
+      {
+        "episodes": 336,
+        "solve_rate": 0.5,
+        "mean_length": 1.625,
+        "policy_loss": -0.017658639906181328,
+        "value_loss": 0.24293842911720276,
+        "entropy": 1.1893768012523651
+      },
+      {
+        "episodes": 352,
+        "solve_rate": 0.375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.013201182325779826,
+        "value_loss": 0.21883324161171913,
+        "entropy": 1.4107417166233063
+      },
+      {
+        "episodes": 368,
+        "solve_rate": 0.25,
+        "mean_length": 1.875,
+        "policy_loss": 0.003861209189441661,
+        "value_loss": 0.15774420276284218,
+        "entropy": 1.5609060525894165
+      },
+      {
+        "episodes": 384,
+        "solve_rate": 0.5,
+        "mean_length": 1.75,
+        "policy_loss": -0.006830175407230854,
+        "value_loss": 0.2384706810116768,
+        "entropy": 1.548742651939392
+      },
+      {
+        "episodes": 400,
+        "solve_rate": 0.375,
+        "mean_length": 1.75,
+        "policy_loss": -0.014182074161778857,
+        "value_loss": 0.23833517357707024,
+        "entropy": 1.3125653564929962
+      },
+      {
+        "episodes": 416,
+        "solve_rate": 0.5,
+        "mean_length": 1.875,
+        "policy_loss": -0.013511670807687892,
+        "value_loss": 0.22970354557037354,
+        "entropy": 1.164230853319168
+      },
+      {
+        "episodes": 432,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.004565717702332606,
+        "value_loss": 0.2389170415699482,
+        "entropy": 1.1166236698627472
+      },
+      {
+        "episodes": 448,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.008120977776814975,
+        "value_loss": 0.2834082469344139,
+        "entropy": 1.1050406396389008
+      },
+      {
+        "episodes": 464,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.011207253406089634,
+        "value_loss": 0.27735713869333267,
+        "entropy": 1.0118328779935837
+      },
+      {
+        "episodes": 480,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.015073268850944288,
+        "value_loss": 0.2501159645617008,
+        "entropy": 1.2286837100982666
+      },
+      {
+        "episodes": 496,
+        "solve_rate": 0.4375,
+        "mean_length": 1.875,
+        "policy_loss": -0.00044221539671163157,
+        "value_loss": 0.2649290971457958,
+        "entropy": 1.1778125166893005
+      },
+      {
+        "episodes": 512,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": 0.009070664895136415,
+        "value_loss": 0.2761038914322853,
+        "entropy": 1.0074829161167145
+      },
+      {
+        "episodes": 528,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": -0.00016712556576514714,
+        "value_loss": 0.24886223673820496,
+        "entropy": 1.1132697463035583
+      },
+      {
+        "episodes": 544,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": 0.0003282521685359363,
+        "value_loss": 0.2733726277947426,
+        "entropy": 1.2194145321846008
+      },
+      {
+        "episodes": 560,
+        "solve_rate": 0.5,
+        "mean_length": 1.75,
+        "policy_loss": -0.009947048383764923,
+        "value_loss": 0.23257006332278252,
+        "entropy": 1.1186938285827637
+      },
+      {
+        "episodes": 576,
+        "solve_rate": 0.3125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.00916827483349536,
+        "value_loss": 0.1538931429386139,
+        "entropy": 1.1394985020160675
+      },
+      {
+        "episodes": 592,
+        "solve_rate": 0.8125,
+        "mean_length": 1.5,
+        "policy_loss": 0.01896592346020043,
+        "value_loss": 0.4376814588904381,
+        "entropy": 1.12986221909523
+      },
+      {
+        "episodes": 608,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.002459155042069394,
+        "value_loss": 0.23236005380749702,
+        "entropy": 1.0953196287155151
+      },
+      {
+        "episodes": 624,
+        "solve_rate": 0.5625,
+        "mean_length": 1.625,
+        "policy_loss": -0.008479265693145388,
+        "value_loss": 0.321764774620533,
+        "entropy": 1.1599537432193756
+      },
+      {
+        "episodes": 640,
+        "solve_rate": 0.5625,
+        "mean_length": 1.625,
+        "policy_loss": -0.023246193340478172,
+        "value_loss": 0.23768224567174911,
+        "entropy": 1.1078472137451172
+      },
+      {
+        "episodes": 656,
+        "solve_rate": 0.4375,
+        "mean_length": 1.9375,
+        "policy_loss": -0.028238938325234386,
+        "value_loss": 0.2470049299299717,
+        "entropy": 1.2550968527793884
+      },
+      {
+        "episodes": 672,
+        "solve_rate": 0.8125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.01131285380365199,
+        "value_loss": 0.2988336607813835,
+        "entropy": 1.0105955749750137
+      },
+      {
+        "episodes": 688,
+        "solve_rate": 0.8125,
+        "mean_length": 1.375,
+        "policy_loss": -0.015833643434399747,
+        "value_loss": 0.19977238029241562,
+        "entropy": 0.8845516741275787
+      },
+      {
+        "episodes": 704,
+        "solve_rate": 0.875,
+        "mean_length": 2.0,
+        "policy_loss": -0.010242991149425507,
+        "value_loss": 0.1121266521513462,
+        "entropy": 0.9774811416864395
+      },
+      {
+        "episodes": 720,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.03901730084584898,
+        "value_loss": 0.19202842935919762,
+        "entropy": 0.888398751616478
+      },
+      {
+        "episodes": 736,
+        "solve_rate": 0.625,
+        "mean_length": 1.875,
+        "policy_loss": -0.00971651105210114,
+        "value_loss": 0.2256455309689045,
+        "entropy": 1.008325457572937
+      },
+      {
+        "episodes": 752,
+        "solve_rate": 0.625,
+        "mean_length": 1.625,
+        "policy_loss": -0.013025633901214917,
+        "value_loss": 0.2121671810746193,
+        "entropy": 1.0039869248867035
+      },
+      {
+        "episodes": 768,
+        "solve_rate": 0.8125,
+        "mean_length": 1.5625,
+        "policy_loss": -0.013567458316683823,
+        "value_loss": 0.17391039431095123,
+        "entropy": 1.2010607421398163
+      },
+      {
+        "episodes": 784,
+        "solve_rate": 0.5,
+        "mean_length": 1.875,
+        "policy_loss": 0.025921200976394942,
+        "value_loss": 0.32476431876420975,
+        "entropy": 1.172498732805252
+      },
+      {
+        "episodes": 800,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.048262346802012246,
+        "value_loss": 0.24291199445724487,
+        "entropy": 1.1416560411453247
+      },
+      {
+        "episodes": 816,
+        "solve_rate": 0.5,
+        "mean_length": 1.75,
+        "policy_loss": -0.02441637683659792,
+        "value_loss": 0.24995701760053635,
+        "entropy": 1.0672893971204758
+      },
+      {
+        "episodes": 832,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.013176723126450351,
+        "value_loss": 0.20279625430703163,
+        "entropy": 0.7780728340148926
+      },
+      {
+        "episodes": 848,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0030914325255215758,
+        "value_loss": 0.21318302676081657,
+        "entropy": 0.8958105146884918
+      },
+      {
+        "episodes": 864,
+        "solve_rate": 0.375,
+        "mean_length": 1.6875,
+        "policy_loss": -0.01292058965191245,
+        "value_loss": 0.22689038142561913,
+        "entropy": 0.6490948498249054
+      },
+      {
+        "episodes": 880,
+        "solve_rate": 0.4375,
+        "mean_length": 1.875,
+        "policy_loss": -0.02778208556895434,
+        "value_loss": 0.2843467555940151,
+        "entropy": 0.7017153352499008
+      },
+      {
+        "episodes": 896,
+        "solve_rate": 0.5625,
+        "mean_length": 1.5,
+        "policy_loss": -0.015262913872936323,
+        "value_loss": 0.22182857990264893,
+        "entropy": 0.8483794331550598
+      },
+      {
+        "episodes": 912,
+        "solve_rate": 0.4375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.0003846976068071495,
+        "value_loss": 0.2526329904794693,
+        "entropy": 0.8862635493278503
+      },
+      {
+        "episodes": 928,
+        "solve_rate": 0.75,
+        "mean_length": 1.8125,
+        "policy_loss": -0.009965586203053434,
+        "value_loss": 0.2638610042631626,
+        "entropy": 0.9300066977739334
+      },
+      {
+        "episodes": 944,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": -0.005337801396049002,
+        "value_loss": 0.2340267151594162,
+        "entropy": 0.9728770852088928
+      },
+      {
+        "episodes": 960,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.02343698059497723,
+        "value_loss": 0.24266304448246956,
+        "entropy": 0.9518624991178513
+      },
+      {
+        "episodes": 976,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5,
+        "policy_loss": -0.005443067580927163,
+        "value_loss": 0.21160605922341347,
+        "entropy": 0.9093321710824966
+      },
+      {
+        "episodes": 992,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": -0.01901701827032065,
+        "value_loss": 0.22902996838092804,
+        "entropy": 0.8351440727710724
+      },
+      {
+        "episodes": 1008,
+        "solve_rate": 0.5625,
+        "mean_length": 1.375,
+        "policy_loss": -0.02595137917579926,
+        "value_loss": 0.23717134445905685,
+        "entropy": 0.783549040555954
+      },
+      {
+        "episodes": 1024,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0010731646304646958,
+        "value_loss": 0.24156705662608147,
+        "entropy": 0.784067913889885
+      },
+      {
+        "episodes": 1040,
+        "solve_rate": 0.5625,
+        "mean_length": 1.875,
+        "policy_loss": -0.026025776440898873,
+        "value_loss": 0.22659142687916756,
+        "entropy": 0.9740695208311081
+      },
+      {
+        "episodes": 1056,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.006894851002531954,
+        "value_loss": 0.21392957493662834,
+        "entropy": 0.7840252667665482
+      },
+      {
+        "episodes": 1072,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5,
+        "policy_loss": -0.019498450681567192,
+        "value_loss": 0.2285379059612751,
+        "entropy": 0.908336952328682
+      },
+      {
+        "episodes": 1088,
+        "solve_rate": 0.4375,
+        "mean_length": 1.6875,
+        "policy_loss": 0.0002192746722826655,
+        "value_loss": 0.2430110163986683,
+        "entropy": 0.5640711784362793
+      },
+      {
+        "episodes": 1104,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.002942956997755486,
+        "value_loss": 0.34745582938194275,
+        "entropy": 0.6863086670637131
+      },
+      {
+        "episodes": 1120,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5,
+        "policy_loss": -0.012379249719042917,
+        "value_loss": 0.24869000539183617,
+        "entropy": 0.7388376891613007
+      },
+      {
+        "episodes": 1136,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.010859780085201276,
+        "value_loss": 0.20542436465620995,
+        "entropy": 0.6829170286655426
+      },
+      {
+        "episodes": 1152,
+        "solve_rate": 0.5,
+        "mean_length": 1.8125,
+        "policy_loss": -0.010414204865309529,
+        "value_loss": 0.32918933033943176,
+        "entropy": 0.6841115057468414
+      },
+      {
+        "episodes": 1168,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.002105266404284656,
+        "value_loss": 0.2105405144393444,
+        "entropy": 0.7836520820856094
+      },
+      {
+        "episodes": 1184,
+        "solve_rate": 0.75,
+        "mean_length": 1.5,
+        "policy_loss": -0.014855093012254628,
+        "value_loss": 0.2185119427740574,
+        "entropy": 0.845762237906456
+      },
+      {
+        "episodes": 1200,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.011474189885820607,
+        "value_loss": 0.1888076402246952,
+        "entropy": 0.8677334487438202
+      },
+      {
+        "episodes": 1216,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": -0.00803726209310951,
+        "value_loss": 0.25770455598831177,
+        "entropy": 0.8088824898004532
+      },
+      {
+        "episodes": 1232,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.016337567095265015,
+        "value_loss": 0.2862202227115631,
+        "entropy": 0.6009426265954971
+      },
+      {
+        "episodes": 1248,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": 0.0023063840745980446,
+        "value_loss": 0.22831415012478828,
+        "entropy": 0.5071340054273605
+      },
+      {
+        "episodes": 1264,
+        "solve_rate": 0.5,
+        "mean_length": 1.875,
+        "policy_loss": -0.013894265372073278,
+        "value_loss": 0.2263062559068203,
+        "entropy": 0.6032716929912567
+      },
+      {
+        "episodes": 1280,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.033800430210501275,
+        "value_loss": 0.24631840735673904,
+        "entropy": 0.5895709693431854
+      },
+      {
+        "episodes": 1296,
+        "solve_rate": 0.75,
+        "mean_length": 1.875,
+        "policy_loss": -0.006227807654067163,
+        "value_loss": 0.22281820327043533,
+        "entropy": 0.6524371355772018
+      },
+      {
+        "episodes": 1312,
+        "solve_rate": 0.875,
+        "mean_length": 1.5625,
+        "policy_loss": 0.017749631814659494,
+        "value_loss": 0.13297534734010696,
+        "entropy": 0.8739311397075653
+      },
+      {
+        "episodes": 1328,
+        "solve_rate": 0.625,
+        "mean_length": 1.875,
+        "policy_loss": 0.012206684596215212,
+        "value_loss": 0.30584147572517395,
+        "entropy": 0.7922541052103043
+      },
+      {
+        "episodes": 1344,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.00881404784640527,
+        "value_loss": 0.2242223434150219,
+        "entropy": 0.7617351114749908
+      },
+      {
+        "episodes": 1360,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.012832820372379317,
+        "value_loss": 0.22327174991369247,
+        "entropy": 0.9775019288063049
+      },
+      {
+        "episodes": 1376,
+        "solve_rate": 0.5,
+        "mean_length": 1.75,
+        "policy_loss": -0.020461753276842742,
+        "value_loss": 0.2556285634636879,
+        "entropy": 0.8556894212961197
+      },
+      {
+        "episodes": 1392,
+        "solve_rate": 0.5,
+        "mean_length": 1.8125,
+        "policy_loss": -0.010384907359397566,
+        "value_loss": 0.23932425677776337,
+        "entropy": 0.7331772297620773
+      },
+      {
+        "episodes": 1408,
+        "solve_rate": 0.625,
+        "mean_length": 1.9375,
+        "policy_loss": 0.005822251903854436,
+        "value_loss": 0.26904017478227615,
+        "entropy": 0.6985816061496735
+      },
+      {
+        "episodes": 1424,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0037108158622114473,
+        "value_loss": 0.24213231354951859,
+        "entropy": 0.6930693686008453
+      },
+      {
+        "episodes": 1440,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": -0.009417489476057028,
+        "value_loss": 0.2384318821132183,
+        "entropy": 0.6992230862379074
+      },
+      {
+        "episodes": 1456,
+        "solve_rate": 0.875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.017783768043887704,
+        "value_loss": 0.14304978400468826,
+        "entropy": 0.5525153428316116
+      },
+      {
+        "episodes": 1472,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.026484081736550813,
+        "value_loss": 0.19898761808872223,
+        "entropy": 0.9233459234237671
+      },
+      {
+        "episodes": 1488,
+        "solve_rate": 0.8125,
+        "mean_length": 1.375,
+        "policy_loss": -0.016306318173354484,
+        "value_loss": 0.19433119148015976,
+        "entropy": 0.7317498326301575
+      },
+      {
+        "episodes": 1504,
+        "solve_rate": 0.625,
+        "mean_length": 1.875,
+        "policy_loss": -0.014380311709828675,
+        "value_loss": 0.23898803815245628,
+        "entropy": 0.7189058363437653
+      },
+      {
+        "episodes": 1520,
+        "solve_rate": 0.75,
+        "mean_length": 1.5625,
+        "policy_loss": 0.0023316175583758536,
+        "value_loss": 0.23251978307962418,
+        "entropy": 0.7464711219072342
+      },
+      {
+        "episodes": 1536,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": -0.013033709591254272,
+        "value_loss": 0.24682824686169624,
+        "entropy": 0.7203230857849121
+      },
+      {
+        "episodes": 1552,
+        "solve_rate": 0.5625,
+        "mean_length": 1.75,
+        "policy_loss": -0.018469525850377977,
+        "value_loss": 0.24361777678132057,
+        "entropy": 0.5989793688058853
+      },
+      {
+        "episodes": 1568,
+        "solve_rate": 0.5625,
+        "mean_length": 1.5,
+        "policy_loss": -0.01045045911334519,
+        "value_loss": 0.22837496921420097,
+        "entropy": 0.7358999699354172
+      },
+      {
+        "episodes": 1584,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": -0.00977566499263105,
+        "value_loss": 0.24193554744124413,
+        "entropy": 0.5912954956293106
+      },
+      {
+        "episodes": 1600,
+        "solve_rate": 0.75,
+        "mean_length": 1.75,
+        "policy_loss": -0.009062315353990158,
+        "value_loss": 0.19882531091570854,
+        "entropy": 0.4313413202762604
+      },
+      {
+        "episodes": 1616,
+        "solve_rate": 0.9375,
+        "mean_length": 1.25,
+        "policy_loss": -0.007966586254769759,
+        "value_loss": 0.07938124239444733,
+        "entropy": 0.5856085270643234
+      },
+      {
+        "episodes": 1632,
+        "solve_rate": 0.75,
+        "mean_length": 1.4375,
+        "policy_loss": -0.005458638382454417,
+        "value_loss": 0.29296959936618805,
+        "entropy": 0.5459476560354233
+      },
+      {
+        "episodes": 1648,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.002354232295017189,
+        "value_loss": 0.23284190148115158,
+        "entropy": 0.4308456480503082
+      },
+      {
+        "episodes": 1664,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.02621325364129401,
+        "value_loss": 0.24391959607601166,
+        "entropy": 0.6959811002016068
+      },
+      {
+        "episodes": 1680,
+        "solve_rate": 0.75,
+        "mean_length": 1.375,
+        "policy_loss": -0.019075218122452497,
+        "value_loss": 0.27206556499004364,
+        "entropy": 0.4843384250998497
+      },
+      {
+        "episodes": 1696,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.003862066427245736,
+        "value_loss": 0.2168736457824707,
+        "entropy": 0.678399384021759
+      },
+      {
+        "episodes": 1712,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": -0.015269411830231228,
+        "value_loss": 0.22855345532298088,
+        "entropy": 0.6961206495761871
+      },
+      {
+        "episodes": 1728,
+        "solve_rate": 0.625,
+        "mean_length": 1.625,
+        "policy_loss": -0.004496222690148599,
+        "value_loss": 0.24214335158467293,
+        "entropy": 0.6879260540008545
+      },
+      {
+        "episodes": 1744,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.013681263110979835,
+        "value_loss": 0.21196811646223068,
+        "entropy": 0.5908404886722565
+      },
+      {
+        "episodes": 1760,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": -0.01671237386120783,
+        "value_loss": 0.24845627322793007,
+        "entropy": 0.5187832117080688
+      },
+      {
+        "episodes": 1776,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.014134312315878361,
+        "value_loss": 0.17452670261263847,
+        "entropy": 0.5454584509134293
+      },
+      {
+        "episodes": 1792,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0011196053345443602,
+        "value_loss": 0.24915402755141258,
+        "entropy": 0.44888899475336075
+      },
+      {
+        "episodes": 1808,
+        "solve_rate": 0.5625,
+        "mean_length": 1.875,
+        "policy_loss": -0.021659058115135466,
+        "value_loss": 0.25231824442744255,
+        "entropy": 0.5406810566782951
+      },
+      {
+        "episodes": 1824,
+        "solve_rate": 0.6875,
+        "mean_length": 1.875,
+        "policy_loss": -0.014942817855626345,
+        "value_loss": 0.1694188192486763,
+        "entropy": 0.5768644511699677
+      },
+      {
+        "episodes": 1840,
+        "solve_rate": 0.875,
+        "mean_length": 1.75,
+        "policy_loss": -0.031662187672087505,
+        "value_loss": 0.14115586318075657,
+        "entropy": 0.5819816440343857
+      },
+      {
+        "episodes": 1856,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": 0.00927703649978362,
+        "value_loss": 0.44984669983386993,
+        "entropy": 0.5436411499977112
+      },
+      {
+        "episodes": 1872,
+        "solve_rate": 0.4375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.004989475481501415,
+        "value_loss": 0.2629983127117157,
+        "entropy": 0.5467134714126587
+      },
+      {
+        "episodes": 1888,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.03934140858688906,
+        "value_loss": 0.31384195387363434,
+        "entropy": 0.6127855479717255
+      },
+      {
+        "episodes": 1904,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.01799211611173135,
+        "value_loss": 0.43612948805093765,
+        "entropy": 0.5196826010942459
+      },
+      {
+        "episodes": 1920,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.008266160976038162,
+        "value_loss": 0.2651051953434944,
+        "entropy": 0.38748375326395035
+      },
+      {
+        "episodes": 1936,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": 0.0013881699889211063,
+        "value_loss": 0.2868950814008713,
+        "entropy": 0.5520818829536438
+      },
+      {
+        "episodes": 1952,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.003980231536034884,
+        "value_loss": 0.2110181413590908,
+        "entropy": 0.45651331543922424
+      },
+      {
+        "episodes": 1968,
+        "solve_rate": 0.8125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.008217375740597888,
+        "value_loss": 0.17345688119530678,
+        "entropy": 0.6764854490756989
+      },
+      {
+        "episodes": 1984,
+        "solve_rate": 0.625,
+        "mean_length": 1.625,
+        "policy_loss": -0.009467556821899592,
+        "value_loss": 0.24801132082939148,
+        "entropy": 0.7189434915781021
+      },
+      {
+        "episodes": 2000,
+        "solve_rate": 0.8125,
+        "mean_length": 1.3125,
+        "policy_loss": -0.0036180644140877405,
+        "value_loss": 0.20233950018882751,
+        "entropy": 0.5222261622548103
+      },
+      {
+        "episodes": 2016,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.014605314850255624,
+        "value_loss": 0.22247596457600594,
+        "entropy": 0.6569214165210724
+      },
+      {
+        "episodes": 2032,
+        "solve_rate": 0.8125,
+        "mean_length": 1.5625,
+        "policy_loss": -0.007329929550181191,
+        "value_loss": 0.16052375361323357,
+        "entropy": 0.5068361982703209
+      },
+      {
+        "episodes": 2048,
+        "solve_rate": 0.8125,
+        "mean_length": 1.4375,
+        "policy_loss": -0.027883555578148922,
+        "value_loss": 0.2110074907541275,
+        "entropy": 0.4446239247918129
+      },
+      {
+        "episodes": 2064,
+        "solve_rate": 0.5,
+        "mean_length": 1.8125,
+        "policy_loss": 0.0041637902975018015,
+        "value_loss": 0.3462173119187355,
+        "entropy": 0.3540392145514488
+      },
+      {
+        "episodes": 2080,
+        "solve_rate": 0.8125,
+        "mean_length": 1.75,
+        "policy_loss": -0.023997956820362987,
+        "value_loss": 0.17770768702030182,
+        "entropy": 0.4301905035972595
+      },
+      {
+        "episodes": 2096,
+        "solve_rate": 0.8125,
+        "mean_length": 1.3125,
+        "policy_loss": -0.023248430452353475,
+        "value_loss": 0.22509460896253586,
+        "entropy": 0.25616438314318657
+      },
+      {
+        "episodes": 2112,
+        "solve_rate": 0.4375,
+        "mean_length": 1.625,
+        "policy_loss": -0.0016095406937424173,
+        "value_loss": 0.3894955664873123,
+        "entropy": 0.3486255258321762
+      },
+      {
+        "episodes": 2128,
+        "solve_rate": 0.375,
+        "mean_length": 1.5,
+        "policy_loss": 0.013304921831670313,
+        "value_loss": 0.3001328259706497,
+        "entropy": 0.19065989553928375
+      },
+      {
+        "episodes": 2144,
+        "solve_rate": 0.75,
+        "mean_length": 1.375,
+        "policy_loss": -0.006869364292360736,
+        "value_loss": 0.31585729122161865,
+        "entropy": 0.20389722660183907
+      },
+      {
+        "episodes": 2160,
+        "solve_rate": 0.4375,
+        "mean_length": 1.5625,
+        "policy_loss": -0.045113906192668196,
+        "value_loss": 0.2030661515891552,
+        "entropy": 0.4711313396692276
+      },
+      {
+        "episodes": 2176,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": -0.025250758545903196,
+        "value_loss": 0.26905348151922226,
+        "entropy": 0.48371440917253494
+      },
+      {
+        "episodes": 2192,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": 0.004945442147020529,
+        "value_loss": 0.22114311531186104,
+        "entropy": 0.5450865477323532
+      },
+      {
+        "episodes": 2208,
+        "solve_rate": 0.625,
+        "mean_length": 1.5,
+        "policy_loss": -0.0038097272044979036,
+        "value_loss": 0.31965845823287964,
+        "entropy": 0.4417106583714485
+      },
+      {
+        "episodes": 2224,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.016647363443755836,
+        "value_loss": 0.2182183377444744,
+        "entropy": 0.5773523449897766
+      },
+      {
+        "episodes": 2240,
+        "solve_rate": 0.875,
+        "mean_length": 1.375,
+        "policy_loss": -0.006232465019406774,
+        "value_loss": 0.18045737221837044,
+        "entropy": 0.568410113453865
+      },
+      {
+        "episodes": 2256,
+        "solve_rate": 0.6875,
+        "mean_length": 1.4375,
+        "policy_loss": -0.003381398000307456,
+        "value_loss": 0.28077923506498337,
+        "entropy": 0.6495486944913864
+      },
+      {
+        "episodes": 2272,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.014565321133254372,
+        "value_loss": 0.195496067404747,
+        "entropy": 0.788910910487175
+      },
+      {
+        "episodes": 2288,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.015416288476746587,
+        "value_loss": 0.1926432028412819,
+        "entropy": 0.86262047290802
+      },
+      {
+        "episodes": 2304,
+        "solve_rate": 0.625,
+        "mean_length": 1.5,
+        "policy_loss": -0.0005833860389733436,
+        "value_loss": 0.23064986988902092,
+        "entropy": 0.7701058238744736
+      },
+      {
+        "episodes": 2320,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": 0.002998487849254161,
+        "value_loss": 0.269369725137949,
+        "entropy": 0.8746062964200974
+      },
+      {
+        "episodes": 2336,
+        "solve_rate": 0.3125,
+        "mean_length": 1.9375,
+        "policy_loss": 0.007131857251103213,
+        "value_loss": 0.26163583248853683,
+        "entropy": 0.9035836905241013
+      },
+      {
+        "episodes": 2352,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.016819427689089395,
+        "value_loss": 0.2004917748272419,
+        "entropy": 0.7305966764688492
+      },
+      {
+        "episodes": 2368,
+        "solve_rate": 0.4375,
+        "mean_length": 1.75,
+        "policy_loss": -0.019457566518602754,
+        "value_loss": 0.2604615092277527,
+        "entropy": 0.7489519715309143
+      },
+      {
+        "episodes": 2384,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.009900464995386216,
+        "value_loss": 0.2171875387430191,
+        "entropy": 0.49161070585250854
+      },
+      {
+        "episodes": 2400,
+        "solve_rate": 0.5625,
+        "mean_length": 1.875,
+        "policy_loss": -0.0024952571159992942,
+        "value_loss": 0.2588960751891136,
+        "entropy": 0.6333760321140289
+      },
+      {
+        "episodes": 2416,
+        "solve_rate": 0.5625,
+        "mean_length": 1.875,
+        "policy_loss": -0.012210509483702836,
+        "value_loss": 0.23203862830996513,
+        "entropy": 0.37636078894138336
+      },
+      {
+        "episodes": 2432,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.0041777344707121244,
+        "value_loss": 0.3315872848033905,
+        "entropy": 0.5034584552049637
+      },
+      {
+        "episodes": 2448,
+        "solve_rate": 0.8125,
+        "mean_length": 1.625,
+        "policy_loss": -0.015759308822453022,
+        "value_loss": 0.2930138558149338,
+        "entropy": 0.34965307265520096
+      },
+      {
+        "episodes": 2464,
+        "solve_rate": 0.5,
+        "mean_length": 1.625,
+        "policy_loss": -0.0015391065591323638,
+        "value_loss": 0.28920871019363403,
+        "entropy": 0.5608126372098923
+      },
+      {
+        "episodes": 2480,
+        "solve_rate": 0.875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.02198526375340748,
+        "value_loss": 0.1428794302046299,
+        "entropy": 0.49742382764816284
+      },
+      {
+        "episodes": 2496,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.008210190194498423,
+        "value_loss": 0.3070717304944992,
+        "entropy": 0.6247091889381409
+      },
+      {
+        "episodes": 2512,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.008401883741969485,
+        "value_loss": 0.26059625670313835,
+        "entropy": 0.6309342682361603
+      },
+      {
+        "episodes": 2528,
+        "solve_rate": 0.8125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.023593620259177328,
+        "value_loss": 0.2570727542042732,
+        "entropy": 0.7293218672275543
+      },
+      {
+        "episodes": 2544,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.01750795796720439,
+        "value_loss": 0.29011552408337593,
+        "entropy": 0.614451214671135
+      },
+      {
+        "episodes": 2560,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.01752524683251977,
+        "value_loss": 0.2267131321132183,
+        "entropy": 0.7189313173294067
+      },
+      {
+        "episodes": 2576,
+        "solve_rate": 0.8125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.02090169168594813,
+        "value_loss": 0.15429887175559998,
+        "entropy": 0.6289830207824707
+      },
+      {
+        "episodes": 2592,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.015533242270286962,
+        "value_loss": 0.23404424637556076,
+        "entropy": 0.7506020814180374
+      },
+      {
+        "episodes": 2608,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.01841038520094429,
+        "value_loss": 0.24439232423901558,
+        "entropy": 0.72177954018116
+      },
+      {
+        "episodes": 2624,
+        "solve_rate": 0.5,
+        "mean_length": 1.8125,
+        "policy_loss": -0.013564406733574508,
+        "value_loss": 0.270697720348835,
+        "entropy": 0.5677573978900909
+      },
+      {
+        "episodes": 2640,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.017344412759745076,
+        "value_loss": 0.22569644823670387,
+        "entropy": 0.7869808673858643
+      },
+      {
+        "episodes": 2656,
+        "solve_rate": 0.75,
+        "mean_length": 1.8125,
+        "policy_loss": -0.020854467225003503,
+        "value_loss": 0.17930031940340996,
+        "entropy": 0.7819701135158539
+      },
+      {
+        "episodes": 2672,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.007232701250661222,
+        "value_loss": 0.32001470029354095,
+        "entropy": 0.6595233529806137
+      },
+      {
+        "episodes": 2688,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.019827601568842113,
+        "value_loss": 0.27763642370700836,
+        "entropy": 0.6534191071987152
+      },
+      {
+        "episodes": 2704,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.014004283191251687,
+        "value_loss": 0.25731073692440987,
+        "entropy": 0.7315202206373215
+      },
+      {
+        "episodes": 2720,
+        "solve_rate": 0.625,
+        "mean_length": 1.875,
+        "policy_loss": -0.027809347367533377,
+        "value_loss": 0.25912171602249146,
+        "entropy": 0.7688936740159988
+      },
+      {
+        "episodes": 2736,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.010833726665522514,
+        "value_loss": 0.2979883626103401,
+        "entropy": 0.618086501955986
+      },
+      {
+        "episodes": 2752,
+        "solve_rate": 0.6875,
+        "mean_length": 1.875,
+        "policy_loss": -0.055295417085289955,
+        "value_loss": 0.21044909209012985,
+        "entropy": 0.7422822862863541
+      },
+      {
+        "episodes": 2768,
+        "solve_rate": 0.875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.013759479202605895,
+        "value_loss": 0.1491839848458767,
+        "entropy": 0.6605916619300842
+      },
+      {
+        "episodes": 2784,
+        "solve_rate": 0.625,
+        "mean_length": 1.625,
+        "policy_loss": -0.026328341677212208,
+        "value_loss": 0.32693149894475937,
+        "entropy": 0.5693504363298416
+      },
+      {
+        "episodes": 2800,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.007892081361765335,
+        "value_loss": 0.2138894386589527,
+        "entropy": 0.48506274074316025
+      },
+      {
+        "episodes": 2816,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.04345758997190474,
+        "value_loss": 0.1497560814023018,
+        "entropy": 0.5775314122438431
+      },
+      {
+        "episodes": 2832,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.02547671476475344,
+        "value_loss": 0.18434520438313484,
+        "entropy": 0.473908506333828
+      },
+      {
+        "episodes": 2848,
+        "solve_rate": 0.6875,
+        "mean_length": 1.375,
+        "policy_loss": -0.021383528375405803,
+        "value_loss": 0.2159215323626995,
+        "entropy": 0.5301251411437988
+      },
+      {
+        "episodes": 2864,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.029283628590276667,
+        "value_loss": 0.23649540916085243,
+        "entropy": 0.5757194608449936
+      },
+      {
+        "episodes": 2880,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5,
+        "policy_loss": 0.003646326697586133,
+        "value_loss": 0.22432082518935204,
+        "entropy": 0.7229862064123154
+      },
+      {
+        "episodes": 2896,
+        "solve_rate": 0.5625,
+        "mean_length": 1.5,
+        "policy_loss": -0.05427978280931711,
+        "value_loss": 0.22766969352960587,
+        "entropy": 0.6021277010440826
+      },
+      {
+        "episodes": 2912,
+        "solve_rate": 0.625,
+        "mean_length": 1.5625,
+        "policy_loss": -0.004193050961475819,
+        "value_loss": 0.3200841248035431,
+        "entropy": 0.48274222016334534
+      },
+      {
+        "episodes": 2928,
+        "solve_rate": 0.6875,
+        "mean_length": 1.375,
+        "policy_loss": -0.014321775718902696,
+        "value_loss": 0.29824523627758026,
+        "entropy": 0.6106192469596863
+      },
+      {
+        "episodes": 2944,
+        "solve_rate": 0.625,
+        "mean_length": 1.5625,
+        "policy_loss": -0.025264365634379393,
+        "value_loss": 0.24426836147904396,
+        "entropy": 0.5268552601337433
+      },
+      {
+        "episodes": 2960,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.012033402769733748,
+        "value_loss": 0.21260490640997887,
+        "entropy": 0.4150578901171684
+      },
+      {
+        "episodes": 2976,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.0276035546826634,
+        "value_loss": 0.1895574890077114,
+        "entropy": 0.45608044415712357
+      },
+      {
+        "episodes": 2992,
+        "solve_rate": 0.8125,
+        "mean_length": 1.625,
+        "policy_loss": -0.028218752274719483,
+        "value_loss": 0.1486572101712227,
+        "entropy": 0.5555299371480942
+      },
+      {
+        "episodes": 3008,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.0035308475309083764,
+        "value_loss": 0.17259002104401588,
+        "entropy": 0.3903837949037552
+      },
+      {
+        "episodes": 3024,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": -0.015038143431482354,
+        "value_loss": 0.202047411352396,
+        "entropy": 0.5733956396579742
+      },
+      {
+        "episodes": 3040,
+        "solve_rate": 0.9375,
+        "mean_length": 1.625,
+        "policy_loss": -0.016723550497912854,
+        "value_loss": 0.1600765436887741,
+        "entropy": 0.7358489632606506
+      },
+      {
+        "episodes": 3056,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": 0.0009133472253921582,
+        "value_loss": 0.3643691688776016,
+        "entropy": 0.7013114243745804
+      },
+      {
+        "episodes": 3072,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.0037070642491521255,
+        "value_loss": 0.25280413031578064,
+        "entropy": 0.7743839621543884
+      },
+      {
+        "episodes": 3088,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.019319426375053794,
+        "value_loss": 0.2727792449295521,
+        "entropy": 0.8260465413331985
+      },
+      {
+        "episodes": 3104,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": 0.023201506052700438,
+        "value_loss": 0.38210222125053406,
+        "entropy": 0.850550577044487
+      },
+      {
+        "episodes": 3120,
+        "solve_rate": 0.8125,
+        "mean_length": 1.5625,
+        "policy_loss": -0.012897327775718281,
+        "value_loss": 0.28001221641898155,
+        "entropy": 0.674469068646431
+      },
+      {
+        "episodes": 3136,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": 0.02856256711055316,
+        "value_loss": 0.4361781105399132,
+        "entropy": 0.6365377604961395
+      },
+      {
+        "episodes": 3152,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.022310072788968682,
+        "value_loss": 0.2914113476872444,
+        "entropy": 0.5746207237243652
+      },
+      {
+        "episodes": 3168,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.0019169582877882618,
+        "value_loss": 0.1797776222229004,
+        "entropy": 0.5252347439527512
+      },
+      {
+        "episodes": 3184,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.019910928130578043,
+        "value_loss": 0.16542182862758636,
+        "entropy": 0.37636297941207886
+      },
+      {
+        "episodes": 3200,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": 0.03614873731774981,
+        "value_loss": 0.22140536457300186,
+        "entropy": 0.4826235771179199
+      },
+      {
+        "episodes": 3216,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.036325960686165004,
+        "value_loss": 0.2630043029785156,
+        "entropy": 0.32094109058380127
+      },
+      {
+        "episodes": 3232,
+        "solve_rate": 0.6875,
+        "mean_length": 1.5625,
+        "policy_loss": 0.022118249796331035,
+        "value_loss": 0.25275351479649544,
+        "entropy": 0.4224089980125427
+      },
+      {
+        "episodes": 3248,
+        "solve_rate": 0.75,
+        "mean_length": 1.5625,
+        "policy_loss": -0.014663549168034251,
+        "value_loss": 0.30268561094999313,
+        "entropy": 0.4030807763338089
+      },
+      {
+        "episodes": 3264,
+        "solve_rate": 0.8125,
+        "mean_length": 1.6875,
+        "policy_loss": -0.022887085253994854,
+        "value_loss": 0.20376624912023544,
+        "entropy": 0.4140428304672241
+      },
+      {
+        "episodes": 3280,
+        "solve_rate": 0.4375,
+        "mean_length": 1.875,
+        "policy_loss": 0.02451751424720605,
+        "value_loss": 0.3058657571673393,
+        "entropy": 0.512622520327568
+      },
+      {
+        "episodes": 3296,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.006763077004709128,
+        "value_loss": 0.21965713798999786,
+        "entropy": 0.3185010477900505
+      },
+      {
+        "episodes": 3312,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.010372850009137125,
+        "value_loss": 0.22821426391601562,
+        "entropy": 0.4333552122116089
+      },
+      {
+        "episodes": 3328,
+        "solve_rate": 0.9375,
+        "mean_length": 1.5,
+        "policy_loss": -0.03029718746741672,
+        "value_loss": 0.21842282265424728,
+        "entropy": 0.3281746730208397
+      },
+      {
+        "episodes": 3344,
+        "solve_rate": 0.4375,
+        "mean_length": 1.875,
+        "policy_loss": -0.001573167225188854,
+        "value_loss": 0.355233371257782,
+        "entropy": 0.5446957647800446
+      },
+      {
+        "episodes": 3360,
+        "solve_rate": 0.8125,
+        "mean_length": 1.625,
+        "policy_loss": -0.013697796357939218,
+        "value_loss": 0.14533934742212296,
+        "entropy": 0.6363299787044525
+      },
+      {
+        "episodes": 3376,
+        "solve_rate": 0.6875,
+        "mean_length": 1.875,
+        "policy_loss": -0.010380626539699733,
+        "value_loss": 0.1887991577386856,
+        "entropy": 0.7567843347787857
+      },
+      {
+        "episodes": 3392,
+        "solve_rate": 0.5,
+        "mean_length": 1.875,
+        "policy_loss": -0.012699248210992664,
+        "value_loss": 0.23662785440683365,
+        "entropy": 0.9158370494842529
+      },
+      {
+        "episodes": 3408,
+        "solve_rate": 0.75,
+        "mean_length": 1.5,
+        "policy_loss": -0.008895047086602048,
+        "value_loss": 0.29439280554652214,
+        "entropy": 0.9348482638597488
+      },
+      {
+        "episodes": 3424,
+        "solve_rate": 0.5625,
+        "mean_length": 1.8125,
+        "policy_loss": -0.009873546856647764,
+        "value_loss": 0.23551397398114204,
+        "entropy": 1.0745095908641815
+      },
+      {
+        "episodes": 3440,
+        "solve_rate": 0.8125,
+        "mean_length": 1.5625,
+        "policy_loss": -0.013519753655419464,
+        "value_loss": 0.20200509205460548,
+        "entropy": 1.0537278056144714
+      },
+      {
+        "episodes": 3456,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.01982119933155957,
+        "value_loss": 0.23192185536026955,
+        "entropy": 1.2269753515720367
+      },
+      {
+        "episodes": 3472,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.001292940238272422,
+        "value_loss": 0.21332470327615738,
+        "entropy": 1.4494110941886902
+      },
+      {
+        "episodes": 3488,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.006936011765251493,
+        "value_loss": 0.22743191197514534,
+        "entropy": 1.3896344602108002
+      },
+      {
+        "episodes": 3504,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.00179620474658293,
+        "value_loss": 0.22203392535448074,
+        "entropy": 1.4729233980178833
+      },
+      {
+        "episodes": 3520,
+        "solve_rate": 0.4375,
+        "mean_length": 1.875,
+        "policy_loss": -0.008017501211725175,
+        "value_loss": 0.26490025967359543,
+        "entropy": 1.5043671429157257
+      },
+      {
+        "episodes": 3536,
+        "solve_rate": 0.1875,
+        "mean_length": 1.9375,
+        "policy_loss": -0.0201501201447698,
+        "value_loss": 0.15054187923669815,
+        "entropy": 1.464049220085144
+      },
+      {
+        "episodes": 3552,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": 0.007090339853535799,
+        "value_loss": 0.5813316106796265,
+        "entropy": 1.3602697253227234
+      },
+      {
+        "episodes": 3568,
+        "solve_rate": 0.625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.017742461516281338,
+        "value_loss": 0.25397009402513504,
+        "entropy": 1.173710972070694
+      },
+      {
+        "episodes": 3584,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.01950847925260124,
+        "value_loss": 0.19001075625419617,
+        "entropy": 1.078344851732254
+      },
+      {
+        "episodes": 3600,
+        "solve_rate": 0.625,
+        "mean_length": 1.5,
+        "policy_loss": -0.02625578626369318,
+        "value_loss": 0.20681098476052284,
+        "entropy": 0.9124376028776169
+      },
+      {
+        "episodes": 3616,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.014939744887804807,
+        "value_loss": 0.29869943857192993,
+        "entropy": 0.805842861533165
+      },
+      {
+        "episodes": 3632,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.020510108805158023,
+        "value_loss": 0.2138916477560997,
+        "entropy": 0.7894876301288605
+      },
+      {
+        "episodes": 3648,
+        "solve_rate": 0.6875,
+        "mean_length": 1.75,
+        "policy_loss": -0.020866482784706264,
+        "value_loss": 0.3333272710442543,
+        "entropy": 0.4820755496621132
+      },
+      {
+        "episodes": 3664,
+        "solve_rate": 0.5,
+        "mean_length": 1.625,
+        "policy_loss": -0.016523184809977387,
+        "value_loss": 0.3310342878103256,
+        "entropy": 0.518501341342926
+      },
+      {
+        "episodes": 3680,
+        "solve_rate": 0.75,
+        "mean_length": 1.5625,
+        "policy_loss": -0.010962192378936919,
+        "value_loss": 0.3799266815185547,
+        "entropy": 0.5941513478755951
+      },
+      {
+        "episodes": 3696,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0011475803626961323,
+        "value_loss": 0.4062964990735054,
+        "entropy": 0.4922788590192795
+      },
+      {
+        "episodes": 3712,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": -0.0014449116984351917,
+        "value_loss": 0.2651566378772259,
+        "entropy": 0.5216656476259232
+      },
+      {
+        "episodes": 3728,
+        "solve_rate": 0.875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.018186427652835846,
+        "value_loss": 0.11046530120074749,
+        "entropy": 0.6928472071886063
+      },
+      {
+        "episodes": 3744,
+        "solve_rate": 0.625,
+        "mean_length": 1.75,
+        "policy_loss": -0.01605001384658422,
+        "value_loss": 0.40500475466251373,
+        "entropy": 0.6485132724046707
+      },
+      {
+        "episodes": 3760,
+        "solve_rate": 0.5625,
+        "mean_length": 1.5,
+        "policy_loss": -0.028038278687745333,
+        "value_loss": 0.39195115119218826,
+        "entropy": 0.6072915196418762
+      },
+      {
+        "episodes": 3776,
+        "solve_rate": 0.6875,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0003268735376042997,
+        "value_loss": 0.24461806192994118,
+        "entropy": 0.6793740391731262
+      },
+      {
+        "episodes": 3792,
+        "solve_rate": 0.625,
+        "mean_length": 1.8125,
+        "policy_loss": 0.00027951082728527865,
+        "value_loss": 0.2741069421172142,
+        "entropy": 0.7854466438293457
+      },
+      {
+        "episodes": 3808,
+        "solve_rate": 0.75,
+        "mean_length": 1.625,
+        "policy_loss": -0.027665633824653924,
+        "value_loss": 0.20198988169431686,
+        "entropy": 0.8109764754772186
+      },
+      {
+        "episodes": 3824,
+        "solve_rate": 0.5,
+        "mean_length": 1.8125,
+        "policy_loss": -0.020640514172806324,
+        "value_loss": 0.3349887430667877,
+        "entropy": 0.8095242530107498
+      },
+      {
+        "episodes": 3840,
+        "solve_rate": 0.5625,
+        "mean_length": 1.6875,
+        "policy_loss": -0.018979732481831935,
+        "value_loss": 0.24072012677788734,
+        "entropy": 0.6903194338083267
+      },
+      {
+        "episodes": 3856,
+        "solve_rate": 0.8125,
+        "mean_length": 1.625,
+        "policy_loss": -0.00806059842579998,
+        "value_loss": 0.30099309980869293,
+        "entropy": 0.548763781785965
+      },
+      {
+        "episodes": 3872,
+        "solve_rate": 0.75,
+        "mean_length": 1.8125,
+        "policy_loss": -0.04027944899581648,
+        "value_loss": 0.2539367116987705,
+        "entropy": 0.568428635597229
+      },
+      {
+        "episodes": 3888,
+        "solve_rate": 0.9375,
+        "mean_length": 1.6875,
+        "policy_loss": 0.0015259964620106814,
+        "value_loss": 0.14844195172190666,
+        "entropy": 0.46339650452136993
+      },
+      {
+        "episodes": 3904,
+        "solve_rate": 0.4375,
+        "mean_length": 1.6875,
+        "policy_loss": -0.024608483365565093,
+        "value_loss": 0.6093502938747406,
+        "entropy": 0.5992943942546844
+      },
+      {
+        "episodes": 3920,
+        "solve_rate": 0.5625,
+        "mean_length": 1.75,
+        "policy_loss": -0.014799987365092804,
+        "value_loss": 0.4339667335152626,
+        "entropy": 0.46793776750564575
+      },
+      {
+        "episodes": 3936,
+        "solve_rate": 0.6875,
+        "mean_length": 1.8125,
+        "policy_loss": -0.027187066056347575,
+        "value_loss": 0.23343297094106674,
+        "entropy": 0.49235448241233826
+      },
+      {
+        "episodes": 3952,
+        "solve_rate": 0.75,
+        "mean_length": 1.6875,
+        "policy_loss": -0.012710505040121056,
+        "value_loss": 0.24645757302641869,
+        "entropy": 0.6550754308700562
+      },
+      {
+        "episodes": 3968,
+        "solve_rate": 0.6875,
+        "mean_length": 1.625,
+        "policy_loss": -0.0351829405945665,
+        "value_loss": 0.21819539368152618,
+        "entropy": 0.5906103700399399
+      },
+      {
+        "episodes": 3984,
+        "solve_rate": 0.5,
+        "mean_length": 1.6875,
+        "policy_loss": -0.0058503548088673085,
+        "value_loss": 0.24522143974900246,
+        "entropy": 0.5173081904649734
+      },
+      {
+        "episodes": 4000,
+        "solve_rate": 0.4375,
+        "mean_length": 1.75,
+        "policy_loss": 0.00810264985609166,
+        "value_loss": 0.22984788566827774,
+        "entropy": 0.7101181745529175
+      }
+    ]
+  },
+  "summary": {
+    "n_seeds": 1,
+    "n_passed": 1,
+    "min_gap_closed": 1.227272727272728,
+    "median_gap_closed": 1.227272727272728,
+    "max_gap_closed": 1.227272727272728,
+    "passed": false
+  }
+}

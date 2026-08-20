@@ -1,0 +1,1090 @@
+diff --git a/logs/marl_causal_cpu.e123649 b/logs/marl_causal_cpu.e123649
+new file mode 100644
+index 0000000..2a04240
+--- /dev/null
++++ b/logs/marl_causal_cpu.e123649
+@@ -0,0 +1,70 @@
++Loading python3/3.11
++  Loading requirement: openssl/1.1.1u python/3.11.4
++    openblas/0.3.7-serial/gnu-4.9.2
++wandb: WARNING Disabling the wandb service is deprecated as of version 0.18.0 and will be removed in version 0.19.0.
++wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: Tracking run with wandb version 0.17.9
++wandb: W&B syncing is set to `offline` in this directory.  
++wandb: Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
++[34m[1mwandb[0m: [33mWARNING[0m URL not available in offline run
++Traceback (most recent call last):
++  File "<frozen runpy>", line 198, in _run_module_as_main
++  File "<frozen runpy>", line 88, in _run_code
++  File "/myriadfs/home/ucabbse/marl_causal/src/train.py", line 690, in <module>
++    main()
++  File "/myriadfs/home/ucabbse/marl_causal/src/train.py", line 605, in main
++    from src.visualizations import plot_dag_to_wandb_image
++  File "/myriadfs/home/ucabbse/marl_causal/src/visualizations.py", line 2, in <module>
++    import matplotlib.pyplot as plt
++ModuleNotFoundError: No module named 'matplotlib'
++wandb: - 0.000 MB of 0.000 MB uploadedwandb:                                                                                
++wandb: 
++wandb: Run history:
++wandb:            agent_0_budget ▅▄▅▅▇▇▁█▂
++wandb:            agent_1_budget ▅▅█▁█▅▅▁▅
++wandb:                   eval/f1 ▁▆▆▃▅▃█▆▃
++wandb:                  eval/shd █▃▃▇▅▇▁▃▆
++wandb:          train/actor_loss ▂▃▂▆▆▄▅▁█
++wandb:  train/agent_0_actor_loss ▃▅▅▄█▃▄▁▇
++wandb: train/agent_0_critic_loss ▁▁▁▁▁▁▁▁▁
++wandb:     train/agent_0_entropy ▇▇▆▁▄█▇▇▅
++wandb:  train/agent_0_graph_loss ▂▄▁▃▃▇▅▂█
++wandb:  train/agent_1_actor_loss ▃▃▁█▃▇▆▅▆
++wandb: train/agent_1_critic_loss ▃▁▅▂▆▂█▂▅
++wandb:     train/agent_1_entropy ▅███▁██▇█
++wandb:  train/agent_1_graph_loss ▄█▁▅▄█▆▃▆
++wandb:         train/critic_loss ▃▁▅▁▆▁█▁▅
++wandb:    train/curriculum_stage ▁▁▁▁▁▁▁▁▁
++wandb:             train/entropy ▅██▇▁██▇█
++wandb:             train/episode ▁▂▃▄▅▅▆▇█
++wandb:      train/episode_reward ▁▄▆▂▄▂█▆▃
++wandb:          train/graph_loss ▃▆▁▄▄█▆▃█
++wandb:        train/info_gain_a0 ▂▁▃█▅▁▂▂▄
++wandb:        train/info_gain_a1 ▄▁▂██▁▂▃▄
++wandb: 
++wandb: Run summary:
++wandb:            agent_0_budget 6.0
++wandb:            agent_1_budget 7.0
++wandb:                   eval/f1 0.22222
++wandb:                  eval/shd 7.0
++wandb:          train/actor_loss 0.11251
++wandb:  train/agent_0_actor_loss 0.10307
++wandb: train/agent_0_critic_loss 399.99994
++wandb:     train/agent_0_entropy 2.4849
++wandb:  train/agent_0_graph_loss 1.19695
++wandb:  train/agent_1_actor_loss 0.12195
++wandb: train/agent_1_critic_loss 399.99994
++wandb:     train/agent_1_entropy 2.48489
++wandb:  train/agent_1_graph_loss 1.02828
++wandb:         train/critic_loss 399.99994
++wandb:    train/curriculum_stage 1
++wandb:             train/entropy 2.48489
++wandb:             train/episode 9
++wandb:      train/episode_reward -0.48872
++wandb:          train/graph_loss 1.11261
++wandb:        train/info_gain_a0 0.00335
++wandb:        train/info_gain_a1 0.00793
++wandb: 
++wandb: You can sync this run to the cloud by running:
++wandb: wandb sync /myriadfs/home/ucabbse/marl_causal/wandb/offline-run-20260812_001038-8v6e1zsd
++wandb: Find logs at: ./wandb/offline-run-20260812_001038-8v6e1zsd/logs
++wandb: WARNING The new W&B backend becomes opt-out in version 0.18.0; try it out with `wandb.require("core")`! See https://wandb.me/wandb-core for more information.
+diff --git a/logs/marl_causal_cpu.e124567 b/logs/marl_causal_cpu.e124567
+new file mode 100644
+index 0000000..106c197
+--- /dev/null
++++ b/logs/marl_causal_cpu.e124567
+@@ -0,0 +1,60 @@
++Loading python3/3.11
++  Loading requirement: openssl/1.1.1u python/3.11.4
++    openblas/0.3.7-serial/gnu-4.9.2
++wandb: WARNING Disabling the wandb service is deprecated as of version 0.18.0 and will be removed in version 0.19.0.
++wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: | Waiting for wandb.init()...wandb: / Waiting for wandb.init()...wandb: - Waiting for wandb.init()...wandb: Tracking run with wandb version 0.17.9
++wandb: W&B syncing is set to `offline` in this directory.  
++wandb: Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
++[34m[1mwandb[0m: [33mWARNING[0m URL not available in offline run
++wandb: - 0.000 MB of 0.000 MB uploadedwandb: \ 0.000 MB of 0.000 MB uploadedwandb: | 0.000 MB of 0.000 MB uploadedwandb:                                                                                
++wandb: 
++wandb: Run history:
++wandb:            agent_0_budget █▇▄▅▄▅▃▂▂▁▁▁▂▂▂▃▄▃▄▅▅▆▅▅▄▄▄▅▆▅▄▅▃▄▅▃▄▆▅▃
++wandb:            agent_1_budget ▅▇█▄▃▃▁▅▃▂▃▃▁▂▆▅▂▅▃▂▆▃▅▄▃▃▆▃▃▃▄▅▅▃▆▃▆▆▄▄
++wandb:                   eval/f1 ▆▃▃▃▃▇▅▆▅█▆▆▆▃▁▆▄▁▆▆▃▇██▆▇▃▅▄▁▆▆█▆▃▄▆▆▁█
++wandb:                  eval/shd ▃▆▇▆▆▂▅▃▅▁▃▃▃▇█▃▅█▃▂▇▃▁▁▃▂▆▅▅█▃▃▁▃▆▅▃▃█▁
++wandb:          train/actor_loss ▃█▆▆█▆▃▄▃▂▂▂▁▂▃▄▁▄▂▂▂▃▂▂▂▂▂▁▂▁▂▁▂▂▂▃▁▂▂▁
++wandb:  train/agent_0_actor_loss ▁▆█▄█▆▄▄▄▃▃▃▃▃▃▄▃▄▃▃▃▃▃▃▃▃▃▃▃▂▃▃▂▃▃▄▂▃▃▂
++wandb: train/agent_0_critic_loss █▅▅▆▄▆▅▅▅▄▆▁▄▅▅▂▄▄█▅█▂▅▅██▄▄▆██▆▂▄▂▂▄▄▄▆
++wandb:     train/agent_0_entropy █████▇▄▅▄▂▂▂▂▂▃▄▄▄▅▅▆▆▆▆▆▅▅▅▅▄▅▅▄▄▄▁▄▄▄▄
++wandb:  train/agent_0_graph_loss ▄▆█▅▄▅▅▅▇▅▄▄▄▇▅▃▅▄▄▃▄▄▄▃▃▄▃▆▅▄▅▂▁▅▆▃▃▃▇▃
++wandb:  train/agent_1_actor_loss ▆█▄█▆▆▃▅▃▁▂▃▁▁▃▄▁▃▂▂▂▃▂▂▂▂▂▁▂▁▂▁▂▁▂▂▂▂▂▂
++wandb: train/agent_1_critic_loss ▄▃▂▃▃▃▆▄▂▃▂▆▃█▅▆▄▄▃▄▃▆▂▃█▅▃▁▃▃█▁▂▄▂▂▅▅▂▅
++wandb:     train/agent_1_entropy ██████▆▆▄▁▄▄▃▄▄▄▁▃▁▃▃▂▃▃▃▂▃▂▂▂▂▂▂▂▂▂▂▂▂▂
++wandb:  train/agent_1_graph_loss ▄▅▇▂▇▆▆▄▅▄▄▅▁▃▄▆▃▆▃▇▇▃▃▃▄▄▅▆▂▆▄▂▂▄▅█▆▅▇▄
++wandb:         train/critic_loss ▅▃▃▄▃▄▅▄▃▃▃▃▃▇▅▄▃▃▅▄▅▄▃▃█▆▃▁▄▅█▃▁▃▁▁▄▄▂▅
++wandb:    train/curriculum_stage ▁▁▁▁▁▁▁▁▅▅▅▅▅▅▅▅▅▅▅▅████████████████████
++wandb:             train/entropy █████▇▅▅▄▁▃▂▃▂▃▄▃▃▃▄▄▄▄▄▄▃▄▃▃▃▃▃▃▃▃▁▃▃▃▃
++wandb:             train/episode ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
++wandb:      train/episode_reward ▆▃▂▄▃▇▆▆▅█▆▆▆▂▁▆▄▁▆█▂▆██▆▇▄▅▅▁▆▆█▆▃▅▄▆▁█
++wandb:          train/graph_loss ▄▅█▄▅▆▆▄▆▄▄▅▃▆▅▄▄▅▄▅▅▄▃▃▄▄▄▆▄▅▅▂▁▅▆▅▄▄█▃
++wandb:        train/info_gain_a0 ▁▁▃▁▁▁▃▁▁▂▁▅▁▁▁▁▁▂▁▁▂▁▁▂▂▁▁▃▂▃▁▁▂▂▂█▁▂▂▁
++wandb:        train/info_gain_a1 ▂▁▅▂▁▂█▂▂▅▁▂▁▂▁▁▃▁▂▁▁▂▂▁▁▃▁▂▃▁▂▁▂▂▂▂▁▁▁▁
++wandb: 
++wandb: Run summary:
++wandb:            agent_0_budget 5.0
++wandb:            agent_1_budget 2.0
++wandb:                   eval/f1 0.22222
++wandb:                  eval/shd 7.0
++wandb:          train/actor_loss 0.00241
++wandb:  train/agent_0_actor_loss 0.00166
++wandb: train/agent_0_critic_loss 399.99988
++wandb:     train/agent_0_entropy 1.76011
++wandb:  train/agent_0_graph_loss 1.17989
++wandb:  train/agent_1_actor_loss 0.00317
++wandb: train/agent_1_critic_loss 399.99994
++wandb:     train/agent_1_entropy 1.61549
++wandb:  train/agent_1_graph_loss 1.05992
++wandb:         train/critic_loss 399.99991
++wandb:    train/curriculum_stage 3
++wandb:             train/entropy 1.6878
++wandb:             train/episode 1000
++wandb:      train/episode_reward -0.39729
++wandb:          train/graph_loss 1.11991
++wandb:        train/info_gain_a0 0.00143
++wandb:        train/info_gain_a1 0.00128
++wandb: 
++wandb: You can sync this run to the cloud by running:
++wandb: wandb sync /myriadfs/home/ucabbse/marl_causal/wandb/offline-run-20260812_010243-6cx0yre5
++wandb: Find logs at: ./wandb/offline-run-20260812_010243-6cx0yre5/logs
++wandb: WARNING The new W&B backend becomes opt-out in version 0.18.0; try it out with `wandb.require("core")`! See https://wandb.me/wandb-core for more information.
+diff --git a/logs/marl_causal_cpu.o123649 b/logs/marl_causal_cpu.o123649
+new file mode 100644
+index 0000000..5fd7a3f
+--- /dev/null
++++ b/logs/marl_causal_cpu.o123649
+@@ -0,0 +1,3 @@
++WandB successfully initialized! View live run at: None
++=== Starting Training Session ===
++Config: agent=ippo, d=4, Episodes=1000
+diff --git a/logs/marl_causal_cpu.o124567 b/logs/marl_causal_cpu.o124567
+new file mode 100644
+index 0000000..80659fc
+--- /dev/null
++++ b/logs/marl_causal_cpu.o124567
+@@ -0,0 +1,107 @@
++WandB successfully initialized! View live run at: None
++=== Starting Training Session ===
++Config: agent=ippo, d=4, Episodes=1000
++[Episode 10] Reward: -0.33 | SHD: 6.00 | F1: 0.40
++[Episode 20] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 30] Reward: -0.54 | SHD: 8.00 | F1: 0.20
++[Episode 40] Reward: -0.53 | SHD: 8.00 | F1: 0.20
++[Episode 50] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 60] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 70] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 80] Reward: -0.39 | SHD: 7.00 | F1: 0.22
++[Episode 90] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 100] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 110] Reward: -0.39 | SHD: 7.00 | F1: 0.22
++[Episode 120] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 130] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 140] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 150] Reward: -0.47 | SHD: 7.00 | F1: 0.22
++[Episode 160] Reward: -0.31 | SHD: 6.00 | F1: 0.40
++[Episode 170] Reward: -0.41 | SHD: 6.00 | F1: 0.40
++[Episode 180] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 190] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 200] Reward: -0.27 | SHD: 5.00 | F1: 0.44
++[Episode 210] Reward: -0.27 | SHD: 5.00 | F1: 0.44
++[Episode 220] Reward: -0.28 | SHD: 5.00 | F1: 0.44
++[Episode 230] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 240] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 250] Reward: -0.24 | SHD: 4.00 | F1: 0.60
++[Episode 260] Reward: -0.39 | SHD: 7.00 | F1: 0.22
++[Episode 270] Reward: -0.54 | SHD: 8.00 | F1: 0.20
++[Episode 280] Reward: -0.28 | SHD: 5.00 | F1: 0.44
++[Episode 290] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 300] Reward: -0.53 | SHD: 8.00 | F1: 0.20
++[Episode 310] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 320] Reward: -0.54 | SHD: 8.00 | F1: 0.20
++[Episode 330] Reward: -0.23 | SHD: 4.00 | F1: 0.60
++[Episode 340] Reward: -0.24 | SHD: 4.00 | F1: 0.60
++[Episode 350] Reward: -0.53 | SHD: 8.00 | F1: 0.20
++[Episode 360] Reward: -0.60 | SHD: 9.00 | F1: 0.00
++[Episode 370] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 380] Reward: -0.44 | SHD: 7.00 | F1: 0.22
++[Episode 390] Reward: -0.38 | SHD: 5.00 | F1: 0.44
++[Episode 400] Reward: -0.30 | SHD: 5.00 | F1: 0.44
++[Episode 410] Reward: -0.40 | SHD: 7.00 | F1: 0.22
++[Episode 420] Reward: -0.19 | SHD: 3.00 | F1: 0.67
++[Episode 430] Reward: -0.39 | SHD: 6.00 | F1: 0.25
++[Episode 440] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 450] Reward: -0.19 | SHD: 3.00 | F1: 0.67
++[Episode 460] Reward: -0.18 | SHD: 3.00 | F1: 0.67
++[Episode 470] Reward: -0.50 | SHD: 7.00 | F1: 0.22
++[Episode 480] Reward: -0.23 | SHD: 4.00 | F1: 0.60
++[Episode 490] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 500] Reward: -0.54 | SHD: 8.00 | F1: 0.20
++[Episode 510] Reward: -0.50 | SHD: 7.00 | F1: 0.22
++[Episode 520] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 530] Reward: -0.30 | SHD: 5.00 | F1: 0.44
++[Episode 540] Reward: -0.45 | SHD: 6.00 | F1: 0.40
++[Episode 550] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 560] Reward: -0.19 | SHD: 3.00 | F1: 0.67
++[Episode 570] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 580] Reward: -0.40 | SHD: 7.00 | F1: 0.22
++[Episode 590] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 600] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 610] Reward: -0.39 | SHD: 7.00 | F1: 0.22
++[Episode 620] Reward: -0.18 | SHD: 3.00 | F1: 0.67
++[Episode 630] Reward: -0.30 | SHD: 5.00 | F1: 0.44
++[Episode 640] Reward: -0.24 | SHD: 4.00 | F1: 0.60
++[Episode 650] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 660] Reward: -0.38 | SHD: 5.00 | F1: 0.44
++[Episode 670] Reward: -0.19 | SHD: 3.00 | F1: 0.67
++[Episode 680] Reward: -0.30 | SHD: 5.00 | F1: 0.44
++[Episode 690] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 700] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 710] Reward: -0.40 | SHD: 7.00 | F1: 0.22
++[Episode 720] Reward: -0.39 | SHD: 6.00 | F1: 0.25
++[Episode 730] Reward: -0.39 | SHD: 7.00 | F1: 0.22
++[Episode 740] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 750] Reward: -0.30 | SHD: 4.00 | F1: 0.50
++[Episode 760] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 770] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 780] Reward: -0.41 | SHD: 6.00 | F1: 0.40
++[Episode 790] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 800] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 810] Reward: -0.40 | SHD: 7.00 | F1: 0.22
++[Episode 820] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 830] Reward: -0.20 | SHD: 4.00 | F1: 0.50
++[Episode 840] Reward: -0.29 | SHD: 5.00 | F1: 0.44
++[Episode 850] Reward: -0.59 | SHD: 9.00 | F1: 0.00
++[Episode 860] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 870] Reward: -0.29 | SHD: 6.00 | F1: 0.25
++[Episode 880] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 890] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 900] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 910] Reward: -0.09 | SHD: 2.00 | F1: 0.75
++[Episode 920] Reward: -0.40 | SHD: 5.00 | F1: 0.44
++[Episode 930] Reward: -0.40 | SHD: 5.00 | F1: 0.44
++[Episode 940] Reward: -0.49 | SHD: 7.00 | F1: 0.22
++[Episode 950] Reward: -0.30 | SHD: 4.00 | F1: 0.50
++[Episode 960] Reward: -0.34 | SHD: 6.00 | F1: 0.40
++[Episode 970] Reward: -0.39 | SHD: 5.00 | F1: 0.44
++[Episode 980] Reward: -0.18 | SHD: 3.00 | F1: 0.67
++[Episode 990] Reward: -0.30 | SHD: 5.00 | F1: 0.44
++[Episode 1000] Reward: -0.40 | SHD: 7.00 | F1: 0.22
++Saved metrics to ./training_metrics.csv
++Running post-training evaluation suite on the BEST model...
++Saved evaluation trace to ./evaluation_trace.json
++Uploaded evaluation trace to WandB.
+diff --git a/requirements.txt b/requirements.txt
+index 2076a04..b261639 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -11,3 +11,5 @@ pytest==7.4.4
+ wandb==0.17.9
+ avici
+ 
++matplotlib==3.9.2
++networkx==3.3
+diff --git a/wandb/latest-run b/wandb/latest-run
+new file mode 120000
+index 0000000..8dc8a7f
+--- /dev/null
++++ b/wandb/latest-run
+@@ -0,0 +1 @@
++offline-run-20260812_010243-6cx0yre5
+\ No newline at end of file
+diff --git a/wandb/offline-run-20260812_001038-8v6e1zsd/run-8v6e1zsd.wandb b/wandb/offline-run-20260812_001038-8v6e1zsd/run-8v6e1zsd.wandb
+new file mode 100644
+index 0000000..9c8ba29
+Binary files /dev/null and b/wandb/offline-run-20260812_001038-8v6e1zsd/run-8v6e1zsd.wandb differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_109_df4c7b7509287dcfcbea.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_109_df4c7b7509287dcfcbea.png
+new file mode 100644
+index 0000000..9d95c62
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_109_df4c7b7509287dcfcbea.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_119_a715e2fd3ce32d533803.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_119_a715e2fd3ce32d533803.png
+new file mode 100644
+index 0000000..355ccdc
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_119_a715e2fd3ce32d533803.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_129_0742e7a92c07644face6.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_129_0742e7a92c07644face6.png
+new file mode 100644
+index 0000000..2bf793c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_129_0742e7a92c07644face6.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_139_ceb9d3c988b9ea61f4e4.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_139_ceb9d3c988b9ea61f4e4.png
+new file mode 100644
+index 0000000..c8ecad2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_139_ceb9d3c988b9ea61f4e4.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_149_840f51d98f38d220685d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_149_840f51d98f38d220685d.png
+new file mode 100644
+index 0000000..c509924
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_149_840f51d98f38d220685d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_159_a6f5113d1253a871576a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_159_a6f5113d1253a871576a.png
+new file mode 100644
+index 0000000..488aa26
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_159_a6f5113d1253a871576a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_169_4803df435184ba3e1dad.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_169_4803df435184ba3e1dad.png
+new file mode 100644
+index 0000000..8747da7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_169_4803df435184ba3e1dad.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_179_6a88fd82779ecf314391.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_179_6a88fd82779ecf314391.png
+new file mode 100644
+index 0000000..eb6171f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_179_6a88fd82779ecf314391.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_189_7212b72a950c0be412b6.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_189_7212b72a950c0be412b6.png
+new file mode 100644
+index 0000000..f419099
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_189_7212b72a950c0be412b6.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_199_c6e19570ece4e606d30c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_199_c6e19570ece4e606d30c.png
+new file mode 100644
+index 0000000..2217bd5
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_199_c6e19570ece4e606d30c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_19_18739b8d810b0867a1ae.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_19_18739b8d810b0867a1ae.png
+new file mode 100644
+index 0000000..ea55fb7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_19_18739b8d810b0867a1ae.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_209_6d57adfd85fc6fef3e99.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_209_6d57adfd85fc6fef3e99.png
+new file mode 100644
+index 0000000..1d915a7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_209_6d57adfd85fc6fef3e99.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_219_d0dddf17e1cc9d7eda64.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_219_d0dddf17e1cc9d7eda64.png
+new file mode 100644
+index 0000000..6e2c9f1
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_219_d0dddf17e1cc9d7eda64.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_229_fe5dd1bcea01f1a66b3f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_229_fe5dd1bcea01f1a66b3f.png
+new file mode 100644
+index 0000000..1be65d2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_229_fe5dd1bcea01f1a66b3f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_239_5bb9d5a6e028091b14b8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_239_5bb9d5a6e028091b14b8.png
+new file mode 100644
+index 0000000..938f071
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_239_5bb9d5a6e028091b14b8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_249_0539e2f95966b6ea6dbd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_249_0539e2f95966b6ea6dbd.png
+new file mode 100644
+index 0000000..0749693
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_249_0539e2f95966b6ea6dbd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_259_9f0f93acb7ef960f3604.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_259_9f0f93acb7ef960f3604.png
+new file mode 100644
+index 0000000..e35cacd
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_259_9f0f93acb7ef960f3604.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_269_30852b0443b10602a745.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_269_30852b0443b10602a745.png
+new file mode 100644
+index 0000000..0586e1a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_269_30852b0443b10602a745.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_279_e803a3b7dbe0e37e21f4.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_279_e803a3b7dbe0e37e21f4.png
+new file mode 100644
+index 0000000..9283f8e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_279_e803a3b7dbe0e37e21f4.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_289_bb2d166bf6eebb8ac3e0.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_289_bb2d166bf6eebb8ac3e0.png
+new file mode 100644
+index 0000000..0295fff
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_289_bb2d166bf6eebb8ac3e0.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_299_90fed23ff549512e52ef.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_299_90fed23ff549512e52ef.png
+new file mode 100644
+index 0000000..e7adbb3
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_299_90fed23ff549512e52ef.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_29_d1074864a8835e61a1a5.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_29_d1074864a8835e61a1a5.png
+new file mode 100644
+index 0000000..5058b2e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_29_d1074864a8835e61a1a5.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_309_bdf0065237609ad4877b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_309_bdf0065237609ad4877b.png
+new file mode 100644
+index 0000000..2c6cd22
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_309_bdf0065237609ad4877b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_319_005096e2b96efffa6b66.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_319_005096e2b96efffa6b66.png
+new file mode 100644
+index 0000000..bd260bc
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_319_005096e2b96efffa6b66.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_329_e05184811ef4bbd23afe.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_329_e05184811ef4bbd23afe.png
+new file mode 100644
+index 0000000..07e8a3e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_329_e05184811ef4bbd23afe.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_339_4d12ea465068b8f89669.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_339_4d12ea465068b8f89669.png
+new file mode 100644
+index 0000000..1321c72
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_339_4d12ea465068b8f89669.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_349_a493dd771eea6ee3b97c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_349_a493dd771eea6ee3b97c.png
+new file mode 100644
+index 0000000..1b462ad
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_349_a493dd771eea6ee3b97c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_359_5f3ce0afa6549fff71ff.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_359_5f3ce0afa6549fff71ff.png
+new file mode 100644
+index 0000000..13ba344
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_359_5f3ce0afa6549fff71ff.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_369_8987c8b36f02c1bd3ab2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_369_8987c8b36f02c1bd3ab2.png
+new file mode 100644
+index 0000000..4b26184
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_369_8987c8b36f02c1bd3ab2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_379_813a0220220445bf47d5.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_379_813a0220220445bf47d5.png
+new file mode 100644
+index 0000000..c57a60b
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_379_813a0220220445bf47d5.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_389_59ba793929542cb0b0fa.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_389_59ba793929542cb0b0fa.png
+new file mode 100644
+index 0000000..6e17a52
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_389_59ba793929542cb0b0fa.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_399_e6bf02366aa7144a6d36.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_399_e6bf02366aa7144a6d36.png
+new file mode 100644
+index 0000000..95fbc75
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_399_e6bf02366aa7144a6d36.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_39_0933f911a1b9d92ef882.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_39_0933f911a1b9d92ef882.png
+new file mode 100644
+index 0000000..212cc10
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_39_0933f911a1b9d92ef882.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_409_dd428416bb8e5b0cf799.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_409_dd428416bb8e5b0cf799.png
+new file mode 100644
+index 0000000..37aedbf
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_409_dd428416bb8e5b0cf799.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_419_d54ffd42289f962c0a18.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_419_d54ffd42289f962c0a18.png
+new file mode 100644
+index 0000000..8d2e4fb
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_419_d54ffd42289f962c0a18.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_429_d7b73c95363ef806ca7e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_429_d7b73c95363ef806ca7e.png
+new file mode 100644
+index 0000000..0dd0d6a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_429_d7b73c95363ef806ca7e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_439_28c8e86b0a213e1362a2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_439_28c8e86b0a213e1362a2.png
+new file mode 100644
+index 0000000..0fb009c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_439_28c8e86b0a213e1362a2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_449_3ffc06410fe9fd54f68f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_449_3ffc06410fe9fd54f68f.png
+new file mode 100644
+index 0000000..4e1da11
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_449_3ffc06410fe9fd54f68f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_459_611fb97874b99c24b40d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_459_611fb97874b99c24b40d.png
+new file mode 100644
+index 0000000..02697c2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_459_611fb97874b99c24b40d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_469_237ee2a23ec2a7b6c05f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_469_237ee2a23ec2a7b6c05f.png
+new file mode 100644
+index 0000000..b1da621
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_469_237ee2a23ec2a7b6c05f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_479_3258049f426148cd64e1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_479_3258049f426148cd64e1.png
+new file mode 100644
+index 0000000..4180077
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_479_3258049f426148cd64e1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_489_cf862fb40bcb21382bc4.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_489_cf862fb40bcb21382bc4.png
+new file mode 100644
+index 0000000..cb8d5fd
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_489_cf862fb40bcb21382bc4.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_499_21138f254381f1c6f845.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_499_21138f254381f1c6f845.png
+new file mode 100644
+index 0000000..b69d213
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_499_21138f254381f1c6f845.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_49_6df36705019525e690cc.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_49_6df36705019525e690cc.png
+new file mode 100644
+index 0000000..c3bd78d
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_49_6df36705019525e690cc.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_509_ffc7ee632b7974627e5a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_509_ffc7ee632b7974627e5a.png
+new file mode 100644
+index 0000000..7a9163b
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_509_ffc7ee632b7974627e5a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_519_ac3c553767a085d965d4.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_519_ac3c553767a085d965d4.png
+new file mode 100644
+index 0000000..a0a85a3
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_519_ac3c553767a085d965d4.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_529_57b01ef7f048bc30c947.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_529_57b01ef7f048bc30c947.png
+new file mode 100644
+index 0000000..cb571d7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_529_57b01ef7f048bc30c947.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_539_dca0a9fd3d13c6b595d8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_539_dca0a9fd3d13c6b595d8.png
+new file mode 100644
+index 0000000..2c11565
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_539_dca0a9fd3d13c6b595d8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_549_d5dbaaf0b794324705fe.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_549_d5dbaaf0b794324705fe.png
+new file mode 100644
+index 0000000..8b7045c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_549_d5dbaaf0b794324705fe.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_559_ed7e0e4bed16db56b38d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_559_ed7e0e4bed16db56b38d.png
+new file mode 100644
+index 0000000..9a404cc
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_559_ed7e0e4bed16db56b38d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_569_ebcb4c1887cfe27548fa.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_569_ebcb4c1887cfe27548fa.png
+new file mode 100644
+index 0000000..f276d2c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_569_ebcb4c1887cfe27548fa.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_579_509eb753cd62ceb1cc03.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_579_509eb753cd62ceb1cc03.png
+new file mode 100644
+index 0000000..959ff30
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_579_509eb753cd62ceb1cc03.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_589_921d45d51af3130bb05a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_589_921d45d51af3130bb05a.png
+new file mode 100644
+index 0000000..ae8034c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_589_921d45d51af3130bb05a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_599_02af65478741f7c06b30.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_599_02af65478741f7c06b30.png
+new file mode 100644
+index 0000000..73273af
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_599_02af65478741f7c06b30.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_59_241b310d6424988592ae.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_59_241b310d6424988592ae.png
+new file mode 100644
+index 0000000..c8fe8a3
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_59_241b310d6424988592ae.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_609_583bb1903fb39e7c910c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_609_583bb1903fb39e7c910c.png
+new file mode 100644
+index 0000000..83eeebb
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_609_583bb1903fb39e7c910c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_619_8a60d3514dcd8301f770.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_619_8a60d3514dcd8301f770.png
+new file mode 100644
+index 0000000..76bdc97
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_619_8a60d3514dcd8301f770.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_629_1c9d82292c91b154f890.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_629_1c9d82292c91b154f890.png
+new file mode 100644
+index 0000000..5337d57
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_629_1c9d82292c91b154f890.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_639_3c4ca2ad4e46ee1800a8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_639_3c4ca2ad4e46ee1800a8.png
+new file mode 100644
+index 0000000..16f960d
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_639_3c4ca2ad4e46ee1800a8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_649_05c8f19c958b26d4728a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_649_05c8f19c958b26d4728a.png
+new file mode 100644
+index 0000000..8579abe
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_649_05c8f19c958b26d4728a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_659_bb67512defa067eb93c2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_659_bb67512defa067eb93c2.png
+new file mode 100644
+index 0000000..2ca8519
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_659_bb67512defa067eb93c2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_669_c8b1882a51d0723f1ca7.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_669_c8b1882a51d0723f1ca7.png
+new file mode 100644
+index 0000000..5c22ce6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_669_c8b1882a51d0723f1ca7.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_679_d19e09305307d229ef2e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_679_d19e09305307d229ef2e.png
+new file mode 100644
+index 0000000..ac5aac0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_679_d19e09305307d229ef2e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_689_22458a6b7fdf6f9be1ba.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_689_22458a6b7fdf6f9be1ba.png
+new file mode 100644
+index 0000000..ada26f1
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_689_22458a6b7fdf6f9be1ba.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_699_9dedc02e5bed7e1a82b1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_699_9dedc02e5bed7e1a82b1.png
+new file mode 100644
+index 0000000..6ba4ea6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_699_9dedc02e5bed7e1a82b1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_69_be03fe6bcb33adde85df.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_69_be03fe6bcb33adde85df.png
+new file mode 100644
+index 0000000..1a3aad1
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_69_be03fe6bcb33adde85df.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_709_9f57b21f069fb2ebe7c0.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_709_9f57b21f069fb2ebe7c0.png
+new file mode 100644
+index 0000000..b6d91e4
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_709_9f57b21f069fb2ebe7c0.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_719_4b148d171e9de24b7fde.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_719_4b148d171e9de24b7fde.png
+new file mode 100644
+index 0000000..b78cdc7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_719_4b148d171e9de24b7fde.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_729_d30ef437881e3d288351.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_729_d30ef437881e3d288351.png
+new file mode 100644
+index 0000000..f47059e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_729_d30ef437881e3d288351.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_739_6df97ab0d890102d6204.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_739_6df97ab0d890102d6204.png
+new file mode 100644
+index 0000000..dec4eb7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_739_6df97ab0d890102d6204.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_749_f8f0261dc226b9711df1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_749_f8f0261dc226b9711df1.png
+new file mode 100644
+index 0000000..ecc01b8
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_749_f8f0261dc226b9711df1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_759_0c16d5bdc97a02be1e9e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_759_0c16d5bdc97a02be1e9e.png
+new file mode 100644
+index 0000000..70bd89c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_759_0c16d5bdc97a02be1e9e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_769_bb07674b9eddeb64d1a1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_769_bb07674b9eddeb64d1a1.png
+new file mode 100644
+index 0000000..b88088c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_769_bb07674b9eddeb64d1a1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_779_8b4820292c5944ddf2c0.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_779_8b4820292c5944ddf2c0.png
+new file mode 100644
+index 0000000..d693c8f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_779_8b4820292c5944ddf2c0.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_789_92fefab6e88ddd007653.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_789_92fefab6e88ddd007653.png
+new file mode 100644
+index 0000000..8a84f84
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_789_92fefab6e88ddd007653.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_799_2d4a3e52005cd52d9a10.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_799_2d4a3e52005cd52d9a10.png
+new file mode 100644
+index 0000000..6903d78
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_799_2d4a3e52005cd52d9a10.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_79_e431d4a174d189f9c91e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_79_e431d4a174d189f9c91e.png
+new file mode 100644
+index 0000000..e67813a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_79_e431d4a174d189f9c91e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_809_13e0666cd87f42f5d2c3.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_809_13e0666cd87f42f5d2c3.png
+new file mode 100644
+index 0000000..69f8b69
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_809_13e0666cd87f42f5d2c3.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_819_2340594ec4c9cceda6d0.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_819_2340594ec4c9cceda6d0.png
+new file mode 100644
+index 0000000..c15a394
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_819_2340594ec4c9cceda6d0.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_829_c9a218008706833b96bc.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_829_c9a218008706833b96bc.png
+new file mode 100644
+index 0000000..d95fab0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_829_c9a218008706833b96bc.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_839_f3ec6d3708b75509396e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_839_f3ec6d3708b75509396e.png
+new file mode 100644
+index 0000000..0d9c71d
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_839_f3ec6d3708b75509396e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_849_5f68fe85d4f816efb91a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_849_5f68fe85d4f816efb91a.png
+new file mode 100644
+index 0000000..c31b66e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_849_5f68fe85d4f816efb91a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_859_1441f50d286b7bf25fec.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_859_1441f50d286b7bf25fec.png
+new file mode 100644
+index 0000000..8be1847
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_859_1441f50d286b7bf25fec.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_869_69054e4d1ab049e88235.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_869_69054e4d1ab049e88235.png
+new file mode 100644
+index 0000000..fc91880
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_869_69054e4d1ab049e88235.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_879_d3030220287707390ea8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_879_d3030220287707390ea8.png
+new file mode 100644
+index 0000000..64ad934
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_879_d3030220287707390ea8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_889_4bcc2afc385f3a14dbe1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_889_4bcc2afc385f3a14dbe1.png
+new file mode 100644
+index 0000000..e21a461
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_889_4bcc2afc385f3a14dbe1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_899_2b54b42af8060fe4b781.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_899_2b54b42af8060fe4b781.png
+new file mode 100644
+index 0000000..39d04f4
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_899_2b54b42af8060fe4b781.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_89_52b27bbb3ffbb94bdf6d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_89_52b27bbb3ffbb94bdf6d.png
+new file mode 100644
+index 0000000..340cab0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_89_52b27bbb3ffbb94bdf6d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_909_6e3d72c6fb41c780820b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_909_6e3d72c6fb41c780820b.png
+new file mode 100644
+index 0000000..4ee42ec
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_909_6e3d72c6fb41c780820b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_919_6d18ec3291cb67fd1fcf.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_919_6d18ec3291cb67fd1fcf.png
+new file mode 100644
+index 0000000..5d42b69
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_919_6d18ec3291cb67fd1fcf.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_929_1ce0bac8b52b32fbd44c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_929_1ce0bac8b52b32fbd44c.png
+new file mode 100644
+index 0000000..2661e21
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_929_1ce0bac8b52b32fbd44c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_939_1d28f69441826765e42c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_939_1d28f69441826765e42c.png
+new file mode 100644
+index 0000000..ccdda95
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_939_1d28f69441826765e42c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_949_c78cfbc40c87f2be9f47.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_949_c78cfbc40c87f2be9f47.png
+new file mode 100644
+index 0000000..fe1e976
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_949_c78cfbc40c87f2be9f47.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_959_bbdbfba47ebeaab88136.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_959_bbdbfba47ebeaab88136.png
+new file mode 100644
+index 0000000..9bdf90f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_959_bbdbfba47ebeaab88136.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_969_204231dd17bcd1fe987a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_969_204231dd17bcd1fe987a.png
+new file mode 100644
+index 0000000..7a63049
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_969_204231dd17bcd1fe987a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_979_f75aae37ddd447eaa698.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_979_f75aae37ddd447eaa698.png
+new file mode 100644
+index 0000000..2e89709
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_979_f75aae37ddd447eaa698.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_989_88e2f1b53404ea9808d9.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_989_88e2f1b53404ea9808d9.png
+new file mode 100644
+index 0000000..6cf48ae
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_989_88e2f1b53404ea9808d9.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_999_634e084a3f9290882622.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_999_634e084a3f9290882622.png
+new file mode 100644
+index 0000000..52fa105
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_999_634e084a3f9290882622.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_99_c0894c3ef2237a2795fb.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_99_c0894c3ef2237a2795fb.png
+new file mode 100644
+index 0000000..08cc4b0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_99_c0894c3ef2237a2795fb.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_9_c573d977c561beba112e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_9_c573d977c561beba112e.png
+new file mode 100644
+index 0000000..b236386
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/pred_dag_img_9_c573d977c561beba112e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_109_50ba8b6c49a7f76455a3.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_109_50ba8b6c49a7f76455a3.png
+new file mode 100644
+index 0000000..ea5ab7c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_109_50ba8b6c49a7f76455a3.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_119_7cfc141be187815ed78e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_119_7cfc141be187815ed78e.png
+new file mode 100644
+index 0000000..d709247
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_119_7cfc141be187815ed78e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_129_21c420886fc9564598c6.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_129_21c420886fc9564598c6.png
+new file mode 100644
+index 0000000..1d1a0f9
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_129_21c420886fc9564598c6.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_139_b5bfb61e8d1505ce507c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_139_b5bfb61e8d1505ce507c.png
+new file mode 100644
+index 0000000..af81485
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_139_b5bfb61e8d1505ce507c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_149_f3c0f13b31c352837564.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_149_f3c0f13b31c352837564.png
+new file mode 100644
+index 0000000..0a1e907
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_149_f3c0f13b31c352837564.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_159_bba1fa0c70f400e2995b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_159_bba1fa0c70f400e2995b.png
+new file mode 100644
+index 0000000..8d1cfb1
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_159_bba1fa0c70f400e2995b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_169_a76d9f65fcd231cfd657.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_169_a76d9f65fcd231cfd657.png
+new file mode 100644
+index 0000000..48533d7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_169_a76d9f65fcd231cfd657.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_179_7b9aacb49105e9a4200b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_179_7b9aacb49105e9a4200b.png
+new file mode 100644
+index 0000000..2e2b11e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_179_7b9aacb49105e9a4200b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_189_dc6ab0d20bc472a20c38.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_189_dc6ab0d20bc472a20c38.png
+new file mode 100644
+index 0000000..c871fca
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_189_dc6ab0d20bc472a20c38.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_199_046f8b5fecdb91111909.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_199_046f8b5fecdb91111909.png
+new file mode 100644
+index 0000000..7e37154
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_199_046f8b5fecdb91111909.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_19_80a5783d01ee55c79b81.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_19_80a5783d01ee55c79b81.png
+new file mode 100644
+index 0000000..0f500d6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_19_80a5783d01ee55c79b81.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_209_e6cf8090299fee938f26.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_209_e6cf8090299fee938f26.png
+new file mode 100644
+index 0000000..2e9db2f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_209_e6cf8090299fee938f26.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_219_3cb814a74d372d8d72c2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_219_3cb814a74d372d8d72c2.png
+new file mode 100644
+index 0000000..e786707
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_219_3cb814a74d372d8d72c2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_229_a0d0be31d87768e8ce2c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_229_a0d0be31d87768e8ce2c.png
+new file mode 100644
+index 0000000..64ec593
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_229_a0d0be31d87768e8ce2c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_239_28499b547a9ca9071f99.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_239_28499b547a9ca9071f99.png
+new file mode 100644
+index 0000000..5f84ba3
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_239_28499b547a9ca9071f99.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_249_3652471e4551bbb30810.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_249_3652471e4551bbb30810.png
+new file mode 100644
+index 0000000..ff4a779
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_249_3652471e4551bbb30810.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_259_fd57990aab598be68b84.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_259_fd57990aab598be68b84.png
+new file mode 100644
+index 0000000..479ac86
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_259_fd57990aab598be68b84.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_269_c41417dcafd49ddd028a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_269_c41417dcafd49ddd028a.png
+new file mode 100644
+index 0000000..fad622d
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_269_c41417dcafd49ddd028a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_279_5f6dfeff56f28b1cc820.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_279_5f6dfeff56f28b1cc820.png
+new file mode 100644
+index 0000000..1eca84a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_279_5f6dfeff56f28b1cc820.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_289_5a39f446f9f5dde6329b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_289_5a39f446f9f5dde6329b.png
+new file mode 100644
+index 0000000..ef727c9
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_289_5a39f446f9f5dde6329b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_299_d14c3009d9c232bdabc2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_299_d14c3009d9c232bdabc2.png
+new file mode 100644
+index 0000000..90600b6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_299_d14c3009d9c232bdabc2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_29_a12495dbbd96b45614fc.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_29_a12495dbbd96b45614fc.png
+new file mode 100644
+index 0000000..fe2391e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_29_a12495dbbd96b45614fc.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_309_e07517c5ec8ccabfa4ac.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_309_e07517c5ec8ccabfa4ac.png
+new file mode 100644
+index 0000000..30d91d0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_309_e07517c5ec8ccabfa4ac.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_319_182df2e27f07a484da3f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_319_182df2e27f07a484da3f.png
+new file mode 100644
+index 0000000..ddb8ee7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_319_182df2e27f07a484da3f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_329_2bdcc6b656e0c85da33a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_329_2bdcc6b656e0c85da33a.png
+new file mode 100644
+index 0000000..a49b499
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_329_2bdcc6b656e0c85da33a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_339_d004f4803b0831f9a3df.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_339_d004f4803b0831f9a3df.png
+new file mode 100644
+index 0000000..28fc504
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_339_d004f4803b0831f9a3df.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_349_f02561dc2282c2376172.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_349_f02561dc2282c2376172.png
+new file mode 100644
+index 0000000..f5dc2a7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_349_f02561dc2282c2376172.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_359_4cb2692ea56e58fc3e1e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_359_4cb2692ea56e58fc3e1e.png
+new file mode 100644
+index 0000000..e64d6f8
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_359_4cb2692ea56e58fc3e1e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_369_962350a9fc65ef3c1709.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_369_962350a9fc65ef3c1709.png
+new file mode 100644
+index 0000000..4ff1d16
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_369_962350a9fc65ef3c1709.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_379_6474f4290f08f587ddb8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_379_6474f4290f08f587ddb8.png
+new file mode 100644
+index 0000000..8c38530
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_379_6474f4290f08f587ddb8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_389_8ed0b6407ee87b187b9c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_389_8ed0b6407ee87b187b9c.png
+new file mode 100644
+index 0000000..22dbc8c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_389_8ed0b6407ee87b187b9c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_399_d44837d04b97cc300911.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_399_d44837d04b97cc300911.png
+new file mode 100644
+index 0000000..d69f090
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_399_d44837d04b97cc300911.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_39_5c88810c3a05e3f70753.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_39_5c88810c3a05e3f70753.png
+new file mode 100644
+index 0000000..00f388c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_39_5c88810c3a05e3f70753.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_409_010dc178c5e01a1d1d52.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_409_010dc178c5e01a1d1d52.png
+new file mode 100644
+index 0000000..b82d934
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_409_010dc178c5e01a1d1d52.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_419_f858b6b2799c8c3cef62.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_419_f858b6b2799c8c3cef62.png
+new file mode 100644
+index 0000000..15b2624
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_419_f858b6b2799c8c3cef62.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_429_5ae7cbc28f877b82a393.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_429_5ae7cbc28f877b82a393.png
+new file mode 100644
+index 0000000..24c55d2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_429_5ae7cbc28f877b82a393.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_439_99a355a845d26645a6d5.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_439_99a355a845d26645a6d5.png
+new file mode 100644
+index 0000000..c8f565b
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_439_99a355a845d26645a6d5.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_449_6472675a50d963877e4a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_449_6472675a50d963877e4a.png
+new file mode 100644
+index 0000000..2580a1a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_449_6472675a50d963877e4a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_459_9ab5eead72669e03f2dd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_459_9ab5eead72669e03f2dd.png
+new file mode 100644
+index 0000000..a22e91f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_459_9ab5eead72669e03f2dd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_469_eea9d0c5c154dd7bd8c3.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_469_eea9d0c5c154dd7bd8c3.png
+new file mode 100644
+index 0000000..fa1d6b2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_469_eea9d0c5c154dd7bd8c3.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_479_14f73217b57ee4d7f75b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_479_14f73217b57ee4d7f75b.png
+new file mode 100644
+index 0000000..96ded98
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_479_14f73217b57ee4d7f75b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_489_78827a53689ca5bc88ae.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_489_78827a53689ca5bc88ae.png
+new file mode 100644
+index 0000000..8e11909
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_489_78827a53689ca5bc88ae.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_499_318aa08c9860e8fa826d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_499_318aa08c9860e8fa826d.png
+new file mode 100644
+index 0000000..788501c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_499_318aa08c9860e8fa826d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_49_52e45cfbc4dc0433a3dd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_49_52e45cfbc4dc0433a3dd.png
+new file mode 100644
+index 0000000..28db69f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_49_52e45cfbc4dc0433a3dd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_509_7127fbd5ec8d414cf6dd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_509_7127fbd5ec8d414cf6dd.png
+new file mode 100644
+index 0000000..a5fd3ae
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_509_7127fbd5ec8d414cf6dd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_519_ba47c0400d28457f51fc.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_519_ba47c0400d28457f51fc.png
+new file mode 100644
+index 0000000..e98f7d6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_519_ba47c0400d28457f51fc.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_529_88c41b8f4b7ff7d4ec69.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_529_88c41b8f4b7ff7d4ec69.png
+new file mode 100644
+index 0000000..86c3542
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_529_88c41b8f4b7ff7d4ec69.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_539_dd09bb2d4f2f8f6b554f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_539_dd09bb2d4f2f8f6b554f.png
+new file mode 100644
+index 0000000..ff87c39
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_539_dd09bb2d4f2f8f6b554f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_549_f8e3d50a4e7cb6fb424f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_549_f8e3d50a4e7cb6fb424f.png
+new file mode 100644
+index 0000000..e06d154
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_549_f8e3d50a4e7cb6fb424f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_559_b6d7aa524a04a5652523.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_559_b6d7aa524a04a5652523.png
+new file mode 100644
+index 0000000..bec2438
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_559_b6d7aa524a04a5652523.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_569_2e4b4618efe9f6bef688.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_569_2e4b4618efe9f6bef688.png
+new file mode 100644
+index 0000000..f7038d0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_569_2e4b4618efe9f6bef688.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_579_89a03317fc3001857588.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_579_89a03317fc3001857588.png
+new file mode 100644
+index 0000000..b8e1e3f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_579_89a03317fc3001857588.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_589_223b7e2cd342e82d4825.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_589_223b7e2cd342e82d4825.png
+new file mode 100644
+index 0000000..13e8085
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_589_223b7e2cd342e82d4825.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_599_9503d3f9f232eaec7ada.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_599_9503d3f9f232eaec7ada.png
+new file mode 100644
+index 0000000..3a5cede
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_599_9503d3f9f232eaec7ada.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_59_7e3af6efc3dffe7427d1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_59_7e3af6efc3dffe7427d1.png
+new file mode 100644
+index 0000000..76ec6fb
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_59_7e3af6efc3dffe7427d1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_609_366bfc30657b208f36b8.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_609_366bfc30657b208f36b8.png
+new file mode 100644
+index 0000000..bc1a6aa
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_609_366bfc30657b208f36b8.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_619_3a8d0ba09b14357a5ad9.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_619_3a8d0ba09b14357a5ad9.png
+new file mode 100644
+index 0000000..2c32828
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_619_3a8d0ba09b14357a5ad9.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_629_38a217c42528d66078d0.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_629_38a217c42528d66078d0.png
+new file mode 100644
+index 0000000..efbe354
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_629_38a217c42528d66078d0.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_639_b01f51972bbbe5afca45.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_639_b01f51972bbbe5afca45.png
+new file mode 100644
+index 0000000..7f52d3e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_639_b01f51972bbbe5afca45.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_649_ebd1d983116db0bca727.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_649_ebd1d983116db0bca727.png
+new file mode 100644
+index 0000000..f0a6ec8
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_649_ebd1d983116db0bca727.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_659_231996cb09e82a5b85d7.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_659_231996cb09e82a5b85d7.png
+new file mode 100644
+index 0000000..3150f55
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_659_231996cb09e82a5b85d7.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_669_cdd8a5bc6cd6078f04dd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_669_cdd8a5bc6cd6078f04dd.png
+new file mode 100644
+index 0000000..d0b0df2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_669_cdd8a5bc6cd6078f04dd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_679_a08b8cc044f67e14cccb.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_679_a08b8cc044f67e14cccb.png
+new file mode 100644
+index 0000000..a1c76f9
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_679_a08b8cc044f67e14cccb.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_689_b0240acf58365b448ce5.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_689_b0240acf58365b448ce5.png
+new file mode 100644
+index 0000000..1516839
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_689_b0240acf58365b448ce5.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_699_b8e43227dc945beaac06.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_699_b8e43227dc945beaac06.png
+new file mode 100644
+index 0000000..ff061ac
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_699_b8e43227dc945beaac06.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_69_85d887f8976a3549c34e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_69_85d887f8976a3549c34e.png
+new file mode 100644
+index 0000000..97c9e45
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_69_85d887f8976a3549c34e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_709_77e2a8e67e203cbecc36.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_709_77e2a8e67e203cbecc36.png
+new file mode 100644
+index 0000000..c253897
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_709_77e2a8e67e203cbecc36.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_719_f381a263456ef824ce1a.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_719_f381a263456ef824ce1a.png
+new file mode 100644
+index 0000000..f880e4b
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_719_f381a263456ef824ce1a.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_729_210b1fe9fedb3a786339.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_729_210b1fe9fedb3a786339.png
+new file mode 100644
+index 0000000..04fd2a7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_729_210b1fe9fedb3a786339.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_739_cb796f237d2c94d41d7b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_739_cb796f237d2c94d41d7b.png
+new file mode 100644
+index 0000000..9ca57a5
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_739_cb796f237d2c94d41d7b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_749_4843282f1437ebd5a20b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_749_4843282f1437ebd5a20b.png
+new file mode 100644
+index 0000000..32710a8
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_749_4843282f1437ebd5a20b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_759_ff00abcdeb5b8d27caec.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_759_ff00abcdeb5b8d27caec.png
+new file mode 100644
+index 0000000..b89e372
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_759_ff00abcdeb5b8d27caec.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_769_497c39281598f770ad56.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_769_497c39281598f770ad56.png
+new file mode 100644
+index 0000000..b918a38
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_769_497c39281598f770ad56.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_779_fde5b08ae3b9b844324d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_779_fde5b08ae3b9b844324d.png
+new file mode 100644
+index 0000000..9754bae
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_779_fde5b08ae3b9b844324d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_789_21722953daded317e303.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_789_21722953daded317e303.png
+new file mode 100644
+index 0000000..ee38840
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_789_21722953daded317e303.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_799_4d0cab1aae51457d733d.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_799_4d0cab1aae51457d733d.png
+new file mode 100644
+index 0000000..4845ae6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_799_4d0cab1aae51457d733d.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_79_0f95f2a80a6a5791f541.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_79_0f95f2a80a6a5791f541.png
+new file mode 100644
+index 0000000..581dd32
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_79_0f95f2a80a6a5791f541.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_809_5d0fdd4eae542ea2800f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_809_5d0fdd4eae542ea2800f.png
+new file mode 100644
+index 0000000..d9c6445
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_809_5d0fdd4eae542ea2800f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_819_65f3861a35e372e1c984.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_819_65f3861a35e372e1c984.png
+new file mode 100644
+index 0000000..fe7dcda
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_819_65f3861a35e372e1c984.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_829_84cc22b71e631f6b8e1f.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_829_84cc22b71e631f6b8e1f.png
+new file mode 100644
+index 0000000..6f008c7
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_829_84cc22b71e631f6b8e1f.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_839_fc524b0cf0f639f30bb5.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_839_fc524b0cf0f639f30bb5.png
+new file mode 100644
+index 0000000..49bc26e
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_839_fc524b0cf0f639f30bb5.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_849_63f3a499a34c5e04ab80.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_849_63f3a499a34c5e04ab80.png
+new file mode 100644
+index 0000000..4799985
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_849_63f3a499a34c5e04ab80.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_859_0f71a5055aa84ad6302e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_859_0f71a5055aa84ad6302e.png
+new file mode 100644
+index 0000000..916444c
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_859_0f71a5055aa84ad6302e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_869_f1e94a6151d496d13a44.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_869_f1e94a6151d496d13a44.png
+new file mode 100644
+index 0000000..0dace37
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_869_f1e94a6151d496d13a44.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_879_9a60768af418bade327b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_879_9a60768af418bade327b.png
+new file mode 100644
+index 0000000..5c2f630
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_879_9a60768af418bade327b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_889_b98cfbc5b9e383cb132e.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_889_b98cfbc5b9e383cb132e.png
+new file mode 100644
+index 0000000..6d1ccd2
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_889_b98cfbc5b9e383cb132e.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_899_78dd35ed044001d6dd13.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_899_78dd35ed044001d6dd13.png
+new file mode 100644
+index 0000000..ccab11a
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_899_78dd35ed044001d6dd13.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_89_3eff7db9e407ae473689.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_89_3eff7db9e407ae473689.png
+new file mode 100644
+index 0000000..ea36045
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_89_3eff7db9e407ae473689.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_909_b84b825d3fc01de79bcd.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_909_b84b825d3fc01de79bcd.png
+new file mode 100644
+index 0000000..5148c88
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_909_b84b825d3fc01de79bcd.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_919_07fc9c7a48f1fa3e7eab.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_919_07fc9c7a48f1fa3e7eab.png
+new file mode 100644
+index 0000000..2a5a778
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_919_07fc9c7a48f1fa3e7eab.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_929_52a97cd566db8841c265.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_929_52a97cd566db8841c265.png
+new file mode 100644
+index 0000000..b353f81
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_929_52a97cd566db8841c265.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_939_1ce740f591d5c049c233.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_939_1ce740f591d5c049c233.png
+new file mode 100644
+index 0000000..7784822
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_939_1ce740f591d5c049c233.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_949_44daebdedcb66a305b05.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_949_44daebdedcb66a305b05.png
+new file mode 100644
+index 0000000..1d5dda0
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_949_44daebdedcb66a305b05.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_959_366b89c83ee6a8a66ec2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_959_366b89c83ee6a8a66ec2.png
+new file mode 100644
+index 0000000..1b0fa98
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_959_366b89c83ee6a8a66ec2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_969_96f7f9aa4feb4647accb.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_969_96f7f9aa4feb4647accb.png
+new file mode 100644
+index 0000000..ae68abd
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_969_96f7f9aa4feb4647accb.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_979_fa29621ff6078c1701e2.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_979_fa29621ff6078c1701e2.png
+new file mode 100644
+index 0000000..a114a41
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_979_fa29621ff6078c1701e2.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_989_7d2e857abeb9e3045a2b.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_989_7d2e857abeb9e3045a2b.png
+new file mode 100644
+index 0000000..a4f75ee
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_989_7d2e857abeb9e3045a2b.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_999_14cc68f239e05fdfd6e1.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_999_14cc68f239e05fdfd6e1.png
+new file mode 100644
+index 0000000..33a944b
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_999_14cc68f239e05fdfd6e1.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_99_c9f7b53f972942807278.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_99_c9f7b53f972942807278.png
+new file mode 100644
+index 0000000..0124cf6
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_99_c9f7b53f972942807278.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_9_bb916c478283ef18bc9c.png b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_9_bb916c478283ef18bc9c.png
+new file mode 100644
+index 0000000..339733f
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/files/media/images/eval/true_dag_img_9_bb916c478283ef18bc9c.png differ
+diff --git a/wandb/offline-run-20260812_010243-6cx0yre5/run-6cx0yre5.wandb b/wandb/offline-run-20260812_010243-6cx0yre5/run-6cx0yre5.wandb
+new file mode 100644
+index 0000000..2400ea5
+Binary files /dev/null and b/wandb/offline-run-20260812_010243-6cx0yre5/run-6cx0yre5.wandb differ

@@ -1,0 +1,37 @@
+=== d7_nobs100_b5 seed 2 (task 18) ===
+host node-t00a-004.myriad.ucl.ac.uk  started Thu 20 Aug 03:03:17 BST 2026
+d=7  subset-DP path (no DAG list); oracle by 4000 MH draws  observation=edge_marginals
+  GATE 1 FAILS: observational-only rate 0.0000 CI 0.0000-0.0000, target 0.0779
+
+  *** WARNING ***
+  GATE 1 FAILS at d=7, n_obs=100: the observational-only identification rate is 0.0000 (CI 0.0000-0.0000) but the singleton fraction of the graph space is 0.0779. The environment does not match its specification -- the agent starts from a blurrier belief than intended, and absolute difficulty is not comparable across d. Raise n_obs.
+
+  references loaded from /home/ucabbse/sa_runs/gnn_budget_exact/refs_d7_nobs100_b5.pkl
+  no_intervention        solve=0.00 cost=5.00
+  random                 solve=0.51 cost=4.32
+  greedy_oracle          solve=0.80 cost=3.43
+  edge_marginal_greedy   solve=0.77 cost=3.55
+
+seed 2 (1555s, final entropy 0.90)
+  gap_closed   +0.661 (sampled +0.600)
+  solve_rate   0.73 (greedy 0.77)
+  cost         3.81 CI 3.65-3.99
+  under_acting 0.000
+  optimal      0.297 (informative 0.99) regret 0.280
+  by_mec       mec_1:+nan(n=0)  mec_2-4:+nan(n=0)  mec_5-inf:+nan(n=0)
+  checks       {'gap_closed': False, 'no_under_acting': True, 'solve_rate': True, 'no_collapse': True}  PASSED=False
+
+=== SUMMARY d=7 edge_marginals ===
+  seeds passing: 0/1
+  gap_closed  min +0.661  median +0.661  max +0.661
+  OVERALL: FAIL
+
+=== CANARIES ===
+  [ok  ] G1 entropy: final entropy 0.896 nats is 43% of the uniform ceiling 2.079; the policy has committed.
+  [ok  ] G2 anchors: anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 4.320 vs 3.553).
+  [ok  ] G3 informative fraction: 98.8% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample.
+  [ok  ] G4 seed spread: only 1 finite seed(s); spread is not defined.
+  [FAIL] G5 gate 1 recorded: observational-only rate 0.0000 against a singleton fraction of 0.0779 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended.
+  1 fired: G5 gate 1 recorded -- results below still stand as recorded, but read them with these in view.
+  written to results/gnn_budget_exact/d7_nobs100_b5_s2.json
+=== done Thu 20 Aug 03:29:28 BST 2026 ===

@@ -1,0 +1,52 @@
+=== BASELINES (median gap closed over seeds) ===
+  pernode  +1.155  (seeds +1.144 to +1.241, n=3)
+  flat     -1.190  (seeds -1.837 to -1.155, n=3)
+
+=== LEVER EFFECTS (delta from the SAME architecture's baseline; |effect| > 0.5 counts) ===
+  configuration                        pernode      flat   verdict
+  ----------------------------------------------------------------
+  NEGCONTROL_n_obs_1000_gate1_fails                        INCOMPLETE (missing ['flat'])
+  budget_10                             +0.003    +1.314   artefact
+  budget_40                             +0.097    -4.821   artefact
+  entropy_coef_0.0                      -0.123    -0.588   artefact
+  entropy_coef_0.001                    +0.045    -0.299   dead
+  entropy_coef_0.01                     +0.064    +0.225   dead
+  entropy_coef_0.03                     +0.070    -0.521   artefact
+  episodes_per_update_32                +0.056    -0.636   artefact
+  episodes_per_update_64                +0.070    -2.556   artefact
+  gamma_0.9                             +0.086    +0.757   artefact
+  gamma_1.0                             -0.032    -0.503   artefact
+  hidden_128                            +0.094    -0.701   artefact
+  hidden_64                             -0.040    -1.487   artefact
+  identify_threshold_0.5                +0.028    -0.266   dead
+  identify_threshold_0.9                -0.288    -4.084   artefact
+  include_counts_False                                     INCOMPLETE (missing ['flat'])
+  intervene_scale_1.0                   +0.043    +0.018   dead
+  intervene_scale_5.0                   -0.069    -0.133   dead
+  lr_0.0001                             +0.088    -6.866   artefact
+  lr_0.0003                             +0.086    -2.610   artefact
+  n_int_400                             -0.049    +0.470   dead
+  n_int_50                              +0.138    -0.858   artefact
+  no_pass_True                                             INCOMPLETE (missing ['flat'])
+  prior_p_0.2                           -0.193    +1.373   artefact
+  prior_p_0.35                          -0.025    +0.750   artefact
+  prior_scale_free                      -0.134    +0.109   dead
+  shaping_coef_0.1                                         INCOMPLETE (missing ['flat'])
+  step_cost_0.0                         +0.088    -2.679   artefact
+  step_cost_0.02                        +0.083    -1.372   artefact
+  step_cost_0.15                        +0.043    +0.492   dead
+  train_episodes_12000                  +0.043    +1.548   artefact
+  train_episodes_2000                   +0.035    -3.053   artefact
+
+=== SUMMARY ===
+  task       0  -
+  artefact  20  budget_10, budget_40, entropy_coef_0.0, entropy_coef_0.03, episodes_per_update_32, episodes_per_update_64, gamma_0.9, gamma_1.0, hidden_128, hidden_64, identify_threshold_0.9, lr_0.0001, lr_0.0003, n_int_50, prior_p_0.2, prior_p_0.35, step_cost_0.0, step_cost_0.02, train_episodes_12000, train_episodes_2000
+  unlocked   0  -
+  dead       8  entropy_coef_0.001, entropy_coef_0.01, identify_threshold_0.5, intervene_scale_1.0, intervene_scale_5.0, n_int_400, prior_scale_free, step_cost_0.15
+
+  'artefact' levers moved the number under the flat network only. The overnight conclusions about them describe compensation for an architecture that could not express the task, and do not carry over.
+
+=== CANARIES: 48 fired across 62 configurations ===
+  G1 entropy                  24
+  G4 seed spread              21
+  G5 gate 1 recorded           3   (1 on the negative control, as designed)

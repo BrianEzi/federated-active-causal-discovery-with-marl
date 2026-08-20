@@ -1,0 +1,37 @@
+=== d5_nobs1000_b5 seed 1 (task 29) ===
+host node-t00a-004.myriad.ucl.ac.uk  started Thu 20 Aug 04:31:56 BST 2026
+d=5  enumerated path; 29281 DAGs / 8782 classes  observation=edge_marginals
+  GATE 1 FAILS: observational-only rate 0.0400 CI 0.0150-0.0700, target 0.0893
+
+  *** WARNING ***
+  GATE 1 FAILS at d=5, n_obs=1000: the observational-only identification rate is 0.0400 (CI 0.0150-0.0700) but the singleton fraction of the graph space is 0.0893. The environment does not match its specification -- the agent starts from a blurrier belief than intended, and absolute difficulty is not comparable across d. Raise n_obs.
+
+  references loaded from /home/ucabbse/sa_runs/gnn_budget_exact/refs_d5_nobs1000_b5.pkl
+  no_intervention        solve=0.07 cost=4.67
+  random                 solve=0.85 cost=2.83
+  greedy_oracle          solve=0.99 cost=1.72
+  edge_marginal_greedy   solve=0.98 cost=1.85
+
+seed 1 (96s, final entropy 0.37)
+  gap_closed   +1.061 (sampled +1.075)
+  solve_rate   0.96 (greedy 0.98)
+  cost         1.79 CI 1.64-1.95
+  under_acting 0.033
+  optimal      0.713 (informative 1.00) regret 0.036
+  by_mec       mec_1:+1.00(n=13)  mec_2-4:+1.14(n=60)  mec_5-inf:+1.01(n=77)
+  checks       {'gap_closed': True, 'no_under_acting': True, 'solve_rate': True, 'no_collapse': True}  PASSED=True
+
+=== SUMMARY d=5 edge_marginals ===
+  seeds passing: 1/1
+  gap_closed  min +1.061  median +1.061  max +1.061
+  OVERALL: FAIL
+
+=== CANARIES ===
+  [ok  ] G1 entropy: final entropy 0.371 nats is 21% of the uniform ceiling 1.792; the policy has committed.
+  [ok  ] G2 anchors: anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 2.833 vs 1.853).
+  [ok  ] G3 informative fraction: 100.0% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample.
+  [ok  ] G4 seed spread: only 1 finite seed(s); spread is not defined.
+  [FAIL] G5 gate 1 recorded: observational-only rate 0.0400 against a singleton fraction of 0.0893 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended.
+  1 fired: G5 gate 1 recorded -- results below still stand as recorded, but read them with these in view.
+  written to results/gnn_budget_exact/d5_nobs1000_b5_s1.json
+=== done Thu 20 Aug 04:33:40 BST 2026 ===

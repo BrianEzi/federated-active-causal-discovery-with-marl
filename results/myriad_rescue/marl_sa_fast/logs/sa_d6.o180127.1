@@ -1,0 +1,41 @@
+=== d6_nobs100_b2 seed 0 (task 1) ===
+host node-t00a-004.myriad.ucl.ac.uk  started Thu 20 Aug 11:34:28 BST 2026
+d=6  enumerated path; 3781503 DAGs / 1067825 classes  observation=edge_marginals
+  GATE 1 FAILS: observational-only rate 0.0000 CI 0.0000-0.0000, target 0.0810
+
+  *** WARNING ***
+  GATE 1 FAILS at d=6, n_obs=100: the observational-only identification rate is 0.0000 (CI 0.0000-0.0000) but the singleton fraction of the graph space is 0.0810. The environment does not match its specification -- the agent starts from a blurrier belief than intended, and absolute difficulty is not comparable across d. Raise n_obs.
+
+  no_intervention        computed (53s)
+  random                 computed (180s)
+  greedy_oracle          computed (214s)
+  edge_marginal_greedy   computed (1341s)
+  references cached to /home/ucabbse/sa_runs/d6_exact/refs_d6_nobs100_b2.pkl
+  no_intervention        solve=0.00 cost=2.00
+  random                 solve=0.13 cost=1.97
+  greedy_oracle          solve=0.43 cost=1.96
+  edge_marginal_greedy   solve=0.32 cost=1.98
+
+seed 0 (5019s, final entropy 0.24)
+  gap_closed   -0.500 (sampled -0.500)
+  solve_rate   0.37 (greedy 0.32)
+  cost         1.96 CI 1.92-1.99
+  under_acting 0.000
+  optimal      0.466 (informative 1.00) regret 0.141
+  by_mec       mec_1:+1.00(n=9)  mec_2-4:-0.00(n=62)  mec_5-inf:-0.00(n=79)
+  checks       {'gap_closed': False, 'no_under_acting': True, 'solve_rate': True, 'no_collapse': True}  PASSED=False
+
+=== SUMMARY d=6 edge_marginals ===
+  seeds passing: 0/1
+  gap_closed  min -0.500  median -0.500  max -0.500
+  OVERALL: FAIL
+
+=== CANARIES ===
+  [ok  ] G1 entropy: final entropy 0.242 nats is 12% of the uniform ceiling 1.946; the policy has committed.
+  [FAIL] G2 anchors: REFERENCES INVERTED: the greedy reference costs 1.980 against random's 1.967. Greedy cannot be worse than random, so the two are almost certainly swapped -- which silently flips the sign of every gap-closed number in this file.
+  [ok  ] G3 informative fraction: 100.0% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample.
+  [ok  ] G4 seed spread: only 1 finite seed(s); spread is not defined.
+  [FAIL] G5 gate 1 recorded: observational-only rate 0.0000 against a singleton fraction of 0.0810 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended.
+  2 fired: G2 anchors, G5 gate 1 recorded -- results below still stand as recorded, but read them with these in view.
+  written to results/d6_exact/d6_nobs100_b2_s0.json
+=== done Thu 20 Aug 13:30:06 BST 2026 ===

@@ -1,0 +1,37 @@
+=== d5_nobs100_b2 seed 2 (task 3) ===
+host node-t00a-006.myriad.ucl.ac.uk  started Thu 20 Aug 00:44:11 BST 2026
+d=5  enumerated path; 29281 DAGs / 8782 classes  observation=edge_marginals
+  GATE 1 FAILS: observational-only rate 0.0000 CI 0.0000-0.0000, target 0.0893
+
+  *** WARNING ***
+  GATE 1 FAILS at d=5, n_obs=100: the observational-only identification rate is 0.0000 (CI 0.0000-0.0000) but the singleton fraction of the graph space is 0.0893. The environment does not match its specification -- the agent starts from a blurrier belief than intended, and absolute difficulty is not comparable across d. Raise n_obs.
+
+  references loaded from /home/ucabbse/sa_runs/gnn_budget_exact/refs_d5_nobs100_b2.pkl
+  no_intervention        solve=0.00 cost=2.00
+  random                 solve=0.40 cost=1.90
+  greedy_oracle          solve=0.76 cost=1.79
+  edge_marginal_greedy   solve=0.67 cost=1.83
+
+seed 2 (50s, final entropy 0.35)
+  gap_closed   +1.400 (sampled +1.400)
+  solve_rate   0.71 (greedy 0.67)
+  cost         1.81 CI 1.74-1.87
+  under_acting 0.000
+  optimal      0.424 (informative 1.00) regret 0.113
+  by_mec       mec_1:+nan(n=13)  mec_2-4:+1.43(n=60)  mec_5-inf:+1.33(n=77)
+  checks       {'gap_closed': True, 'no_under_acting': True, 'solve_rate': True, 'no_collapse': True}  PASSED=True
+
+=== SUMMARY d=5 edge_marginals ===
+  seeds passing: 1/1
+  gap_closed  min +1.400  median +1.400  max +1.400
+  OVERALL: FAIL
+
+=== CANARIES ===
+  [ok  ] G1 entropy: final entropy 0.353 nats is 20% of the uniform ceiling 1.792; the policy has committed.
+  [ok  ] G2 anchors: anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 1.900 vs 1.833).
+  [ok  ] G3 informative fraction: 100.0% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample.
+  [ok  ] G4 seed spread: only 1 finite seed(s); spread is not defined.
+  [FAIL] G5 gate 1 recorded: observational-only rate 0.0000 against a singleton fraction of 0.0893 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended.
+  1 fired: G5 gate 1 recorded -- results below still stand as recorded, but read them with these in view.
+  written to results/gnn_budget_exact/d5_nobs100_b2_s2.json
+=== done Thu 20 Aug 00:45:04 BST 2026 ===

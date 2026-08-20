@@ -1,0 +1,308 @@
+{
+  "args": {
+    "d": 5,
+    "observation": "edge_marginals",
+    "seeds": [
+      0
+    ],
+    "train_episodes": 256,
+    "eval_episodes": 30,
+    "out": "results/budget/calib.json",
+    "tag": "",
+    "ref_cache": null,
+    "refs_only": false,
+    "require_gate1": false,
+    "gate1_episodes": 200,
+    "wandb_project": null,
+    "wandb_dir": null,
+    "budget": 3,
+    "n_obs": 100,
+    "n_int": 100,
+    "identify_threshold": 0.7,
+    "prior": "erdos_renyi",
+    "prior_p": 0.5,
+    "intervene_scale": 2.0,
+    "include_counts": false,
+    "entropy_coef": 0.003,
+    "lr": 0.0003,
+    "step_cost": 0.05,
+    "hidden": 128,
+    "gamma": 0.99,
+    "episodes_per_update": 32,
+    "no_pass": false,
+    "arch": "pernode",
+    "layers": 2,
+    "shaping_coef": 0.0,
+    "force_dp": null,
+    "oracle_draws": 4000
+  },
+  "tag": "",
+  "provenance": {
+    "git_commit": "414756a0ad8378b9d9ed68b6aeb4fb96fe611305",
+    "python": "3.11.9",
+    "numpy": "1.26.4",
+    "torch": "2.10.0+cpu",
+    "host": "Brianslptp",
+    "finished_utc": "2026-08-19T18:21:44Z"
+  },
+  "space": {
+    "d": 5,
+    "n_dags": 29281,
+    "n_mecs": 8782,
+    "singleton_fraction": 0.08934121102421365
+  },
+  "references": {
+    "no_intervention": {
+      "solve_rate": 0.0,
+      "mean_cost": 3.0
+    },
+    "random": {
+      "solve_rate": 0.5666666666666667,
+      "mean_cost": 2.466666666666667
+    },
+    "greedy_oracle": {
+      "solve_rate": 0.9333333333333333,
+      "mean_cost": 1.9666666666666666
+    },
+    "edge_marginal_greedy": {
+      "solve_rate": 0.9333333333333333,
+      "mean_cost": 1.9333333333333333
+    }
+  },
+  "gate1": {
+    "rate": 0.0,
+    "ci": [
+      0.0,
+      0.0
+    ],
+    "target": 0.08934121102421365,
+    "target_ci": null,
+    "passed": false,
+    "n_episodes": 200
+  },
+  "canaries": [
+    {
+      "name": "G1 entropy",
+      "ok": false,
+      "severity": "warn",
+      "observed": 0.9978930111340959,
+      "threshold": 0.65,
+      "detail": "final entropy 1.788 nats is 100% of the uniform ceiling 1.792 -- near-uniform, so the policy has probably not learned to discriminate between targets. Every overnight failure looked like this."
+    },
+    {
+      "name": "G2 anchors",
+      "ok": true,
+      "severity": "fail",
+      "observed": 0.0,
+      "threshold": 1e-09,
+      "detail": "anchors exact: random -> 0.0e+00, greedy -> 1.000000 (costs 2.467 vs 1.933)."
+    },
+    {
+      "name": "G3 informative fraction",
+      "ok": true,
+      "severity": "fail",
+      "observed": 1.0,
+      "threshold": 0.1,
+      "detail": "100.0% of scored actions were ones the oracle had a preference about; agreement numbers rest on a real sample."
+    },
+    {
+      "name": "G4 seed spread",
+      "ok": true,
+      "severity": "warn",
+      "observed": null,
+      "threshold": 0.5,
+      "detail": "only 1 finite seed(s); spread is not defined."
+    },
+    {
+      "name": "G5 gate 1 recorded",
+      "ok": false,
+      "severity": "fail",
+      "observed": 0.0,
+      "threshold": 0.08934121102421365,
+      "detail": "observational-only rate 0.0000 against a singleton fraction of 0.0893 -- GATE 1 FAILED, so this environment does not match its specification and the results below describe a different task than intended."
+    }
+  ],
+  "per_seed": [
+    {
+      "checks": {
+        "gap_closed": false,
+        "no_under_acting": true,
+        "solve_rate": false,
+        "no_collapse": true
+      },
+      "passed": false,
+      "gap_closed": 0.3750000000000003,
+      "under_acting_rate": 0.0,
+      "solve_rate": 0.6333333333333333,
+      "greedy_solve_rate": 0.9333333333333333,
+      "sampled_gap_closed": -0.18750000000000014,
+      "seed": 0,
+      "train_seconds": 5.83688759803772,
+      "final_entropy": 1.7879842519760132,
+      "deterministic": {
+        "gap_closed": 0.3750000000000003,
+        "solve_rate": 0.6333333333333333,
+        "greedy_solve_rate": 0.9333333333333333,
+        "mean_cost": 2.2666666666666666,
+        "cost_ci": [
+          2.033333333333333,
+          2.5
+        ],
+        "mean_interventions_when_solved": 1.8421052631578947,
+        "under_acting_rate": 0.0,
+        "mean_regret": 0.3785108838240872,
+        "optimal_rate": 0.22058823529411764,
+        "informative_fraction": 1.0,
+        "by_mec_size": {
+          "mec_1": {
+            "n": 3,
+            "gap_closed": NaN,
+            "solve_rate": 1.0,
+            "mean_interventions": 1.6666666666666667
+          },
+          "mec_2-4": {
+            "n": 14,
+            "gap_closed": 0.09090909090909113,
+            "solve_rate": 0.42857142857142855,
+            "mean_interventions": 2.5
+          },
+          "mec_5-inf": {
+            "n": 13,
+            "gap_closed": 1.0,
+            "solve_rate": 0.7692307692307693,
+            "mean_interventions": 2.1538461538461537
+          }
+        },
+        "repeat_rate": 0.3088235294117647,
+        "distinct_targets": 1.5666666666666667,
+        "action_histogram": [
+          0.17647058823529413,
+          0.19117647058823528,
+          0.14705882352941177,
+          0.22058823529411764,
+          0.2647058823529412
+        ]
+      },
+      "sampled": {
+        "gap_closed": -0.18750000000000014,
+        "solve_rate": 0.43333333333333335,
+        "greedy_solve_rate": 0.9333333333333333,
+        "mean_cost": 2.566666666666667,
+        "cost_ci": [
+          2.3333333333333335,
+          2.8
+        ],
+        "mean_interventions_when_solved": 2.0,
+        "under_acting_rate": 0.3333333333333333,
+        "mean_regret": 0.4334681140000369,
+        "optimal_rate": 0.18867924528301888,
+        "informative_fraction": 1.0,
+        "by_mec_size": {
+          "mec_1": {
+            "n": 3,
+            "gap_closed": NaN,
+            "solve_rate": 0.6666666666666666,
+            "mean_interventions": 2.0
+          },
+          "mec_2-4": {
+            "n": 14,
+            "gap_closed": -0.09090909090909058,
+            "solve_rate": 0.5,
+            "mean_interventions": 1.9285714285714286
+          },
+          "mec_5-inf": {
+            "n": 13,
+            "gap_closed": -0.20000000000000046,
+            "solve_rate": 0.3076923076923077,
+            "mean_interventions": 1.5384615384615385
+          }
+        },
+        "repeat_rate": 0.16981132075471697,
+        "distinct_targets": 1.76,
+        "action_histogram": [
+          0.22641509433962265,
+          0.16981132075471697,
+          0.24528301886792453,
+          0.20754716981132076,
+          0.1509433962264151
+        ]
+      }
+    }
+  ],
+  "training_history": {
+    "0": [
+      {
+        "episodes": 32,
+        "solve_rate": 0.375,
+        "mean_length": 1.8125,
+        "policy_loss": -0.000908627262925954,
+        "value_loss": 0.2693963274359703,
+        "entropy": 1.7917526364326477
+      },
+      {
+        "episodes": 64,
+        "solve_rate": 0.3125,
+        "mean_length": 1.71875,
+        "policy_loss": -0.0009054265392478555,
+        "value_loss": 0.20393597334623337,
+        "entropy": 1.7916914224624634
+      },
+      {
+        "episodes": 96,
+        "solve_rate": 0.46875,
+        "mean_length": 1.65625,
+        "policy_loss": -0.0018964404880534858,
+        "value_loss": 0.24325327575206757,
+        "entropy": 1.7915571928024292
+      },
+      {
+        "episodes": 128,
+        "solve_rate": 0.28125,
+        "mean_length": 1.96875,
+        "policy_loss": -0.0014949270147266436,
+        "value_loss": 0.2122027538716793,
+        "entropy": 1.7912346124649048
+      },
+      {
+        "episodes": 160,
+        "solve_rate": 0.34375,
+        "mean_length": 2.0625,
+        "policy_loss": -0.0007681646682997645,
+        "value_loss": 0.21055826172232628,
+        "entropy": 1.7908680140972137
+      },
+      {
+        "episodes": 192,
+        "solve_rate": 0.46875,
+        "mean_length": 1.78125,
+        "policy_loss": -0.0019940564403686523,
+        "value_loss": 0.2509860619902611,
+        "entropy": 1.7903861999511719
+      },
+      {
+        "episodes": 224,
+        "solve_rate": 0.3125,
+        "mean_length": 2.1875,
+        "policy_loss": -0.0011510109783833822,
+        "value_loss": 0.19322171807289124,
+        "entropy": 1.78923499584198
+      },
+      {
+        "episodes": 256,
+        "solve_rate": 0.34375,
+        "mean_length": 1.96875,
+        "policy_loss": -0.0017081833211705089,
+        "value_loss": 0.206451665610075,
+        "entropy": 1.7879842519760132
+      }
+    ]
+  },
+  "summary": {
+    "n_seeds": 1,
+    "n_passed": 0,
+    "min_gap_closed": 0.3750000000000003,
+    "median_gap_closed": 0.3750000000000003,
+    "max_gap_closed": 0.3750000000000003,
+    "passed": false
+  }
+}
