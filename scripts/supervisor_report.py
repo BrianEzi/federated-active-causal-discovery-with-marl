@@ -67,6 +67,40 @@ def test_suite_line():
             "revision was still in progress when this was generated.")
 
 
+def control_line():
+    """The zero-cost control, which separates two very different explanations.
+
+    The no-bit arm collapses into passing. Two readings: the step cost made acting
+    irrational, or the task is genuinely unlearnable without disclosure. Setting the cost to
+    zero and changing nothing else tells them apart, and the answer is not the one the
+    collapse suggests.
+    """
+    runs = [d for d in (read(p) for p in
+                        sorted(glob.glob("results/ma_fixed/nobit_nocost_fixed_s*.json"))) if d]
+    if not runs:
+        return ("<p>The zero-cost control is still running; until it lands, the collapse has "
+                "two live explanations and this report does not choose between them.</p>")
+    learned = [d["arms"]["learned"] for d in runs]
+    rand = [d["arms"]["random_clamp"] for d in runs]
+    steps = float(np.mean([a["mean_steps"] for a in learned]))
+    ent = [d.get("final_entropy") for d in runs if d.get("final_entropy")]
+    return ("<p><b>The control has now run, and it splits the question cleanly.</b> With the "
+            "cost set to zero and nothing else changed, the no-bit arm stops collapsing: it "
+            "takes <b>%.1f</b> steps per episode against 0.0, and final policy entropy is "
+            "<b>%.2f</b> against 0.02. So the collapse really was the reward design.</p>"
+            "<p>But it still does not learn anything. Success is <b>%.3f</b> against its own "
+            "random floor of <b>%.3f</b> &mdash; indistinguishable. Acting freely and "
+            "exploring fully, an agent without the regime bit cannot beat random. That is "
+            "the answer we needed: the step cost explains the <i>collapse</i>, and it does "
+            "not explain away the <i>bit</i>. Disclosure is doing real work, because without "
+            "it the belief cannot separate confounding from a genuine shared edge, and no "
+            "policy can recover what the belief cannot represent. (%d seed%s.)</p>"
+            % (steps, float(np.mean(ent)) if ent else float("nan"),
+               float(np.mean([a["success"] for a in learned])),
+               float(np.mean([a["success"] for a in rand])),
+               len(runs), "" if len(runs) == 1 else "s"))
+
+
 def seed_status(withbit, nobit):
     """State the seed count that EXISTS, and what is actually still running.
 
@@ -478,6 +512,7 @@ def build(out_path):
         "MA_STATUS": ("%d of 6 corrected runs finished" % n_done if n_done < 6
                       else "all 6 corrected runs finished"),
         "TESTS": test_suite_line(),
+        "CONTROL": control_line(),
         "SEED_STATUS": seed_status(withbit, nobit),
         "EXACT_NATS": ("%.4f" % ex) if ex else "&mdash;",
         "MH_NATS": ("%.4f" % mh) if mh else "&mdash;",

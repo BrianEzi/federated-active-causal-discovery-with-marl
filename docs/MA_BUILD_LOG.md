@@ -1215,3 +1215,30 @@ The policy comparison stands, since all arms face the same environment. What doe
 is any claim about absolute identification rates. The fix is either more data or a threshold
 derived per setting instead of inherited from the d=3/d=4 case -- goes in the parameter
 audit.
+
+[MEASURED] **The zero-cost control splits the collapse from the bit, and the answer is not
+the one the collapse suggested.** No regime bit, `step_cost=0`, everything else identical,
+corrected criterion:
+
+    learned         0.073   CI 0.033-0.120    8.03 steps   entropy 1.83
+    random_clamp    0.080   CI 0.040-0.127    7.59 steps
+    random_vary     0.073   CI 0.033-0.113    7.61 steps
+    greedy          0.060   CI 0.027-0.100    7.62 steps
+
+Two findings, and they point in opposite directions:
+
+1. **The collapse WAS the reward design.** 8.03 steps against 0.00, entropy 1.83 against
+   0.02. Remove the price on acting and the agent acts. Nothing subtle about it.
+2. **Removing the price does not make the task learnable.** 0.073 against a random floor of
+   0.080 -- indistinguishable. An agent that acts freely, explores fully, and is never
+   punished for it STILL cannot beat random without the regime bit.
+
+So the step cost explains the collapse and does NOT explain away the bit. This is the
+control I expected to weaken the regime-bit claim, and it strengthens it instead. The
+mechanism is the belief, not the policy: without disclosure the posterior cannot separate
+confounding from a genuine shared edge, and no policy can recover what the belief cannot
+represent. Note the ceiling -- EVERY arm sits at 0.06-0.08, including greedy with an exact
+posterior. That is a property of the no-bit belief, not of any policy in it.
+
+This retires hypothesis "the no-bit arm might learn if acting were free", which had been
+open since 2026-08-19.
