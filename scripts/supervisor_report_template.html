@@ -1,0 +1,499 @@
+<title>Confounded by Design</title>
+<style>
+:root {
+  --ground:#F6F7F5; --surface:#FFFFFF; --ink:#14181B; --muted:#5C6569; --rule:#DBDFDC;
+  --learned:#0E6B77; --random:#A8446A; --greedy:#6B62D6;
+  --good:#2C6B4F; --bad:#A6402F; --track:#E9ECEA;
+  --warn-bg:#FBF4F2; --warn-line:#A6402F;
+  --note-bg:#F1F4F3; --note-line:#0E6B77;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#101315; --surface:#171B1E; --ink:#E7EAE8; --muted:#98A1A5; --rule:#282D30;
+    --learned:#4FB6C4; --random:#E084AA; --greedy:#A79EFF;
+    --good:#5CBE90; --bad:#E88274; --track:#212629;
+    --warn-bg:#1F1614; --warn-line:#E88274;
+    --note-bg:#151C1E; --note-line:#4FB6C4;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#101315; --surface:#171B1E; --ink:#E7EAE8; --muted:#98A1A5; --rule:#282D30;
+  --learned:#4FB6C4; --random:#E084AA; --greedy:#A79EFF;
+  --good:#5CBE90; --bad:#E88274; --track:#212629;
+  --warn-bg:#1F1614; --warn-line:#E88274;
+  --note-bg:#151C1E; --note-line:#4FB6C4;
+}
+* { box-sizing:border-box; }
+body {
+  background:var(--ground); color:var(--ink); margin:0; padding:0 20px 6rem;
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  font-size:17px; line-height:1.62;
+}
+.wrap { max-width:47rem; margin:0 auto; }
+.mono { font-family:ui-monospace,"Cascadia Mono","SF Mono",Consolas,Menlo,monospace; }
+
+header { padding:4rem 0 2rem; }
+.eyebrow {
+  font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;
+  font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted);
+  margin:0 0 1.1rem;
+}
+h1 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:clamp(2.2rem,5.5vw,3.2rem); font-weight:700; letter-spacing:-.028em;
+  line-height:1.05; margin:0 0 1.1rem; text-wrap:balance;
+}
+.standfirst { font-size:1.18rem; color:var(--muted); margin:0 0 2rem; text-wrap:pretty; }
+.rule { height:2px; background:var(--ink); opacity:.85; margin:0 0 2.5rem; }
+
+h2 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:1.55rem; font-weight:650; letter-spacing:-.02em; margin:3.6rem 0 .3rem;
+  text-wrap:balance;
+}
+h2 + .sub { color:var(--muted); font-size:.95rem; margin:0 0 1.1rem;
+  font-family:system-ui,sans-serif; }
+h3 {
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:1.05rem; font-weight:650; margin:2.1rem 0 .3rem;
+}
+p { margin:.85rem 0; }
+b, strong { font-weight:650; }
+code, .mono { font-size:.9em; }
+code {
+  font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;
+  background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+  padding:.06em .34em;
+}
+
+figure { margin:1.6rem 0; padding:1rem 1rem .4rem; background:var(--surface);
+  border:1px solid var(--rule); border-radius:10px; overflow-x:auto; }
+figcaption { font-family:system-ui,sans-serif; font-size:12.5px; color:var(--muted);
+  margin-bottom:.7rem; text-wrap:pretty; }
+figcaption b { color:var(--ink); }
+.chart { width:100%; height:auto; display:block; min-width:460px; }
+.grid { stroke:var(--rule); stroke-width:1; }
+.thresh { stroke:var(--ink); stroke-width:1.2; stroke-dasharray:5 4; opacity:.5; }
+.tick { font-family:ui-monospace,Menlo,monospace; font-size:10px; fill:var(--muted); }
+.ty { text-anchor:end; } .tx { text-anchor:middle; }
+.axis { font-family:ui-monospace,Menlo,monospace; font-size:10px; fill:var(--muted);
+  letter-spacing:.05em; }
+.track { fill:var(--track); }
+.ci { stroke:var(--ink); stroke-width:1.6; opacity:.5; }
+.blabel { font-family:ui-monospace,Menlo,monospace; font-size:10.5px; fill:var(--muted);
+  text-anchor:end; }
+.bval { font-family:ui-monospace,Menlo,monospace; font-size:11px; fill:var(--ink);
+  font-variant-numeric:tabular-nums; }
+.bnote { font-family:ui-monospace,Menlo,monospace; font-size:9.5px; fill:var(--muted); }
+.legend { display:flex; flex-wrap:wrap; gap:1rem; font-family:system-ui,sans-serif;
+  font-size:12px; color:var(--muted); padding:.2rem 0 .6rem; }
+.key { display:inline-flex; align-items:center; gap:.4rem; }
+.key i { width:11px; height:11px; border-radius:2px; display:inline-block; }
+.empty { font-family:system-ui,sans-serif; font-size:13px; color:var(--muted);
+  padding:1.4rem 0; text-align:center; }
+
+table { width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace;
+  font-size:12.5px; font-variant-numeric:tabular-nums; }
+th { text-align:left; font-weight:600; color:var(--muted); border-bottom:1px solid var(--rule);
+  padding:.4rem .5rem; font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
+td { padding:.34rem .5rem; border-bottom:1px solid var(--rule); }
+td.num { text-align:right; }
+td.good { color:var(--good); font-weight:600; }
+td.bad { color:var(--bad); font-weight:600; }
+
+.gate { display:flex; gap:1.1rem; padding:1.1rem 0; border-top:1px solid var(--rule); }
+.gnum { font-family:ui-monospace,Menlo,monospace; font-size:11px; letter-spacing:.1em;
+  color:var(--muted); padding-top:.3rem; min-width:4.6rem; }
+.gbody { flex:1; }
+.ghead { font-family:system-ui,sans-serif; font-size:1rem; display:flex; gap:.7rem;
+  align-items:baseline; flex-wrap:wrap; }
+.gbody p { margin:.4rem 0 0; font-size:.95rem; }
+.verdict { font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.1em;
+  padding:.16rem .45rem; border-radius:3px; border:1px solid currentColor; }
+.vpass { color:var(--good); } .vfail { color:var(--bad); }
+.vrunning, .vinconclusive { color:var(--muted); }
+.fresh { color:var(--learned); }
+
+.callout { background:var(--warn-bg); border-left:3px solid var(--warn-line);
+  padding:1rem 1.2rem; margin:1.6rem 0; border-radius:0 6px 6px 0; }
+.callout p:first-child { margin-top:0; } .callout p:last-child { margin-bottom:0; }
+.callout .tag { font-family:ui-monospace,Menlo,monospace; font-size:10px;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--warn-line);
+  display:block; margin-bottom:.4rem; }
+.note { background:var(--note-bg); border-left:3px solid var(--note-line);
+  padding:1rem 1.2rem; margin:1.6rem 0; border-radius:0 6px 6px 0; }
+.note .tag { font-family:ui-monospace,Menlo,monospace; font-size:10px;
+  letter-spacing:.13em; text-transform:uppercase; color:var(--note-line);
+  display:block; margin-bottom:.4rem; }
+.note p:first-child, .note p:first-of-type { margin-top:0; }
+
+ul.plain { list-style:none; padding:0; margin:1rem 0; }
+ul.plain li { padding:.55rem 0 .55rem 1.4rem; border-bottom:1px solid var(--rule);
+  position:relative; font-size:.97rem; }
+ul.plain li::before { content:"—"; position:absolute; left:0; color:var(--muted); }
+ul.plain li b { font-family:system-ui,sans-serif; font-size:.93rem; }
+
+.dates { width:100%; border-collapse:collapse; font-size:.95rem;
+  font-family:system-ui,sans-serif; }
+.dates td { padding:.6rem .5rem; border-bottom:1px solid var(--rule); vertical-align:top; }
+.dates td:first-child { font-family:ui-monospace,Menlo,monospace; font-size:11.5px;
+  color:var(--muted); white-space:nowrap; width:7.5rem; padding-top:.75rem; }
+footer { margin-top:4rem; padding-top:1.4rem; border-top:1px solid var(--rule);
+  font-family:system-ui,sans-serif; font-size:12.5px; color:var(--muted); }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">MSc thesis &middot; supervisor briefing &middot; {{DATE}}</p>
+  <h1>Confounded by Design</h1>
+  <p class="standfirst">Two agents share a causal system. Neither may see the other's
+  private variables, so each one's view is confounded by construction &mdash; and the only
+  way to break that confounding is for your partner to spend a move helping you. This is
+  where that experiment stands, including what was withdrawn from it this morning.</p>
+  <div class="rule"></div>
+</header>
+
+<p>Three things to take from this briefing.</p>
+
+<p>The <b>single-agent</b> half is settled: a learned policy matches or beats the myopic
+information-gain oracle across the whole budget grid at five variables, and most decisively
+where the experiment budget is tight.</p>
+
+<p>The <b>two-agent</b> half had a measurement fault, found and fixed this morning. The
+reported success metric could not be earned at all on confounded episodes &mdash; the case
+the entire design exists for &mdash; so every two-agent number produced before today is an
+<i>unconfounded-episodes-only</i> figure wearing a general label. All of them are withdrawn,
+and the retraction is set out in full below rather than buried.</p>
+
+<p>The <b>re-measurement</b> is done, and it holds up. GATE&nbsp;3 &mdash; the gate that
+establishes coordination is both necessary and available, and the only one that scores
+confounded episodes exclusively &mdash; passes again under the corrected criterion with a
+larger sample and a <i>wider</i> margin than before. And on the corrected metric a learned
+policy beats its own random floor on every seed run so far, with non-overlapping intervals,
+using roughly half the moves. That is the simplest two-agent case working. It is three seeds
+per arm, so it is a sanity check rather than a sized effect, and twenty per arm are
+queued.</p>
+
+
+<h2>The problem, stated precisely</h2>
+<p class="sub">What the agents can see, what they can do, and what counts as success</p>
+
+<p>One linear Gaussian system, five variables, two agents. Agent&nbsp;A owns one
+<b>private</b> variable, agent&nbsp;B owns another, and three are <b>shared</b>. Each agent
+observes its own private variable and all shared ones. It never observes its partner's
+private variable, there is no central server, and training is <b>independent PPO</b> &mdash;
+each agent learns from its own trajectory, with no centralised critic.</p>
+
+<p>The federation boundary is what creates the science. Because a partner's private variable
+is invisible, any causal path running through it appears inside your window as
+<b>latent confounding</b> between two shared variables &mdash; a correlation with no visible
+cause. We proved, and then verified exhaustively over the graph space, that this confounding
+is <b>confined to the shared set</b>: no other pair of variables can be confounded. That
+result is what makes the belief tractable, because the agent's posterior ranges over
+(window DAG, confounding assignment) pairs and the assignment only has to enumerate shared
+pairs &mdash; 3<sup>3</sup>&nbsp;=&nbsp;27 assignments, of which 2 admit no acyclic
+completion, leaving 25.</p>
+
+<p>Each round an agent picks a variable and a mode. It can <b>vary</b> it &mdash; a
+randomised hard intervention drawn from a Gaussian &mdash; or <b>clamp</b> it, holding it at
+a constant. Clamping is the interesting one: holding your own private variable constant is
+what lets your partner tell a genuine shared edge apart from confounding through you. It is
+the only altruistic act in the game, and it costs you, because a variable held constant
+teaches you nothing about what drives it.</p>
+
+<div class="note">
+  <span class="tag">Why the coordination problem is about timing, not willingness</span>
+  <p>An agent that clamps its private variable <i>every</i> round never learns that
+  variable's own parents &mdash; and those edges are part of its own success criterion.
+  Traced directly: agent A rises 0.368&nbsp;&rarr;&nbsp;0.814 while B, clamping every round,
+  stays at 0.04 and never identifies. Pure altruism is strictly dominated. What has to be
+  discovered is a <i>mix</i> &mdash; clamp on some rounds, experiment on others &mdash; which
+  is why the reference ceiling in GATE&nbsp;3 is a mixed policy rather than an always-clamping
+  one.</p>
+</div>
+
+<p><b>Success</b> is a three-part criterion, and all three parts must hold. Each agent's
+posterior must place at least 0.7 of its mass on its <i>credit set</i>: every edge touching a
+private variable exactly right, and Markov-equivalent on the rest &mdash; because orientation
+inside an equivalence class is not identifiable from data and demanding it would be
+measuring floating-point tie-breaks. Then the union of the two agents' answers must be
+acyclic, and Markov-equivalent to the true global graph. The acyclicity check is not
+redundant: two agents can orient a shared edge differently within the same equivalence class
+and union into a cycle, which is exactly the failure the relaxation admits.</p>
+
+
+<h2>Single agent: the settled result</h2>
+<p class="sub">Learned policy against the myopic information-gain oracle</p>
+
+<p>The opponent is a greedy oracle that picks the single highest-expected-information-gain
+intervention at every step, using the exact posterior. It is myopic by construction: a
+one-step optimum, not a sequential one. That is precisely why beating it is possible &mdash;
+optimal sequential design is not greedy design chained together, and expected information
+gain is not adaptive submodular, so no <span class="mono">(1&minus;1/e)</span> guarantee
+protects it.</p>
+
+<p>We report <code>gap_closed</code>: 0 means the learned policy matched random, 1 means it
+matched the oracle, above 1 means it beat the oracle. Three seeds per cell, 150 evaluation
+episodes each.</p>
+
+<figure>
+  <figcaption><b>The learned policy's advantage is a scarcity effect.</b> Median
+  <code>gap_closed</code> over three seeds at five variables. The dashed line is the myopic
+  oracle. The margin is widest at budget 2 and narrows as the budget loosens.</figcaption>
+  {{GAP_CHART}}
+  {{GAP_LEGEND}}
+</figure>
+
+<p>The strongest cell is five variables at budget 2, where all three seeds land at or above
+1.2 &mdash; the learned policy solves 0.856 of episodes against the oracle's 0.833 and
+random's 0.460. Across the full grid the median clears 1.0 in ten of fourteen cells, and
+every cell at five variables clears it. All four shortfalls are at seven variables: three of
+them where only 100 observational samples are available, bottoming out at 0.529, and one
+marginal miss at 0.973. The reading is that the learned advantage is real at five variables
+and thins as the space grows &mdash; which is exactly the boundary the scaling work below
+has to push on.</p>
+
+<div class="callout">
+  <span class="tag">The caveat that belongs with these numbers</span>
+  <p>GATE&nbsp;1 does not pass in the single-agent setting at five or seven variables. The
+  observational-only identification rate is <b>below</b> its predicted target in every cell
+  &mdash; 0.040 against 0.089 at five variables, 0.000 at the scarce-data settings &mdash;
+  and the gate is deliberately two-sided. A rate <i>above</i> target would be a leak, meaning
+  the task is solvable without intervening, and would invalidate everything built on it. A
+  rate <i>below</i> target is the opposite failure: the posterior cannot reach the 0.7
+  identification threshold even on graphs that are uniquely identifiable, so the task is
+  harder than intended, not easier. The comparison between policies stands, because all
+  three face the same environment; what does not stand is any claim about absolute
+  identification rates. Recovering the gate means either more data or a threshold derived
+  per setting rather than inherited &mdash; part of the parameter audit below.</p>
+</div>
+
+<figure>
+  <figcaption><b>Why every gate runs at a tight budget.</b> The distance between the oracle
+  and random selection &mdash; that is, how much choosing a good experiment is worth at all
+  &mdash; collapses as the budget grows. By budget 8 random already solves 95% of episodes,
+  so a generous budget produces a benchmark that passes while measuring nothing.</figcaption>
+  {{CLIFF_CHART}}
+</figure>
+
+<figure>
+  <figcaption><b>Full grid.</b> Solve rate by policy, and the median
+  <code>gap_closed</code>. "no action" is the observational-only control.</figcaption>
+  {{SA_TABLE}}
+</figure>
+
+
+<h2>What the belief actually computes</h2>
+<p class="sub">And the chain of independent checks under it</p>
+
+<p>The agent carries an exact Bayesian posterior, not a learned estimator. Structure scores
+use the <b>BGe</b> marginal likelihood (Geiger &amp; Heckerman, 2002), which integrates the
+parameters out and is score-equivalent by construction &mdash; members of one equivalence
+class score identically, which is a property we test rather than hope for. Interventional
+data enters by the <b>Cooper &amp; Yoo (1999)</b> rule: a hard-intervened variable
+contributes no likelihood term for itself, but its realised value remains valid evidence for
+its children.</p>
+
+<p>Enumerating DAGs stops being possible at about six variables, so the posterior is computed
+by a <b>subset dynamic program</b> over sink orderings &mdash; Robinson's recurrence &mdash;
+carried out in <i>signed</i> log space. The sign matters: the inclusion&ndash;exclusion terms
+alternate, and per-node rescaling cannot work, which we established the expensive way. That
+moves the reachable size from six variables to roughly nine.</p>
+
+<p>Confounding is handled by <b>marginalising the orientation</b> of each confounding edge
+rather than fixing it with a tie-break, and that was not cosmetic tidying. The previous code
+oriented each confounding edge along the DAG's topological order &mdash; but a DAG has many
+topological orders, and for two shared variables that are incomparable in the DAG the choice
+came down to which one had the lower index. The two orientations score differently under
+BGe, so the hypothesis being evaluated depended on node numbering. Making the orientation
+part of the hypothesis and integrating it out removes the arbitrary choice, and has the side
+benefit that acyclicity comes for free because the dynamic program only emits DAGs. Finally,
+the oracle needs posterior samples, so a Metropolis&ndash;Hastings sampler was replaced with
+<b>exact sampling</b> by source-layer decomposition (Talvitie, Vuoksenmaa &amp; Koivisto,
+UAI 2019), which sidesteps the signed terms entirely.</p>
+
+<h3>The independent checks</h3>
+<ul class="plain">
+  <li><b>Subset DP against frozen enumeration</b> &mdash; agreement to 1e&minus;10, against a
+  fixture generated by the <i>previous</i> generation of the code, so the check is not
+  circular.</li>
+  <li><b>Exact sampler against the DP's partition function</b> &mdash; agreement to
+  1e&minus;13, through a completely different derivation.</li>
+  <li><b>Oracle information loss</b> &mdash; the exact sampler loses {{EXACT_NATS}} nats
+  against an exact reference where Metropolis&ndash;Hastings lost {{MH_NATS}}: a factor of
+  {{NATS_RATIO}}. Doubling the draws changes nothing, which is the check that the remaining
+  error is not a sample-size problem.</li>
+  <li><b>Test suite</b> &mdash; 534 tests, green.</li>
+</ul>
+
+
+<h2>The three gates</h2>
+<p class="sub">Each one has to pass before the phase after it means anything</p>
+
+<p>The gates exist because this project already threw away a results table once, after
+skipping them. They are ordered and each is a stopping condition: a benchmark that cannot
+discriminate produces numbers, and those numbers are worthless.</p>
+
+{{GATES}}
+
+<div class="callout">
+  <span class="tag">GATE 2 is open, and it is the honest weak point</span>
+  <p>At two agents the myopic oracle is no better than random. The live hypothesis is
+  <b>collision</b>: both greedy agents compute the same objective over overlapping authority,
+  pick the same target, and waste the round &mdash; measured at 0.352 of rounds against
+  random's 0.227. If that holds, the finding is that <i>myopic design does not survive
+  decentralisation</i>, which is a result worth having rather than an obstacle. What it is
+  not is a reason to keep quoting the oracle as a reference; either GATE&nbsp;2 is resolved,
+  or greedy is formally retired as a benchmark and random becomes the reference.</p>
+</div>
+
+
+<h2>What was withdrawn this morning</h2>
+<p class="sub">One confusion, four measurement bugs, and the guard now standing over it</p>
+
+<p>A hypothesis in this belief is a pair: a DAG <span class="mono">H</span>, and a set
+<span class="mono">P</span> of confounded shared pairs whose edges are <i>present in</i>
+<span class="mono">H</span>. So the agent's causal claim is <span class="mono">H</span>
+minus <span class="mono">P</span> &mdash; never <span class="mono">H</span> itself. The
+reported metric compared <span class="mono">H</span> against the true causal graph. On a
+confounded episode the truth therefore matched only under the empty assignment: the one
+hypothesis that refuses to model the confounding at all.</p>
+
+<p>The consequence is stark. Reported success on confounded episodes was <b>exactly
+0.000</b> &mdash; not low, not noisy, structurally unreachable &mdash; against roughly 0.59
+on unconfounded ones. Confounded episodes are the entire point of the two-agent design, so
+every headline number we had was silently conditioned on the cases that do not need
+coordination.</p>
+
+<div class="callout">
+  <span class="tag">Retracted &mdash; do not cite</span>
+  <p><b>All two-agent training figures dated 19 August</b>, including the with-bit and
+  no-bit headline rates and the paired comparison against random. They are
+  unconfounded-only.</p>
+  <p><b>"The myopic oracle never clamps."</b> An artefact: the baseline's action list was
+  hardcoded to vary-only, so it could not have clamped. The real claim is weaker and more
+  interesting &mdash; myopic expected information gain is <i>indifferent</i> between the two
+  modes, so the tie-break decides, measured at 0.526.</p>
+  <p><b>The GATE&nbsp;3 headroom of +0.393</b>, measured against a random baseline whose two
+  agents shared an RNG stream and therefore collided on 78% of rounds against an expected
+  19%. Superseded twice: to +0.184 once the baseline was desynchronised, and now to
+  <b>+0.237</b> on the corrected criterion with four times the sample.</p>
+</div>
+
+<p>That is four measurement bugs in two days, and three of them are the same confusion
+appearing in three different places &mdash; in the reward, in the reported metric, and in
+the identification criterion. The pattern is worth naming because it generalises past this
+project.</p>
+
+<div class="note">
+  <span class="tag">The guard that now exists</span>
+  <p><b>A metric can be perfectly well-formed and still be structurally unearnable, and the
+  two look identical in a results table.</b> The whole suite passed, green, while the
+  reported two-agent metric could not be earned at all on confounded episodes &mdash; because
+  every test asked whether the metric computed the right number, and none asked whether that
+  number was reachable in the first place.</p>
+  <p>Every metric now carries an explicit reachability case, per regime it claims to cover:
+  a test that constructs the best achievable belief in that regime and asserts the metric
+  can be earned. <code>tests/ma/test_metric_reachability.py</code>.</p>
+</div>
+
+<p>The same discipline was applied backwards, and it paid. GATE&nbsp;3 had been recorded at
+01:12 this morning, before the fix, and it is the one gate that scores confounded episodes
+<i>exclusively</i> &mdash; exactly the regime the broken criterion could not credit. Rather
+than reason about which way the error ran, it was re-measured from scratch, on 2000 attempted
+episodes instead of 400.</p>
+
+<p>It passes, and the margin got <b>wider</b>: headroom +0.237 on 169 confounded episodes,
+against +0.184 on 38 before. That is the opposite of what I expected. The old criterion
+demanded the exact true DAG <i>together with</i> the exact confounding set, which is strictly
+harder than the criterion we actually specified, and it was penalising the arm that
+<i>can</i> clamp more than the arm that cannot. Reasoning would have got the sign wrong;
+measuring did not.</p>
+
+
+<h2>Two agents: provisional</h2>
+<p class="sub">{{MA_STATUS}} &mdash; three seeds per arm, 2000 training episodes, budget 8</p>
+
+<p>These are the first two-agent numbers whose value on a confounded episode is not
+structurally zero. Treat them as a sanity check on the corrected pipeline rather than a
+result: three seeds per arm is enough to see whether learning happens, and not enough to
+size the effect. Twenty seeds per arm are queued.</p>
+
+<p>The comparison being re-run is the <b>regime bit</b> &mdash; whether telling an agent
+which data-collection regime each sample came from is what makes coordination learnable.
+Today's runs sharpened that question rather than answering it. Disclosure turns out to move
+the <i>belief</i>, not just the policy: the no-bit arm's own random floor sits near 0.03,
+against 0.19 for the with-bit arm, on the same policy class and the same budget. So most of
+the bit's effect happens upstream of any learning, by making the confounding claim
+identifiable at all.</p>
+
+<p>Two consequences. First, cross-arm comparisons of the learned rate are meaningless, and
+each arm is scored against <b>its own</b> random floor throughout. Second, the with-bit /
+no-bit contrast is not the clean test of learnability it was being read as, because it
+confounds a belief effect with a learning effect &mdash; which is what the zero-cost control
+is for.</p>
+
+<p>{{MA_VERDICT}}</p>
+
+<figure>
+  <figcaption><b>Training curves under the corrected criterion.</b> Fraction of episodes
+  solved during training, smoothed. Note the starting point: the arms differ at update 0,
+  before any learning &mdash; disclosure sharpens the posterior directly, independently of
+  the policy.</figcaption>
+  {{MA_CURVES}}
+</figure>
+
+<figure>
+  <figcaption><b>Final evaluation.</b> 150 episodes per seed with bootstrap intervals. Each
+  learned policy sits above the two random references from the same arm: one allowed to
+  clamp, one never allowed to. The annotation gives mean steps taken and what fraction of
+  moves were clamps &mdash; a policy that collapsed into passing shows up as steps near
+  zero.</figcaption>
+  {{MA_BARS}}
+</figure>
+
+<div class="note">
+  <span class="tag">One parameter is doing more work than it should</span>
+  <p>The per-step cost is set to 0.05 and has never been swept. At roughly 7.7 steps per
+  episode that is a charge of about <span class="mono">0.39</span> against a success reward
+  of 1 &mdash; so on every run we have measured, a policy performing at random's level has
+  <i>negative</i> expected value against <span class="mono">0.000</span> for doing nothing.
+  <b>Passing is optimal</b>, and an arm that collapses into passing is behaving correctly
+  rather than failing to learn.</p>
+  <p>The control confirms it. Holding everything else fixed and setting the cost to zero,
+  the no-bit arm stops collapsing outright: final policy entropy 1.97 against 0.02, and 8.1
+  steps taken per episode against 0.0. That is a within-criterion behavioural comparison, so
+  it stands on its own; the success rates from that control were measured under the previous
+  criterion and are <i>not</i> comparable to the table above, which is why it is being
+  re-run. What it establishes is that the no-bit collapse is a property of the reward design,
+  not evidence that coordination is unlearnable without disclosure.</p>
+  <p>This is the clearest case of a wider problem: several parameters are asserted rather
+  than measured, and that audit is scheduled below.</p>
+</div>
+
+
+<h2>The remaining nineteen days</h2>
+<p class="sub">Dissertation due 8 September; experiments close 27 August</p>
+
+<table class="dates">
+  <tr><td>to 22 Aug</td><td><b>Re-establish the two-agent result properly.</b> Corrected runs
+  at twenty seeds per arm, both with and without the regime bit, plus the zero-cost control.
+  Resolve GATE&nbsp;2 or formally retire the oracle as the two-agent reference.</td></tr>
+  <tr><td>to 25 Aug</td><td><b>Parameter audit.</b> Every value the results depend on gets
+  classified as measured, derived, or asserted, and the asserted ones get swept &mdash;
+  step cost, interventional sample count, intervention scale, edge prior, identification
+  threshold. This is what stops a viva question landing badly.</td></tr>
+  <tr><td>to 27 Aug</td><td><b>Scaling.</b> Two private variables per agent, then five shared.
+  The shared-set size is the binding axis, since the confounding enumeration grows as
+  3 to the power of the number of shared pairs.</td></tr>
+  <tr><td>27 Aug on</td><td><b>Writing only.</b> The repository is consolidated into a single
+  branch with an explicit supersession layer over the chronological logs, so retracted claims
+  cannot be resurrected by reading forwards.</td></tr>
+</table>
+
+<footer>
+  Generated from the result files in the repository; every figure traces to a JSON artefact
+  under <code>results/</code>. Numbers marked provisional are from runs still in progress at
+  the time of writing.
+</footer>
+</div>

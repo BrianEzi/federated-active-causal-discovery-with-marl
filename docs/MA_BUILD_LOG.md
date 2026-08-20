@@ -1133,3 +1133,85 @@ claims to recover, which argues for H \ P plus a correct confounding claim -- ex
 criterion adopted for `true_mass`. That would make the reward and the report agree AND make
 confounded episodes scorable. It is the third time this distinction has caused a bug, so it
 belongs in the code's structure rather than in a comment.
+
+---
+
+## 2026-08-20 (afternoon) -- the first two-agent numbers that can score confounding
+
+Everything below is measured under the criterion corrected at 12:11/12:35/12:41 today. It
+is the first evidence about the two-agent case that is not conditioned on unconfounded
+episodes.
+
+[MEASURED] **With the regime bit, learning beats random, and the intervals separate.**
+Seed 0, 2000 training episodes, budget 8, 150 evaluation episodes:
+
+    learned         0.467   CI 0.387-0.547    3.85 steps   clamp 0.776
+    random_clamp    0.200   CI 0.140-0.260    7.23 steps   clamp 0.500
+    random_vary     0.073   CI 0.033-0.113    7.61 steps   clamp 0.000
+    greedy          0.173   CI 0.113-0.233    7.27 steps   clamp 0.516
+
+Three separate things fall out of that one table.
+
+1. The learned policy is strictly better than its own random floor -- non-overlapping
+   intervals, not a point-estimate gap -- and it gets there in HALF the steps (3.85 vs
+   7.23). It is not buying success by spending more budget.
+2. **GATE 2's failure reproduces here independently.** Greedy 0.173 sits BELOW random 0.200.
+   That is a second measurement, on a different harness, of the thing the gate found: at two
+   agents the myopic oracle is not a good reference. It is now hard to read this as a
+   sampling accident.
+3. **GATE 3's effect reproduces here too, for free.** random_clamp 0.200 against
+   random_vary 0.073 is the same clamp-vs-never-clamp contrast the gate isolates, measured
+   inside the training evaluation with no extra runs. Being ALLOWED to clamp is worth more
+   than doubling, before any learning happens.
+
+[MEASURED] **The no-bit arm still collapses, and that is still correct behaviour.** Entropy
+0.025-0.036 by update 80, solve rate 0.000. The metric fix does not rescue it, which
+matters: the collapse was never a measurement artefact. It is the step cost. At 0.05 per
+step and ~7.7 steps, acting has negative expected value against 0.000 for passing, so
+passing is optimal and the policy finds it. The `ma_cost0` control on Myriad is what
+separates "disclosure makes it learnable" from "the reward design made acting irrational".
+
+[MEASURED] **Disclosure changes the BELIEF, not only the policy.** The no-bit arm's own
+random floor is 0.027-0.047, against 0.200 for the with-bit arm's random floor. Same policy
+class, same budget, ~5x difference. So the regime bit is doing most of its work upstream of
+learning, by sharpening the posterior. Two consequences: (a) cross-arm comparisons of the
+learned rate are meaningless, each arm must be scored against ITS OWN random floor, which is
+what the report now does; (b) the with-bit/no-bit contrast is not a clean test of "does the
+bit make coordination learnable" -- it confounds a belief effect with a learning effect.
+
+[CORRECTED] **GATE 3's recorded numbers predate the fix and are not being carried forward.**
+`results/ma2/gates_withbit_v7.json` was written at 01:12 today; the criterion was corrected
+at 12:11. The gate scores CONFOUNDED EPISODES ONLY -- precisely the regime the old criterion
+could not credit. Re-running from scratch (`scripts/ma_gate3_recheck.py`, 2000 attempted
+episodes so the confounded subsample is large).
+
+[MEASURED] **GATE 3 PASSES under the corrected criterion, with MORE headroom than before.**
+
+    never-clamp    0.012   CI 0.000-0.030    n=169
+    mixed-clamp    0.249   CI 0.183-0.314    n=169
+    headroom      +0.237   (was +0.184 at n=38 under the old criterion)
+
+Intervals do not overlap, on 4.4x the confounded sample. The design's central premise --
+coordination is both necessary and available -- is re-established rather than inherited. The
+direction is worth noting: correcting the metric made the headroom BIGGER, not smaller. The
+old criterion demanded the exact true DAG together with the exact confounding set, which is
+strictly harder than [U14] and was suppressing the arm that CAN clamp more than the arm that
+cannot. I had assumed the error ran the other way, which is precisely why it had to be
+measured instead of reasoned about.
+
+[MEASURED, and it belongs in the thesis as a caveat] **Single-agent GATE 1 does not pass at
+d=5 or d=7.** Across all 42 runs in `results/gnn_budget_exact/`:
+
+    d=5  n_obs=1000    rate 0.0400   target 0.0893    passed 0/12
+    d=5  n_obs=100     rate 0.0000   target 0.0893    passed 0/12
+    d=7  n_obs=1000    rate 0.0167   target 0.0779    passed 0/9
+    d=7  n_obs=100     rate 0.0000   target 0.0779    passed 0/9
+
+Every failure is on the BELOW-target side, and the gate is two-sided for a reason. Above
+target would be a leak -- the task solvable without intervening -- and would invalidate the
+comparison. Below target means the posterior cannot reach the 0.7 identification threshold
+even on graphs that are uniquely identifiable: the task is HARDER than intended, not easier.
+The policy comparison stands, since all arms face the same environment. What does not stand
+is any claim about absolute identification rates. The fix is either more data or a threshold
+derived per setting instead of inherited from the d=3/d=4 case -- goes in the parameter
+audit.
