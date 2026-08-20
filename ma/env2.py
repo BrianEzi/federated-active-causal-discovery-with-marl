@@ -14,8 +14,24 @@ measurement rather than to preference:
                 system, so it fails in fewer ways and a bug in it is attributable. It also
                 needs no disclosure protocol, so it can run before the supervisor rules on
                 whether the bit is admissible at all.
-  budget        5 per agent, not 8. Above ~8 the budget stops binding and every arm
-                converges, so the comparison measures nothing (results/budget/).
+  budget        The DEFAULT here is 5, but training runs pass 8 explicitly and that is
+                what every reported result uses. The two gates want opposite budgets:
+                discrimination peaks at 2-3 and is gone by 16, while coordination registers
+                nothing below 5, because an agent must spend moves clamping for its partner
+                AND moves experimenting on itself. Training follows coordination.
+
+KNOWN FLAW, NOT YET FIXED -- THE REWARD IS NOT THE REPORTED METRIC.
+
+`_result` pays +1 when `both_identified`, which requires each agent's posterior to put
+>= `identify_threshold` on its EXACT true DAG with the correct confounded pairs named.
+`ma/evaluate2.py` reports `success` under the [U14] criterion, which credits any graph that
+matches the truth on private-incident edges and is MARKOV EQUIVALENT to it. The second is
+roughly twice as forgiving -- measured with a random policy: reward 0.250 vs reported 0.500
+with the regime bit, 0.133 vs 0.467 without.
+
+So every reported number is on a metric the agent was never trained for. [U14] is the
+criterion that was specified, so it is the REWARD that is wrong, not the report. Fixing it
+means changing the reward and re-running, which has not been done.
 
 Everything else follows `docs/MA_PROBLEM_STATEMENT.md`: one shared SCM, vertical partition
 with overlap, cross-private edges forbidden, hard interventions in two value modes,
