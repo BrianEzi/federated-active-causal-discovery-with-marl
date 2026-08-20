@@ -177,6 +177,22 @@ Instead you can recurse over **subsets of nodes**. Two families:
   was losing 0.1116 nats against an exact reference, where this one loses 0.0018 -- 62x --
   and its partition function agrees with our independently derived DP to 1e-13.
 
+- **Chevalley, Mehrjou & Schwab, "Theoretical Guarantees for Causal Discovery on Large
+  Random Graphs", arXiv:2511.02536.** VERIFIED against source 2026-08-20 (title, authors and
+  the scaling assumption confirmed by fetching the abstract).
+  *Why it matters, and it is a live problem for us*: the paper's sparse regime assumes edge
+  probability **`p_e = Theta(1/d)`**. Our `prior_p` is a FIXED 0.5, which at d=4-5 happens to
+  land at expected degree 1.5-2.0 -- inside the sparse regime by accident -- and does not
+  scale. At d=30 a fixed 0.5 gives ~218 edges and expected degree 14.5, against the
+  literature's ER-2 / ER-4 benchmarks (60-120 edges at d=30). So `prior_p` must become a
+  FUNCTION of d, roughly `2/(d-1)`, before any scaling claim is meaningful. Note the paper
+  argues via concentration inequalities, not percolation.
+  *The percolation connection is ours, and it is a framing rather than a citation*: in
+  G(d, p) the giant component appears at `p_c = 1/d`, so `p_e = Theta(1/d)` IS the
+  percolation-critical scaling. Our fixed 0.5 sits 15x above threshold at d=30 -- deep in the
+  dense phase, where the graph is one connected blob and structure recovery is neither
+  realistic nor informative.
+
 - **Robinson's recurrence** for counting labelled DAGs — the sink/inclusion–exclusion
   identity our implementation uses. Search "Robinson counting labelled acyclic digraphs".
 - **Björklund, Husfeldt, Kaski & Koivisto (2007), "Fourier meets Möbius: fast subset

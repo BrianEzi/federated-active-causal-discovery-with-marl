@@ -99,12 +99,29 @@ def sample(
 
     The intervention assigns a *random* value per sample, `X_i ~ N(0, intervene_scale)`,
     rather than one fixed constant. It is still a hard intervention -- the structural
-    equation is replaced and the parents are disconnected -- but the assigned value
-    varies. This matters for identifiability from finite data: a constant value has zero
-    variance, so the intervened column is collinear with the intercept and the
-    descendants' dependence on it cannot be estimated from those samples. A varying value
-    both shifts and *moves* the descendants, which is what actually separates orientations.
-    `intervene_scale` is set above the noise range so the signal stands out.
+    equation is replaced and the parents are disconnected -- but the assigned value varies.
+
+    [CORRECTED 2026-08-20] An earlier version of this docstring claimed a constant value is
+    "collinear with the intercept" so that "the descendants' dependence on it cannot be
+    estimated from those samples". THAT IS TOO STRONG, and measuring it says so: a constant
+    intervention recovers 93-98% of the information a varying one does (d=4 and d=5, 40 and
+    25 random graphs, posterior entropy over the DAG space).
+
+    The reason the strong claim fails is POOLING. Collinearity would bite only if the
+    interventional batch were scored on its own. It is not -- it is pooled with the
+    observational rows, and the clamped rows sit at a different location in
+    (X_i, descendant) space from the observational cloud, so the slope is identified by the
+    contrast BETWEEN regimes even though X_i has zero variance WITHIN the clamped batch.
+    Consistent with that, clamping at 2, 4 or 16 distinct levels does not close the small
+    remaining gap -- so it is not a degrees-of-freedom effect either.
+
+    Varying is still the right default, for two reasons that survive: the residual few
+    percent, and the fact that `intervene_scale` above the noise range makes the signal
+    stand out. But the two modes are NOT far apart for learning your own structure. Where
+    they genuinely diverge is de-confounding for a PARTNER -- see `ma/env2.py`: a randomly
+    varying hidden node is still a variance source, so rescue rate is 0.000 at scale 2.0 and
+    1.0 and rises only as the scale goes to zero, i.e. as the intervention becomes a
+    constant. Clamping is essential there and varying is useless.
     """
     d = params.d
     samples = np.zeros((n, d))

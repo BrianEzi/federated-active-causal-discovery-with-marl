@@ -2523,3 +2523,46 @@ identical agreement (0.883) and 0.0021 vs 0.0018 nats. The draw count can be HAL
 Not applied to the queued Myriad jobs (176027/176028), which are already running at 4000;
 resubmitting a third time to save time on a job that is already affordable is not worth the
 churn. Worth taking for any future run.
+
+## 2026-08-20 -- clamp vs vary, measured because the supervisor asked precisely
+
+[CORRECTED] **Our own claim that a constant hard intervention "cannot" identify descendant
+dependence was too strong.** `sa/scm.py` asserted that a constant value is collinear with
+the intercept, so the descendants' dependence on the intervened node cannot be estimated.
+Measured, same graph and budget, only the assigned value distribution differing, posterior
+entropy over the enumerated DAG space:
+
+    d=4, 300 obs + 300 interventional, 40 random graphs
+      observational only    2.266 nats
+      vary                  0.744      info gained 1.522    100%
+      clamp, 1 level        0.845      info gained 1.421     93.3%
+      clamp, 2 levels       0.791                            96.9%
+      clamp, 4 levels       0.856                            92.6%
+      clamp, 16 levels      0.791                            96.9%
+
+    d=5, 200 obs + 200 interventional, 25 random graphs
+      observational only    3.424 nats
+      vary                  1.732      info gained 1.692    100%
+      clamp, 1 level        1.772                            97.6%
+      clamp, 16 levels      1.629                           106.1%
+
+**Clamping recovers 93-98% of what varying does.** Not "cannot estimate" -- a few percent,
+and at d=5 the 16-level arm is nominally ABOVE vary, which is noise at 25 graphs.
+
+[MEASURED] **The mechanism is POOLING, not collinearity, and not degrees of freedom.**
+Collinearity would bite only if the interventional batch were scored alone. It is not: it is
+pooled with the observational rows, and the clamped rows sit at a different location in
+(X_i, descendant) space from the observational cloud, so the slope is identified by the
+contrast BETWEEN regimes even though X_i has zero variance WITHIN the clamped batch.
+
+The degrees-of-freedom hypothesis -- one constant gives one mean shift per descendant, L
+levels give L-1 contrasts -- predicts monotone improvement with levels. It does not happen
+(93.3 / 96.9 / 92.6 / 96.9 at d=4). Hypothesis rejected.
+
+[DECIDED] Vary stays the default: the residual few percent is real, and `intervene_scale`
+above the noise range keeps the signal clear. But the honest statement is that the two modes
+are CLOSE for learning your own structure. Where they genuinely diverge is de-confounding
+for a partner, and there the direction REVERSES -- a randomly varying hidden node is still a
+variance source, so rescue is 0.000 at scale 2.0 and 1.0 and rises only as the scale goes to
+zero, i.e. as the intervention becomes constant. That asymmetry is the real reason the design
+carries both modes, and it is a cleaner justification than the one we had.
