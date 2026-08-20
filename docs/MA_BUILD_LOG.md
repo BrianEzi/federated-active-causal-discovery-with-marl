@@ -1370,3 +1370,71 @@ logger whose output depends on when it happened to be running.
 
 TODO: the old `ma-two-agent` project should be renamed or annotated as retracted in the W&B
 UI. Cannot be done from here.
+
+## 2026-08-20 -- turn-taking implemented, and two measurement bugs it exposed
+
+[DECIDED] **Turn-taking added as `turn_order`: `simultaneous` (default) / `round_robin` /
+`random`.** The default stays simultaneous so every pre-2026-08-20 command reproduces its
+old number; turn-taking is opted into and is recorded in the run report, so the two
+protocols cannot be compared by accident.
+
+[DECIDED] **Budget stays PER AGENT under turn-taking.** A shared pool would halve each
+agent's interventions and with them the number of clean rounds, confounding the protocol
+change with a data-quantity change. Episodes now run up to `2 * budget` rounds. Clean rows
+are preserved in COUNT; they are a smaller FRACTION of a doubled dataset, which does not
+matter because the regime rules score the regimes separately.
+
+[CORRECTED] **My claim that turn-taking would halve clean rows was wrong** -- it assumed a
+shared budget pool. With per-agent budgets, B clamps exactly as often as before.
+
+[CORRECTED] **The claim that turn-taking drains the clean regime of value was also wrong.**
+The two regimes share one structure under `joint_conf` and differ only in parameters.
+Orientation comes from the dirty regime, which is where the interventions now live;
+disambiguating a real edge from a confounding artefact is the clean regime's job and needs
+no interventions, because the confounded correlation simply disappears when the pathway is
+switched off. Nothing is lost structurally.
+
+[CORRECTED] **"Per-block confounding inference" is not new machinery.** Giving each clamp
+block its own active subset `S_r` and marginalising it costs `R * 2^|S|`, not
+`2^(R*|S|)` -- the per-block log-scores ADD because the parameters are independent. It is
+the existing `joint_conf` marginalisation applied per block. Not built (not needed at one
+private node per agent), but it is not a blocker.
+
+[MEASURED, structural] **The clean rule was `all(hidden clamped)`, which is UNREACHABLE at
+more than one private node per agent.** An agent gets one action per round and has no
+authority over its partner's private nodes, so "every hidden node clamped at once" can
+never fire. Under `T1` (two private each, still in the repo) `clean` would be permanently
+False, every regime rule would silently reduce to `pooled`, and any confounding result on
+top would be void -- the same shape as the unearnable metric of 2026-08-19. Changed to
+`any(...)`, which is identical at one hidden node.
+
+Because a partially-clean block still carries live confounding while the scorer treats a
+clean block as confounding-free, `TwoAgentEnv2` now REFUSES a multi-private topology with a
+`NotImplementedError` naming the reason, rather than scoring wrong data quietly. Reachability
+is asserted per protocol in `tests/test_env2_turns.py::test_clean_rounds_are_reachable`.
+
+[CORRECTED] **Round-robin ends episodes early in the obvious implementation.** If the
+rotation hands the turn to an agent with no budget left, its only legal move is a pass,
+which reads as a VOLUNTARY pass and terminates the episode while the partner still has moves
+to spend. Fixed by rotating only among agents with budget remaining.
+
+[CORRECTED] **`clamp_fraction` counted moves that never happened.** `run_arm` tallied the
+SUBMITTED actions before `env.step`, but under turn-taking the inactive agent's action is
+discarded by the protocol -- so `moves` was inflated ~2x and the discarded agent's mode was
+counted. Now tallied after the step from `env.last_chosen`, which is what was actually
+applied.
+
+[CORRECTED] **`mean_steps` means two different things under the two protocols.**
+`max(n_interventions)` tracks episode length under simultaneous play, but under turn-taking
+an agent acts every other round, so it is ~half the episode length. Measured on a smoke run
+(budget 4, round-robin): random_clamp `steps 3.70` against `rounds 7.30`. Both are now
+reported and the units are documented; neither may be quoted as the other across protocols.
+
+[DECIDED] **Clamp-only is an ARM (`--clamp_only`), not a deletion.** The dominance argument
+is unproven under turn-taking, and the decisive evidence is behavioural: a policy given both
+modes that converges on clamp anyway. `random_vary` has no legal action in this arm and is
+dropped from the baseline set rather than reported as an empty comparison.
+
+[NOT MEASURED] The smoke runs above used 40-60 training episodes and 20 evaluation episodes.
+They establish that the code path runs end to end and that the units are right. **No
+performance claim of any kind can be read out of them.**

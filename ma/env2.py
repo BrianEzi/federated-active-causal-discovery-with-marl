@@ -54,6 +54,15 @@ CLAMP = "clamp"
 MODES = (VARY, CLAMP)
 AGENTS = ("A", "B")
 
+# Turn protocols. SIMULTANEOUS is the original and every result before 2026-08-20 was
+# measured under it; it is kept so those numbers stay reproducible, not because it is
+# preferred. Under the two turn-taking protocols exactly one agent may act per round and
+# the other is forced to pass.
+SIMULTANEOUS = "simultaneous"
+ROUND_ROBIN = "round_robin"
+RANDOM_TURN = "random"
+TURN_ORDERS = (SIMULTANEOUS, ROUND_ROBIN, RANDOM_TURN)
+
 
 @dataclass
 class MA2Config:
@@ -61,6 +70,19 @@ class MA2Config:
     n_obs: int = 1000
     n_int: int = 100
     budget: int = 5                    # PER AGENT -- separate budgets, not a shared pool
+    # One agent acts per round, or both. Budget stays PER AGENT under turn-taking, which
+    # is deliberate: a shared pool would halve each agent's interventions and with them the
+    # number of clean rounds, confounding the protocol change with a data-quantity change.
+    # An episode therefore runs up to 2*budget rounds instead of budget rounds, and the
+    # total row count doubles. That dilutes the clean FRACTION but not the clean COUNT,
+    # and the regime rules score the two regimes separately, so only the count matters.
+    turn_order: str = SIMULTANEOUS
+    # Which intervention modes an agent may choose. `(CLAMP,)` is the clamp-only arm: it
+    # halves the action space without removing the coordination problem, which becomes one
+    # of targeting and timing rather than of mode. Kept as an ARM, not a deletion -- whether
+    # clamp really dominates vary under turn-taking is the open question, and a policy
+    # given both that converges on clamp anyway is the evidence for it.
+    action_modes: Tuple[str, ...] = MODES
     identify_threshold: float = 0.7
     prior_p: float = 0.5
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
@@ -105,8 +127,10 @@ class MA2StepResult:
 class AgentWindow:
     """One agent's view: its columns, its authority, and its DP belief."""
 
-    def __init__(self, name: str, topology: Topology):
+    def __init__(self, name: str, topology: Topology,
+                 modes: Sequence[str] = MODES):
         self.name = name
+        self.modes: Tuple[str, ...] = tuple(modes)
         self.nodes: List[int] = list(topology.observed_by(name))
         self.authority: List[int] = list(topology.may_intervene_on(name))
         self.shared: List[int] = list(topology.exposed)
@@ -114,7 +138,7 @@ class AgentWindow:
         self.k = len(self.nodes)
         self.pos = {node: i for i, node in enumerate(self.nodes)}
         self.actions: List[Tuple[int, Optional[str]]] = (
-            [(node, mode) for node in self.authority for mode in MODES]
+            [(node, mode) for node in self.authority for mode in self.modes]
             + [(PASS_ACTION, None)])
         self.n_actions = len(self.actions)
         self.pass_index = self.n_actions - 1
@@ -134,10 +158,29 @@ class TwoAgentEnv2:
     """One SCM, two agents, simultaneous hard interventions."""
 
     def __init__(self, config: MA2Config, seed: int = 0):
+        if config.turn_order not in TURN_ORDERS:
+            raise ValueError(f"turn_order must be one of {TURN_ORDERS}")
+        if not config.action_modes or any(m not in MODES for m in config.action_modes):
+            raise ValueError(f"action_modes must be a non-empty subset of {MODES}")
+        # A block marked clean is scored against the BARE DAG -- no confounding at all. With
+        # a single hidden node that is exact. With several, one clamp silences only the
+        # pathways through the node it clamped and the block is PARTIALLY clean, so scoring
+        # it as fully clean is simply wrong. The fix is known and cheap -- give each clamp
+        # block its own active confounding subset S_r and marginalise it, which costs
+        # R * 2^|S| because the per-block log-scores ADD -- but it is not built, and the
+        # ladder does not need it until an agent has two private nodes. Fail loudly rather
+        # than score silently wrong data.
+        widest = max(len(config.topology.hidden_from(name)) for name in AGENTS)
+        if widest > 1:
+            raise NotImplementedError(
+                f"topology {config.topology.name!r} hides {widest} nodes from an agent; the "
+                "regime rules assume a clean block has NO confounding, which holds only for "
+                "one hidden node. Per-block confounding subsets are needed first.")
         self.config = config
         self.topology = config.topology
         self.windows: Dict[str, AgentWindow] = {
-            name: AgentWindow(name, config.topology) for name in AGENTS}
+            name: AgentWindow(name, config.topology, config.action_modes)
+            for name in AGENTS}
         self._rng = np.random.default_rng(seed)
         self.reset(seed)
 
@@ -167,8 +210,35 @@ class TwoAgentEnv2:
             self.regime_bit[name] = 0.0
 
         self._credit_cache: Dict[str, np.ndarray] = {}
+        self.round = 0
+        self.active: Optional[str] = None
+        self.last_chosen: Dict[str, Tuple[int, Optional[str]]] = {
+            n: (PASS_ACTION, None) for n in AGENTS}
         self._refresh()
         return self._result(reward=0.0)
+
+    # -- turn taking --------------------------------------------------------------------
+
+    def active_agent(self) -> Optional[str]:
+        """Whose turn it is, or None when both act. Round-robin alternates from A; random
+        draws from the environment's own stream, so the choice is part of the episode seed
+        and an evaluation is reproducible without the policy having to record it."""
+        order = self.config.turn_order
+        if order == SIMULTANEOUS:
+            return None
+        # Only agents with budget left are eligible. Without this, round-robin hands the
+        # turn to an exhausted agent, whose only legal move is a pass -- which reads as a
+        # voluntary pass and ends the episode while the partner still has moves to spend.
+        eligible = [n for n in AGENTS
+                    if self.n_interventions[n] < self.config.budget]
+        if not eligible:
+            return None
+        if order == ROUND_ROBIN:
+            for offset in range(len(AGENTS)):
+                candidate = AGENTS[(self.round + offset) % len(AGENTS)]
+                if candidate in eligible:
+                    return candidate
+        return str(self._rng.choice(eligible))
 
     def step(self, action_a: int, action_b: int) -> MA2StepResult:
         cfg = self.config
@@ -177,7 +247,25 @@ class TwoAgentEnv2:
             if not 0 <= index < self.windows[name].n_actions:
                 raise ValueError(f"action {index} out of range for {name}")
 
+        # Under turn-taking the inactive agent is FORCED to pass. Its submitted action is
+        # discarded rather than rejected: the policy is queried for both agents every round
+        # and the environment, not the policy, owns the protocol.
+        self.active = self.active_agent()
+        if cfg.turn_order != SIMULTANEOUS:
+            for name in AGENTS:
+                if name != self.active:            # active None => everyone passes
+                    actions[name] = self.windows[name].pass_index
+        self.round += 1
+
+        # A voluntary pass by the only agent able to act ends the episode, exactly as a
+        # mutual pass does under simultaneous play -- it is the same signal, "no one wants
+        # another move", read through whoever had the move.
         passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
+        # What was ACTUALLY applied, after the protocol has had its say. Consumers must
+        # tally from this rather than from the submitted actions: under turn-taking the
+        # inactive agent still submits a move and it is discarded, so counting submissions
+        # double-counts the moves and corrupts any per-move statistic.
+        self.last_chosen = {n: self.windows[n].actions[actions[n]] for n in AGENTS}
         if passed:
             return self._result(reward=0.0, passed=True)
 
@@ -216,7 +304,13 @@ class TwoAgentEnv2:
             # clamped -- only then is its window really a DAG rather than a latent
             # projection.
             hidden = self.topology.hidden_from(name)
-            hidden_clamped = bool(hidden) and all(
+            # ANY, not ALL. With one hidden node the two are identical, which is every
+            # result to date. They diverge as soon as an agent has more than one private
+            # node, and there ALL is unreachable: an agent gets one action per round and
+            # has no authority over the other's private nodes, so "all hidden clamped" can
+            # never fire -- the regime machinery would be silently dead. See the guard in
+            # __init__ and tests/test_env2_turns.py::test_clean_rounds_are_reachable.
+            hidden_clamped = bool(hidden) and any(
                 targets.get(node, None) == 0.0 for node in hidden)
             self.clean[name] = np.concatenate(
                 [self.clean[name], np.full(cfg.n_int, hidden_clamped, dtype=bool)])
@@ -373,6 +467,10 @@ class TwoAgentEnv2:
             reward=reward,
             n_interventions=dict(self.n_interventions),
             info={"true_mass": mass, "both_identified": both, "passed": passed,
+                  # ROUNDS, not per-agent interventions. Under turn-taking an agent acts
+                  # every other round, so `n_interventions` is roughly half the episode
+                  # length -- reporting one as the other understates duration by 2x.
+                  "rounds": self.round, "active": self.active,
                   "budget_left": {n: self.config.budget - self.n_interventions[n]
                                   for n in AGENTS}},
         )

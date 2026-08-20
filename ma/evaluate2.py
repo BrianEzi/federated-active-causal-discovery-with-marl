@@ -208,16 +208,19 @@ def run_arm(env: TwoAgentEnv2, policies: Dict[str, object], episodes: int,
         result = env.reset(seed=seed * 100_000 + episode)
         while not result.done:
             actions = {n: policies[n](env, result) for n in AGENTS}
-            for name, index in actions.items():
-                node, mode = env.windows[name].actions[index]
+            result = env.step(actions["A"], actions["B"])
+            # Tallied AFTER the step, from what the environment actually applied. Counting
+            # the submitted actions instead double-counts under turn-taking, where the
+            # inactive agent's move is discarded by the protocol.
+            for node, mode in env.last_chosen.values():
                 if node == -1:
                     continue
                 moves += 1
                 clamps += (mode == "clamp")
-            result = env.step(actions["A"], actions["B"])
         row = evaluate_episode(env)
         row["threshold_identified"] = result.info["both_identified"]
         row["steps"] = max(result.n_interventions.values())
+        row["rounds"] = result.info["rounds"]
         rows.append(row)
 
     def rate(key) -> float:
@@ -235,7 +238,11 @@ def run_arm(env: TwoAgentEnv2, policies: Dict[str, object], episodes: int,
             [r["private_and_shared_ok"]["A"] for r in rows])),
         "private_and_shared_B": float(np.mean(
             [r["private_and_shared_ok"]["B"] for r in rows])),
+        # `mean_steps` is per-agent INTERVENTIONS and `mean_rounds` is episode LENGTH.
+        # They coincide under simultaneous play and differ by ~2x under turn-taking, so
+        # both are reported and neither may be quoted as the other across protocols.
         "mean_steps": float(np.mean([r["steps"] for r in rows])),
+        "mean_rounds": float(np.mean([r["rounds"] for r in rows])),
         "clamp_fraction": float(clamps / moves) if moves else float("nan"),
     }
 

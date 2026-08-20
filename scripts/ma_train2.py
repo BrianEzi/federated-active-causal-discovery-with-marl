@@ -17,7 +17,8 @@ import time
 import numpy as np
 
 from ma.baselines2 import make_baselines
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
+from ma.env2 import (AGENTS, CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
+                     MA2Config, TwoAgentEnv2)
 from ma.evaluate2 import run_arm
 from ma.policy2 import IndependentPPO2, MA2PPOConfig
 from ma.topology import Topology
@@ -41,13 +42,23 @@ def main(argv=None) -> dict:
     # -0.255 against 0.000 for passing, so PASSING IS OPTIMAL and a collapse is correct
     # behaviour rather than a training failure.
     ap.add_argument("--step_cost", type=float, default=0.05)
+    # Protocol. The default stays `simultaneous` so that re-running an old command
+    # reproduces the old number; turn-taking is opted into explicitly, and the choice is
+    # recorded in the report so no two numbers can be compared across protocols by accident.
+    ap.add_argument("--turn_order", default=SIMULTANEOUS, choices=list(TURN_ORDERS))
+    # Clamp-only is an ARM. Budget stays PER AGENT under turn-taking, so the number of
+    # rounds in which a partner is de-confounded is unchanged by the protocol switch.
+    ap.add_argument("--clamp_only", action="store_true",
+                    help="restrict the action space to clamps; the vary mode is removed")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    modes = (CLAMP,) if args.clamp_only else MODES
     config = MA2Config(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
-                       score_rule=args.rule, step_cost=args.step_cost)
+                       score_rule=args.rule, step_cost=args.step_cost,
+                       turn_order=args.turn_order, action_modes=modes)
     env = TwoAgentEnv2(config)
     started = time.time()
 
@@ -68,6 +79,8 @@ def main(argv=None) -> dict:
         "arm": args.arm, "seed": args.seed,
         "config": {"n_obs": args.n_obs, "n_int": args.n_int, "budget": args.budget,
                    "rule": args.rule, "disclose_regime": args.disclose_regime,
+                   "turn_order": args.turn_order,
+                   "action_modes": list(modes),
                    "train_episodes": args.train_episodes,
                    "potential_shaping": args.potential_shaping,
                    "step_cost": args.step_cost},
@@ -83,7 +96,12 @@ def main(argv=None) -> dict:
 
     arms = {"learned": ppo.policies(deterministic=False)}
     reference = {name: make_baselines(env, name, seed=args.seed) for name in AGENTS}
-    for label in ("random_clamp", "random_vary", "greedy", "pass"):
+    # `random_vary` has no legal actions in the clamp-only arm, so it is dropped rather
+    # than reported as an empty comparison. Its absence is visible in the report's arm list.
+    labels = ["random_clamp", "greedy", "pass"]
+    if not args.clamp_only:
+        labels.insert(1, "random_vary")
+    for label in labels:
         arms[label] = {name: reference[name][label] for name in AGENTS}
 
     for label, policies in arms.items():
