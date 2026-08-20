@@ -1335,3 +1335,38 @@ No seed collapses (8.3 steps, entropy 1.66-2.01, against 0.00 steps and 0.02 ent
 step_cost=0.05), and no seed learns anything (ahead of its own floor on 1 of 5, by 0.013).
 Greedy tracks both at 0.013-0.087. Every arm sits in the same 0.02-0.10 band, so the ceiling
 belongs to the no-bit BELIEF and not to any policy in it.
+
+## 2026-08-20 (late afternoon) -- two gaps found by trying to LOOK at a result
+
+[CORRECTED] **Trained policies were never written to disk.** `scripts/ma_train2.py` called
+`ppo.policies()`, which returns in-memory closures, and saved only the evaluation JSON. Ten
+trained two-agent policies were evaluated, reported, and then discarded. The cost only
+became visible when asked to show what an agent had LEARNED -- which variable it targets,
+when it clamps, what graph it ends up believing -- because answering that meant retraining
+from scratch.
+
+Fixed: `IndependentPPO2.save/load`, and `ma_train2` now writes `<out>.pt` alongside the
+JSON. `load` REFUSES a checkpoint whose observation size or score rule does not match the
+environment, because cross-rule numbers are void (a joint_conf-trained policy scored under
+`subset` collapses below random) and a checkpoint that cannot say what environment it
+belongs to is one you cannot trust.
+
+[MEASURED] **Retraining seed 0 reproduces it bit-for-bit** -- identical entropy and solve
+rate at every logged update (2.194/0.188, 1.985/0.562, 1.646/0.375, 1.691/0.625, ...). The
+`torch.manual_seed` + seeded `default_rng` combination is doing its job, so a checkpoint and
+a retrain are interchangeable for this configuration.
+
+[CORRECTED] **W&B held the RETRACTED overnight results and nothing else.** Runs from
+2026-08-20 09:12 in project `ma-two-agent` are the pre-correction numbers. Synced the 18
+corrected runs to a SEPARATE project, `ma-two-agent-corrected`, rather than adding them to
+the same one -- mixing withdrawn and current numbers in a single dashboard is how a
+retracted figure gets quoted six weeks later.
+
+    https://wandb.ai/bezinwoke-university-college-london/ma-two-agent-corrected
+
+The sync is post-hoc from the committed JSONs (`scripts/ma_wandb_sync.py`), which is
+deliberate: it is reproducible by anyone against the same files, which is not true of a live
+logger whose output depends on when it happened to be running.
+
+TODO: the old `ma-two-agent` project should be renamed or annotated as retracted in the W&B
+UI. Cannot be done from here.

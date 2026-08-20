@@ -57,6 +57,12 @@ def main(argv=None) -> dict:
         mask_pass_updates=args.mask_pass_updates))
     history = ppo.train(verbose=True)
     train_seconds = time.time() - started
+    # Persist the trained pair. Ten seeds were previously evaluated and discarded because
+    # nothing wrote them out, so any question about what an agent LEARNED needed a retrain.
+    if args.out:
+        checkpoint = pathlib.Path(args.out).with_suffix(".pt")
+        ppo.save(checkpoint)
+        print(f"  saved policy pair -> {checkpoint}", flush=True)
 
     report = {
         "arm": args.arm, "seed": args.seed,

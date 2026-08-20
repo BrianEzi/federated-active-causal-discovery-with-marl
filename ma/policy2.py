@@ -26,6 +26,7 @@ weakening it -- greedy EIG becomes the myopic optimum of the agent's own reward,
 """
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -245,3 +246,56 @@ class IndependentPPO2:
 
     def policies(self, deterministic: bool = False) -> Dict[str, object]:
         return {name: self.policy(name, deterministic) for name in AGENTS}
+
+    # -- persistence --------------------------------------------------------------------
+
+    def save(self, path) -> None:
+        """Write both agents' weights, with the shapes needed to rebuild them.
+
+        Added after the fact, and the omission had a cost worth recording: ten trained
+        two-agent policies were evaluated, reported, and then discarded, because nothing
+        wrote them to disk. Reproducing any qualitative claim about what an agent LEARNED
+        -- which variable it targets, when it clamps, what graph it ends up believing --
+        meant retraining from scratch.
+
+        The observation and action sizes are stored alongside the weights because they are
+        derived from the topology, and a checkpoint that cannot say what environment it
+        belongs to is a checkpoint you cannot trust.
+        """
+        import torch as _torch
+
+        path = pathlib.Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _torch.save({
+            "nets": {name: net.state_dict() for name, net in self.nets.items()},
+            "hidden": self.config.hidden,
+            "seed": self.config.seed,
+            "obs_size": {name: self.env.obs_size(name) for name in AGENTS},
+            "n_actions": {name: self.env.n_actions(name) for name in AGENTS},
+            "topology": self.env.topology.name,
+            "score_rule": self.env.config.score_rule,
+            "disclose_regime": self.env.config.disclose_regime,
+        }, path)
+
+    @classmethod
+    def load(cls, path, env: TwoAgentEnv2, config: Optional[MA2PPOConfig] = None):
+        """Rebuild a trained pair against `env`, refusing a mismatched environment."""
+        import torch as _torch
+
+        blob = _torch.load(path, map_location=DEVICE, weights_only=False)
+        for name in AGENTS:
+            if blob["obs_size"][name] != env.obs_size(name):
+                raise ValueError(
+                    "checkpoint is for a different environment: agent %s has obs_size %d, "
+                    "this env has %d" % (name, blob["obs_size"][name], env.obs_size(name)))
+        if blob.get("score_rule") != env.config.score_rule:
+            # Cross-rule numbers are void -- a joint_conf-trained policy scored under
+            # `subset` collapses below random. Performance belongs to the (policy, rule)
+            # pair, so loading across rules is refused rather than warned about.
+            raise ValueError("checkpoint was trained under rule %r, env uses %r"
+                             % (blob.get("score_rule"), env.config.score_rule))
+        learner = cls(env, config or MA2PPOConfig(hidden=blob["hidden"],
+                                                  seed=blob["seed"]))
+        for name in AGENTS:
+            learner.nets[name].load_state_dict(blob["nets"][name])
+        return learner

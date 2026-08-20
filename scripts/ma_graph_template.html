@@ -1,0 +1,164 @@
+<title>What the Agents Recover</title>
+<style>
+:root {
+  --ground:#F6F7F5; --surface:#FFFFFF; --ink:#14181B; --muted:#5C6569; --rule:#DBDFDC;
+  --ok:#0E6B77; --wrong:#A6402F; --missing:#9AA3A6; --conf-ok:#7A5AA8;
+  --edge:#14181B; --good:#2C6B4F; --bad:#A6402F;
+  --priv-a:#CFE4E7; --priv-b:#EBDCE4; --shared:#E9ECEA;
+  --clamp:#7A5AA8; --vary:#0E6B77;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#101315; --surface:#171B1E; --ink:#E7EAE8; --muted:#98A1A5; --rule:#282D30;
+    --ok:#4FB6C4; --wrong:#E88274; --missing:#6A7376; --conf-ok:#B49AE0;
+    --edge:#E7EAE8; --good:#5CBE90; --bad:#E88274;
+    --priv-a:#1D3B40; --priv-b:#3A2836; --shared:#242A2D;
+    --clamp:#B49AE0; --vary:#4FB6C4;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#101315; --surface:#171B1E; --ink:#E7EAE8; --muted:#98A1A5; --rule:#282D30;
+  --ok:#4FB6C4; --wrong:#E88274; --missing:#6A7376; --conf-ok:#B49AE0;
+  --edge:#E7EAE8; --good:#5CBE90; --bad:#E88274;
+  --priv-a:#1D3B40; --priv-b:#3A2836; --shared:#242A2D;
+  --clamp:#B49AE0; --vary:#4FB6C4;
+}
+* { box-sizing:border-box; }
+body {
+  background:var(--ground); color:var(--ink); margin:0; padding:0 20px 6rem;
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  font-size:17px; line-height:1.6;
+}
+.wrap { max-width:62rem; margin:0 auto; }
+header { padding:4rem 0 1.5rem; max-width:44rem; }
+.eyebrow { font-family:ui-monospace,Consolas,Menlo,monospace; font-size:11px;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin:0 0 1rem; }
+h1 { font-family:system-ui,"Segoe UI",sans-serif; font-size:clamp(2.1rem,5vw,3rem);
+  font-weight:700; letter-spacing:-.028em; line-height:1.06; margin:0 0 1rem;
+  text-wrap:balance; }
+.standfirst { font-size:1.15rem; color:var(--muted); margin:0; text-wrap:pretty; }
+.rule { height:2px; background:var(--ink); opacity:.85; margin:2rem 0 2.5rem; }
+p { margin:.85rem 0; max-width:44rem; }
+h2 { font-family:system-ui,"Segoe UI",sans-serif; font-size:1.4rem; font-weight:650;
+  letter-spacing:-.018em; margin:3rem 0 .5rem; }
+
+.key { display:flex; flex-wrap:wrap; gap:1.4rem; padding:1.1rem 1.2rem; margin:1.6rem 0;
+  background:var(--surface); border:1px solid var(--rule); border-radius:10px;
+  font-family:system-ui,sans-serif; font-size:13px; color:var(--muted); }
+.key div { display:flex; align-items:center; gap:.5rem; }
+.key svg { flex:none; }
+
+.case { background:var(--surface); border:1px solid var(--rule); border-radius:12px;
+  padding:1.2rem 1.3rem 1rem; margin:1.6rem 0; }
+.chead { display:flex; align-items:baseline; justify-content:space-between; gap:1rem;
+  flex-wrap:wrap; border-bottom:1px solid var(--rule); padding-bottom:.7rem; }
+.chead h3 { font-family:system-ui,sans-serif; font-size:1.05rem; font-weight:650;
+  margin:0; }
+.tag { font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; padding:.18rem .5rem; border-radius:3px;
+  border:1px solid currentColor; margin-left:.4rem; }
+.tag.conf { color:var(--conf-ok); } .tag.unconf { color:var(--muted); }
+.tag.good { color:var(--good); } .tag.bad { color:var(--bad); }
+
+.panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
+  gap:1.1rem; margin-top:1rem; }
+figure { margin:0; }
+figcaption { font-family:system-ui,sans-serif; font-size:12px; font-weight:600;
+  letter-spacing:.02em; color:var(--ink); margin-bottom:.3rem; }
+.graph { width:100%; height:auto; display:block; }
+.nlabel { font-family:ui-monospace,Menlo,monospace; font-size:12px; fill:var(--ink);
+  text-anchor:middle; font-weight:600; }
+.nlabel.hidden { fill:var(--missing); font-weight:400; }
+.cap { font-family:system-ui,sans-serif; font-size:11.5px; color:var(--muted);
+  margin:.35rem 0 0; line-height:1.45; }
+
+.stat { display:flex; align-items:center; gap:.5rem; font-family:ui-monospace,Menlo,monospace;
+  font-size:11px; color:var(--muted); margin-top:.4rem; }
+.stat b { font-variant-numeric:tabular-nums; }
+.stat b.good { color:var(--good); } .stat b.bad { color:var(--bad); }
+.stat .bar { flex:1; height:5px; background:var(--rule); border-radius:3px;
+  overflow:hidden; position:relative; }
+.stat .bar i { display:block; height:100%; background:currentColor; opacity:.55; }
+
+.moves { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--rule);
+  overflow-x:auto; }
+.mrow { display:flex; align-items:center; gap:.3rem; margin:.25rem 0;
+  font-family:ui-monospace,Menlo,monospace; font-size:10.5px; }
+.mrow b { width:1.3rem; color:var(--muted); flex:none; }
+.mv { display:inline-flex; align-items:baseline; gap:.15rem; padding:.16rem .38rem;
+  border-radius:3px; border:1px solid var(--rule); white-space:nowrap; }
+.mv i { font-style:normal; font-size:8.5px; opacity:.75; }
+.mv.clamp { color:var(--clamp); border-color:currentColor; }
+.mv.vary  { color:var(--vary); border-color:currentColor; }
+.mv.pass  { color:var(--missing); }
+
+.note { background:var(--surface); border-left:3px solid var(--ok);
+  padding:1rem 1.2rem; margin:1.8rem 0; border-radius:0 6px 6px 0; max-width:46rem; }
+.note .tg { font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--ok); display:block; margin-bottom:.4rem; }
+.note p:first-of-type { margin-top:0; } .note p:last-child { margin-bottom:0; }
+footer { margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--rule);
+  font-family:system-ui,sans-serif; font-size:12.5px; color:var(--muted); }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">MSc thesis &middot; two-agent worked examples</p>
+  <h1>What the Agents Recover</h1>
+  <p class="standfirst">Eight episodes from a trained pair, drawn out in full: the graph
+  that generated the data, what each agent concluded from its own restricted view, and the
+  moves it spent getting there.</p>
+</header>
+<div class="rule"></div>
+
+<p>{{SUMMARY}}</p>
+
+<p>Each agent sees its own private variable and the three shared ones. It never sees its
+partner's private variable &mdash; drawn as a dotted circle. Because a causal path can run
+<i>through</i> that invisible variable, an agent can be looking at two shared variables that
+move together with no visible cause between them. Telling that apart from a genuine edge is
+the entire problem, and the only way to do it is for the partner to spend a move
+<b>clamping</b> the hidden variable, which switches the pathway off.</p>
+
+<div class="key">
+  <div><svg width="46" height="14" viewBox="0 0 46 14"><line x1="2" y1="7" x2="34" y2="7" stroke="var(--ok)" stroke-width="2.2"/><polygon points="42,7 34,10 34,4" fill="var(--ok)"/></svg> correct edge</div>
+  <div><svg width="46" height="14" viewBox="0 0 46 14"><line x1="2" y1="7" x2="34" y2="7" stroke="var(--wrong)" stroke-width="2.2"/><polygon points="42,7 34,10 34,4" fill="var(--wrong)"/></svg> spurious &mdash; claimed, not real</div>
+  <div><svg width="46" height="14" viewBox="0 0 46 14"><line x1="2" y1="7" x2="34" y2="7" stroke="var(--missing)" stroke-width="1.6" stroke-dasharray="5 4"/><polygon points="42,7 34,10 34,4" fill="var(--missing)"/></svg> missed &mdash; real, not claimed</div>
+  <div><svg width="46" height="16" viewBox="0 0 46 16"><path d="M 6 12 Q 22 1 40 12" fill="none" stroke="var(--conf-ok)" stroke-width="2" stroke-dasharray="4 3"/><polygon points="4,13 10,10 9,15" fill="var(--conf-ok)"/><polygon points="42,13 36,10 37,15" fill="var(--conf-ok)"/></svg> confounding, correctly identified</div>
+  <div><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:var(--priv-a);border:1px solid var(--rule)"></span> A's private</div>
+  <div><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:var(--priv-b);border:1px solid var(--rule)"></span> B's private</div>
+  <div><span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:var(--shared);border:1px solid var(--rule)"></span> shared</div>
+</div>
+
+<div class="note">
+  <span class="tg">How to read "credit mass"</span>
+  <p>An agent does not output one graph &mdash; it holds a probability distribution over all
+  of them. The bar is how much of that probability sits on answers we accept as correct:
+  every edge touching a private variable exactly right, and the rest right up to
+  <i>Markov equivalence</i>, since some orientations are provably indistinguishable from any
+  amount of data. It has to clear <b>0.70</b>, and both agents have to clear it, and their
+  answers have to union into an acyclic graph matching the truth. The picture shows the
+  single most likely hypothesis; the bar shows how confident the agent is across all of
+  them.</p>
+</div>
+
+<h2>The episodes</h2>
+{{CASES}}
+
+<div class="note">
+  <span class="tg">Reading the move strips</span>
+  <p><b>v</b> = vary (a randomised intervention, for orienting edges), <b>c</b> = clamp
+  (hold the variable at a constant, which switches off a confounding pathway for the
+  partner), <b>&mdash;</b> = passed. Clamping your own private variable does nothing for you
+  &mdash; it is the move that helps the <i>other</i> agent, and it costs you information
+  about what drives that variable. Nothing in the reward names this behaviour; it has to be
+  discovered from a shared scalar reward alone.</p>
+</div>
+
+<footer>
+  Generated from a trained checkpoint by <code>scripts/ma_graph_examples.py</code> and
+  <code>scripts/ma_graph_render.py</code>. Episodes are unseen &mdash; drawn from a seed
+  range disjoint from training &mdash; and are selected to span confounded successes,
+  unconfounded successes and failures rather than to flatter.
+</footer>
+</div>
