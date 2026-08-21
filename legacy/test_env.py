@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
-from src.types import SCMConfig, SCMParams, MechanismType, NoiseType
-from src.environment import init_env, get_observations, step_env
+from legacy.src.types import SCMConfig, SCMParams, MechanismType, NoiseType
+from legacy.src.environment import init_env, get_observations, step_env
 
 def test():
     # Setup static parameters
