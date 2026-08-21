@@ -1500,16 +1500,15 @@ while scoring three to four times better. It is not acting more; it is acting di
 yields interventional information about that node's children. What rules out the selfish
 explanation is greedy: an agent optimising exactly that self-information does not choose it.
 
-[DECIDED] **Clamp-only is ADOPTED, on evidence.** `tb_clamp` 0.553 against `tb_both` 0.563 --
-a difference of 0.010 against a seed sd of ~0.037. The second mode does not earn its place.
+[DECIDED] **Clamp-only adopted as a TRADE, not as a proven equivalence.** Paired over the
+same 10 seeds, both-modes is ahead on **8 of 10**, mean **+0.018**, 95% CI **[-0.005,
++0.041]**. That is "no significant difference", not "no difference": equivalence passes at a
++/-5pp margin and FAILS at +/-2pp. Removing vary plausibly costs ~2pp and at most ~4pp on a
+base of 0.55, bought for a halved action space (which compounds at 5 agents x 30 nodes) and a
+non-degenerate greedy baseline. State it that way; do not claim vary was shown to be useless.
 
-Two supporting observations. Restricting a RANDOM policy to clamps nearly doubles it,
-**0.210 -> 0.380**, so clamping beats varying even with no learning at all. And the learned
-policy was already choosing clamps, which is why losing vary costs it nothing.
-
-[MEASURED] **The gap to random NARROWS under clamp-only, 0.353 -> 0.173, because the baseline
-gets stronger rather than because the policy gets worse.** That is the honest direction and it
-is what the supervisor asked for: a harder opponent makes the remaining margin mean more.
+What IS firmly established: clamping beats varying **per move**. A random policy restricted
+to clamps goes 0.210 -> 0.380.
 
 [CORRECTED] The earlier claim that the agents' clamp preference was weak evidence for
 clamp-only was wrong in both directions. At the time it was NO evidence -- clamp fractions of
