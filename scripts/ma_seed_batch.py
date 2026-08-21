@@ -26,6 +26,10 @@ def main(argv=None):
     ap.add_argument("--step_cost", type=float, default=0.05)
     ap.add_argument("--train_episodes", type=int, default=2000)
     ap.add_argument("--eval_episodes", type=int, default=150)
+    # ROUNDS for the whole system, not interventions per agent -- semantics changed on
+    # 2026-08-21, see docs/TURN_BUDGET_SPEC.md section 2. Was hardcoded to 8, which under
+    # the new meaning is 4 turns each and thin enough to risk a null result.
+    ap.add_argument("--budget", type=int, default=10)
     # Protocol and action space are passed through so that an arm name and its settings
     # travel together. Defaults reproduce the pre-2026-08-20 batches exactly.
     ap.add_argument("--turn_order", default="simultaneous",
@@ -49,7 +53,8 @@ def main(argv=None):
                 continue
             cmd = [sys.executable, "-u", "-m", "scripts.ma_train2",
                    "--seed", str(seed), "--arm", args.arm,
-                   "--n_obs", "1000", "--n_int", "100", "--budget", "8",
+                   "--n_obs", "1000", "--n_int", "100",
+                   "--budget", str(args.budget),
                    "--train_episodes", str(args.train_episodes),
                    "--eval_episodes", str(args.eval_episodes),
                    "--step_cost", str(args.step_cost),
