@@ -111,7 +111,7 @@ def compare_temperatures_and_visualize(
     Evaluates a checkpoint across a range of temperature scales, plots comparative
     SHD trajectories for each topology, and generates an aggregate mean-SHD comparison.
     """
-    from src.evaluate import evaluate_checkpoint
+    from legacy.src.evaluate import evaluate_checkpoint
     
     os.makedirs(output_dir, exist_ok=True)
     print(f"=== Running Multi-Temperature Evaluation across T = {temperatures} ===")

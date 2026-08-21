@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 import pytest
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, mask_invalid_targets
+from legacy.src.marl.ppo_agent import IPPOActor, IPPOCritic, mask_invalid_targets
 
 def test_ippo_actor_shape():
     def forward(obs):

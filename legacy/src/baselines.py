@@ -1,5 +1,5 @@
 import numpy as np
-from src.types import ActionCategory, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
+from legacy.src.types import ActionCategory, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
 
 def estimate_graph_from_obs(obs: np.ndarray, d: int, agent_id: int, threshold: float = 0.25) -> np.ndarray:
     """

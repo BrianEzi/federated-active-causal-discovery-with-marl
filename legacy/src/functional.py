@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from src.types import MechanismType, NoiseType, SCMParams
+from legacy.src.types import MechanismType, NoiseType, SCMParams
 
 def generate_noise(key: jax.Array, noise_type: int, shape: tuple, scale: float = 1.0) -> jax.Array:
     """Generates noise based on the specified distribution type."""

@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
-from src.evaluator_env import FederatedCausalEnv
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
+from legacy.src.evaluator_env import FederatedCausalEnv
 
 @pytest.fixture
 def base_config():

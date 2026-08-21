@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 from typing import Tuple, Dict
-from src.types import ActionCategory
+from legacy.src.types import ActionCategory
 
 class IPPOActor(hk.Module):
     def __init__(self, d: int, embed_dim: int = 32, hidden_dim: int = 64, name: str = None):

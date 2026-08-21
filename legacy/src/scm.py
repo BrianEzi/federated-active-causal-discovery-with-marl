@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
 from functools import partial
-from src.types import SCMConfig, EnvState, InterventionSpec, InterventionType
-from src.functional import apply_mechanism, generate_noise
+from legacy.src.types import SCMConfig, EnvState, InterventionSpec, InterventionType
+from legacy.src.functional import apply_mechanism, generate_noise
 
 def _sample_single_scm(key: jax.Array, 
                        state: EnvState, 

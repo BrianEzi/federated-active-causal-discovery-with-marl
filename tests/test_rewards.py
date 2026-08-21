@@ -2,7 +2,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import pytest
-from src.rewards import compute_ippo_rewards, jitted_compute_ippo_rewards
+from legacy.src.rewards import compute_ippo_rewards, jitted_compute_ippo_rewards
 
 def test_compute_ippo_rewards_perfect():
     stitched_dag = np.zeros((4, 4))

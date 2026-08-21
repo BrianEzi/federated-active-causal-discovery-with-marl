@@ -3,10 +3,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from src.generators import generate_4node_topologies
-from src.evaluator_env import FederatedCausalEnv
-from src.types import SCMConfig
-from src.train import get_curriculum_topologies
+from legacy.src.generators import generate_4node_topologies
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.types import SCMConfig
+from legacy.src.train import get_curriculum_topologies
 
 
 def test_generate_4node_topologies_allowed_indices():

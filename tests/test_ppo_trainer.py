@@ -4,11 +4,11 @@ import jax.numpy as jnp
 import haiku as hk
 import pytest
 
-from src.marl.ppo_trainer import compute_gae, RolloutBuffer, IPPOTrainer
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, mask_invalid_targets, sample_actions_jitted
-from src.evaluator_env import FederatedCausalEnv
-from src.stitching import detect_cycle
-from src.types import SCMConfig, MechanismType, NoiseType
+from legacy.src.marl.ppo_trainer import compute_gae, RolloutBuffer, IPPOTrainer
+from legacy.src.marl.ppo_agent import IPPOActor, IPPOCritic, mask_invalid_targets, sample_actions_jitted
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.stitching import detect_cycle
+from legacy.src.types import SCMConfig, MechanismType, NoiseType
 
 
 def test_compute_gae_returns_are_not_variance_normalized():
@@ -164,7 +164,7 @@ def test_evaluator_env_step_applies_cycle_penalty_in_analytic_hypothesis_path():
     stitched_dag/true_dag/prev_shd under has_cycle=True vs has_cycle=False -- isolating
     the cycle-penalty term specifically.
     """
-    from src.rewards import compute_ippo_rewards
+    from legacy.src.rewards import compute_ippo_rewards
 
     config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
     # intrinsic_coef/impact_coef=0 so the reference reward computation below (which omits

@@ -4,8 +4,8 @@ import numpy as np
 import optax
 import pytest
 
-from src.marl.graph_estimator import init_graph_estimator, make_graph_estimator_fns
-from src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_global_structural_mask
+from legacy.src.marl.graph_estimator import init_graph_estimator, make_graph_estimator_fns
+from legacy.src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_global_structural_mask
 
 
 def _make_fns(d=4):
@@ -68,8 +68,8 @@ def test_update_step_only_trains_within_structural_mask():
 
 
 def test_evaluator_env_learned_estimator_predicts_and_updates():
-    from src.evaluator_env import FederatedCausalEnv
-    from src.types import SCMConfig, MechanismType, NoiseType
+    from legacy.src.evaluator_env import FederatedCausalEnv
+    from legacy.src.types import SCMConfig, MechanismType, NoiseType
 
     config = SCMConfig(d=4, K=2, mechanism_type=int(MechanismType.LINEAR), noise_type=int(NoiseType.GAUSSIAN))
     env = FederatedCausalEnv(config=config, action_costs=np.array([1.0, 1.0]), estimator_type="learned")

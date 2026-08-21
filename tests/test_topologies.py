@@ -3,10 +3,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from src.types import SCMConfig, MechanismType, NoiseType
-from src.evaluator_env import FederatedCausalEnv
-from src.generators import generate_4node_topologies
-from src.train import parse_topology_list
+from legacy.src.types import SCMConfig, MechanismType, NoiseType
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.generators import generate_4node_topologies
+from legacy.src.train import parse_topology_list
 
 def test_parse_topology_list():
     assert parse_topology_list("0,1,2") == (0, 1, 2)

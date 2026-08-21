@@ -4,9 +4,9 @@ import numpy as np
 import haiku as hk
 import pytest
 
-from src.types import SCMConfig, MechanismType, NoiseType
-from src.evaluator_env import FederatedCausalEnv, compute_invariance_asymmetry_matrix
-from src.marl.ppo_agent import InductiveIPPOActor, InductiveIPPORNNActor
+from legacy.src.types import SCMConfig, MechanismType, NoiseType
+from legacy.src.evaluator_env import FederatedCausalEnv, compute_invariance_asymmetry_matrix
+from legacy.src.marl.ppo_agent import InductiveIPPOActor, InductiveIPPORNNActor
 
 def test_compute_invariance_asymmetry_matrix():
     d = 4

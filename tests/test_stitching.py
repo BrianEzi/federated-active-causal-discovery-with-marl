@@ -2,7 +2,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import pytest
-from src.stitching import stitch_predicted_dags, detect_cycle, jitted_stitch_dags, jitted_detect_cycle
+from legacy.src.stitching import stitch_predicted_dags, detect_cycle, jitted_stitch_dags, jitted_detect_cycle
 
 def test_detect_cycle_no_cycle():
     # 0 -> 1 -> 2

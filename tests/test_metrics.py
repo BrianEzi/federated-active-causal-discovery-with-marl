@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from src.metrics import evaluate_dag_against_true
+from legacy.src.metrics import evaluate_dag_against_true
 
 def test_evaluate_dag_against_true_perfect():
     pred = np.zeros((4, 4))

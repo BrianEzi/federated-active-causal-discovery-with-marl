@@ -2,9 +2,9 @@ import numpy as np
 import jax
 import pytest
 
-from src.types import ActionCategory, SCMConfig, MechanismType, NoiseType
-from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent, estimate_graph_from_obs
-from src.evaluator_env import FederatedCausalEnv
+from legacy.src.types import ActionCategory, SCMConfig, MechanismType, NoiseType
+from legacy.src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent, estimate_graph_from_obs
+from legacy.src.evaluator_env import FederatedCausalEnv
 
 ALL_AGENT_CLASSES = [RandomAgent, RoundRobinAgent, VanillaAgent]
 

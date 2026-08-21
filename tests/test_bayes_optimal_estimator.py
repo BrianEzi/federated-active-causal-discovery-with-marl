@@ -1,11 +1,11 @@
 import jax
 import numpy as np
 
-from src.generators import get_all_4node_topologies, generate_4node_topologies, generate_scm_params
-from src.environment import init_env
-from src.types import SCMConfig, MechanismType, NoiseType, InterventionSpec, InterventionType
-from src.scm import sample_scm
-from src.marl.bayes_optimal_estimator import compute_hypothesis_posterior, bayes_optimal_predict
+from legacy.src.generators import get_all_4node_topologies, generate_4node_topologies, generate_scm_params
+from legacy.src.environment import init_env
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, InterventionSpec, InterventionType
+from legacy.src.scm import sample_scm
+from legacy.src.marl.bayes_optimal_estimator import compute_hypothesis_posterior, bayes_optimal_predict
 
 
 def test_get_all_4node_topologies_matches_individual_force_idx_calls():

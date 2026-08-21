@@ -7,13 +7,13 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
-from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
-from src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
-from src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
-from src.metrics import evaluate_dag_against_true
-from src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS, ActionCategory
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.marl.ppo_agent import IPPOActor, IPPOCritic, IPPORNNActor, IPPORNNCritic, InductiveIPPOActor, InductiveIPPORNNActor, mask_invalid_targets, sample_actions_jitted
+from legacy.src.marl.ppo_trainer import IPPOTrainer, RolloutBuffer, compute_gae
+from legacy.src.baselines import RandomAgent, RoundRobinAgent, VanillaAgent
+from legacy.src.metrics import evaluate_dag_against_true
+from legacy.src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
 
 
 try:
@@ -603,7 +603,7 @@ def main():
                     ep_info_gain_1 += float(step_info["info_gains"]["agent_1"])
                 ep_steps += 1
                 
-                from src.stitching import stitch_predicted_dags
+                from legacy.src.stitching import stitch_predicted_dags
                 final_dag, _ = stitch_predicted_dags(predicted_dags, args.num_variables)
             
         # End of episode update
@@ -688,7 +688,7 @@ def main():
             
         if args.use_wandb and WANDB_AVAILABLE:
             if episode % args.eval_freq == 0:
-                from src.visualizations import plot_dag_to_wandb_image
+                from legacy.src.visualizations import plot_dag_to_wandb_image
                 log_data["eval/true_dag_img"] = plot_dag_to_wandb_image(true_adj, f"True DAG (Ep {episode})")
                 log_data["eval/pred_dag_img"] = plot_dag_to_wandb_image(final_dag, f"Predicted DAG (Ep {episode})")
                 
@@ -757,7 +757,7 @@ def main():
         
     if args.agent_type == "ippo":
         print("Running post-training evaluation suite on the BEST model...")
-        from src.evaluate import evaluate_checkpoint
+        from legacy.src.evaluate import evaluate_checkpoint
         import json
         
         ckpt_file = os.path.join(args.checkpoint_dir, "best_ippo_params.pkl")

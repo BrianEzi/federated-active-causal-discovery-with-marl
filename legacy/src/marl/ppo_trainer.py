@@ -4,8 +4,8 @@ import jax.numpy as jnp
 import optax
 import haiku as hk
 from typing import Dict, Any, Tuple
-from src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
-from src.marl.ppo_agent import mask_invalid_targets
+from legacy.src.types import STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_mask
+from legacy.src.marl.ppo_agent import mask_invalid_targets
 
 class RolloutBuffer:
     def __init__(self):

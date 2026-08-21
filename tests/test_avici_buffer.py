@@ -3,9 +3,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from unittest.mock import MagicMock
-from src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
-from src.evaluator_env import FederatedCausalEnv
-from src.environment import stitch_global_mean
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.environment import stitch_global_mean
 
 
 @pytest.fixture

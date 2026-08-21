@@ -4,11 +4,11 @@ import jax.numpy as jnp
 import numpy as np
 import haiku as hk
 
-from src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
-from src.evaluator_env import FederatedCausalEnv, build_intervention_spec_jitted
-from src.marl.ppo_agent import IPPOActor, sample_actions_jitted
-from src.stitching import jitted_stitch_dags, jitted_detect_cycle, stitch_predicted_dags, detect_cycle
-from src.rewards import jitted_compute_ippo_rewards, compute_ippo_rewards
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
+from legacy.src.evaluator_env import FederatedCausalEnv, build_intervention_spec_jitted
+from legacy.src.marl.ppo_agent import IPPOActor, sample_actions_jitted
+from legacy.src.stitching import jitted_stitch_dags, jitted_detect_cycle, stitch_predicted_dags, detect_cycle
+from legacy.src.rewards import jitted_compute_ippo_rewards, compute_ippo_rewards
 
 def test_jitted_cycle_detection_vs_dfs():
     rng = np.random.RandomState(123)

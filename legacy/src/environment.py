@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
 from typing import Tuple
-from src.types import SCMConfig, SCMParams, EnvState, AgentObservation, InterventionSpec
-from src.scm import sample_scm
+from legacy.src.types import SCMConfig, SCMParams, EnvState, AgentObservation, InterventionSpec
+from legacy.src.scm import sample_scm
 
 def init_env(key: jax.Array,
              config: SCMConfig,

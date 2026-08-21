@@ -4,9 +4,9 @@ import numpy as np
 import json
 from typing import Dict, Any
 
-from src.types import SCMConfig, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_masks
-from src.evaluator_env import FederatedCausalEnv
-from src.marl.ppo_agent import IPPOActor, IPPORNNActor, InductiveIPPOActor, InductiveIPPORNNActor
+from legacy.src.types import SCMConfig, STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, compute_edge_authority_masks
+from legacy.src.evaluator_env import FederatedCausalEnv
+from legacy.src.marl.ppo_agent import IPPOActor, IPPORNNActor, InductiveIPPOActor, InductiveIPPORNNActor
 
 def run_evaluation_suite(
     actor: Any,
@@ -47,9 +47,9 @@ def run_evaluation_suite(
     boundary_mask = STANDARD_BOUNDARY_MASK
     edge_masks = compute_edge_authority_masks(STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK)
 
-    from src.marl.ppo_agent import mask_invalid_targets
-    from src.stitching import stitch_predicted_dags
-    from src.metrics import evaluate_dag_against_true
+    from legacy.src.marl.ppo_agent import mask_invalid_targets
+    from legacy.src.stitching import stitch_predicted_dags
+    from legacy.src.metrics import evaluate_dag_against_true
 
     # Run evaluation on all 8 graphs
     for graph_idx in range(8):
@@ -155,7 +155,7 @@ def evaluate_checkpoint(
     import os
     import pickle
     import haiku as hk
-    from src.types import MechanismType, NoiseType
+    from legacy.src.types import MechanismType, NoiseType
 
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(

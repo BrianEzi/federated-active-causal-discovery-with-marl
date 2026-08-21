@@ -3,13 +3,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from typing import Dict, Tuple
-from src.scm import sample_scm, _sample_scm_jitted
+from legacy.src.scm import sample_scm, _sample_scm_jitted
 
-from src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
+from legacy.src.types import (SCMConfig, SCMParams, EnvState, InterventionSpec, InterventionType, ActionCategory,
                        STANDARD_LOCAL_MASKS, STANDARD_BOUNDARY_MASK, STANDARD_OBS_MASKS,
                        compute_edge_authority_mask, compute_global_structural_mask)
-from src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance, stitch_global_mean
-from src.generators import generate_4node_topologies, generate_scm_params
+from legacy.src.environment import init_env, step_env, update_running_statistics, stitch_global_covariance, stitch_global_mean
+from legacy.src.generators import generate_4node_topologies, generate_scm_params
 
 @jax.jit
 def compute_local_covariances(samples: jax.Array, agent_masks: jax.Array) -> jax.Array:
@@ -317,7 +317,7 @@ class FederatedCausalEnv:
         self._bayes_candidate_adjacencies = None
         self.last_bayes_posterior = None
         if self.estimator_type == "bayes_optimal":
-            from src.generators import get_all_4node_topologies
+            from legacy.src.generators import get_all_4node_topologies
             adjacencies, _ = get_all_4node_topologies()
             self._bayes_candidate_adjacencies = np.array(adjacencies)
             self.last_bayes_posterior = np.full(self._bayes_candidate_adjacencies.shape[0],
@@ -335,7 +335,7 @@ class FederatedCausalEnv:
         self._graph_estimator_predict_fn = None
         if self.estimator_type == "learned":
             import optax
-            from src.marl.graph_estimator import init_graph_estimator, make_graph_estimator_fns
+            from legacy.src.marl.graph_estimator import init_graph_estimator, make_graph_estimator_fns
             rng = jax.random.PRNGKey(0)
             transformed, self.graph_estimator_params = init_graph_estimator(rng, self.config.d)
             optimizer = optax.adam(1e-3)
@@ -398,7 +398,7 @@ class FederatedCausalEnv:
             # samples with real intervention labels), fed in full (not context-capped --
             # the per-node OLS fits here are cheap numpy, not a re-JIT-compiled network
             # call, so there's no AVICI-style recompilation cost to cap against).
-            from src.marl.bayes_optimal_estimator import bayes_optimal_predict
+            from legacy.src.marl.bayes_optimal_estimator import bayes_optimal_predict
             n_valid = int(self.jax_state.raw_count[0])
             x = np.array(self.jax_state.raw_samples[:n_valid], dtype=np.float64)
             interv = np.array(self.jax_state.raw_interv[:n_valid], dtype=np.float64)
@@ -556,11 +556,11 @@ class FederatedCausalEnv:
         
         # Stage 2 Per-Step Graph Prediction
         if predicted_dags is not None and len(predicted_dags) > 0:
-            from src.stitching import stitch_predicted_dags
+            from legacy.src.stitching import stitch_predicted_dags
             stitched_dag, has_cycle = stitch_predicted_dags(predicted_dags, self.config.d, margin=self.boundary_margin)
             self.last_predicted_dag = stitched_dag
         else:
-            from src.stitching import detect_cycle
+            from legacy.src.stitching import detect_cycle
             obs_cov_np = np.array(self.jax_state.obs_covariance)
             run_cov_np = np.array(self.jax_state.running_covariance)
             self.last_predicted_dag = self.predict_graph_hypothesis(obs_cov_np, run_cov_np, asym)
@@ -581,7 +581,7 @@ class FederatedCausalEnv:
         impact_a1 = float(np.sum(np.abs(asym[1:4, 1:4]) > 0.1))
         impact_dict = {"agent_0": impact_a0, "agent_1": impact_a1}
         
-        from src.metrics import evaluate_dag_against_true
+        from legacy.src.metrics import evaluate_dag_against_true
         eval_metrics = evaluate_dag_against_true(stitched_dag, true_dag)
         curr_shd = float(eval_metrics["shd"])
         
@@ -591,7 +591,7 @@ class FederatedCausalEnv:
         e1 = float(np.sum(diff[0, :]) + np.sum(diff[:, 0]) + diff[1, 2] + diff[2, 1])
         e2 = float(np.sum(diff[3, :]) + np.sum(diff[:, 3]) + diff[1, 2] + diff[2, 1])
         
-        from src.rewards import compute_ippo_rewards
+        from legacy.src.rewards import compute_ippo_rewards
         rewards = compute_ippo_rewards(
             stitched_dag, true_dag, has_cycle, 
             max_steps=norm_factor, 
@@ -633,8 +633,8 @@ class FederatedCausalEnv:
         DAG stitching, and reward computation entirely on GPU.
         Returns: (agent_observations, r0, r1, terminated, stitched_dag, info_gains)
         """
-        from src.stitching import jitted_stitch_dags
-        from src.rewards import jitted_compute_ippo_rewards
+        from legacy.src.stitching import jitted_stitch_dags
+        from legacy.src.rewards import jitted_compute_ippo_rewards
         
         costs_vec = jnp.array(self.action_costs)
         mask, types, values, costs = build_intervention_spec_jitted(

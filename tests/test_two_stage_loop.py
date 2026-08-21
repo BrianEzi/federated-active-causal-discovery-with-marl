@@ -3,8 +3,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from src.types import SCMConfig, MechanismType, NoiseType, InterventionType
-from src.evaluator_env import FederatedCausalEnv, build_intervention_spec_jitted
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, InterventionType
+from legacy.src.evaluator_env import FederatedCausalEnv, build_intervention_spec_jitted
 
 def test_soft_shift_intervention_spec():
     budgets = jnp.array([10.0, 10.0])

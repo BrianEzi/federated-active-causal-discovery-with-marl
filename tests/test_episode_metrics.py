@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 from scipy.stats import multivariate_normal
-from src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
-from src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
-from src.evaluator_env import FederatedCausalEnv
+from legacy.src.episode_metrics import gaussian_entropy, shd_trajectory_auc, shd_reduction_auc, normalized_target_entropy
+from legacy.src.types import SCMConfig, MechanismType, NoiseType, ActionCategory
+from legacy.src.evaluator_env import FederatedCausalEnv
 import jax
 import jax.numpy as jnp
 

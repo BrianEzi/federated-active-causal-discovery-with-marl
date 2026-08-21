@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from src.types import MechanismType, SCMParams
+from legacy.src.types import MechanismType, SCMParams
 
 def generate_er_dag(key: jax.Array, num_variables: int, edge_prob: float) -> jax.Array:
     """

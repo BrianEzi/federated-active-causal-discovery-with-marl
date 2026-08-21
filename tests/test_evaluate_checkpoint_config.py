@@ -17,8 +17,8 @@ import jax
 import jax.numpy as jnp
 import haiku as hk
 
-from src.evaluate import evaluate_checkpoint
-from src.marl.ppo_agent import IPPOActor
+from legacy.src.evaluate import evaluate_checkpoint
+from legacy.src.marl.ppo_agent import IPPOActor
 
 
 def _make_fake_checkpoint(d=4, **overrides):
