@@ -546,3 +546,65 @@ precisely the case that motivates RL over DAD, so Blau et al. supports our choic
 rather than threatening it. Second, DAD's **permutation invariance** of the optimal policy is
 the same structural argument behind our permutation-equivariant per-node scorer, and it
 should be cited there rather than presented as our own idea.
+
+## 15. Multi-agent / distributed greedy — the baselines our design was missing
+
+Found 2026-08-21 while looking for a defensible multi-agent greedy. This literature does
+exactly the coordination problem we have, and it arrives at turn-taking independently of
+the supervisor.
+
+```bibtex
+@article{fisher1978analysis,
+  author  = {Fisher, M. L. and Nemhauser, G. L. and Wolsey, L. A.},
+  title   = {An Analysis of Approximations for Maximizing Submodular Set Functions---{II}},
+  journal = {Mathematical Programming Study}, volume = {8}, pages = {73--87},
+  year    = {1978}}                                          % STANDARD -- the 1/2 bound
+
+@article{grimsman2018impact,
+  author  = {Grimsman, David and Ali, Mohd. Shabbir and Hespanha, Jo{\~a}o P.
+             and Marden, Jason R.},
+  title   = {The Impact of Information in Distributed Submodular Maximization},
+  journal = {IEEE Transactions on Control of Network Systems}, year = {2018},
+  note    = {Earlier version, IEEE CDC 2017; arXiv:1807.10639}}   % VERIFIED 2026-08-21
+
+@article{corah2019distributed,
+  author  = {Corah, Micah and Michael, Nathan},
+  title   = {Distributed Matroid-Constrained Submodular Maximization for Multi-Robot
+             Exploration: Theory and Practice},
+  journal = {Autonomous Robots}, volume = {43}, number = {2}, pages = {485--501},
+  year    = {2019}}                                              % VERIFIED 2026-08-21
+```
+
+**Sequential greedy assignment (SGA).** Agents decide IN TURN, each conditioning on the
+choices already made by earlier agents; `1/2` of optimal under a matroid constraint
+(Fisher et al. 1978). This is the multi-agent greedy we should have had. Our current
+`GreedyAgent` is NOT this -- it optimises its own window in isolation and conditions on
+nothing -- and turn-taking is precisely the protocol that makes SGA implementable.
+
+**Grimsman et al. (2018)** bound greedy's quality as a function of **how much of the earlier
+agents' decisions each agent can see**, with performance degrading in the size of the largest
+group deciding independently. That is our disclosure question stated formally: we already
+disclose shared-node targets after acting, and this says what such disclosure is worth.
+
+**Corah & Michael (2019)** give DSGA, which keeps SGA's bound plus **a penalty for assigning
+several plans at once**. It therefore quantifies the cost of simultaneous decision-making
+against sequential -- independent theoretical support for the turn-taking directive, from a
+literature that had never heard of this project.
+
+**THE CAVEAT, WHICH MUST BE STATED WHEREVER THESE ARE CITED.** All of these guarantees need
+submodularity, and the adaptive sequential case needs **adaptive submodularity** (Golovin &
+Krause 2011), which expected information gain does **not** satisfy in general. We borrow the
+ALGORITHMS as baselines. We must not claim the BOUNDS.
+
+**The agreed baseline set** (decided 2026-08-21):
+
+| baseline | what it is | what it shows |
+|---|---|---|
+| random | uniform over legal targets | what pure exploration achieves |
+| selfish greedy | own window only -- what we have | the honest myopic floor |
+| sequential greedy | conditions on the partner's disclosed choices | the real decentralised baseline |
+| joint greedy | one oracle scoring BOTH posteriors | upper bound; deliberately violates federation |
+
+Beating sequential greedy makes the claim mean something; approaching joint greedy shows the
+federation costs little. Random stays in because it is the only arm that says what
+exploration alone buys.
