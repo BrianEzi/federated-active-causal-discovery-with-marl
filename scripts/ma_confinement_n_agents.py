@@ -200,6 +200,8 @@ def main(argv=None):
 
     report = {"args": vars(args), "configs": []}
     any_violation = False
+    out = pathlib.Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     for label, visibility, n_agents in configs:
         started = time.time()
         result = check(visibility, n_agents, args.limit, args.samples, args.seed,
@@ -207,6 +209,7 @@ def main(argv=None):
         result["label"] = label
         result["seconds"] = time.time() - started
         report["configs"].append(result)
+        out.write_text(json.dumps(report, indent=1))     # incremental: survive a kill
         kind = "exhaustive" if result["exhaustive"] else f"sampled {result['n_dags']}"
         status = "HOLDS" if result["holds"] else "*** VIOLATED ***"
         print(f"{label:44s} d={result['d']:2d}  {kind:18s}  "
@@ -218,8 +221,6 @@ def main(argv=None):
                   "private endpoint", result["violations"][0]["private_endpoint"], flush=True)
 
     report["holds_everywhere"] = not any_violation
-    out = pathlib.Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=1))
     print()
     print("CONFINEMENT HOLDS EVERYWHERE" if not any_violation
