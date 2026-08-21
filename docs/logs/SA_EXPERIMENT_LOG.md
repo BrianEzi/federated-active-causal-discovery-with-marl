@@ -2716,3 +2716,63 @@ correct diagnosis, and it prescribes raising `n_obs` rather than weakening the c
 
 Open: the `n_obs` needed for G1b to pass at `d=5,6` is measurable with the same script and
 has not been measured.
+
+## 2026-08-22 (overnight) -- how much data d>=5 needs, and what prior_p should be
+
+### A2. The power sweep: `n_obs` needed for the criterion to be earnable
+
+`scripts/sa_criterion_sweep.py`, 80 graphs per cell, observational only. The column that
+matters is P(true DAG mass >= 0.7 | the graph's MEC is a singleton) -- i.e. restricted to
+graphs that ARE identifiable without acting, so anything short of 1.0 is the environment
+being starved rather than the task being hard.
+
+    n_obs      d=5     d=6
+    1000      0.333   0.333
+    2000      0.714   0.444
+    4000      0.833   0.500
+    8000      0.900   0.857
+    16000     1.000   1.000
+
+[MEASURED] **G1b (>= 0.9) needs roughly `n_obs = 8000` at `d=5` and `16000` at `d=6`** --
+eight to sixteen times what we use. Extrapolating the shape (d=4 clears 0.9 near 2000), the
+requirement looks like it roughly DOUBLES per node. At `d=9`, the largest window the subset
+DP supports, that projects to order 10^5 rows per episode.
+
+[CAVEAT, and it is a real one] The singleton subset is TINY -- at 80 episodes and a singleton
+fraction near 0.08, several cells rest on 3-6 graphs. The trend across five sample sizes is
+consistent and monotone, which is what makes it usable, but no individual cell should be
+quoted. A proper version needs episodes in the thousands or rejection-sampling for singletons.
+
+### A3. `prior_p` must scale, and the literature default does not give connected graphs
+
+`scripts/sa_graph_density.py`, 400 draws per cell. Cells are connected-fraction / mean-degree.
+
+    rule                     d=5      d=8     d=10     d=15     d=20     d=30
+    fixed 0.5           0.76/2.0  0.92/3.5 0.98/4.5 1.00/7.0 1.00/9.5 1.00/14.5
+    percolation 1/d     0.07/0.8  0.01/0.9 0.01/0.9 0.00/0.9 0.00/0.9 0.00/1.0
+    ER-2  2/(d-1)       0.71/2.0  0.43/2.0 0.27/2.0 0.15/2.0 0.06/2.0 0.01/2.0
+    connectivity ln(d)/d 0.28/1.3 0.35/1.8 0.37/2.1 0.40/2.5 0.42/2.8 0.39/3.3
+    ER-4  4/(d-1)       1.00/4.0  0.98/4.0 0.93/4.0 0.87/4.0 0.80/4.0 0.70/4.0
+    2 ln(d)/d           0.92/2.6  0.95/3.6 0.97/4.2 0.97/5.1 0.97/5.8 0.99/6.5
+
+[MEASURED] **ER-2 -- the literature's sparse default -- gives DISCONNECTED graphs at scale.**
+27% connected at `d=10`, **1% at `d=30`**. So "use the literature's sparse regime" and "test
+on graphs that are one connected component" are in direct conflict, and the conflict is not
+small.
+
+[MEASURED] **The percolation threshold is the wrong target.** At `p = 1/d` almost nothing is
+connected (0.00-0.07). It marks where a GIANT COMPONENT appears, not where every node joins
+one -- a distinction this project had been eliding.
+
+[MEASURED] **The asymptotic connectivity threshold `ln(d)/d` is also insufficient at finite
+`d`** -- only 28-42% connected across the range. It is where connectivity probability tends
+to 1, and the constant matters at the sizes we actually run.
+
+[PROPOSED] **`prior_p = 2 ln(d) / d`.** Measured at 92-99% connected across `d = 5..30`, with
+mean degree 2.6-6.5 -- inside the literature's ER-2 to ER-6 band, so it is defensible as
+sparse while actually delivering connected graphs. It reproduces roughly today's density at
+`d=5` (degree 2.6 against 2.0), so small-`d` results stay comparable.
+
+Cite Chevalley, Mehrjou & Schwab for the `Theta(1/d)` sparse regime and say we deliberately
+chose the connectivity threshold instead, with the reason. **The percolation framing is ours,
+not a citation.**
