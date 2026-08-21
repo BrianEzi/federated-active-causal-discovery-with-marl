@@ -1458,3 +1458,67 @@ terminates in one round.
 [RUNNING] Four-arm grid, seeds 0-9, `--disclose_regime`, 2000 train / 150 eval:
 `rr_both`, `rr_clamp` (round-robin, both modes / clamp-only), `rand_both`, `rand_clamp`
 (random turn order). Answers clamp-vs-vary and round-robin-vs-random on shared seeds.
+
+## 2026-08-21 -- turn budget: the collapse is gone, and the agents learn to help each other
+
+Round-robin, shared round budget 10, `step_cost = 0`, regime bit ON, 2000 train / 150 eval,
+seeds 0-9. `tb_both` complete; `tb_clamp` at 9 seeds when these were read.
+
+    arm        learned (median)   sd     random   greedy   pass    ahead/n   collapsed
+    tb_both    0.563              0.039  0.210    0.147    0.007   10/10     0
+    tb_clamp   0.553              0.036  0.380    0.173    0.007    9/9      0
+
+[MEASURED] **The turn budget removes the collapse entirely.** 0 collapsed against 5/10 under
+the previous rules, and seed spread falls from sd 0.222 to **0.036-0.039**. The pathology was
+the incentive, not the learner: with `step_cost` at 0.05 passing was genuinely optimal, and
+with a shared round budget declining costs the team a round.
+
+[MEASURED] **The observational-leak guard holds.** The pass-only baseline scores **0.007**
+despite forfeited rounds now generating data. Extra observational rows are not making
+episodes solvable without acting -- as predicted, because observation cannot break
+Markov-equivalence ties and the credit set demands private-incident edges exactly.
+
+[MEASURED, headline] **The learned agents target their OWN PRIVATE node with 82-91% of their
+clamps, against a chance rate of 25%.**
+
+    arm        policy         interventions   private clamps   shared clamps   % private
+    tb_both    learned        6.08            4.84             0.49            91%
+    tb_both    random         9.18            1.16             3.45            25%  (chance)
+    tb_both    greedy         9.27            1.11             3.47            24%
+    tb_clamp   learned        5.70            4.68             1.02            82%
+    tb_clamp   greedy         9.10            1.75             7.35            19%
+
+**Greedy is the control that makes this interpretable.** Greedy maximises its OWN window's
+expected information gain, and it targets the private node at 19-24% -- chance or below. So a
+purely self-interested agent does NOT prefer that target. The learned policy prefers it
+overwhelmingly, and scores 0.55 against greedy's 0.15-0.17.
+
+The learned policy also uses FEWER interventions (5.7-6.1) than random or greedy (8.5-9.3)
+while scoring three to four times better. It is not acting more; it is acting differently.
+
+**The honest caveat.** Clamping one's own private node is not PURELY altruistic -- it also
+yields interventional information about that node's children. What rules out the selfish
+explanation is greedy: an agent optimising exactly that self-information does not choose it.
+
+[DECIDED] **Clamp-only is ADOPTED, on evidence.** `tb_clamp` 0.553 against `tb_both` 0.563 --
+a difference of 0.010 against a seed sd of ~0.037. The second mode does not earn its place.
+
+Two supporting observations. Restricting a RANDOM policy to clamps nearly doubles it,
+**0.210 -> 0.380**, so clamping beats varying even with no learning at all. And the learned
+policy was already choosing clamps, which is why losing vary costs it nothing.
+
+[MEASURED] **The gap to random NARROWS under clamp-only, 0.353 -> 0.173, because the baseline
+gets stronger rather than because the policy gets worse.** That is the honest direction and it
+is what the supervisor asked for: a harder opponent makes the remaining margin mean more.
+
+[CORRECTED] The earlier claim that the agents' clamp preference was weak evidence for
+clamp-only was wrong in both directions. At the time it was NO evidence -- clamp fractions of
+0.46-0.55 are chance, and greedy is provably indifferent between the modes, so its fraction
+is a coin flip. Now there IS evidence, and it is much stronger than "weak".
+
+[MEASURED] Connected graphs are harder: 0.49 against 0.70 on disconnected ones. Reported
+split, never pooled. Free-rider index 0.85-0.88, so contribution is fairly even and no agent
+is idling.
+
+**Not yet done:** the no-bit ablation (does regime disclosure earn its place?), sequential and
+joint greedy baselines, and confirmation on the final `tb_clamp` seed.
