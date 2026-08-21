@@ -2665,3 +2665,54 @@ which is what makes the `d=6` column trustworthy despite enumeration being impos
 is no longer "the environment may be broken" -- the environment is fine. It is that the
 metric those runs were scored against is the same mis-specified one, so they must be
 re-scored on a corrected criterion before the claim can stand.
+
+## 2026-08-21 -- criterion sweep: the d=6 problem is DATA as much as criterion
+
+`scripts/sa_criterion_sweep.py`, 200 graphs per `d` from the ER prior, observational only,
+`n_obs=1000`. Policy-free. Every candidate criterion computed on the SAME episodes so the
+choice is made from numbers.
+
+    d   singleton  mean|MEC|   P(dag_mass >= 0.7 | singleton)   P(mec_mass >= 0.7 | all)
+    3   0.235      2.5         0.936                            0.955
+    4   0.145      3.3         0.724                            0.845
+    5   0.125      5.7         0.400                            0.545
+    6   0.075      6.6         0.400                            0.460
+
+[VALIDATION] The covered-edge-reversal closure reproduces the ENUMERATED equivalence class
+with max size error **0** at `d=3` and `d=4`, which is what licenses the `d=5,6` rows where
+enumeration is impossible.
+
+[MEASURED] **The arithmetic closes.** Predicted GATE 1 rate = singleton fraction x
+P(mass >= 0.7 | singleton): `0.235x0.936 = 0.220`, `0.145x0.724 = 0.105`,
+`0.075x0.400 = 0.030`. Measured "all" rates: 0.220, 0.105, 0.030. Exact. And the earlier
+cluster measurement at `d=6` was 0.025 [0.005, 0.050], consistent with 0.030.
+
+[MEASURED] **The MEC criterion is DISQUALIFIED, as predicted and now measured.** Mass on the
+true DAG's equivalence class clears 0.7 without any intervention in 46-96% of episodes. A
+criterion satisfiable by sitting still cannot be the success criterion for a task whose whole
+point is that acting is necessary. Recorded as a measurement rather than an assumption
+because it was the obvious candidate.
+
+[MEASURED, and this is the new part] **No threshold rescues GATE 1 at `d >= 5`, because the
+shortfall is DATA, not the cut-off.** Among singleton-MEC graphs -- graphs that ARE
+identifiable from observation alone -- the true DAG clears 0.7 only 40% of the time at `d=5`
+and `d=6`, and clears even 0.5 only 67% of the time. At `d=6` the posterior fails to
+concentrate on the whole EQUIVALENCE CLASS in over half of episodes. With `n_obs=1000` the
+environment simply does not supply enough evidence at `d >= 5` for any mass-based criterion
+to be earnable.
+
+[PROPOSED, needs a decision] **Split GATE 1 into two checks that are currently conflated.**
+
+  G1a  LEAK CHECK. The observational-only identification rate must not EXCEED the singleton
+       fraction. This is the original purpose -- it catches the d=4 bug this project was
+       built to fix, where episodes were solved without acting.
+  G1b  POWER CHECK. Among singleton-MEC graphs, the observational-only rate must be HIGH
+       (>= 0.9). If it fails, the environment is underpowered and the fix is more data,
+       not a looser criterion.
+
+As written, GATE 1 fails identically whether the environment leaks or is starved, and those
+need opposite fixes. Under the split, `d=6` fails G1b at 0.400 and passes G1a -- which is the
+correct diagnosis, and it prescribes raising `n_obs` rather than weakening the criterion.
+
+Open: the `n_obs` needed for G1b to pass at `d=5,6` is measurable with the same script and
+has not been measured.
