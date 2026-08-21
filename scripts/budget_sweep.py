@@ -35,8 +35,8 @@ from typing import Dict, List
 
 import numpy as np
 
-from ma.baselines import GreedyAgentPolicy, RandomAgentPolicy
-from ma.env import MAConfig, PASS_ACTION, TwoAgentEnv
+from legacy.ma_v1.baselines import GreedyAgentPolicy, RandomAgentPolicy
+from legacy.ma_v1.env import MAConfig, PASS_ACTION, TwoAgentEnv
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 from sa.baselines import GreedyOracleDPPolicy, RandomPolicy

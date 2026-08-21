@@ -41,8 +41,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ma.env import MAConfig
-from ma.policy import IndependentPPO, MAPPOConfig
+from legacy.ma_v1.env import MAConfig
+from legacy.ma_v1.policy import IndependentPPO, MAPPOConfig
 from ma.score_regimes import RULES
 from ma.topology import Topology
 from scripts.ma_train import evaluate_baseline, evaluate_learned

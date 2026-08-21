@@ -16,11 +16,11 @@ import time
 
 import numpy as np
 
-from ma.baselines2 import make_baselines
-from ma.env2 import (AGENTS, CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
-                     MA2Config, TwoAgentEnv2)
-from ma.evaluate2 import run_arm
-from ma.policy2 import IndependentPPO2, MA2PPOConfig
+from ma.baselines import make_baselines
+from ma.env import (AGENTS, CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
+                     MAConfig, TwoAgentEnv)
+from ma.evaluate import run_arm
+from ma.policy import IndependentPPO, PPOConfig
 from ma.topology import Topology
 
 
@@ -31,23 +31,26 @@ def main(argv=None) -> dict:
     ap.add_argument("--disclose_regime", action="store_true")
     ap.add_argument("--n_obs", type=int, default=1000)
     ap.add_argument("--n_int", type=int, default=100)
-    ap.add_argument("--budget", type=int, default=8)
+    # ROUNDS for the whole system, a shared pool -- NOT interventions per agent. Semantics
+    # changed 2026-08-21, see docs/TURN_BUDGET_SPEC.md section 2.
+    ap.add_argument("--budget", type=int, default=10)
     ap.add_argument("--train_episodes", type=int, default=4000)
     ap.add_argument("--eval_episodes", type=int, default=200)
     ap.add_argument("--rule", default="joint_conf")
     ap.add_argument("--potential_shaping", type=float, default=0.0)
     ap.add_argument("--mask_pass_updates", type=int, default=0)
-    # Exposed because it turned out to be the lever that decides whether acting is worth
-    # anything at all. At 0.05 x ~7.7 steps, a random-level policy has expected value
-    # -0.255 against 0.000 for passing, so PASSING IS OPTIMAL and a collapse is correct
-    # behaviour rather than a training failure.
-    ap.add_argument("--step_cost", type=float, default=0.05)
+    # DEFAULT ZERO since 2026-08-21. At 0.05 a random-level policy has expected value
+    # -0.255 against 0.000 for passing, so PASSING WAS OPTIMAL and every recorded collapse
+    # was the agent being correct. Coupled to the absence of voluntary termination -- see
+    # docs/TURN_BUDGET_SPEC.md section 5 before changing either.
+    ap.add_argument("--step_cost", type=float, default=0.0)
     # Protocol. The default stays `simultaneous` so that re-running an old command
     # reproduces the old number; turn-taking is opted into explicitly, and the choice is
     # recorded in the report so no two numbers can be compared across protocols by accident.
     ap.add_argument("--turn_order", default=SIMULTANEOUS, choices=list(TURN_ORDERS))
-    # Clamp-only is an ARM. Budget stays PER AGENT under turn-taking, so the number of
-    # rounds in which a partner is de-confounded is unchanged by the protocol switch.
+    # Clamp-only. Measured 2026-08-21: costs at most ~4pp against keeping both modes
+    # (paired, 8/10 seeds favour both, CI [-0.005, +0.041]) and buys a halved action space.
+    # A trade, not a demonstration that vary is useless.
     ap.add_argument("--clamp_only", action="store_true",
                     help="restrict the action space to clamps; the vary mode is removed")
     ap.add_argument("--out", default=None)
@@ -55,14 +58,14 @@ def main(argv=None) -> dict:
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     modes = (CLAMP,) if args.clamp_only else MODES
-    config = MA2Config(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
+    config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
                        score_rule=args.rule, step_cost=args.step_cost,
                        turn_order=args.turn_order, action_modes=modes)
-    env = TwoAgentEnv2(config)
+    env = TwoAgentEnv(config)
     started = time.time()
 
-    ppo = IndependentPPO2(env, MA2PPOConfig(
+    ppo = IndependentPPO(env, PPOConfig(
         total_episodes=args.train_episodes, seed=args.seed,
         potential_shaping=args.potential_shaping,
         mask_pass_updates=args.mask_pass_updates))

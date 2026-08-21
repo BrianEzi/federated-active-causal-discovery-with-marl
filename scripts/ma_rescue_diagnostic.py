@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ma.env import AgentView
+from legacy.ma_v1.env import AgentView
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 from sa.scm import sample_multi, sample_scm_params

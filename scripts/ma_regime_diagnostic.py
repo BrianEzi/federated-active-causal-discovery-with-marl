@@ -41,8 +41,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ma.baselines import GreedyAgentPolicy
-from ma.env import CLAMP, VARY, AgentView, MAConfig, TwoAgentEnv
+from legacy.ma_v1.baselines import GreedyAgentPolicy
+from legacy.ma_v1.env import CLAMP, VARY, AgentView, MAConfig, TwoAgentEnv
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 from sa.scm import sample_multi, sample_scm_params

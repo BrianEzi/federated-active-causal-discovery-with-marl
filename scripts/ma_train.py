@@ -35,9 +35,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ma.baselines import GreedyAgentPolicy, RandomAgentPolicy
-from ma.env import MAConfig, TwoAgentEnv
-from ma.policy import IndependentPPO, MAPPOConfig
+from legacy.ma_v1.baselines import GreedyAgentPolicy, RandomAgentPolicy
+from legacy.ma_v1.env import MAConfig, TwoAgentEnv
+from legacy.ma_v1.policy import IndependentPPO, MAPPOConfig
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 

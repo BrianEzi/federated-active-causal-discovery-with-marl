@@ -12,21 +12,21 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env2 import (AGENTS, CLAMP, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
-                     MA2Config, TwoAgentEnv2)
+from ma.env import (AGENTS, CLAMP, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
+                     MAConfig, TwoAgentEnv)
 from ma.topology import Topology
 
 T_1_1_3 = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 T_2_2_2 = Topology(name="T1", a_private=(0, 1), b_private=(2, 3), exposed=(4, 5))
 
 
-def _env(**kw) -> TwoAgentEnv2:
-    config = MA2Config(topology=T_1_1_3, n_obs=200, n_int=50, budget=3,
+def _env(**kw) -> TwoAgentEnv:
+    config = MAConfig(topology=T_1_1_3, n_obs=200, n_int=50, budget=3,
                        disclose_regime=True, **kw)
-    return TwoAgentEnv2(config, seed=0)
+    return TwoAgentEnv(config, seed=0)
 
 
-def _clamp_own_private(env: TwoAgentEnv2, name: str) -> int:
+def _clamp_own_private(env: TwoAgentEnv, name: str) -> int:
     """The action index that clamps this agent's own private node."""
     window = env.windows[name]
     private = set(env.topology.a_private if name == "A" else env.topology.b_private)
@@ -122,14 +122,14 @@ def test_multi_private_topology_is_refused_rather_than_scored_wrong():
     """With two hidden nodes a single clamp leaves a block PARTIALLY clean, which the
     regime rules would score as fully confounding-free. Refuse until per-block confounding
     subsets exist."""
-    config = MA2Config(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
+    config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
     with pytest.raises(NotImplementedError, match="hides 2 nodes"):
-        TwoAgentEnv2(config, seed=0)
+        TwoAgentEnv(config, seed=0)
 
 
 def test_turn_order_is_validated():
     with pytest.raises(ValueError, match="turn_order"):
-        TwoAgentEnv2(MA2Config(topology=T_1_1_3, turn_order="alternating"), seed=0)
+        TwoAgentEnv(MAConfig(topology=T_1_1_3, turn_order="alternating"), seed=0)
 
 
 # -- determinism ------------------------------------------------------------------------

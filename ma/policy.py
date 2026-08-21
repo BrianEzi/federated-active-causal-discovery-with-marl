@@ -1,275 +1,301 @@
-"""Independent PPO for the two-agent case. One network per agent, no CTDE.
+"""PHASE 5 -- independent PPO for the rebuilt two-agent environment.
 
-Each agent has its own actor-critic, sees only its own observation (edge marginals over its
-own window plus its remaining budget), and emits an index into its own (target, mode)
-action list. Nothing in the training loop lets one agent see the other's belief,
-observation, action, or gradient. That is the supervisor's constraint, and it is enforced
-structurally rather than by convention -- `_observe` takes an agent name and can only reach
-that agent's view.
+No CTDE [supervisor constraint]: each agent has its own actor, its own critic, its own
+optimiser, and sees only its own observation. Nothing is shared but the scalar reward,
+which is necessary rather than incidental -- a selfish agent has no reason to clamp for its
+partner, so a per-agent reward makes the target behaviour strictly dominated [U15].
 
-REWARD IS SHARED, and this is the one decision that genuinely changes the problem.
-Recorded here rather than buried:
+THE FIRST TASK HERE IS NOT TRAINING, IT IS THE 1-IN-10 SEED COLLAPSE. sd 0.154 on a median
+of 0.312, with one seed in ten degenerating into passing immediately. Three ordered
+hypotheses, each with a lever in `PPOConfig` that isolates it:
 
-    A purely self-interested B has NO reason to clamp its private node for A's benefit.
-    Clamping costs B a turn and teaches B nothing it wants -- the entire benefit lands in
-    A's window, which B cannot even see. Under per-agent reward the coordination behaviour
-    this whole design exists to study is strictly dominated, and no amount of training
-    would produce it. It would not be a hard exploration problem; it would be a
-    correctly-solved different problem.
+  1. entropy collapse       policy entropy falls before any reward signal arrives.
+                            Lever: `entropy_coef`, and `entropy_floor` traces it.
+  2. PASS too attractive    with a step cost and a low initial solve rate, passing dominates
+                            until the policy is good enough for the +1 to be reachable.
+                            Lever: `mask_pass_updates`.
+  3. reward never sampled   the +1 is never seen at all on the collapsed seed.
+                            Diagnostic: `first_success_episode` in the trace.
 
-    So both agents receive the same terminal reward, paid when BOTH have identified their
-    own induced DAG. Each still pays for its own interventions, so budgets stay separate
-    and the agents are not merged into one decision-maker.
-
-    This is a cooperative team objective, not centralised training: the shared quantity is
-    a scalar reward, not observations, parameters, or gradients. Two labs jointly mapping
-    one system share the goal without sharing the data, which is the setting.
-
-    The alternative -- per-agent reward plus an explicit "helping" bonus -- was rejected as
-    circular: it would hand-code the answer the experiment is supposed to measure.
+`potential_shaping` implements the fix that follows from hypothesis 3 without changing the
+task. With potential Phi(s) = -H(belief), the shaping term gamma*Phi(s') - Phi(s) is
+POLICY-INVARIANT (Ng, Harada & Russell 1999): the optimal policy is provably unchanged and
+only the gradient becomes informative. It also sharpens the headline claim rather than
+weakening it -- greedy EIG becomes the myopic optimum of the agent's own reward, so
+"beats greedy" becomes "beats the one-step optimum of its own objective".
 """
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ma.env import MAConfig, TwoAgentEnv
+from ma.env import AGENTS, TwoAgentEnv
+
+DEVICE = torch.device("cpu")
 
 
 @dataclass
-class MAPPOConfig:
-    lr: float = 1e-3
+class PPOConfig:
     hidden: int = 128
+    lr: float = 3e-4
     gamma: float = 0.99
-    lam: float = 0.95
+    gae_lambda: float = 0.95
     clip: float = 0.2
     entropy_coef: float = 0.01
     value_coef: float = 0.5
     epochs: int = 4
     episodes_per_update: int = 16
     total_episodes: int = 4000
-    step_cost: float = 0.05
-    # Extra cost charged ONLY for a clamp, on top of step_cost. Zero by default, which is
-    # what the 2026-08-17 runs used.
-    #
-    # Why it exists: those runs learned to clamp (84-96%) but not WHEN -- clamp rates on
-    # confounded and unconfounded episodes differed by +0.057/+0.036/-0.006. Seed 2 clamped
-    # 95.7% even where clamping is pointless and finished below random. A price on clamping
-    # is the minimal, non-circular way to make indiscriminate clamping costly: it does not
-    # tell the agent when to clamp, it only makes clamping-always a worse policy than
-    # clamping-when-it-pays. The rejected alternative was shaping on unresolved shared-pair
-    # ambiguity, which hand-codes the answer the experiment is meant to measure.
-    clamp_cost: float = 0.0
     seed: int = 0
+    # Hypothesis 2's lever: PASS is unavailable for this many updates, so the policy cannot
+    # settle into "do nothing" before it has ever seen the terminal reward.
+    mask_pass_updates: int = 0
+    # Hypothesis 3's fix. Potential-based, hence policy-invariant.
+    potential_shaping: float = 0.0
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, obs_dim: int, n_actions: int, hidden: int = 128):
+    """Deliberately small and feedforward. The observation is a belief summary, so the
+    problem is close to a proper MDP and recurrence has nothing obvious to add; adding it
+    would also reintroduce the saturating running state previously diagnosed as the cause
+    of a greedy collapse."""
+
+    def __init__(self, obs_size: int, n_actions: int, hidden: int):
         super().__init__()
-        self.trunk = nn.Sequential(
-            nn.Linear(obs_dim, hidden), nn.Tanh(),
-            nn.Linear(hidden, hidden), nn.Tanh(),
-        )
+        self.body = nn.Sequential(
+            nn.Linear(obs_size, hidden), nn.Tanh(),
+            nn.Linear(hidden, hidden), nn.Tanh())
         self.actor = nn.Linear(hidden, n_actions)
         self.critic = nn.Linear(hidden, 1)
 
-    def forward(self, obs):
-        features = self.trunk(obs)
-        return self.actor(features), self.critic(features).squeeze(-1)
+    def forward(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        latent = self.body(obs)
+        return self.actor(latent), self.critic(latent).squeeze(-1)
+
+
+def belief_entropy(marginals: np.ndarray) -> float:
+    """H of the edge-marginal field, in nats -- the shaping potential's magnitude.
+
+    Not the exact posterior entropy: that would need the full joint, which is the thing the
+    DP exists to avoid materialising. Potential-based shaping stays policy-invariant for ANY
+    potential function, so an approximate one costs nothing in correctness -- only in how
+    informative the gradient is.
+    """
+    off = ~np.eye(marginals.shape[0], dtype=bool)
+    p = np.clip(marginals[off], 1e-9, 1 - 1e-9)
+    return float(-(p * np.log(p) + (1 - p) * np.log(1 - p)).sum())
 
 
 class IndependentPPO:
-    """Two independent PPO learners on one shared environment."""
+    """One PPO learner per agent. No shared parameters, gradients, or observations."""
 
-    def __init__(self, env_config: MAConfig, ppo_config: MAPPOConfig):
-        self.cfg = ppo_config
-        self.env = TwoAgentEnv(env_config, seed=ppo_config.seed)
-        self.env_config = env_config
-        torch.manual_seed(ppo_config.seed)
-        self.rng = np.random.default_rng(ppo_config.seed)
+    def __init__(self, env: TwoAgentEnv, config: PPOConfig):
+        self.env = env
+        self.config = config
+        torch.manual_seed(config.seed)
+        self.rng = np.random.default_rng(config.seed)
+        self.nets = {
+            name: ActorCritic(env.obs_size(name), env.n_actions(name), config.hidden)
+            for name in AGENTS}
+        self.opts = {name: torch.optim.Adam(net.parameters(), lr=config.lr)
+                     for name, net in self.nets.items()}
+        self.history: List[dict] = []
+        self.first_success_episode: Optional[int] = None
 
-        self.names = ("A", "B")
-        self.nets: Dict[str, ActorCritic] = {}
-        self.opts: Dict[str, torch.optim.Optimizer] = {}
-        for name in self.names:
-            net = ActorCritic(self.env.observation_dim(name),
-                              self.env.n_actions(name), ppo_config.hidden)
-            self.nets[name] = net
-            self.opts[name] = torch.optim.Adam(net.parameters(), lr=ppo_config.lr)
+    # -- rollout ------------------------------------------------------------------------
 
-    # -- rollout -------------------------------------------------------------------
-
-    def _act(self, name: str, obs: np.ndarray, deterministic: bool = False):
-        tensor = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+    def _act(self, name: str, obs: np.ndarray, mask_pass: bool):
+        # Rollout only -- gradients come from the recomputed forward pass in `update`, so
+        # nothing here needs the graph. Without no_grad these floats drag a live autograd
+        # graph into the buffers.
         with torch.no_grad():
-            logits, value = self.nets[name](tensor)
-        if deterministic:
-            action = int(torch.argmax(logits, dim=-1).item())
-            return action, 0.0, float(value.item())
-        dist = torch.distributions.Categorical(logits=logits)
-        action = dist.sample()
-        return int(action.item()), float(dist.log_prob(action).item()), float(value.item())
+            logits, value = self.nets[name](torch.as_tensor(obs, dtype=torch.float32))
+            if mask_pass:
+                logits = logits.clone()
+                logits[self.env.windows[name].pass_index] = -1e9
+            dist = torch.distributions.Categorical(logits=logits)
+            action = dist.sample()
+            return (int(action), float(dist.log_prob(action)), float(value),
+                    float(dist.entropy()))
 
-    def collect(self, n_episodes: int, deterministic: bool = False) -> dict:
-        cfg = self.cfg
-        buf = {name: {"obs": [], "act": [], "logp": [], "val": [],
-                      "rew": [], "done": []} for name in self.names}
-        stats = {"solved": [], "length": [], "clamp_fraction": [],
-                 "solved_A": [], "solved_B": []}
+    def collect(self, episodes: int, episode_offset: int, mask_pass: bool) -> Dict[str, dict]:
+        cfg = self.config
+        buffers = {name: {k: [] for k in
+                          ("obs", "action", "logp", "value", "reward", "done")}
+                   for name in AGENTS}
+        entropies: List[float] = []
+        solved = 0
 
-        for _ in range(n_episodes):
+        for episode in range(episodes):
             result = self.env.reset(seed=int(self.rng.integers(1 << 30)))
-            steps = 0
-            clamps = 0
-            actions_taken = 0
+            potential = {n: -belief_entropy(result.beliefs[n]) for n in AGENTS}
+            while not result.done:
+                obs = {n: self.env.observation(n) for n in AGENTS}
+                picks = {n: self._act(n, obs[n], mask_pass) for n in AGENTS}
+                result = self.env.step(picks["A"][0], picks["B"][0])
+                new_potential = {n: -belief_entropy(result.beliefs[n]) for n in AGENTS}
+                for name in AGENTS:
+                    shaped = result.reward
+                    if cfg.potential_shaping:
+                        shaped += cfg.potential_shaping * (
+                            cfg.gamma * new_potential[name] - potential[name])
+                    action, logp, value, entropy = picks[name]
+                    buf = buffers[name]
+                    buf["obs"].append(obs[name])
+                    buf["action"].append(action)
+                    buf["logp"].append(logp)
+                    buf["value"].append(value)
+                    buf["reward"].append(shaped)
+                    buf["done"].append(float(result.done))
+                    entropies.append(entropy)
+                potential = new_potential
+            if result.info["both_identified"]:
+                solved += 1
+                if self.first_success_episode is None:
+                    self.first_success_episode = episode_offset + episode
 
-            while not result.done and steps < self.env_config.budget:
-                chosen, logps, values, observations = {}, {}, {}, {}
-                for name in self.names:
-                    observations[name] = self.env.observation(name)
-                    chosen[name], logps[name], values[name] = self._act(
-                        name, observations[name], deterministic)
+        for name in AGENTS:
+            for key in buffers[name]:
+                buffers[name][key] = np.asarray(buffers[name][key], dtype=np.float32)
+        return {"buffers": buffers, "entropy": float(np.mean(entropies)),
+                "solve_rate": solved / episodes}
 
-                for name in self.names:
-                    target, mode = self.env.views[name].actions[chosen[name]]
-                    if target != -1:
-                        actions_taken += 1
-                        if mode == "clamp":
-                            clamps += 1
+    # -- learning -----------------------------------------------------------------------
 
-                result = self.env.step(chosen["A"], chosen["B"])
-                steps += 1
-                done = result.done or steps >= self.env_config.budget
-
-                # SHARED terminal reward, per-agent step cost. See the module docstring.
-                team = 1.0 if result.info["both_identified"] else 0.0
-                for name in self.names:
-                    target, mode = self.env.views[name].actions[chosen[name]]
-                    cost = 0.0
-                    if target != -1:
-                        cost = cfg.step_cost + (cfg.clamp_cost if mode == "clamp" else 0.0)
-                    buf[name]["obs"].append(observations[name])
-                    buf[name]["act"].append(chosen[name])
-                    buf[name]["logp"].append(logps[name])
-                    buf[name]["val"].append(values[name])
-                    buf[name]["rew"].append((team if done else 0.0) - cost)
-                    buf[name]["done"].append(done)
-
-            stats["solved"].append(float(result.info["both_identified"]))
-            stats["solved_A"].append(float(result.identified["A"]))
-            stats["solved_B"].append(float(result.identified["B"]))
-            stats["length"].append(steps)
-            stats["clamp_fraction"].append(clamps / max(actions_taken, 1))
-
-        return {"buf": buf, "stats": stats}
-
-    # -- learning ------------------------------------------------------------------
-
-    def _advantages(self, rewards, values, dones):
-        cfg = self.cfg
-        adv = np.zeros(len(rewards), dtype=np.float32)
-        last = 0.0
-        for t in reversed(range(len(rewards))):
+    def _advantages(self, buf: dict) -> Tuple[np.ndarray, np.ndarray]:
+        cfg = self.config
+        rewards, values, dones = buf["reward"], buf["value"], buf["done"]
+        advantages = np.zeros_like(rewards)
+        running = 0.0
+        for t in range(len(rewards) - 1, -1, -1):
             next_value = 0.0 if dones[t] else (values[t + 1] if t + 1 < len(values) else 0.0)
             delta = rewards[t] + cfg.gamma * next_value - values[t]
-            last = delta + cfg.gamma * cfg.lam * (0.0 if dones[t] else last)
-            adv[t] = last
-        returns = adv + np.asarray(values, dtype=np.float32)
-        # Normalised over the whole batch, AFTER the recursion -- normalising inside the
-        # loop was the single-agent `compute_gae` bug (memory: advantage normalisation).
-        if adv.std() > 1e-8:
-            adv = (adv - adv.mean()) / (adv.std() + 1e-8)
-        return adv, returns
+            running = delta + cfg.gamma * cfg.gae_lambda * (0.0 if dones[t] else running)
+            advantages[t] = running
+        returns = advantages + values
+        return advantages, returns
 
-    def _update(self, name: str, data: dict) -> dict:
-        cfg = self.cfg
-        obs = torch.as_tensor(np.asarray(data["obs"]), dtype=torch.float32)
-        act = torch.as_tensor(np.asarray(data["act"]), dtype=torch.long)
-        old_logp = torch.as_tensor(np.asarray(data["logp"]), dtype=torch.float32)
-        adv_np, ret_np = self._advantages(data["rew"], data["val"], data["done"])
-        adv = torch.as_tensor(adv_np, dtype=torch.float32)
-        ret = torch.as_tensor(ret_np, dtype=torch.float32)
+    def update(self, buffers: Dict[str, dict]) -> None:
+        cfg = self.config
+        for name in AGENTS:
+            buf = buffers[name]
+            advantages, returns = self._advantages(buf)
+            # Normalise over the whole batch, AFTER computing returns. Normalising before
+            # would corrupt the critic's target -- the exact advantage-normalisation bug
+            # that once put a floor of ~400 under the critic loss.
+            std = advantages.std()
+            normed = (advantages - advantages.mean()) / (std + 1e-8)
 
-        net, opt = self.nets[name], self.opts[name]
-        losses = {}
-        for _ in range(cfg.epochs):
-            logits, values = net(obs)
-            dist = torch.distributions.Categorical(logits=logits)
-            logp = dist.log_prob(act)
-            ratio = torch.exp(logp - old_logp)
-            clipped = torch.clamp(ratio, 1 - cfg.clip, 1 + cfg.clip)
-            policy_loss = -torch.min(ratio * adv, clipped * adv).mean()
-            value_loss = F.mse_loss(values, ret)
-            entropy = dist.entropy().mean()
-            loss = policy_loss + cfg.value_coef * value_loss - cfg.entropy_coef * entropy
+            obs = torch.as_tensor(buf["obs"], dtype=torch.float32)
+            actions = torch.as_tensor(buf["action"], dtype=torch.long)
+            old_logp = torch.as_tensor(buf["logp"], dtype=torch.float32)
+            adv = torch.as_tensor(normed, dtype=torch.float32)
+            ret = torch.as_tensor(returns, dtype=torch.float32)
 
-            opt.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(net.parameters(), 0.5)
-            opt.step()
-            losses = {"policy_loss": float(policy_loss.item()),
-                      "value_loss": float(value_loss.item()),
-                      "entropy": float(entropy.item())}
-        return losses
+            for _ in range(cfg.epochs):
+                logits, values = self.nets[name](obs)
+                dist = torch.distributions.Categorical(logits=logits)
+                logp = dist.log_prob(actions)
+                ratio = torch.exp(logp - old_logp)
+                clipped = torch.clamp(ratio, 1 - cfg.clip, 1 + cfg.clip)
+                policy_loss = -torch.min(ratio * adv, clipped * adv).mean()
+                value_loss = F.mse_loss(values, ret)
+                entropy = dist.entropy().mean()
+                loss = (policy_loss + cfg.value_coef * value_loss
+                        - cfg.entropy_coef * entropy)
+                self.opts[name].zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.nets[name].parameters(), 0.5)
+                self.opts[name].step()
+
+    def train(self, verbose: bool = False) -> List[dict]:
+        cfg = self.config
+        n_updates = max(1, cfg.total_episodes // cfg.episodes_per_update)
+        for update in range(n_updates):
+            mask_pass = update < cfg.mask_pass_updates
+            batch = self.collect(cfg.episodes_per_update,
+                                 update * cfg.episodes_per_update, mask_pass)
+            self.update(batch["buffers"])
+            record = {"update": update, "entropy": batch["entropy"],
+                      "solve_rate": batch["solve_rate"], "mask_pass": mask_pass}
+            self.history.append(record)
+            if verbose and update % 10 == 0:
+                print(f"  update {update:4d}  entropy {record['entropy']:.3f}  "
+                      f"solve {record['solve_rate']:.3f}", flush=True)
+        return self.history
+
+    # -- use ----------------------------------------------------------------------------
+
+    def policy(self, name: str, deterministic: bool = False):
+        def act(env: TwoAgentEnv, result) -> int:
+            obs = torch.as_tensor(env.observation(name), dtype=torch.float32)
+            with torch.no_grad():
+                logits, _ = self.nets[name](obs)
+            if deterministic:
+                return int(torch.argmax(logits))
+            return int(torch.distributions.Categorical(logits=logits).sample())
+
+        act.reset = lambda seed=None: None
+        return act
+
+    def policies(self, deterministic: bool = False) -> Dict[str, object]:
+        return {name: self.policy(name, deterministic) for name in AGENTS}
+
+    # -- persistence --------------------------------------------------------------------
 
     def save(self, path) -> None:
-        """Persist both agents' networks and the config needed to rebuild them.
+        """Write both agents' weights, with the shapes needed to rebuild them.
 
-        Without this a trained pair is unrecoverable once the process exits, and the
-        cross-rule evaluation -- score a policy trained under one belief rule against
-        another -- would mean retraining every arm from scratch. The rule the policy was
-        TRAINED under is stored alongside, because evaluating a policy under a different
-        rule is the whole point and mixing the two up silently would be easy.
+        Added after the fact, and the omission had a cost worth recording: ten trained
+        two-agent policies were evaluated, reported, and then discarded, because nothing
+        wrote them to disk. Reproducing any qualitative claim about what an agent LEARNED
+        -- which variable it targets, when it clamps, what graph it ends up believing --
+        meant retraining from scratch.
+
+        The observation and action sizes are stored alongside the weights because they are
+        derived from the topology, and a checkpoint that cannot say what environment it
+        belongs to is a checkpoint you cannot trust.
         """
-        from pathlib import Path
+        import torch as _torch
 
-        path = Path(path)
+        path = pathlib.Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({
-            "nets": {name: self.nets[name].state_dict() for name in self.names},
-            "obs_dims": {name: self.env.observation_dim(name) for name in self.names},
-            "n_actions": {name: self.env.n_actions(name) for name in self.names},
-            "hidden": self.cfg.hidden,
-            "seed": self.cfg.seed,
-            "trained_under_rule": self.env_config.score_rule,
-            "topology": self.env_config.topology.name,
+        _torch.save({
+            "nets": {name: net.state_dict() for name, net in self.nets.items()},
+            "hidden": self.config.hidden,
+            "seed": self.config.seed,
+            "obs_size": {name: self.env.obs_size(name) for name in AGENTS},
+            "n_actions": {name: self.env.n_actions(name) for name in AGENTS},
+            "topology": self.env.topology.name,
+            "score_rule": self.env.config.score_rule,
+            "disclose_regime": self.env.config.disclose_regime,
         }, path)
 
-    def load(self, path) -> dict:
-        """Restore both agents' networks. Returns the stored metadata so a caller can check
-        which rule the policy was trained under before scoring it."""
-        payload = torch.load(path, weights_only=False)
-        for name in self.names:
-            self.nets[name].load_state_dict(payload["nets"][name])
-            self.nets[name].eval()
-        return {k: v for k, v in payload.items() if k != "nets"}
+    @classmethod
+    def load(cls, path, env: TwoAgentEnv, config: Optional[PPOConfig] = None):
+        """Rebuild a trained pair against `env`, refusing a mismatched environment."""
+        import torch as _torch
 
-    def train(self, verbose: bool = True) -> List[dict]:
-        cfg = self.cfg
-        history = []
-        done_episodes = 0
-        while done_episodes < cfg.total_episodes:
-            batch = self.collect(cfg.episodes_per_update)
-            done_episodes += cfg.episodes_per_update
-            record = {"episodes": done_episodes,
-                      "solved": float(np.mean(batch["stats"]["solved"])),
-                      "solved_A": float(np.mean(batch["stats"]["solved_A"])),
-                      "solved_B": float(np.mean(batch["stats"]["solved_B"])),
-                      "length": float(np.mean(batch["stats"]["length"])),
-                      "clamp_fraction": float(np.mean(batch["stats"]["clamp_fraction"]))}
-            for name in self.names:
-                for key, value in self._update(name, batch["buf"][name]).items():
-                    record[f"{name}_{key}"] = value
-            history.append(record)
-            if verbose and (done_episodes % (cfg.episodes_per_update * 20) == 0):
-                print(f"  ep {done_episodes:>6}  solved {record['solved']:.3f}"
-                      f"  (A {record['solved_A']:.3f} B {record['solved_B']:.3f})"
-                      f"  len {record['length']:.2f}"
-                      f"  clamp {record['clamp_fraction']:.3f}"
-                      f"  H_A {record['A_entropy']:.3f}", flush=True)
-        return history
+        blob = _torch.load(path, map_location=DEVICE, weights_only=False)
+        for name in AGENTS:
+            if blob["obs_size"][name] != env.obs_size(name):
+                raise ValueError(
+                    "checkpoint is for a different environment: agent %s has obs_size %d, "
+                    "this env has %d" % (name, blob["obs_size"][name], env.obs_size(name)))
+        if blob.get("score_rule") != env.config.score_rule:
+            # Cross-rule numbers are void -- a joint_conf-trained policy scored under
+            # `subset` collapses below random. Performance belongs to the (policy, rule)
+            # pair, so loading across rules is refused rather than warned about.
+            raise ValueError("checkpoint was trained under rule %r, env uses %r"
+                             % (blob.get("score_rule"), env.config.score_rule))
+        learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
+                                                  seed=blob["seed"]))
+        for name in AGENTS:
+            learner.nets[name].load_state_dict(blob["nets"][name])
+        return learner

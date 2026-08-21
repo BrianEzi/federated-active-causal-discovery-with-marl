@@ -10,8 +10,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env2 import MA2Config, TwoAgentEnv2
-from ma.evaluate2 import credit_set, evaluate_episode, union_graph
+from ma.env import MAConfig, TwoAgentEnv
+from ma.evaluate import credit_set, evaluate_episode, union_graph
 from ma.topology import Topology
 from sa.graphs import is_acyclic, mec_signature
 
@@ -23,7 +23,7 @@ def topology():
 
 @pytest.fixture(scope="module")
 def env(topology):
-    return TwoAgentEnv2(MA2Config(topology=topology, n_obs=200, n_int=50, budget=2))
+    return TwoAgentEnv(MAConfig(topology=topology, n_obs=200, n_int=50, budget=2))
 
 
 def test_the_truth_is_always_in_its_own_credit_set(env):
@@ -35,7 +35,7 @@ def test_the_truth_is_always_in_its_own_credit_set(env):
             env.reset(seed=seed)
             truth = window.induced(env.true_adjacency)
             mask = credit_set(window, truth)
-            from ma.baselines2 import _Window
+            from ma.baselines import _Window
             index = next(i for i, dag in enumerate(_Window.get(window.k).dags)
                          if np.array_equal(dag, truth))
             assert mask[index], "the true graph is not in its own credit set"
@@ -45,7 +45,7 @@ def test_credit_requires_private_incident_edges_to_be_exactly_right(env, topolog
     """Part 1 of the criterion is BOUNDARY-INCLUSIVE: every edge touching a private node
     must be oriented correctly, not merely present. At (1,1,3) that is 3 edges per agent,
     so this part is not vacuous at the starting topology."""
-    from ma.baselines2 import _Window
+    from ma.baselines import _Window
     window = env.windows["A"]
     private = [window.pos[n] for n in window.private]
     assert len(private) == 1
@@ -77,7 +77,7 @@ def test_credit_allows_shared_reorientation_within_the_equivalence_class(env):
 
 
 def test_every_credited_graph_is_markov_equivalent_to_the_truth(env):
-    from ma.baselines2 import _Window
+    from ma.baselines import _Window
     window = env.windows["B"]
     for seed in range(8):
         env.reset(seed=seed)
@@ -91,7 +91,7 @@ def test_every_credited_graph_is_markov_equivalent_to_the_truth(env):
 def test_union_of_two_correct_windows_reproduces_the_true_graph(env):
     """The federation claim in one assertion: cross-private edges are forbidden, so every
     permitted edge lies in one window or the other and nothing is lost by restriction."""
-    from ma.baselines2 import _Window
+    from ma.baselines import _Window
     for seed in range(10):
         env.reset(seed=seed)
         indices = {}

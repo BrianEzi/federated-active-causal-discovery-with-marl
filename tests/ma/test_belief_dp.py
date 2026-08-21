@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from ma.belief_dp import JOINT, POOLED, SUBSET, WindowBeliefDP
-from ma.env import AgentView
+from legacy.ma_v1.env import AgentView
 from ma.topology import Topology
 
 FIXTURE = pathlib.Path("tests/fixtures/ma_reference_posteriors.npz")

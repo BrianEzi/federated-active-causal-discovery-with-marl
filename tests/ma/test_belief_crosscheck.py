@@ -15,9 +15,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.baselines2 import _Window, enumerated_posterior
+from ma.baselines import _Window, enumerated_posterior
 from ma.belief_dp import JOINT, JOINT_CONF, POOLED, SUBSET
-from ma.env2 import MA2Config, TwoAgentEnv2
+from ma.env import MAConfig, TwoAgentEnv
 from ma.topology import Topology
 
 TOL = 1e-9
@@ -31,7 +31,7 @@ def topology():
 
 @pytest.mark.parametrize("rule", RULES)
 def test_dp_and_enumeration_agree_on_edge_marginals(topology, rule):
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=300, n_int=50, budget=3,
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=300, n_int=50, budget=3,
                                  score_rule=rule, disclose_regime=True))
     worst = 0.0
     for seed in range(4):
@@ -55,10 +55,10 @@ def test_dp_and_enumeration_agree_on_edge_marginals(topology, rule):
 def test_a_regime_split_actually_occurs(topology):
     """Guards the test above from being vacuous: if no clean rows are ever produced, the
     four rules collapse to the same computation and agreement proves nothing."""
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=300, n_int=50, budget=3,
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=300, n_int=50, budget=3,
                                  score_rule=JOINT_CONF, disclose_regime=True))
     env.reset(seed=0)
-    from ma.env2 import CLAMP
+    from ma.env import CLAMP
     b_clamp = env.windows["B"].actions.index((topology.b_private[0], CLAMP))
     env.step(0, b_clamp)
     assert env.clean["A"].any() and not env.clean["A"].all(), (
@@ -67,7 +67,7 @@ def test_a_regime_split_actually_occurs(topology):
 
 def test_marginals_are_a_valid_probability_field(topology):
     for rule in RULES:
-        env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=300, n_int=50, budget=2,
+        env = TwoAgentEnv(MAConfig(topology=topology, n_obs=300, n_int=50, budget=2,
                                      score_rule=rule))
         env.reset(seed=9)
         env.step(0, 2)

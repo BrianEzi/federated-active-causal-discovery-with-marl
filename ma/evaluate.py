@@ -27,9 +27,9 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ma.baselines2 import _Window, enumerated_posterior
+from ma.baselines import _Window, enumerated_posterior
 from ma.belief_dp import JOINT_CONF
-from ma.env2 import AGENTS, TwoAgentEnv2
+from ma.env import AGENTS, TwoAgentEnv
 from sa.graphs import is_acyclic, mec_signature
 
 
@@ -96,7 +96,7 @@ def credit_candidates(window, truth: np.ndarray) -> np.ndarray:
     return np.asarray(out)
 
 
-def agent_report(env: TwoAgentEnv2, name: str) -> Dict[str, float]:
+def agent_report(env: TwoAgentEnv, name: str) -> Dict[str, float]:
     """Posterior mass on each of the criteria, for one agent."""
     window = env.windows[name]
     truth = window.induced(env.true_adjacency)
@@ -148,7 +148,7 @@ def agent_report(env: TwoAgentEnv2, name: str) -> Dict[str, float]:
     }
 
 
-def union_graph(env: TwoAgentEnv2, map_indices: Dict[str, int]) -> np.ndarray:
+def union_graph(env: TwoAgentEnv, map_indices: Dict[str, int]) -> np.ndarray:
     """Stitch both agents' MAP window graphs into a global adjacency.
 
     Shared edges are claimed by both agents. Disagreement is resolved by OR, which is the
@@ -167,7 +167,7 @@ def union_graph(env: TwoAgentEnv2, map_indices: Dict[str, int]) -> np.ndarray:
     return union
 
 
-def evaluate_episode(env: TwoAgentEnv2) -> Dict[str, object]:
+def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     """Every criterion for one finished episode."""
     threshold = env.config.identify_threshold
     reports = {name: agent_report(env, name) for name in AGENTS}
@@ -195,7 +195,7 @@ def evaluate_episode(env: TwoAgentEnv2) -> Dict[str, object]:
     }
 
 
-def run_arm(env: TwoAgentEnv2, policies: Dict[str, object], episodes: int,
+def run_arm(env: TwoAgentEnv, policies: Dict[str, object], episodes: int,
             seed: int = 0) -> Dict[str, object]:
     """Play one (policy pair) over seeded episodes and score every criterion."""
     for policy in policies.values():
@@ -274,7 +274,7 @@ def _per_agent_block(rows: List[Dict[str, object]]) -> Dict[str, object]:
     coordinate about -- and pooling those episodes with connected ones dilutes exactly the
     effect this project exists to measure.
     """
-    from ma.env2 import AGENTS
+    from ma.env import AGENTS
 
     def mean_over(key: str, name: str) -> float:
         return float(np.mean([r[key][name] for r in rows]))

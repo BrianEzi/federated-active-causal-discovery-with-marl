@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env2 import AGENTS, CLAMP, MA2Config, TwoAgentEnv2, VARY
+from ma.env import AGENTS, CLAMP, MAConfig, TwoAgentEnv, VARY
 from ma.topology import Topology
 
 
@@ -27,8 +27,8 @@ def topology():
 
 
 def make(topology, **kwargs):
-    config = MA2Config(topology=topology, n_obs=200, n_int=50, budget=3, **kwargs)
-    return TwoAgentEnv2(config)
+    config = MAConfig(topology=topology, n_obs=200, n_int=50, budget=3, **kwargs)
+    return TwoAgentEnv(config)
 
 
 def test_observation_uses_only_the_agents_own_columns(topology):

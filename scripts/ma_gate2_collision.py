@@ -38,9 +38,9 @@ import time
 
 import numpy as np
 
-from ma.baselines2 import GreedyAgent, RandomAgent
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
-from ma.evaluate2 import bootstrap_ci
+from ma.baselines import GreedyAgent, RandomAgent
+from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 
@@ -52,7 +52,7 @@ def argmax_diagnostic(env, episodes, seed):
     worked. Reported alongside the arms so the negative result above is falsifiable rather
     than asserted.
     """
-    from ma.baselines2 import _partition_entropy, enumerated_posterior
+    from ma.baselines import _partition_entropy, enumerated_posterior
 
     agents = {n: GreedyAgent(n, env, seed=seed) for n in AGENTS}
 
@@ -143,7 +143,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-    env = TwoAgentEnv2(MA2Config(
+    env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
         disclose_regime=args.disclose_regime))
 

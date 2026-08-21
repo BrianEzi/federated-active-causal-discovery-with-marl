@@ -25,8 +25,8 @@ import json
 import pathlib
 import time
 
-from ma.baselines2 import RandomAgent
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
+from ma.baselines import RandomAgent
+from ma.env import AGENTS, MAConfig, TwoAgentEnv
 from ma.topology import Topology
 from scripts.ma_gates2 import play
 
@@ -43,7 +43,7 @@ def main(argv=None) -> dict:
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-    env = TwoAgentEnv2(MA2Config(
+    env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
         disclose_regime=args.disclose_regime))
     assert env.config.reward_criterion == "u14", env.config.reward_criterion

@@ -42,19 +42,19 @@ import time
 
 import numpy as np
 
-from ma.baselines2 import ForcedClampAgent, GreedyAgent, RandomAgent, make_baselines
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
-from ma.evaluate2 import bootstrap_ci
+from ma.baselines import ForcedClampAgent, GreedyAgent, RandomAgent, make_baselines
+from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 from sa.graphs import mec_signature
 
 
-def singleton_fraction(env: TwoAgentEnv2, draws: int, seed: int) -> dict:
+def singleton_fraction(env: TwoAgentEnv, draws: int, seed: int) -> dict:
     """Prior-weighted fraction of episodes whose BOTH induced windows are alone in their
     equivalence class -- the asymptotic ceiling on observational-only identification."""
     rng = np.random.default_rng(seed)
-    from ma.baselines2 import _Window
+    from ma.baselines import _Window
 
     hits = []
     for _ in range(draws):
@@ -74,7 +74,7 @@ def singleton_fraction(env: TwoAgentEnv2, draws: int, seed: int) -> dict:
     return {"estimate": float(hits.mean()), "ci": bootstrap_ci(hits, seed=seed)}
 
 
-def play(env: TwoAgentEnv2, policies, episodes: int, seed: int, only=None):
+def play(env: TwoAgentEnv, policies, episodes: int, seed: int, only=None):
     """Run episodes, optionally restricted to confounded / unconfounded ones."""
     for policy in policies.values():
         if hasattr(policy, "reset"):
@@ -125,9 +125,9 @@ def main(argv=None) -> dict:
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-    config = MA2Config(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
+    config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime)
-    env = TwoAgentEnv2(config)
+    env = TwoAgentEnv(config)
     started = time.time()
     report = {"config": {"n_obs": args.n_obs, "n_int": args.n_int,
                          "budget": args.budget, "episodes": args.episodes,
@@ -154,7 +154,7 @@ def main(argv=None) -> dict:
     #
     # So the gate runs on `pooled`. What joint_conf does to identification is a separate
     # question, measured separately, and not a property of the environment.
-    gate1_env = TwoAgentEnv2(MA2Config(
+    gate1_env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
         disclose_regime=args.disclose_regime, score_rule="pooled"))
     # CONDITIONED ON UNCONFOUNDED EPISODES, and this is a correction to the gate rather
@@ -210,7 +210,7 @@ def main(argv=None) -> dict:
     # self-defeating and cannot be the coordination ceiling. What is needed is a MIX --
     # clamp some rounds, experiment on others -- which is what random_clamp does and what
     # a learned policy would have to discover.
-    g3_env = TwoAgentEnv2(MA2Config(
+    g3_env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int,
         budget=args.gate3_budget, disclose_regime=args.disclose_regime))
     never = {n: RandomAgent(n, seed=args.seed + 2, allow_clamp=False) for n in AGENTS}

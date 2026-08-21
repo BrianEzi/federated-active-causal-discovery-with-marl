@@ -29,7 +29,7 @@ from typing import Dict, List
 import numpy as np
 
 from ma.confounding import latent_projection_pairs
-from ma.env import PASS_ACTION, MAConfig, TwoAgentEnv
+from legacy.ma_v1.env import PASS_ACTION, MAConfig, TwoAgentEnv
 from ma.projection import bidirected_pairs
 from sa.graphs import build_graph_space
 

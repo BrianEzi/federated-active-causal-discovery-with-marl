@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env import AgentView, MAConfig, TwoAgentEnv
+from legacy.ma_v1.env import AgentView, MAConfig, TwoAgentEnv
 from ma.score_regimes import JOINT, JOINT_CONF, POOLED, RULES, SUBSET, RegimeScorer
 from ma.topology import Topology
 

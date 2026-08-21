@@ -9,20 +9,20 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env2 import (AGENTS, CLAMP, NO_INTERVENTION, PRIVATE_SIGNAL, RANDOM_TURN,
-                     ROUND_ROBIN, SHARED_SIGNAL, SIMULTANEOUS, MA2Config, TwoAgentEnv2)
+from ma.env import (AGENTS, CLAMP, NO_INTERVENTION, PRIVATE_SIGNAL, RANDOM_TURN,
+                     ROUND_ROBIN, SHARED_SIGNAL, SIMULTANEOUS, MAConfig, TwoAgentEnv)
 from ma.topology import Topology
 
 T_1_1_3 = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
-def _env(**kw) -> TwoAgentEnv2:
-    config = MA2Config(topology=T_1_1_3, n_obs=200, n_int=50, budget=6,
+def _env(**kw) -> TwoAgentEnv:
+    config = MAConfig(topology=T_1_1_3, n_obs=200, n_int=50, budget=6,
                        disclose_regime=True, **kw)
-    return TwoAgentEnv2(config, seed=0)
+    return TwoAgentEnv(config, seed=0)
 
 
-def _action(env: TwoAgentEnv2, name: str, *, private: bool, mode: str = CLAMP) -> int:
+def _action(env: TwoAgentEnv, name: str, *, private: bool, mode: str = CLAMP) -> int:
     window = env.windows[name]
     private_nodes = set(env.topology.a_private if name == "A" else env.topology.b_private)
     for index, (node, node_mode) in enumerate(window.actions):
@@ -33,7 +33,7 @@ def _action(env: TwoAgentEnv2, name: str, *, private: bool, mode: str = CLAMP) -
     raise AssertionError(f"no {'private' if private else 'shared'} {mode} action for {name}")
 
 
-def _pass(env: TwoAgentEnv2) -> tuple:
+def _pass(env: TwoAgentEnv) -> tuple:
     return env.windows["A"].pass_index, env.windows["B"].pass_index
 
 
@@ -161,9 +161,9 @@ def test_the_done_bit_comes_from_the_agents_own_posterior_not_the_credit_set():
     adjacency = env.true_adjacency.copy()
     other = adjacency.copy()
     other[:] = False                                  # a different truth, same everything
-    first = TwoAgentEnv2(_env().config, seed=3)
+    first = TwoAgentEnv(_env().config, seed=3)
     first.reset(seed=11, adjacency=adjacency)
-    second = TwoAgentEnv2(_env().config, seed=3)
+    second = TwoAgentEnv(_env().config, seed=3)
     second.reset(seed=11, adjacency=adjacency)
     assert first.done_bit == second.done_bit
 
@@ -216,7 +216,7 @@ def test_graph_connectedness_is_recorded():
 def test_step_cost_defaults_to_zero():
     """Load-bearing with the absence of voluntary termination. Re-adding one without the
     other re-opens the collapse; see TURN_BUDGET_SPEC section 5."""
-    assert MA2Config(topology=T_1_1_3).step_cost == 0.0
+    assert MAConfig(topology=T_1_1_3).step_cost == 0.0
 
 
 def test_acting_is_not_punished_relative_to_declining():

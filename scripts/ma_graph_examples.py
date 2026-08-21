@@ -30,17 +30,17 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from ma.baselines2 import _PerDagIndex, _Window, enumerated_posterior
+from ma.baselines import _PerDagIndex, _Window, enumerated_posterior
 from ma.belief_dp import JOINT_CONF
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
-from ma.evaluate2 import credit_set, evaluate_episode, union_graph
-from ma.policy2 import IndependentPPO2, MA2PPOConfig
+from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.evaluate import credit_set, evaluate_episode, union_graph
+from ma.policy import IndependentPPO, PPOConfig
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 from sa.graphs import is_acyclic, mec_signature
 
 
-def joint_grid(env: TwoAgentEnv2, name: str) -> np.ndarray:
+def joint_grid(env: TwoAgentEnv, name: str) -> np.ndarray:
     """Normalised posterior over (assignment, DAG), shape [n_assign, n_dags].
 
     Rebuilds the same grid `enumerated_posterior` marginalises away, because the identity
@@ -73,7 +73,7 @@ def joint_grid(env: TwoAgentEnv2, name: str) -> np.ndarray:
     return weights / weights.sum()
 
 
-def describe_agent(env: TwoAgentEnv2, name: str) -> Dict:
+def describe_agent(env: TwoAgentEnv, name: str) -> Dict:
     """One agent's answer, in a form that can be drawn."""
     window = env.windows[name]
     space = _Window.get(window.k)
@@ -134,7 +134,7 @@ def describe_agent(env: TwoAgentEnv2, name: str) -> Dict:
     }
 
 
-def run_episode(env: TwoAgentEnv2, policies, seed: int) -> Dict:
+def run_episode(env: TwoAgentEnv, policies, seed: int) -> Dict:
     result = env.reset(seed=seed)
     # PER AGENT. The episode-level flag used to be computed from A's observed set alone and
     # then labelled "confounded", which mislabels every episode confounded only for B --
@@ -207,9 +207,9 @@ def main(argv=None) -> Dict:
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                                  budget=args.budget, disclose_regime=True))
-    learner = IndependentPPO2.load(args.checkpoint, env)
+    learner = IndependentPPO.load(args.checkpoint, env)
     policies = learner.policies(deterministic=False)
 
     episodes = []

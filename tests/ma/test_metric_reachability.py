@@ -20,9 +20,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.baselines2 import RandomAgent
-from ma.env2 import AGENTS, MA2Config, TwoAgentEnv2
-from ma.evaluate2 import agent_report, credit_set, evaluate_episode
+from ma.baselines import RandomAgent
+from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.evaluate import agent_report, credit_set, evaluate_episode
 from ma.projection import bidirected_pairs
 from ma.topology import Topology
 
@@ -34,7 +34,7 @@ def topology():
 
 def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2):
     """Run a clamping random pair and bucket episodes by whether confounding is present."""
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=1000, n_int=100, budget=budget,
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=1000, n_int=100, budget=budget,
                                  disclose_regime=True))
     policies = {n: RandomAgent(n, seed=seed, allow_clamp=True) for n in AGENTS}
     clean_eps, dirty_eps = [], []
@@ -86,7 +86,7 @@ def test_success_is_attainable_at_all(topology):
 def test_credit_mass_never_exceeds_equivalence_mass(topology):
     """Sanity on the nesting: the credit set is a SUBSET of the equivalence class, so its
     mass cannot be larger. Catches an indexing mismatch between the two paths."""
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=600, n_int=100, budget=3,
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=600, n_int=100, budget=3,
                                  disclose_regime=True))
     for episode in range(8):
         env.reset(seed=episode)
@@ -100,8 +100,8 @@ def test_the_truth_is_in_its_own_credit_set(topology):
     """Kept from the earlier suite. Necessary but NOT sufficient -- it passed throughout the
     period when the metric was scoring 0.000 on confounded episodes, because the bug was in
     the posterior indexing rather than in the set."""
-    env = TwoAgentEnv2(MA2Config(topology=topology, n_obs=400, n_int=100, budget=2))
-    from ma.baselines2 import _Window
+    env = TwoAgentEnv(MAConfig(topology=topology, n_obs=400, n_int=100, budget=2))
+    from ma.baselines import _Window
     for episode in range(10):
         env.reset(seed=episode)
         for name in AGENTS:

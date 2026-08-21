@@ -31,7 +31,7 @@ import time
 
 import numpy as np
 
-from ma.env import MAConfig, TwoAgentEnv
+from legacy.ma_v1.env import MAConfig, TwoAgentEnv
 from ma.score_regimes import RULES
 from ma.topology import Topology
 
