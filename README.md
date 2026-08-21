@@ -1,109 +1,51 @@
-# Federated Active Causal Discovery Framework (JAX)
+# Federated Active Causal Discovery with Multi-Agent RL
 
-This repository contains the foundational simulation backend and Deep Multi-Agent Reinforcement Learning (MARL) framework for **Federated Active Causal Discovery**, formulated as a Decentralized Partially Observable Markov Decision Process (Dec-POMDP) in JAX and Haiku/Optax.
+MSc thesis. Several agents each see part of a causal system, choose interventions to run, and
+must recover the structure — **without a central server and without sharing private data.**
+The difficulty the setting creates: a variable one agent cannot see can confound two it can,
+so an agent must sometimes spend a move that helps only its partner.
 
-The primary goal of this framework is to allow multiple decentralized RL agents to interact with, observe, and intervene on their local jurisdiction of a hidden global causal graph, collaborating to discover the true Directed Acyclic Graph (DAG) without sharing private node data.
+## Start here
 
----
+| you want | read |
+|---|---|
+| what is true right now | **`docs/STATE_OF_TRUTH.md`** — established, retracted, open |
+| how scoring works | `docs/SCORING.md` |
+| what every term means | `docs/GLOSSARY.md` |
+| the current protocol | `docs/TURN_BUDGET_SPEC.md` |
+| references | `docs/BIBLIOGRAPHY.md` |
 
-## 📑 System Documentation (`docs/`)
+**Do not cite a number straight out of `docs/logs/`.** Those are chronological and contain
+claims withdrawn later. Check `STATE_OF_TRUTH.md` first.
 
-Detailed technical documentation and algorithmic specifications are available in the [`docs/`](file:///c:/Workspace/MSc%20Project/docs/README.md) directory:
+## Layout
 
-- [**Documentation Index (`docs/README.md`)**](file:///c:/Workspace/MSc%20Project/docs/README.md): Overview and table of contents.
-- [**System Architecture (`docs/ARCHITECTURE.md`)**](file:///c:/Workspace/MSc%20Project/docs/ARCHITECTURE.md): Strict privacy boundaries, meta-learning topologies, algorithmic covariance aggregation, and JAX GPU simulation details.
-- [**MARL Agent Architectures (`docs/AGENTS_AND_MODELS.md`)**](file:///c:/Workspace/MSc%20Project/docs/AGENTS_AND_MODELS.md): Dual-Head `IPPOActor` (Node Embeddings, Multi-Discrete Actions, Graph Edge Scorer) and `IPPOCritic`.
-- [**Causal Evaluator Engine (`docs/CAUSAL_EVALUATOR.md`)**](file:///c:/Workspace/MSc%20Project/docs/CAUSAL_EVALUATOR.md): Deterministic continuous graph stitching, DFS cycle detection, and Dense Structural Hamming Distance (SHD) mixed-cooperative rewards.
-- [**Project Changelog (`docs/CHANGELOG.md`)**](file:///c:/Workspace/MSc%20Project/docs/CHANGELOG.md): History of optimizations, architectural pivots (e.g. QMIX to IPPO), and feature additions.
+    sa/         single agent: graphs, BGe scoring, exact posterior (subset DP), oracle, PPO
+    ma/         two agents: windows, regime scoring, confounding, environment, policy
+    scripts/    only what reproduces a number we cite
+    tests/      570 tests
+    docs/       authoritative set; logs/ and archive/ behind warnings
+    legacy/     superseded code, kept not deleted -- see legacy/README.md
 
----
+`legacy/ma_v1/env.py` looks like dead code and **must not be deleted**: it generated the
+fixture that validates the subset DP to 1e-10, and regenerating it from current code would
+make the check circular.
 
-## 🏗️ Core Architecture Overview
+## Reproduce the headline result
 
-### 1. The JAX Simulation Backend (`src/scm.py`, `src/environment.py`)
-- **Topological `jax.lax.scan`**: Simulates linear and non-linear Additive Noise Models (ANM) following topological ordering natively in JAX.
-- **Meta-Learning Topologies**: Dynamically generates Chains, Colliders, and Forks at the start of every episode to force structural generalization.
-- **Algorithmic State Aggregation**: Tracks a running covariance matrix to maintain the Markov property without relying on unstable RNNs.
+    pip install -r requirements.txt
+    PYTHONPATH=. python -m scripts.ma_seed_batch --arm tb_clamp --seeds 0-9 --jobs 5 \
+        --disclose_regime --turn_order round_robin --budget 10 --clamp_only \
+        --train_episodes 2000 --eval_episodes 150
 
-### 2. IPPO MARL Architecture (`src/marl/ppo_agent.py`)
-- **Independent PPO (IPPO)**: Fully decentralized training execution, ensuring agents learn to act on localized partial observability.
-- **Unified Intervention Action Space**: Agents select `INTERVENE` (natively targeting any node in their local domain or the shared boundary) or `NOOP`.
-- **Graph Structure Estimation**: Predicted DAG structure comes from a fixed, non-learned analytic invariance scorer over the server-stitched covariance (`FederatedCausalEnv.predict_graph_hypothesis`), not a learned graph head -- see `docs/CHANGELOG.md` ("Collapsed ActionCategory to INTERVENE/NOOP") for the prior dual-head design this replaced.
+About 40 minutes on 5 cores. Expect the learned policy near **0.55** against a random floor
+near **0.38**, and — the actual finding — roughly **82% of its clamps aimed at its own private
+node**, against a chance rate of 25% and a myopic-greedy rate of 19%.
 
-### 3. Stitching & Rewards (`src/stitching.py`, `src/rewards.py`)
-- **Deterministic Server-Side Stitching**: Averages continuous boundary predictions across agents to resolve overlapping edge conflicts.
-- **Dense SHD Penalty**: Replaces terminal rewards with a continuous step-by-step SHD penalty that penalizes individual local errors but shares penalties for boundary mistakes and topological cycles.
+That gap is the result: the agents learn to spend moves on the intervention that helps their
+partner rather than themselves, from a shared reward alone, with no communication beyond one
+bit per round.
 
----
+## Tests
 
-## 🚀 Quick Start & CLI Usage
-
-### 1. Running Automated Verification Suite
-Verify the architecture and test all 18 unit and integration tests using `pytest` inside the virtual environment:
-```bash
-python -m pytest tests/ -v
-```
-
-### 2. Launching Training Runs
-Run IPPO training or evaluate a non-learning baseline (Random/Round-Robin):
-
-#### A. IPPO Agent
-```bash
-python -m src.train \
-    --agent_type ippo \
-    --num_variables 4 \
-    --num_agents 2 \
-    --num_episodes 150 \
-    --batch_size 16 \
-    --action_cost 0.5 \
-    --initial_budget 10.0 \
-    --learning_rate 3e-4 \
-    --use_wandb \
-    --wandb_project "federated-causal-marl" \
-    --fixed_graph 0  # Forces environment to use Topology 0 exclusively
-```
-
-#### B. Post-Training Visualization
-After training completes and `evaluation_trace.json` is generated, visualize the agent's behavior:
-```bash
-python -m src.visualize_trace
-```
-
-#### B. Random Baseline (Sanity Check)
-```bash
-python -m src.train \
-    --agent_type random \
-    --num_episodes 10
-```
-
----
-
-## 📁 Repository Structure
-```text
-├── docs/                     # Architectural, mathematical, and model documentation
-├── src/
-│   ├── types.py              # JAX Dataclass structures (SCMConfig, EnvState)
-│   ├── functional.py         # SCM mathematical primitives (Linear, ANM)
-│   ├── scm.py                # JIT-compiled topological sampling
-│   ├── environment.py        # Algorithmic state aggregation and covariance updates
-│   ├── generators.py         # Meta-Learning Topologies (Chain, Collider, Fork)
-│   ├── stitching.py          # Deterministic DAG stitching and DFS cycle detection
-│   ├── rewards.py            # Dense SHD and mixed cooperative/competitive shaping
-│   ├── metrics.py            # SHD, Precision, Recall, and F1 calculations
-│   ├── evaluator_env.py      # PettingZoo/Gym wrapper bridging SCM and IPPO logic
-│   ├── baselines.py          # Random and Round-Robin benchmark agents
-│   └── marl/
-│       ├── ppo_agent.py      # Haiku Dual-Head IPPOActor and IPPOCritic
-│       └── ppo_trainer.py    # Optax IPPO rollout buffer and update loop
-├── tests/
-│   ├── test_evaluator_env.py # Verification for env initialization and steps
-│   ├── test_metrics.py       # Verification for SHD evaluation
-│   ├── test_ppo_agent.py     # Verification for Haiku network shapes & masking
-│   ├── test_rewards.py       # Verification for local/boundary penalties
-│   └── test_stitching.py     # Verification for overlap merging & cycles
-├── shelved/                  # Deprecated QMIX & PAG engines (saved for future phases)
-├── .agents/                  # Autonomous agent configuration and rules
-├── notebooks/                # Production Kaggle GPU training notebooks
-├── README.md
-└── requirements.txt
-```
+    python -m pytest tests/ -q
