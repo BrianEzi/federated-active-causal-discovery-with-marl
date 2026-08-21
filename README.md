@@ -13,6 +13,8 @@ so an agent must sometimes spend a move that helps only its partner.
 | how scoring works | `docs/SCORING.md` |
 | what every term means | `docs/GLOSSARY.md` |
 | the current protocol | `docs/TURN_BUDGET_SPEC.md` |
+| why each value was chosen | `docs/PARAMETERS.md` — measured, derived, or asserted |
+| why each design decision was made | `docs/DECISIONS.md` — and what would overturn it |
 | references | `docs/BIBLIOGRAPHY.md` |
 
 **Do not cite a number straight out of `docs/logs/`.** Those are chronological and contain
