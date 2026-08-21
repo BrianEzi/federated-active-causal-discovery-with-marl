@@ -63,13 +63,53 @@ ROUND_ROBIN = "round_robin"
 RANDOM_TURN = "random"
 TURN_ORDERS = (SIMULTANEOUS, ROUND_ROBIN, RANDOM_TURN)
 
+# The broadcast signal, one categorical per agent per round, free of charge. It names a
+# REGION, never a variable, and carries no value -- see docs/TURN_BUDGET_SPEC.md section 6.
+# Advisory: nothing forces an agent to respect it. PROVISIONAL on the supervisor confirming
+# that a peer-to-peer action-type broadcast is admissible; `disclose_signals=False` removes
+# it in one flag.
+NO_INTERVENTION = "none"
+SHARED_SIGNAL = "shared"
+PRIVATE_SIGNAL = "private"
+SIGNALS = (NO_INTERVENTION, SHARED_SIGNAL, PRIVATE_SIGNAL)
+
+
+def _is_connected(adjacency: np.ndarray) -> bool:
+    """Is the graph one component, ignoring edge direction?
+
+    A DISCONNECTED graph splits the agents into independent subproblems: no path crosses the
+    private/shared boundary, so there is no latent confounding and nothing to coordinate
+    about. Those episodes cannot test what this project is building, so every multi-agent
+    metric is reported split by this flag rather than pooled over both kinds.
+    """
+    a = np.asarray(adjacency) > 0.5
+    d = a.shape[0]
+    if d == 0:
+        return True
+    undirected = a | a.T
+    seen = {0}
+    frontier = [0]
+    while frontier:
+        node = frontier.pop()
+        for other in np.flatnonzero(undirected[node]):
+            if int(other) not in seen:
+                seen.add(int(other))
+                frontier.append(int(other))
+    return len(seen) == d
+
 
 @dataclass
 class MA2Config:
     topology: Topology
     n_obs: int = 1000
     n_int: int = 100
-    budget: int = 5                    # PER AGENT -- separate budgets, not a shared pool
+    # TOTAL ROUNDS FOR THE SYSTEM -- a SHARED POOL, not a per-agent allowance. Every round
+    # consumes one unit whether the active agent intervenes or declines, which is what makes
+    # free-riding cost something: a round A wastes is a round B does not get, and the reward
+    # is shared. Under round-robin this is exactly equivalent to a per-agent budget of
+    # `budget / n_agents`; the two diverge only under random turn order.
+    # NOTE the semantic change from the pre-2026-08-21 meaning ("interventions per agent").
+    budget: int = 10
     # One agent acts per round, or both. Budget stays PER AGENT under turn-taking, which
     # is deliberate: a shared pool would halve each agent's interventions and with them the
     # number of clean rounds, confounding the protocol change with a data-quantity change.
@@ -94,7 +134,16 @@ class MA2Config:
     # this reveals nothing private. Delivered AFTER acting, so it can only condition
     # future moves [U10].
     disclose_shared_targets: bool = True
-    step_cost: float = 0.05
+    # The three-category action-type broadcast. Provisional on the supervisor; one flag.
+    disclose_signals: bool = True
+    # ZERO, and load-bearing. Measured at 0.05: over ~7.7 steps a random-level policy has
+    # expected value -0.255 against 0.000 for passing, so PASSING WAS OPTIMAL and every
+    # recorded "collapse" was the agent being correct. Efficiency pressure now comes from
+    # the finite round budget and from gamma discounting instead.
+    # DO NOT re-introduce a step cost without also re-introducing a termination mechanism:
+    # the two are coupled, and changing one alone re-opens the collapse. See
+    # docs/TURN_BUDGET_SPEC.md section 5.
+    step_cost: float = 0.0
     # WHAT THE AGENT IS ACTUALLY PAID FOR.
     #   "u14"        the specified success criterion: each agent's posterior mass on its
     #                CREDIT SET (private-incident edges exact, Markov equivalent on the
@@ -151,7 +200,7 @@ class AgentWindow:
 
     @property
     def obs_size(self) -> int:
-        return self.k * (self.k - 1) + 1 + len(self.shared) + 1
+        return self.k * (self.k - 1) + 1 + len(self.shared) + 1 + len(SIGNALS)
 
 
 class TwoAgentEnv2:
@@ -211,11 +260,19 @@ class TwoAgentEnv2:
 
         self._credit_cache: Dict[str, np.ndarray] = {}
         self.round = 0
+        self.rounds_used = 0
         self.active: Optional[str] = None
-        # Agents that have passed since the last real action. Under turn-taking an episode
-        # ends only when EVERY agent still holding budget has declined its turn -- see the
-        # `passed` logic in `step`.
-        self._passed_since_action: set = set()
+        # Per-agent behaviour, logged separately and never as a max across agents: an idle
+        # agent hides inside an average, and free-riding is exactly what we need to see.
+        self.forfeits: Dict[str, int] = {n: 0 for n in AGENTS}
+        # Clamps split by TARGET REGION. Clamping a shared node does nothing for a partner;
+        # only clamping one's own private node de-confounds for them. An aggregate clamp
+        # fraction cannot tell those apart, so it cannot measure altruism.
+        self.clamps_private: Dict[str, int] = {n: 0 for n in AGENTS}
+        self.clamps_shared: Dict[str, int] = {n: 0 for n in AGENTS}
+        self.signals: Dict[str, str] = {n: NO_INTERVENTION for n in AGENTS}
+        self.done_bit: Dict[str, float] = {n: 0.0 for n in AGENTS}
+        self.connected = _is_connected(self.true_adjacency)
         self.last_chosen: Dict[str, Tuple[int, Optional[str]]] = {
             n: (PASS_ACTION, None) for n in AGENTS}
         self._refresh()
@@ -230,19 +287,12 @@ class TwoAgentEnv2:
         order = self.config.turn_order
         if order == SIMULTANEOUS:
             return None
-        # Only agents with budget left are eligible. Without this, round-robin hands the
-        # turn to an exhausted agent, whose only legal move is a pass -- which reads as a
-        # voluntary pass and ends the episode while the partner still has moves to spend.
-        eligible = [n for n in AGENTS
-                    if self.n_interventions[n] < self.config.budget]
-        if not eligible:
-            return None
+        # The budget is a shared pool of ROUNDS, so there is no per-agent exhaustion to
+        # skip over: whoever the rotation names may act. The episode simply stops when the
+        # pool runs out.
         if order == ROUND_ROBIN:
-            for offset in range(len(AGENTS)):
-                candidate = AGENTS[(self.round + offset) % len(AGENTS)]
-                if candidate in eligible:
-                    return candidate
-        return str(self._rng.choice(eligible))
+            return AGENTS[self.round % len(AGENTS)]
+        return str(self._rng.choice(AGENTS))
 
     def step(self, action_a: int, action_b: int) -> MA2StepResult:
         cfg = self.config
@@ -261,42 +311,32 @@ class TwoAgentEnv2:
                     actions[name] = self.windows[name].pass_index
         self.round += 1
 
-        # Under SIMULTANEOUS play a mutual pass ends the episode: both agents declined in
-        # the same round, so nobody wants another move.
-        #
-        # Turn-taking needs the same MEANING, not the same test. Reading "everyone passed
-        # this round" literally would let a single agent end the episode unilaterally,
-        # because the inactive agent's pass is forced by the protocol rather than chosen.
-        # Measured consequence of getting this wrong: 5/10 seeds collapsed into passing at
-        # mean_steps 1.11, against 0/10 under simultaneous play -- passing became a free
-        # exit from the step cost. The episode now ends only when every agent that still
-        # HAS budget has declined its own turn.
-        if cfg.turn_order == SIMULTANEOUS:
-            passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
-        else:
-            if self.active is None:
-                passed = True                       # nobody left with budget
-            elif actions[self.active] == self.windows[self.active].pass_index:
-                self._passed_since_action.add(self.active)
-                eligible = {n for n in AGENTS
-                            if self.n_interventions[n] < cfg.budget}
-                passed = eligible.issubset(self._passed_since_action)
-            else:
-                self._passed_since_action.clear()
-                passed = False
+        # THERE IS NO VOLUNTARY TERMINATION. Declining is a forfeit: it burns the round and
+        # the episode rolls on. With `step_cost` at zero there is nothing to escape by
+        # stopping early -- an episode ending with no solution scores 0, while continuing
+        # might still score a discounted +1 -- so early exit is dominated rather than
+        # tempting. Removing the mechanism also removes the entire class of rule that
+        # collapsed 5/10 seeds on 20 August. `passed` survives as a DIAGNOSTIC only.
+        passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
+        self.rounds_used += 1
+
         # What was ACTUALLY applied, after the protocol has had its say. Consumers must
         # tally from this rather than from the submitted actions: under turn-taking the
         # inactive agent still submits a move and it is discarded, so counting submissions
         # double-counts the moves and corrupts any per-move statistic.
         self.last_chosen = {n: self.windows[n].actions[actions[n]] for n in AGENTS}
-        # Nobody acted this round. Under simultaneous play that is the mutual pass and the
-        # episode is over. Under turn-taking it may instead be a FORFEIT -- one agent
-        # declining its turn while the other still intends to act -- and then the round
-        # simply advances to the partner. Either way no data is generated and nothing is
-        # charged: a turn not taken must not hand out a free observational batch, which
-        # would make forfeiting a way to buy data with no budget.
-        if all(actions[n] == self.windows[n].pass_index for n in AGENTS):
-            return self._result(reward=0.0, passed=passed)
+        self._record_signals()
+        self._tally(cfg)
+
+        if passed:
+            # A forfeited round still GENERATES DATA. Both agents receive it -- samples are
+            # shared, so there is no asymmetry -- and because every round produces a batch,
+            # total data volume is constant at `n_obs + budget * n_int` instead of varying
+            # with how much the policy chose to act. That confound is present in every
+            # number this project produced before 2026-08-21.
+            self._append_observational_batch()
+            self._refresh()
+            return self._result(reward=0.0, passed=True)
 
         # Both act on the SAME system. On a collision the more restrictive assignment wins:
         # a clamp fixes the variable outright, so a simultaneous vary cannot also hold.
@@ -349,14 +389,83 @@ class TwoAgentEnv2:
                 self.disclosed[name][window.shared.index(other_node)] = 1.0
             self.regime_bit[name] = float(hidden_clamped) if cfg.disclose_regime else 0.0
 
-        for name in AGENTS:
-            if chosen[name][0] != PASS_ACTION:
-                self.n_interventions[name] += 1
-
         self._refresh()
         cost = cfg.step_cost * sum(
             1 for name in AGENTS if chosen[name][0] != PASS_ACTION)
         return self._result(reward=-cost)
+
+    def _append_observational_batch(self) -> None:
+        """One batch with nothing intervened on -- what a forfeited round produces."""
+        cfg = self.config
+        new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng)
+        self.samples = np.vstack([self.samples, new_samples])
+        for name, window in self.windows.items():
+            self.known[name] = np.vstack(
+                [self.known[name], np.zeros((cfg.n_int, window.k))])
+            # Nothing hidden was clamped, so the batch is DIRTY for a confounded agent.
+            self.clean[name] = np.concatenate(
+                [self.clean[name], np.zeros(cfg.n_int, dtype=bool)])
+            self.disclosed[name] = np.zeros(len(window.shared))
+            self.regime_bit[name] = 0.0
+
+    def _tally(self, cfg) -> None:
+        """Per-agent accounting, from what was APPLIED, in exactly one place.
+
+        A FORFEIT means "I had the move and declined it" -- not "it was not my turn".
+        Counting the inactive agent as forfeiting would make every agent forfeit every round
+        it did not hold, which measures the protocol rather than the policy.
+        """
+        for name in AGENTS:
+            if cfg.turn_order != SIMULTANEOUS and name != self.active:
+                continue
+            node, mode = self.last_chosen[name]
+            if node == PASS_ACTION:
+                self.forfeits[name] += 1
+                continue
+            self.n_interventions[name] += 1
+            if mode == CLAMP:
+                if node in self.windows[name].shared:
+                    self.clamps_shared[name] += 1
+                else:
+                    self.clamps_private[name] += 1
+
+    def _record_signals(self) -> None:
+        """The free broadcast, derived from what was actually applied this round."""
+        for name in AGENTS:
+            node, _mode = self.last_chosen[name]
+            if node == PASS_ACTION:
+                self.signals[name] = NO_INTERVENTION
+            elif node in self.windows[name].shared:
+                self.signals[name] = SHARED_SIGNAL
+            else:
+                self.signals[name] = PRIVATE_SIGNAL
+
+    def _signal_onehot(self, name: str) -> np.ndarray:
+        """The PARTNER's signal, one-hot. Zeros when disclosure is switched off, so the
+        observation width does not change with the flag and a checkpoint stays loadable."""
+        out = np.zeros(len(SIGNALS))
+        if not self.config.disclose_signals:
+            return out
+        other = "B" if name == "A" else "A"
+        out[SIGNALS.index(self.signals[other])] = 1.0
+        return out
+
+    def _update_done_bits(self) -> None:
+        """Each agent's confidence in ITS OWN answer, from ITS OWN posterior.
+
+        Deliberately NOT the credit-set mass. The credit set is defined against the TRUE
+        graph, so its mass is an ORACLE quantity -- and since the reward already computes it
+        every step, it would be free to hand over, which is precisely what made this an easy
+        mistake to make. Free is not the same as legitimate.
+
+        Concentration is measured on the edge marginals: how far the belief sits from
+        maximum uncertainty. Cheap, truth-free, and monotone in how settled the posterior is.
+        """
+        for name, window in self.windows.items():
+            marginals = self.marginals[name]
+            off_diagonal = marginals[~np.eye(window.k, dtype=bool)]
+            # Mean distance from 0.5, rescaled to [0, 1]: 0 is a coin flip on every edge.
+            self.done_bit[name] = float(np.mean(np.abs(off_diagonal - 0.5)) * 2.0)
 
     # -- belief -------------------------------------------------------------------------
 
@@ -372,6 +481,7 @@ class TwoAgentEnv2:
                      else np.zeros(len(self.samples), dtype=bool))
             self.marginals[name] = window.belief.edge_marginals(
                 self.samples[:, window.nodes], self.known[name], clean, cfg.score_rule)
+        self._update_done_bits()
 
     def true_mass(self, name: str) -> float:
         window = self.windows[name]
@@ -469,12 +579,14 @@ class TwoAgentEnv2:
         window = self.windows[name]
         marginals = self.marginals[name]
         off_diagonal = ~np.eye(window.k, dtype=bool)
+        # ROUNDS left in the shared pool -- the same number for both agents now, because
+        # the budget is shared. It was per-agent interventions before 2026-08-21.
         budget_left = np.array(
-            [(self.config.budget - self.n_interventions[name])
-             / max(self.config.budget, 1)])
+            [(self.config.budget - self.rounds_used) / max(self.config.budget, 1)])
         return np.concatenate([marginals[off_diagonal], budget_left,
                                self.disclosed[name],
-                               np.array([self.regime_bit[name]])])
+                               np.array([self.regime_bit[name]]),
+                               self._signal_onehot(name)])
 
     def _result(self, reward: float, passed: bool = False) -> MA2StepResult:
         threshold = self.config.identify_threshold
@@ -485,17 +597,30 @@ class TwoAgentEnv2:
             mass = {name: self.true_mass(name) for name in AGENTS}
             identified = {name: mass[name] >= threshold for name in AGENTS}
             both = all(identified.values())
-        out_of_budget = all(self.n_interventions[n] >= self.config.budget
-                            for n in AGENTS)
+        # The SHARED pool is what ends an episode, together with joint success. Declining
+        # never ends it -- see docs/TURN_BUDGET_SPEC.md section 4.
+        out_of_budget = self.rounds_used >= self.config.budget
         if both:
             reward += 1.0                       # shared terminal reward [U15]
         return MA2StepResult(
             beliefs={n: self.marginals[n].copy() for n in AGENTS},
             identified=identified,
-            done=both or passed or out_of_budget,
+            # `passed` is DELIBERATELY absent: declining never terminates an episode.
+            # It remains in `info` as a diagnostic only. See TURN_BUDGET_SPEC section 4.
+            done=both or out_of_budget,
             reward=reward,
             n_interventions=dict(self.n_interventions),
             info={"true_mass": mass, "both_identified": both, "passed": passed,
+                  # Per agent, never a max across agents: an idle agent hides inside an
+                  # average, and free-riding is the thing we most need to see.
+                  "interventions": dict(self.n_interventions),
+                  "forfeits": dict(self.forfeits),
+                  "clamps_private": dict(self.clamps_private),
+                  "clamps_shared": dict(self.clamps_shared),
+                  "signals": dict(self.signals),
+                  "done_bit": dict(self.done_bit),
+                  "connected": bool(self.connected),
+                  "rounds_used": self.rounds_used,
                   # ROUNDS, not per-agent interventions. Under turn-taking an agent acts
                   # every other round, so `n_interventions` is roughly half the episode
                   # length -- reporting one as the other understates duration by 2x.

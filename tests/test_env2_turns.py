@@ -72,56 +72,17 @@ def test_simultaneous_is_unchanged():
     assert env.n_interventions == {"A": 1, "B": 1}
 
 
-def test_budget_is_per_agent_so_an_exhausted_agent_does_not_end_the_episode():
-    """Round-robin must skip an agent with no budget left. Without the eligibility check
-    the exhausted agent's forced pass reads as a voluntary pass and terminates the episode
-    while its partner still has moves."""
-    env = _env(turn_order=ROUND_ROBIN)
-    env.n_interventions["A"] = env.config.budget          # A is spent, B is not
-    result = env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
-    assert env.active == "B"
-    assert not result.done
-    assert env.n_interventions["B"] == 1
 
 
-def test_one_pass_is_a_forfeit_not_a_termination():
-    """A single agent must NOT be able to end the episode by declining its turn. Reading
-    "everyone passed this round" literally allows exactly that, because the inactive
-    agent's pass is forced by the protocol. Measured cost of the wrong reading: 5/10 seeds
-    collapsed into passing at mean_steps 1.11, against 0/10 under simultaneous play."""
-    env = _env(turn_order=ROUND_ROBIN)
-    result = env.step(env.windows["A"].pass_index, _clamp_own_private(env, "B"))
-    assert not result.info["passed"] and not result.done
-    assert env.n_interventions == {"A": 0, "B": 0}, "a passed round must cost nothing"
-    # B still gets its turn, and can still act.
-    result = env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
-    assert env.active == "B" and env.n_interventions["B"] == 1
 
 
-def test_every_eligible_agent_passing_does_end_the_episode():
-    env = _env(turn_order=ROUND_ROBIN)
-    env.step(env.windows["A"].pass_index, env.windows["B"].pass_index)   # A forfeits
-    result = env.step(env.windows["A"].pass_index, env.windows["B"].pass_index)  # B too
-    assert result.info["passed"] and result.done
 
-
-def test_a_forfeited_turn_generates_no_data():
-    """A turn not taken must not hand out a free observational batch -- otherwise passing
-    becomes a way to buy data without spending budget."""
-    env = _env(turn_order=ROUND_ROBIN)
-    before = len(env.samples)
-    env.step(env.windows["A"].pass_index, _clamp_own_private(env, "B"))
-    assert len(env.samples) == before
-
-
-def test_a_forfeit_does_not_reset_the_partners_pass():
-    """Passes must accumulate across turns: A passes, B passes, episode ends. It is only a
-    real ACTION that clears the tally."""
-    env = _env(turn_order=ROUND_ROBIN)
-    env.step(env.windows["A"].pass_index, env.windows["B"].pass_index)
-    assert env._passed_since_action == {"A"}
-    env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))   # B acts
-    assert env._passed_since_action == set()
+# NOTE. Five tests were REMOVED here on 2026-08-21, not fixed. They pinned the pre-spec
+# rules -- a per-agent intervention budget, the consecutive-pass tally, and "a forfeited turn
+# generates no data" -- all of which `docs/TURN_BUDGET_SPEC.md` deliberately replaces. Their
+# successors live in `tests/test_env2_turn_budget.py`, numbered to the spec's section 12.
+# A test that encodes a superseded decision is worse than no test: it argues for the old
+# design every time someone runs it.
 
 
 # -- the clean regime -------------------------------------------------------------------

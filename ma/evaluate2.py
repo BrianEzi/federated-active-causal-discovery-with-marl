@@ -218,9 +218,22 @@ def run_arm(env: TwoAgentEnv2, policies: Dict[str, object], episodes: int,
                 moves += 1
                 clamps += (mode == "clamp")
         row = evaluate_episode(env)
-        row["threshold_identified"] = result.info["both_identified"]
+        info = result.info
+        row["threshold_identified"] = info["both_identified"]
         row["steps"] = max(result.n_interventions.values())
-        row["rounds"] = result.info["rounds"]
+        row["rounds"] = info["rounds"]
+        # Per agent, never a max. An idle agent is invisible inside `steps`, and free-riding
+        # is precisely what the shared round budget was introduced to make measurable.
+        row["interventions"] = dict(info["interventions"])
+        row["forfeits"] = dict(info["forfeits"])
+        # Clamps split by target REGION. Only a clamp on one's OWN PRIVATE node de-confounds
+        # for a partner; a clamp on a shared node does nothing for them. The aggregate clamp
+        # fraction cannot separate altruism from self-interest, so it is not evidence of
+        # cooperation on its own.
+        row["clamps_private"] = dict(info["clamps_private"])
+        row["clamps_shared"] = dict(info["clamps_shared"])
+        row["done_bit"] = dict(info["done_bit"])
+        row["connected"] = bool(info["connected"])
         rows.append(row)
 
     def rate(key) -> float:
@@ -243,8 +256,52 @@ def run_arm(env: TwoAgentEnv2, policies: Dict[str, object], episodes: int,
         # both are reported and neither may be quoted as the other across protocols.
         "mean_steps": float(np.mean([r["steps"] for r in rows])),
         "mean_rounds": float(np.mean([r["rounds"] for r in rows])),
+        **_per_agent_block(rows),
         "clamp_fraction": float(clamps / moves) if moves else float("nan"),
     }
+
+
+def _per_agent_block(rows: List[Dict[str, object]]) -> Dict[str, object]:
+    """Per-agent behaviour, the connectedness split, and the free-rider index.
+
+    `free_rider_index` is `min(interventions) / max(interventions)` across agents: 1.0 when
+    the pair pulls its weight evenly, 0.0 when one agent did nothing at all. Episodes in
+    which NOBODY acted are excluded -- the ratio is undefined there and would otherwise read
+    as perfect cooperation.
+
+    Every headline is also reported split by CONNECTED. A disconnected graph gives the agents
+    independent subproblems -- no cross-boundary path, so no confounding and nothing to
+    coordinate about -- and pooling those episodes with connected ones dilutes exactly the
+    effect this project exists to measure.
+    """
+    from ma.env2 import AGENTS
+
+    def mean_over(key: str, name: str) -> float:
+        return float(np.mean([r[key][name] for r in rows]))
+
+    ratios = []
+    for r in rows:
+        counts = [r["interventions"][n] for n in AGENTS]
+        if max(counts) > 0:
+            ratios.append(min(counts) / max(counts))
+
+    out: Dict[str, object] = {
+        "interventions_per_agent": {n: mean_over("interventions", n) for n in AGENTS},
+        "forfeits_per_agent": {n: mean_over("forfeits", n) for n in AGENTS},
+        "clamps_private_per_agent": {n: mean_over("clamps_private", n) for n in AGENTS},
+        "clamps_shared_per_agent": {n: mean_over("clamps_shared", n) for n in AGENTS},
+        "done_bit_per_agent": {n: mean_over("done_bit", n) for n in AGENTS},
+        "free_rider_index": float(np.mean(ratios)) if ratios else float("nan"),
+        "never_acted_episodes": float(np.mean(
+            [max(r["interventions"][n] for n in AGENTS) == 0 for r in rows])),
+        "connected_fraction": float(np.mean([r["connected"] for r in rows])),
+    }
+    for label, want in (("connected", True), ("disconnected", False)):
+        subset = [r for r in rows if r["connected"] is want]
+        out["success_%s" % label] = (
+            float(np.mean([float(r["success"]) for r in subset])) if subset else float("nan"))
+        out["episodes_%s" % label] = len(subset)
+    return out
 
 
 def bootstrap_ci(values: Sequence[float], seed: int = 0, draws: int = 2000) -> List[float]:
