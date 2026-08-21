@@ -9,7 +9,7 @@ One row per (configuration, seed). Aggregation across seeds happens in the analy
 here, because a mean over seeds is what hides a lucky run.
 
 Usage:
-    python -m scripts.analyse_sweep --results ~/sa_runs/sweep --out results/sweep
+    python -m legacy.scripts.analyse_sweep --results ~/sa_runs/sweep --out results/sweep
 """
 from __future__ import annotations
 

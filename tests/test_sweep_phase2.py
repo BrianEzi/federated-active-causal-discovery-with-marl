@@ -8,7 +8,7 @@ through the real argument parser.
 import pytest
 
 from scripts.run_experiment import build_parser
-from scripts.sweep_phase2 import ARCHES, BASELINE, build_matrix, to_cli
+from legacy.scripts.sweep_phase2 import ARCHES, BASELINE, build_matrix, to_cli
 
 
 @pytest.fixture(scope="module")

@@ -46,7 +46,7 @@ from sa.graphs import build_graph_space
 from sa.scm import sample as scm_sample, sample_scm_params
 from sa.score import BGeScore
 
-from scripts.exchange_value import induced_order_on_shared, jointly_acyclic
+from legacy.scripts.exchange_value import induced_order_on_shared, jointly_acyclic
 
 
 def local_hypotheses(nodes, shared):

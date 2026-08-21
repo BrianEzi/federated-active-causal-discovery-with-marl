@@ -12,7 +12,7 @@ data size on both d" is deliberately demanding: a lift that appears at one d, or
 one data size, is the shape of noise, and the probe's own seed spread was 0.014 in a pilot
 against a 0.03 threshold.
 
-    python -m scripts.analyse_depth --dir results/probe_depth
+    python -m legacy.scripts.analyse_depth --dir results/probe_depth
 """
 from __future__ import annotations
 

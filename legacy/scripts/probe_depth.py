@@ -14,8 +14,8 @@ Three seeds per cell, not one, because the decision threshold is 0.03 and a sing
 pilot already showed 0.014 of spread between depths on identical data. A rule that fine
 needs to be applied to a mean, or it just reports noise.
 
-    python -m scripts.probe_depth --count
-    python -m scripts.probe_depth --cli 7
+    python -m legacy.scripts.probe_depth --count
+    python -m legacy.scripts.probe_depth --cli 7
 
 DECISION RULE, fixed before the numbers exist: if depth 2 or 3 beats depth 1 by more than
 0.03 mean accuracy at matched data size on BOTH d=4 and d=5, carry the best depth into

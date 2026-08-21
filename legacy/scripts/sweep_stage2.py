@@ -31,7 +31,7 @@ equivalent to lowering the bonus. Only the cost is swept, because the bonus cann
 zero -- with no reward for identifying, passing immediately would be optimal.
 
 Usage mirrors sweep_configs.py:
-    python -m scripts.sweep_stage2 --count | --cli N | --json
+    python -m legacy.scripts.sweep_stage2 --count | --cli N | --json
 """
 from __future__ import annotations
 

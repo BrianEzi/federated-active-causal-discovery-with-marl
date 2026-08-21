@@ -5,7 +5,7 @@ collapse discussion (a fully deterministic policy doesn't make much sense to tre
 *the* evaluation target for an active-experiment-design task, so it's worth checking a
 range rather than only temperature=0.0).
 
-Usage: python -m scripts.temperature_sweep_eval --checkpoint_path diag_runs/RUN/checkpoints/best_ippo_params.pkl --output_dir diag_runs/RUN
+Usage: python -m legacy.scripts.temperature_sweep_eval --checkpoint_path diag_runs/RUN/checkpoints/best_ippo_params.pkl --output_dir diag_runs/RUN
 """
 import argparse
 import json

@@ -24,9 +24,9 @@ show what an invalid environment does to the headline number. It is tagged as su
 can never be read as a normal result.
 
 Usage:
-    python -m scripts.sweep_phase2 --count
-    python -m scripts.sweep_phase2 --cli 7
-    python -m scripts.sweep_phase2            # human-readable listing
+    python -m legacy.scripts.sweep_phase2 --count
+    python -m legacy.scripts.sweep_phase2 --cli 7
+    python -m legacy.scripts.sweep_phase2            # human-readable listing
 """
 from __future__ import annotations
 

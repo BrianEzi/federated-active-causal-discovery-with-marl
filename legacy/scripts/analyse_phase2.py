@@ -22,7 +22,7 @@ configuration shows across seeds is not an effect:
              network can express the mapping at all
   dead       moves under neither
 
-    python -m scripts.analyse_phase2 --results results/phase2
+    python -m legacy.scripts.analyse_phase2 --results results/phase2
 """
 from __future__ import annotations
 
@@ -34,8 +34,8 @@ from typing import Dict, List
 
 import numpy as np
 
-from scripts.analyse_sweep import load_rows
-from scripts.sweep_phase2 import ARCHES, build_matrix
+from legacy.scripts.analyse_sweep import load_rows
+from legacy.scripts.sweep_phase2 import ARCHES, build_matrix
 
 # An effect below this is not distinguishable from the spread a configuration already
 # shows across its own seeds. Stated here rather than chosen per lever after the fact.

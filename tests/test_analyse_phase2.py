@@ -7,15 +7,15 @@ import json
 
 import pytest
 
-from scripts.analyse_phase2 import (
+from legacy.scripts.analyse_phase2 import (
     EFFECT_THRESHOLD,
     classify,
     load_canaries,
     summarise_by_tag,
     tag_to_arm,
 )
-from scripts.analyse_sweep import load_rows
-from scripts.sweep_phase2 import build_matrix
+from legacy.scripts.analyse_sweep import load_rows
+from legacy.scripts.sweep_phase2 import build_matrix
 
 
 def _payload(tag, arch, gaps, canaries=None):
@@ -96,7 +96,7 @@ def test_arms_come_from_the_matrix_not_from_parsing_the_tag():
     assert arms["flat_entropy_coef_0.03"] == "entropy_coef"
     assert arms["pernode_baseline"] == "baseline"
 
-    from scripts.analyse_sweep import _arm_of
+    from legacy.scripts.analyse_sweep import _arm_of
     assert _arm_of("pernode_lr_0.0001") != "lr"   # the reason this module exists
 
 
@@ -157,7 +157,7 @@ def test_canaries_are_loaded_alongside_the_numbers(results):
 def test_incomplete_pairs_are_reported_not_silently_dropped(results, capsys):
     """A task that died leaves one architecture only. Dropping it would quietly turn a
     missing run into an absent lever."""
-    from scripts.analyse_phase2 import main
+    from legacy.scripts.analyse_phase2 import main
     import sys
 
     tmp_path, write = results

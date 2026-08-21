@@ -51,7 +51,7 @@ def main(argv=None):
             if pathlib.Path(out).exists():
                 print("seed %d already done, skipping" % seed, flush=True)
                 continue
-            cmd = [sys.executable, "-u", "-m", "scripts.ma_train2",
+            cmd = [sys.executable, "-u", "-m", "scripts.ma_train",
                    "--seed", str(seed), "--arm", args.arm,
                    "--n_obs", "1000", "--n_int", "100",
                    "--budget", str(args.budget),

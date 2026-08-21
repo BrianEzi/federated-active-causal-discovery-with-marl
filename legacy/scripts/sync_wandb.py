@@ -4,9 +4,9 @@ Compute nodes on Myriad have no outbound internet, so runs are written offline a
 directories under `wandb/` until something with a network connection pushes them. That is
 this script.
 
-    python -m scripts.sync_wandb                # sync everything not yet synced
-    python -m scripts.sync_wandb --dry_run      # list what would be synced
-    python -m scripts.sync_wandb --dir wandb    # non-default location
+    python -m legacy.scripts.sync_wandb                # sync everything not yet synced
+    python -m legacy.scripts.sync_wandb --dry_run      # list what would be synced
+    python -m legacy.scripts.sync_wandb --dir wandb    # non-default location
 
 Deliberately not part of `run_experiment`: a job that tried to sync would hang on the
 network call rather than fail, spending its remaining walltime doing nothing. Keeping the

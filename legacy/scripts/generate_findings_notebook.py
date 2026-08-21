@@ -3,7 +3,7 @@
 Reads the same `results/all_runs.csv` everything else does, so the notebook cannot drift
 from the report. Nothing is hardcoded: change the CSV and the notebook's numbers change.
 
-    python -m scripts.generate_findings_notebook
+    python -m legacy.scripts.generate_findings_notebook
 """
 from __future__ import annotations
 
@@ -426,7 +426,7 @@ print("references:", json.dumps(example["references"], indent=2))
 
 To regenerate the CSV after adding runs:
 
-    python -m scripts.analyse_sweep --results results/raw --out results/all
+    python -m legacy.scripts.analyse_sweep --results results/raw --out results/all
 
 Every result file records the exact command line that produced it, plus the git commit and
 package versions. Note the cluster ran `torch 2.6.0+cpu` and the laptop `2.10.0+cpu`; numpy
