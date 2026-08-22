@@ -351,10 +351,18 @@ structural hypothesis against its OWN columns.
    `PRIVATE_SIGNAL` while cleaning nothing. Under `action_modes=(CLAMP,)` — the default
    since 2026-08-22 — intervened and clamped coincide and the equivalence above is exact.
    Under both modes it is not, and would need a fourth signal category.
-2. **One private node per agent.** At multi-private topologies (rung 2, rung 4), "agent j
-   clamped SOME private node" does not say WHICH, so `C_r` is underdetermined and genuinely
-   would require disclosure beyond today's protocol. Those shapes stay blocked regardless
-   of this document.
+2. **One private node per agent** — *for the CURRENT signal only, not for the maths.*
+   CORRECTED 2026-08-22 after review. Equations (6)-(10) are completely agnostic to whether
+   the hidden nodes belong to one agent or several; `strip_r` needs only that `C_r ⊆ S` is
+   known, and nothing in the derivation reads ownership. What blocks multi-private today is
+   purely that the signal is 3-category, so "agent j clamped SOME private node" does not say
+   WHICH -- a protocol BIT-WIDTH limit, not a mathematical one.
+
+   The earlier version of this section called multi-private a limitation of the method. It
+   is not. And the fix is not a new disclosure CLASS: once the existence of private
+   variables is disclosed at all, naming which of them was clamped is the same kind of
+   disclosure, just wider. Widening `SIGNALS` from 3 categories to "which node index, or
+   none" makes rung 2 and rung 4 work under exactly the same equations.
 
 **Coupled decision, flagged.** `disclose_signals` is provisional pending the supervisor. If
 the signalling channel is ruled inadmissible, S_r at `n >= 3` falls with it: the only
@@ -368,3 +376,55 @@ puts `Σ_C` OUTSIDE `Π_v`, which is exactly the modularity break described in
 `ma/belief_dp.py`'s module docstring — no per-(node, parent-set) table can express it, and
 the subset DP cannot compute it. So "is the signalling channel admissible" and "can we do
 S_r at three agents" are one question, not two.
+
+---
+
+## 14. Why "known `C_r`" is load-bearing: the modularity argument in full
+
+The subset DP (Robinson sink recurrence, `sa/dp.py`) sums over all DAGs in `O(k 2^k)` only
+if a DAG's score is **modular**:
+
+```
+(16)  score(H) = Σ_v f(v, pa_H(v))
+```
+
+each term depending only on that node and its own parent set. That is what permits a
+precomputed table indexed by `(node, parent set)` and a recursion over subsets.
+(NOTE: modular, not SUBmodular -- unrelated to the submodularity that appears in the
+greedy/SGA baseline literature.)
+
+**With `C_r` known**, equation (9) is already of that form:
+
+```
+(17)  log P(rows_r | 𝒜, H) = Σ_v log ℓ(v, π_v \ strip_{C_r}(v,𝒜) | rows_r)      modular
+```
+
+**With `C_r` unknown** and marginalised:
+
+```
+(18)  log P(rows_r | 𝒜, H) = log Σ_C P(C) Π_v ℓ(v, π_v \ strip_C(v,𝒜) | rows_r)  NOT modular
+```
+
+Why (18) fails, concretely. Two nodes, two candidate clamp-sets at prior 1/2:
+
+```
+      1/2 · [ ℓ_1(C_a) · ℓ_2(C_a) ]  +  1/2 · [ ℓ_1(C_b) · ℓ_2(C_b) ]
+```
+
+The cross terms `ℓ_1(C_a)·ℓ_2(C_b)` are ABSENT -- both nodes are obliged to use the SAME
+`C`. That shared unknown couples them. Were each node to carry its own independent `C`, the
+expression would be a product of sums and would factor without trouble; it is the SHARING
+that breaks it. Mechanically, `log(a_1 b_1 + a_2 b_2)` admits no form `f(a) + g(b)`, whereas
+`log(a·b) = log a + log b` splits at once. No per-`(node, parent-set)` table exists for
+(18), so the DP has nothing to build.
+
+**This is the same obstacle the module already resolved once.** `ma/belief_dp.py`'s
+docstring records that ORIENTATION of a confounding edge broke modularity in exactly this
+shape, and the resolution was to lift orientation into the hypothesis and enumerate at the
+top level (`3^pairs` assignments), leaving everything deterministic and modular inside each
+assignment. Equation (6) is that identical move applied to IDENTITY rather than orientation.
+The cost structure is identical too: the hypothesis count grows, each hypothesis stays
+cheap and exact.
+
+So "is `C_r` observable" is not a convenience question. It decides between an exact DP and
+no DP at all.
