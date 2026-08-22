@@ -24,9 +24,9 @@ import pytest
 
 from legacy.ma_v1.env import AgentView, MAConfig, TwoAgentEnv
 from ma.score_regimes import JOINT, JOINT_CONF, POOLED, RULES, SUBSET, RegimeScorer
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
-T113 = Topology("(1,1,3)", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+T113 = two_agent("(1,1,3)", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 def reference_log_posterior(scorer, samples, known, clean, rule):

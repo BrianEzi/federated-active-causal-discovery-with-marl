@@ -19,11 +19,11 @@ from ma.projection import (
     d_separated,
     latent_projection,
 )
-from ma.topology import T1, Topology
+from ma.topology import T1, Topology, two_agent
 from sa.graphs import build_graph_space
 
-T112 = Topology("t112", a_private=(0,), b_private=(1,), exposed=(2, 3))
-T113 = Topology("t113", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+T112 = two_agent("t112", a_private=(0,), b_private=(1,), exposed=(2, 3))
+T113 = two_agent("t113", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 def masked_dags(topology):
@@ -100,7 +100,7 @@ def test_confounding_is_confined_to_the_shared_set(topology):
     shared = set(topology.exposed)
     for t in keep:
         adjacency = np.asarray(space.dags[t], dtype=np.int8)
-        for agent in ("A", "B"):
+        for agent in (0, 1):
             for u, v in bidirected_pairs(adjacency, topology.observed_by(agent)):
                 assert u in shared and v in shared, (
                     f"bidirected edge {u}<->{v} touches a private node "
@@ -117,7 +117,7 @@ def test_confinement_also_holds_with_two_private_nodes_each():
     shared = set(T1.exposed)
     for t in rng.choice(keep, 2000, replace=False):
         adjacency = np.asarray(space.dags[t], dtype=np.int8)
-        for agent in ("A", "B"):
+        for agent in (0, 1):
             for u, v in bidirected_pairs(adjacency, T1.observed_by(agent)):
                 assert u in shared and v in shared
 
@@ -140,7 +140,7 @@ def test_the_section_3_metric_overcounts_and_the_excess_is_ancestral(topology):
     for t in keep:
         adjacency = np.asarray(space.dags[t], dtype=np.int8)
         anc = ancestor_matrix(adjacency)
-        for agent in ("A", "B"):
+        for agent in (0, 1):
             observed = topology.observed_by(agent)
             proxy = {tuple(p) for p in latent_projection_pairs(
                 adjacency, observed, topology.hidden_from(agent))}

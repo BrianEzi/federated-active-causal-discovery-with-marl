@@ -24,12 +24,12 @@ from ma.baselines import RandomAgent
 from ma.env import AGENTS, MAConfig, TwoAgentEnv
 from ma.evaluate import agent_report, credit_set, evaluate_episode
 from ma.projection import bidirected_pairs
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 
 @pytest.fixture(scope="module")
 def topology():
-    return Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    return two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2):
@@ -43,9 +43,9 @@ def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2
         while not result.done:
             result = env.step(*(policies[n](env, result) for n in AGENTS))
         confounded = (bool(bidirected_pairs(env.true_adjacency,
-                                            env.topology.observed_by("A")))
+                                            env.topology.observed_by(0)))
                       or bool(bidirected_pairs(env.true_adjacency,
-                                               env.topology.observed_by("B"))))
+                                               env.topology.observed_by(1))))
         row = evaluate_episode(env)
         (dirty_eps if confounded else clean_eps).append(row)
     return clean_eps, dirty_eps

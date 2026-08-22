@@ -54,6 +54,11 @@ VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
 AGENTS = ("A", "B")
+# TRANSITIONAL, 2026-08-22. `ma/topology.py` now indexes agents by INTEGER (0..n-1); this
+# module still keys its dicts, observations and reports by name. The translation lives here
+# and only here, so that converting env to integers later is a contained change rather than
+# a hunt. Nothing outside this module should build a name from an index or vice versa.
+AGENT_INDEX = {name: i for i, name in enumerate(AGENTS)}
 
 # Turn protocols. SIMULTANEOUS is the original and every result before 2026-08-20 was
 # measured under it; it is kept so those numbers stay reproducible, not because it is
@@ -197,8 +202,8 @@ class AgentWindow:
                  modes: Sequence[str] = MODES):
         self.name = name
         self.modes: Tuple[str, ...] = tuple(modes)
-        self.nodes: List[int] = list(topology.observed_by(name))
-        self.authority: List[int] = list(topology.may_intervene_on(name))
+        self.nodes: List[int] = list(topology.observed_by(AGENT_INDEX[name]))
+        self.authority: List[int] = list(topology.may_intervene_on(AGENT_INDEX[name]))
         self.shared: List[int] = list(topology.exposed)
         self.private: List[int] = [n for n in self.nodes if n not in self.shared]
         self.k = len(self.nodes)
@@ -236,7 +241,8 @@ class TwoAgentEnv:
         # R * 2^|S| because the per-block log-scores ADD -- but it is not built, and the
         # ladder does not need it until an agent has two private nodes. Fail loudly rather
         # than score silently wrong data.
-        widest = max(len(config.topology.hidden_from(name)) for name in AGENTS)
+        widest = max(len(config.topology.hidden_from(AGENT_INDEX[name]))
+                     for name in AGENTS)
         if widest > 1:
             raise NotImplementedError(
                 f"topology {config.topology.name!r} hides {widest} nodes from an agent; the "
@@ -389,7 +395,7 @@ class TwoAgentEnv:
             # A batch is CLEAN for this agent when every variable hidden from it was
             # clamped -- only then is its window really a DAG rather than a latent
             # projection.
-            hidden = self.topology.hidden_from(name)
+            hidden = self.topology.hidden_from(AGENT_INDEX[name])
             # ANY, not ALL. With one hidden node the two are identical, which is every
             # result to date. They diverge as soon as an agent has more than one private
             # node, and there ALL is unreachable: an agent gets one action per round and

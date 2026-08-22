@@ -18,7 +18,7 @@ import pytest
 from ma.baselines import _Window, enumerated_posterior
 from ma.belief_dp import JOINT, JOINT_CONF, POOLED, SUBSET
 from ma.env import MAConfig, TwoAgentEnv
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 TOL = 1e-9
 RULES = (POOLED, SUBSET, JOINT, JOINT_CONF)
@@ -26,7 +26,7 @@ RULES = (POOLED, SUBSET, JOINT, JOINT_CONF)
 
 @pytest.fixture(scope="module")
 def topology():
-    return Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    return two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 @pytest.mark.parametrize("rule", RULES)
@@ -59,7 +59,7 @@ def test_a_regime_split_actually_occurs(topology):
                                  score_rule=JOINT_CONF, disclose_regime=True))
     env.reset(seed=0)
     from ma.env import CLAMP
-    b_clamp = env.windows["B"].actions.index((topology.b_private[0], CLAMP))
+    b_clamp = env.windows["B"].actions.index((topology.private[1][0], CLAMP))
     env.step(0, b_clamp)
     assert env.clean["A"].any() and not env.clean["A"].all(), (
         "need both clean and dirty rows for the regime rules to differ")

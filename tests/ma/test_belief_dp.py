@@ -28,7 +28,7 @@ import pytest
 
 from ma.belief_dp import JOINT, POOLED, SUBSET, WindowBeliefDP
 from legacy.ma_v1.env import AgentView
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 FIXTURE = pathlib.Path("tests/fixtures/ma_reference_posteriors.npz")
 TOL = 1e-10
@@ -45,7 +45,7 @@ def fixture():
 
 @pytest.fixture(scope="module")
 def topology():
-    return Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    return two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 @pytest.fixture(scope="module")

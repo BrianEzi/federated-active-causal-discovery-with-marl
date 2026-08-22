@@ -16,12 +16,12 @@ import pytest
 
 from ma.baselines import GreedyAgent
 from ma.env import AGENTS, MAConfig, TwoAgentEnv
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 
 @pytest.fixture(scope="module")
 def env():
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     return TwoAgentEnv(MAConfig(topology=topology, n_obs=200, n_int=50, budget=3,
                                   disclose_regime=True))
 

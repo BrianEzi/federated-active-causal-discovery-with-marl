@@ -42,7 +42,7 @@ from ma.baselines import GreedyAgent, RandomAgent
 from ma.env import AGENTS, MAConfig, TwoAgentEnv
 from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 
 def argmax_diagnostic(env, episodes, seed):
@@ -106,7 +106,7 @@ def play(env, policies, episodes, seed, only=None):
     for episode in range(episodes):
         result = env.reset(seed=seed * 100_000 + episode)
         confounded = bool(bidirected_pairs(env.true_adjacency,
-                                           env.topology.observed_by("A")))
+                                           env.topology.observed_by(0)))
         if only is not None and confounded != only:
             continue
         while not result.done:
@@ -142,7 +142,7 @@ def main(argv=None):
     ap.add_argument("--out", default="results/ma_fixed/gate2_collision.json")
     args = ap.parse_args(argv)
 
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
         disclose_regime=args.disclose_regime))

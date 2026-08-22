@@ -1621,3 +1621,40 @@ the rung-0 gate.
 **[NOTED] Stale comment removed.** `MAConfig.turn_order` still carried the pre-turn-budget
 claim that the budget was per-agent, three lines below the `budget` field saying it is a
 shared pool. Two contradictory comments on adjacent fields, both written by us.
+
+**[DONE] n-agent topology refactor** (spec section 8). `Topology` now carries
+`private: Tuple[Tuple[int, ...], ...]` over integer agents `0..n-1`, with the
+JOINTLY-VISIBLE edge rule: an edge may exist only where some single agent observes both
+endpoints. Verified bit-identical to the old cross-private rule at two agents across all
+three topologies -- that equality is the refactor's gate, because if it moved, every
+two-agent number would have been measured on a different hypothesis space than the one now
+generated. 470 tests pass (8 new).
+
+No `a_private`/`b_private` shim, per the spec: a property returning `private[0]` would keep
+stale callers working at two agents and silently mean the wrong thing at five. 55 call sites
+across 18 files updated instead. `ma/env.py` and `legacy/ma_v1/env.py` still key by name and
+translate at the boundary -- one `AGENT_INDEX` map each, and converting env is the next step.
+
+`visibility` is implemented, not deferred: with it, `d` comes from the visibility list and a
+node may belong to no private block and not be exposed either. That is what makes the
+overlap counterexample expressible, and writing the test for it is what forced the design --
+the first version could not represent the very case that retired the old rule.
+
+**[CORRECTED] The `2 ln(d)/d` connectivity figures were measured on the wrong graphs.**
+`scripts/sa_graph_density.py` samples plain Erdos-Renyi with NO topology mask, so its
+92-99% is an upper bound, not an estimate. The environment always draws through
+`allowed_edges`, which removes 10-33% of pairs. Measured under the mask
+(`scripts/ma_graph_density_masked.py`):
+
+    2 agents 1-1-3 (current)     86%   (unmasked 91%)
+    2 agents 2-2-2               74%   (unmasked 94%)
+    rung 1: 3 agents 1 each      78%   (unmasked 92%)
+    rung 2: 3 agents 2 each      64%   (unmasked 96%)
+    rung 3: 5 agents 1 each      80%   (unmasked 95%)
+
+The rule stands -- fixed `p=0.5` gives mean degree 14.5 at d=30 and ER-2 gives 1% connected
+there -- but the honest claim is 64-86%, not 92-99%. This costs statistical power on the
+connected half rather than correctness: connectivity is recorded per episode and every
+headline is already split by it rather than pooled. Worth noting rung 2 is the WORST shape,
+not rung 3, so this does not simply worsen with scale; it tracks how much of the edge set
+the mask removes.

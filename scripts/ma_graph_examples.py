@@ -36,7 +36,7 @@ from ma.env import AGENTS, MAConfig, TwoAgentEnv
 from ma.evaluate import credit_set, evaluate_episode, union_graph
 from ma.policy import IndependentPPO, PPOConfig
 from ma.projection import bidirected_pairs
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 from sa.graphs import is_acyclic, mec_signature
 
 
@@ -163,8 +163,8 @@ def run_episode(env: TwoAgentEnv, policies, seed: int) -> Dict:
         "confounded": confounded,
         "confounded_by": confounded_by,
         "true_adjacency": np.asarray(env.true_adjacency, dtype=int).tolist(),
-        "topology": {"a_private": [int(x) for x in env.topology.a_private],
-                     "b_private": [int(x) for x in env.topology.b_private],
+        "topology": {"a_private": [int(x) for x in env.topology.private[0]],
+                     "b_private": [int(x) for x in env.topology.private[1]],
                      "exposed": [int(x) for x in env.topology.exposed]},
         "agents": agents,
         "union": np.asarray(union, dtype=int).tolist(),
@@ -206,7 +206,7 @@ def main(argv=None) -> Dict:
     ap.add_argument("--out", default="results/ma_examples/examples.json")
     args = ap.parse_args(argv)
 
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     env = TwoAgentEnv(MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                                  budget=args.budget, disclose_regime=True))
     learner = IndependentPPO.load(args.checkpoint, env)

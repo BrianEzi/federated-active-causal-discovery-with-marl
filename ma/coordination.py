@@ -143,7 +143,8 @@ def run_arm(masked: MaskedSpace, arm: str, n_episodes: int, n_obs: int, n_int: i
     flat = parent_ids + (np.arange(masked.d) * engine.n_parent_sets)[None, :]
 
     prior = masked.uniform_prior()
-    authority = {"A": topology.may_intervene_on("A"), "B": topology.may_intervene_on("B")}
+    authority = {"A": topology.may_intervene_on(0),
+                 "B": topology.may_intervene_on(1)}
     n_agents = 2
 
     spent, solved, confounded = [], [], []
@@ -199,10 +200,10 @@ def run_arm(masked: MaskedSpace, arm: str, n_episodes: int, n_obs: int, n_int: i
         spent.append(float(used if identified else budget))
         solved.append(float(identified))
         confounded.append(float(bool(
-            latent_projection_pairs(true_adjacency, topology.observed_by("A"),
-                                    topology.hidden_from("A"))
-            or latent_projection_pairs(true_adjacency, topology.observed_by("B"),
-                                       topology.hidden_from("B")))))
+            latent_projection_pairs(true_adjacency, topology.observed_by(0),
+                                    topology.hidden_from(0))
+            or latent_projection_pairs(true_adjacency, topology.observed_by(1),
+                                       topology.hidden_from(1)))))
 
     spent = np.array(spent)
     return {

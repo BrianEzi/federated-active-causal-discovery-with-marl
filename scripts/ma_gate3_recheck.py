@@ -27,7 +27,7 @@ import time
 
 from ma.baselines import RandomAgent
 from ma.env import AGENTS, MAConfig, TwoAgentEnv
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 from scripts.ma_gates2 import play
 
 
@@ -42,7 +42,7 @@ def main(argv=None) -> dict:
     ap.add_argument("--out", default="results/ma_fixed/gate3_recheck.json")
     args = ap.parse_args(argv)
 
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int, budget=args.budget,
         disclose_regime=args.disclose_regime))

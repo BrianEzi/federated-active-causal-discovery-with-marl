@@ -92,6 +92,13 @@ Round-robin beats random turn order: **+0.028**, CI [+0.011, +0.045], ahead on 8
 
 ## Retracted
 
+| retracted claim | why | what replaced it |
+|---|---|---|
+| "`2 ln(d)/d` gives 92—99% connected graphs" | measured on **unmasked** Erdos-Renyi (`scripts/sa_graph_density.py`), not on the graphs the environment draws. The federation mask forbids every pair no single agent observes, removing 10—33% of edges | under the mask: **86%** at the current 1-1-3 shape, **74%** at 2-2-2, **64%** at rung 2 (3 agents, 2 private each). `scripts/ma_graph_density_masked.py`. The rule is still the right one — the alternatives are far worse — but the number was an upper bound, not an estimate |
+
+**More retractions below.**
+
+
 **These claims appear in the logs and are wrong. Do not cite them.**
 
 | retracted claim | why | what replaced it |

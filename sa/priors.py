@@ -121,6 +121,14 @@ def connectivity_prior_p(d: int) -> float:
     So connectivity stays in the 92-99% band, and mean degree drifts up from 2.6 to 6.5 --
     inside the ER-2..ER-6 band the literature uses, at the dense end of it.
 
+    **THOSE ARE UNMASKED NUMBERS, and the two-agent environment never draws such a graph.**
+    `ma/topology.py` forbids every pair no single agent observes, which removes 10-33% of
+    the possible edges, and removing edges can only reduce connectivity. Re-measured under
+    the mask (`scripts/ma_graph_density_masked.py`, 2026-08-22): 86% at the current 1-1-3
+    shape, 74% at 2-2-2, and 64% at three agents with two private nodes each. Treat the
+    table above as an UPPER BOUND. The rule is still the right one -- the alternatives are
+    far worse -- and connectivity is reported per episode with every headline split by it.
+
     For contrast, at the sizes this project targets: fixed `p = 0.5` gives degree 14.5 at
     d=30, and ER-2 gives **1% connected** at d=30 and is unusable. Connectivity is reported
     per episode either way, and every headline is split by it rather than pooled.

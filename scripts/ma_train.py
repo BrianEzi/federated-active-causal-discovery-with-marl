@@ -21,7 +21,7 @@ from ma.env import (AGENTS, CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
                      MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
 from ma.policy import IndependentPPO, PPOConfig
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
 
 def main(argv=None) -> dict:
@@ -58,7 +58,7 @@ def main(argv=None) -> dict:
                     help="overwrite --out even if it holds a result from a different config")
     args = ap.parse_args(argv)
 
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     modes = (CLAMP,) if args.clamp_only else MODES
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
@@ -97,8 +97,8 @@ def main(argv=None) -> dict:
                    "intervene_scale": config.intervene_scale,
                    "reward_criterion": config.reward_criterion,
                    "topology": {"name": topology.name, "d": topology.d,
-                                "a_private": list(topology.a_private),
-                                "b_private": list(topology.b_private),
+                                "a_private": list(topology.private[0]),
+                                "b_private": list(topology.private[1]),
                                 "exposed": list(topology.exposed)},
                    "train_episodes": args.train_episodes,
                    "potential_shaping": args.potential_shaping,

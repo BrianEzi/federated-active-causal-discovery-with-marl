@@ -11,9 +11,9 @@ import pytest
 
 from ma.env import (AGENTS, CLAMP, NO_INTERVENTION, PRIVATE_SIGNAL, RANDOM_TURN,
                      ROUND_ROBIN, SHARED_SIGNAL, SIMULTANEOUS, MAConfig, TwoAgentEnv)
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
-T_1_1_3 = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+T_1_1_3 = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 def _env(**kw) -> TwoAgentEnv:
@@ -24,7 +24,7 @@ def _env(**kw) -> TwoAgentEnv:
 
 def _action(env: TwoAgentEnv, name: str, *, private: bool, mode: str = CLAMP) -> int:
     window = env.windows[name]
-    private_nodes = set(env.topology.a_private if name == "A" else env.topology.b_private)
+    private_nodes = set(env.topology.private[0] if name == "A" else env.topology.private[1])
     for index, (node, node_mode) in enumerate(window.actions):
         if node == -1 or node_mode != mode:
             continue

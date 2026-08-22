@@ -14,10 +14,10 @@ import pytest
 
 from ma.env import (AGENTS, CLAMP, MODES, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
                      MAConfig, TwoAgentEnv)
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 
-T_1_1_3 = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-T_2_2_2 = Topology(name="T1", a_private=(0, 1), b_private=(2, 3), exposed=(4, 5))
+T_1_1_3 = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+T_2_2_2 = two_agent(name="T1", a_private=(0, 1), b_private=(2, 3), exposed=(4, 5))
 
 
 def _env(**kw) -> TwoAgentEnv:
@@ -32,7 +32,7 @@ def _env(**kw) -> TwoAgentEnv:
 def _clamp_own_private(env: TwoAgentEnv, name: str) -> int:
     """The action index that clamps this agent's own private node."""
     window = env.windows[name]
-    private = set(env.topology.a_private if name == "A" else env.topology.b_private)
+    private = set(env.topology.private[0] if name == "A" else env.topology.private[1])
     for index, (node, mode) in enumerate(window.actions):
         if node in private and mode == CLAMP:
             return index
@@ -116,7 +116,7 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     env = _env(turn_order=ROUND_ROBIN)
     window = env.windows["A"]
     vary = next(i for i, (node, mode) in enumerate(window.actions)
-                if node in env.topology.a_private and mode != CLAMP)
+                if node in env.topology.private[0] and mode != CLAMP)
     env.step(vary, env.windows["B"].pass_index)
     assert not env.clean["B"].any()
 

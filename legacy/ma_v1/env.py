@@ -107,8 +107,13 @@ class AgentView:
 
     def __init__(self, name: str, topology: Topology):
         self.name = name
-        self.nodes: List[int] = list(topology.observed_by(name))
-        self.authority: List[int] = list(topology.may_intervene_on(name))
+        # ma.topology indexes agents by INTEGER since 2026-08-22; this module is the v1
+        # reference oracle and still keys by name. Translating here keeps the cross-check
+        # alive -- the oracle's independence is in its SCORING, not in how it numbers
+        # agents, so this costs nothing that the comparison relies on.
+        index = ("A", "B").index(name)
+        self.nodes: List[int] = list(topology.observed_by(index))
+        self.authority: List[int] = list(topology.may_intervene_on(index))
         self.shared: List[int] = list(topology.exposed)
         self.private: List[int] = [n for n in self.nodes if n not in self.shared]
         self.k = len(self.nodes)

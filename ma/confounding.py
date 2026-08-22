@@ -90,8 +90,8 @@ def measure_topology(space, topology: Topology, max_graphs: int = None) -> Dict:
     if max_graphs is not None and len(indices) > max_graphs:
         indices = np.random.default_rng(0).choice(indices, size=max_graphs, replace=False)
 
-    observed_a, hidden_a = topology.observed_by("A"), topology.hidden_from("A")
-    observed_b, hidden_b = topology.observed_by("B"), topology.hidden_from("B")
+    observed_a, hidden_a = topology.observed_by(0), topology.hidden_from(0)
+    observed_b, hidden_b = topology.observed_by(1), topology.hidden_from(1)
 
     n_a = n_b = n_either = 0
     total_pairs = 0

@@ -18,13 +18,13 @@ import numpy as np
 import pytest
 
 from ma.env import AGENTS, CLAMP, MAConfig, MODES, TwoAgentEnv, VARY
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 from sa.priors import connectivity_prior_p
 
 
 @pytest.fixture(scope="module")
 def topology():
-    return Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    return two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 def make(topology, **kwargs):
@@ -50,7 +50,7 @@ def test_observation_uses_only_the_agents_own_columns(topology):
     env.reset(seed=3)
     before = env.observation("A").copy()
 
-    hidden = topology.hidden_from("A")
+    hidden = topology.hidden_from(0)
     assert hidden, "topology must hide something from A or the test is vacuous"
     rng = np.random.default_rng(0)
     for node in hidden:
@@ -68,7 +68,7 @@ def test_belief_uses_only_the_agents_own_columns(topology):
     env.reset(seed=5)
     before = env.marginals["B"].copy()
     rng = np.random.default_rng(1)
-    for node in topology.hidden_from("B"):
+    for node in topology.hidden_from(1):
         env.samples[:, node] = rng.normal(size=env.samples.shape[0])
     env._refresh()
     assert np.allclose(env.marginals["B"], before, atol=1e-12)
@@ -83,7 +83,7 @@ def test_partner_disclosure_is_not_readable_before_acting(topology):
     assert not env.disclosed["B"].any()
 
     shared_index = env.windows["B"].actions.index((topology.exposed[0], VARY))
-    a_private = env.windows["A"].actions.index((topology.a_private[0], VARY))
+    a_private = env.windows["A"].actions.index((topology.private[0][0], VARY))
     env.step(a_private, shared_index)
     # AFTER the step, A may see that B touched a shared node.
     assert env.disclosed["A"].any(), "shared-node targets are supposed to be disclosed"
@@ -93,8 +93,8 @@ def test_private_targets_are_never_disclosed(topology):
     """B acting on its own private node must leave A's disclosure vector empty."""
     env = make(topology, disclose_shared_targets=True)
     env.reset(seed=11)
-    b_private = env.windows["B"].actions.index((topology.b_private[0], VARY))
-    a_private = env.windows["A"].actions.index((topology.a_private[0], VARY))
+    b_private = env.windows["B"].actions.index((topology.private[1][0], VARY))
+    a_private = env.windows["A"].actions.index((topology.private[0][0], VARY))
     env.step(a_private, b_private)
     assert not env.disclosed["A"].any(), (
         "A was told about an intervention on B's PRIVATE node -- that is the federation "
@@ -105,8 +105,8 @@ def test_regime_bit_is_off_unless_enabled(topology):
     """The no-bit arm is the baseline, so the default must really disclose nothing."""
     env = make(topology, disclose_regime=False)
     env.reset(seed=13)
-    b_clamp = env.windows["B"].actions.index((topology.b_private[0], CLAMP))
-    a_private = env.windows["A"].actions.index((topology.a_private[0], VARY))
+    b_clamp = env.windows["B"].actions.index((topology.private[1][0], CLAMP))
+    a_private = env.windows["A"].actions.index((topology.private[0][0], VARY))
     env.step(a_private, b_clamp)
     assert env.regime_bit["A"] == 0.0
     # The environment still tracks cleanliness internally; it simply does not tell anyone.
@@ -118,8 +118,8 @@ def test_regime_bit_is_off_unless_enabled(topology):
 def test_regime_bit_fires_when_enabled(topology):
     env = make(topology, disclose_regime=True)
     env.reset(seed=13)
-    b_clamp = env.windows["B"].actions.index((topology.b_private[0], CLAMP))
-    a_private = env.windows["A"].actions.index((topology.a_private[0], VARY))
+    b_clamp = env.windows["B"].actions.index((topology.private[1][0], CLAMP))
+    a_private = env.windows["A"].actions.index((topology.private[0][0], VARY))
     env.step(a_private, b_clamp)
     assert env.regime_bit["A"] == 1.0
 
@@ -163,7 +163,7 @@ def test_passing_does_not_consume_the_partners_opportunities(topology):
     env = make(topology)
     result = env.reset(seed=29)
     a_pass = env.windows["A"].pass_index
-    b_act = env.windows["B"].actions.index((topology.b_private[0], VARY))
+    b_act = env.windows["B"].actions.index((topology.private[1][0], VARY))
     for _ in range(env.config.budget):
         result = env.step(a_pass, b_act)
     assert result.n_interventions["A"] == 0

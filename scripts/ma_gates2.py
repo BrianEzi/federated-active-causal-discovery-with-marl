@@ -46,7 +46,7 @@ from ma.baselines import ForcedClampAgent, GreedyAgent, RandomAgent, make_baseli
 from ma.env import AGENTS, MAConfig, TwoAgentEnv
 from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 from sa.graphs import mec_signature
 
 
@@ -83,7 +83,7 @@ def play(env: TwoAgentEnv, policies, episodes: int, seed: int, only=None):
     for episode in range(episodes):
         result = env.reset(seed=seed * 100_000 + episode)
         confounded = bool(bidirected_pairs(env.true_adjacency,
-                                           env.topology.observed_by("A")))
+                                           env.topology.observed_by(0)))
         if only is not None and confounded != only:
             continue
         while not result.done:
@@ -124,7 +124,7 @@ def main(argv=None) -> dict:
     ap.add_argument("--out", default="results/ma2/gates.json")
     args = ap.parse_args(argv)
 
-    topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime)
     env = TwoAgentEnv(config)
@@ -168,9 +168,9 @@ def main(argv=None) -> dict:
     for episode in range(args.episodes):
         result = gate1_env.reset(seed=args.seed * 7919 + episode)
         confounded = (bool(bidirected_pairs(gate1_env.true_adjacency,
-                                            gate1_env.topology.observed_by("A")))
+                                            gate1_env.topology.observed_by(0)))
                       or bool(bidirected_pairs(gate1_env.true_adjacency,
-                                               gate1_env.topology.observed_by("B"))))
+                                               gate1_env.topology.observed_by(1))))
         observational.append(float(result.info["both_identified"]))
         if not confounded:
             unconfounded_only.append(float(result.info["both_identified"]))

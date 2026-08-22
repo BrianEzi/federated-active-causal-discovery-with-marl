@@ -12,13 +12,13 @@ import pytest
 
 from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import credit_set, evaluate_episode, union_graph
-from ma.topology import Topology
+from ma.topology import Topology, two_agent
 from sa.graphs import is_acyclic, mec_signature
 
 
 @pytest.fixture(scope="module")
 def topology():
-    return Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    return two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
 
 
 @pytest.fixture(scope="module")
