@@ -1736,3 +1736,50 @@ confirmation, not just a unit-test guarantee. **The n-agent topology refactor
 (`6bd3484`) is cleared for merge on this basis.** The env.py generalisation and S_r fix
 (`f63dcb6`, `6250384`) are separate, later commits on the same branch and are not covered
 by this specific gate -- they were reviewed on their own evidence above.
+
+**[MEASURED] The structural ceiling on observational confounding detection: 1.3-6.5%.**
+`scripts/ma_structural_ceiling.py`, 400 episodes per configuration, both topologies, both
+priors. Of the agent-windows that ARE confounded, the share where NO latent-free DAG over
+the observed nodes reproduces the observed conditional-independence pattern -- i.e. the most
+any observational-only method could EVER detect, at infinite data:
+
+    T1_1-1-3 (current)  p=0.500   confounded  8.6%   ceiling 4.3%
+    T1_1-1-3 (current)  p=0.644   confounded  9.8%   ceiling 1.3%
+    T1_2-2-2            p=0.500   confounded  6.6%   ceiling 3.8%
+    T1_2-2-2            p=0.597   confounded  7.8%   ceiling 6.5%
+
+So **93-99% of confounded windows are STRUCTURALLY INVISIBLE to observational data.** Not a
+sample-size problem; no quantity of data changes it. This is a hard ceiling on our own BGe
+posterior's observational path too, since that path uses exactly this evidence.
+
+Validated before being believed, per the standing lesson. The d-separation routine passes 10
+textbook cases (chain, fork, collider, collider-with-descendant, both signs). The ceiling
+itself is checked against two hand-workable cases: the classic two-instrument pattern
+(a->X1, c->X2, b->X1, b->X2) is correctly found DETECTABLE, and a latent-free control is
+correctly found explainable.
+
+**[CORRECTED] The single-instrument CI test does NOT prove confounding.** Earlier in the
+2026-08-22 discussion the pattern `a -> X1 -> X2` with `b -> X1, b -> X2` was offered as a
+detection test, on the grounds that `a` and `X2` are dependent given `X1` when the confounder
+is present and independent when it is absent. Both halves of that are true, but the
+CONCLUSION does not follow: the test rules out the chain `a->X1->X2`, and a latent-free
+alternative -- a direct edge `a->X2` -- explains the same pattern. Measured directly: that
+window is SATURATED (zero conditional independencies among the observed nodes), so a complete
+DAG reproduces it and no latent is required.
+
+What actually forces a latent is an instrument on BOTH sides of the confounded pair, mutually
+independent (CASE 2 above). That is a far more demanding configuration, and its rarity is
+exactly what the 1.3-6.5% is measuring.
+
+**[DECIDED] The observational-only training ablation is NOT worth cluster time.** It was
+queued to measure how much identification survives with the regime machinery removed. The
+ceiling answers that analytically and more strongly: at best 1.3-6.5% of confounded windows,
+before any statistical loss. Running it could only confirm a near-total failure already
+established by enumeration. Cancelled; the ceiling result replaces it.
+
+**[NOTE] This does NOT weaken the interventional or IV argument.** The ceiling is about
+OBSERVATIONAL data. An intervention `do(X1)` severs the incoming edges and creates a perfect
+instrument by construction, which is precisely why interventions -- and partner clamps --
+carry information the observational margin cannot. If anything the result sharpens the
+thesis: the value of both intervening and disclosing is the gap between this ceiling and the
+truth, and that gap is now measured at 93-99%.
