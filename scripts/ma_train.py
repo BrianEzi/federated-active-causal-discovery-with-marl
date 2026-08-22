@@ -54,6 +54,8 @@ def main(argv=None) -> dict:
     ap.add_argument("--clamp_only", action="store_true",
                     help="restrict the action space to clamps; the vary mode is removed")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--force", action="store_true",
+                    help="overwrite --out even if it holds a result from a different config")
     args = ap.parse_args(argv)
 
     topology = Topology(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
@@ -142,9 +144,47 @@ def main(argv=None) -> dict:
     if args.out:
         out = pathlib.Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
+        _refuse_to_clobber_a_different_config(out, report["config"], args.force)
         out.write_text(json.dumps(report, indent=1))
         print(f"wrote {out}")
     return report
+
+
+def _refuse_to_clobber_a_different_config(out: pathlib.Path, config: dict, force: bool):
+    """Abort rather than overwrite a result produced under DIFFERENT settings.
+
+    Written after a real incident on 22 August 2026. An overnight local launcher and a
+    Myriad array both wrote `results/ma_fixed/tb_both_s15..19.json` -- same arm name, same
+    seeds, but `step_cost` 0.05 against 0.0. The local job finished second and silently
+    replaced five already-committed results with runs from a different configuration. It
+    surfaced only because `git status` showed modified files that nothing had edited.
+
+    The arm name is not a configuration fingerprint, and treating it as one is what made the
+    collision silent. Same name plus same seed plus different config is always a mistake:
+    either the name is too coarse or the wrong command is being run.
+
+    Re-running the SAME configuration is fine and stays silent -- that is an ordinary
+    recompute, and blocking it would make reruns annoying enough to be worked around.
+    """
+    if force or not out.exists():
+        return
+    try:
+        existing = json.loads(out.read_text()).get("config")
+    except (json.JSONDecodeError, OSError):
+        return                      # unreadable or half-written: overwriting is the fix
+    if existing is None or existing == config:
+        return
+    differing = {k: (existing.get(k), config.get(k))
+                 for k in set(existing) | set(config)
+                 if existing.get(k) != config.get(k)}
+    lines = ["REFUSING to overwrite %s" % out,
+             "  It holds a result from a DIFFERENT configuration:"]
+    for k, (a, b) in sorted(differing.items()):
+        lines.append("    %s: on disk %r -> would become %r" % (k, a, b))
+    lines.append("  Same arm name and seed, different settings. Either give this run its "
+                 "own --out,")
+    lines.append("  or pass --force if you really mean to replace the existing result.")
+    raise SystemExit(chr(10).join(lines))
 
 
 if __name__ == "__main__":

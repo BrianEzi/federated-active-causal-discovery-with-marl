@@ -93,11 +93,24 @@ generation suffix, and both moved to `legacy/tests/` anyway.)
 
 ---
 
+## Both open points, now closed
+
+**`test_metric_reachability.py`: 179 s -> 25.7 s.** The three tests each called
+`split_by_confounding(topology, episodes=70)` with *identical arguments*, so the same 70
+episodes were simulated three times. Now a module-scoped fixture. No coverage lost: the
+function is deterministic in its arguments, and the rows are shared read-only.
+
+**`test_env_turns.py` vs `test_env_turn_budget.py`: no overlap worth removing.** Exactly one
+pair duplicates -- `test_clean_rounds_are_reachable` against
+`test_clean_rounds_are_still_reachable` -- and the second is item **12.8 of the turn-budget
+spec**, whose point is that the older guard survives the new shared-budget semantics. Same
+assertion, different claim. Both are sub-second. Kept, with a note on each so the
+duplication reads as deliberate rather than as an oversight.
+
+Everything else in the two files is complementary: `turns.py` covers turn-order mechanics,
+`turn_budget.py` covers budget, forfeits and signalling.
+
 ## Still open
 
-- **`tests/ma/test_metric_reachability.py` is 179 s across three tests**, the largest single
-  block left. Worth understanding before the n-agent refactor makes it worse; it is not
-  obvious that it needs that many episodes to prove earnability.
-- **Possible overlap** between `test_env_turns.py` (9 tests) and `test_env_turn_budget.py`
-  (18), the first predating the turn-budget spec. **Check before merging them**: the spec's
-  nine acceptance tests live in the second file and are the gate on the collapse fix.
+Nothing. The next thing that would move the number is `tests/test_dp.py` and
+`tests/test_projection.py`, and both are exact-enumeration checks whose cost IS the check.

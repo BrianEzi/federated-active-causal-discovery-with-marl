@@ -51,14 +51,31 @@ def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2
     return clean_eps, dirty_eps
 
 
+@pytest.fixture(scope="module")
+def split_70(topology):
+    """The 70-episode split, computed ONCE for the three tests that need it.
+
+    All three called `split_by_confounding(topology, episodes=70)` with identical arguments,
+    so the same 70 episodes were simulated three times over -- 179 s of the suite's 484 s,
+    two thirds of it recomputing a deterministic function of its arguments.
+
+    Module-scoped rather than session-scoped: nothing outside this file wants it, and a
+    session fixture would build it even for a run that deselects these tests.
+
+    Consumers must treat the returned rows as READ-ONLY; they are shared across the three
+    tests now, and mutating them would couple tests through the fixture.
+    """
+    return split_by_confounding(topology, episodes=70)
+
+
 @pytest.mark.slow
-def test_confounded_episodes_can_be_scored(topology):
+def test_confounded_episodes_can_be_scored(split_70):
     """THE REGRESSION. Reported success was structurally 0.000 here.
 
     A rate of zero on a whole regime is not a hard task -- it is an unearnable metric, and
     the two look identical in a results table.
     """
-    _, dirty = split_by_confounding(topology, episodes=70)
+    _, dirty = split_70
     assert len(dirty) >= 5, "need confounded episodes for this test to mean anything"
     credited = [r["per_agent"][name]["mass_credit"]
                 for r in dirty for name in AGENTS]
@@ -68,20 +85,20 @@ def test_confounded_episodes_can_be_scored(topology):
 
 
 @pytest.mark.slow
-def test_unconfounded_episodes_can_be_scored(topology):
+def test_unconfounded_episodes_can_be_scored(split_70):
     """The control. If this fails too, the metric is broken outright rather than blind to
     one regime, which is a different diagnosis."""
-    clean, _ = split_by_confounding(topology, episodes=70)
+    clean, _ = split_70
     assert len(clean) >= 5
     assert max(r["per_agent"][name]["mass_credit"]
                for r in clean for name in AGENTS) > 0.0
 
 
 @pytest.mark.slow
-def test_success_is_attainable_at_all(topology):
+def test_success_is_attainable_at_all(split_70):
     """Somewhere in a reasonable run, the full three-part criterion must actually fire.
     A criterion that never returns True cannot distinguish any two policies."""
-    clean, dirty = split_by_confounding(topology, episodes=70)
+    clean, dirty = split_70
     assert any(r["success"] for r in clean + dirty), (
         "the reported success criterion never fired in 70 episodes")
 

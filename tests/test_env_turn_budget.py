@@ -231,6 +231,13 @@ def test_acting_is_not_punished_relative_to_declining():
 
 @pytest.mark.parametrize("order", [SIMULTANEOUS, ROUND_ROBIN, RANDOM_TURN])
 def test_clean_rounds_are_still_reachable(order):
+    """DELIBERATE DUPLICATE of test_env_turns.py::test_clean_rounds_are_reachable.
+
+    Checked 2026-08-22 and kept. It is item 12.8 of the turn-budget spec: the point is that
+    the OLDER guard still holds under the new shared-budget semantics, which is a different
+    claim from the original even though the assertion is identical. Sub-second either way.
+    Do not "deduplicate" these without also removing 12.8 from the spec.
+    """
     env = _env(turn_order=order)
     env.step(_action(env, "A", private=True), _action(env, "B", private=True))
     assert env.clean["A"].any() or env.clean["B"].any()
