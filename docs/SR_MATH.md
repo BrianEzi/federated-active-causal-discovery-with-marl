@@ -320,3 +320,51 @@ Everything above is a derivation, not yet a proof-by-test. Before the guard come
    that showed non-identical (but confounded, uninterpretable) beliefs under the old
    fraction scheme — rerun it here and show the difference is now attributable to the
    *correct* mechanism (equation 7's per-bit stripping), not an artifact.
+
+---
+
+## 13. Does naming `h` break the privacy constraint?
+
+Asked directly, and the answer needs two things kept apart.
+
+**Structural metadata** — that `S = {h_1, ..., h_m}` exists, its size `m`, and which agent
+owns which element. Every agent already constructs its window from
+`topology.hidden_from(agent)`; this is schema, not values. Knowing a column exists is not
+knowing what is in it, and equation (6) uses `h` only as an INDEX. Nothing new.
+
+**Per-round `C_r`** — which hidden nodes were clamped. This is the load-bearing one, and it
+is **already broadcast by the existing protocol**. `ma/env.py::_record_signals` sends each
+agent's action as one of `{NO_INTERVENTION, SHARED_SIGNAL, PRIVATE_SIGNAL}`, per partner.
+At rung1 (one private node per agent):
+
+```
+      PRIVATE_SIGNAL from agent j   <=>   h_j ∈ C_r
+```
+
+so `C_r` is recoverable from the signal vector with no new channel. The agent never sees
+`h`'s values; it sees a three-category action label its partner already sends, and scores a
+structural hypothesis against its OWN columns.
+
+**Two conditions this rests on, both must hold:**
+
+1. **Clamp-only.** The signal does not encode mode, so a private VARY also emits
+   `PRIVATE_SIGNAL` while cleaning nothing. Under `action_modes=(CLAMP,)` — the default
+   since 2026-08-22 — intervened and clamped coincide and the equivalence above is exact.
+   Under both modes it is not, and would need a fourth signal category.
+2. **One private node per agent.** At multi-private topologies (rung 2, rung 4), "agent j
+   clamped SOME private node" does not say WHICH, so `C_r` is underdetermined and genuinely
+   would require disclosure beyond today's protocol. Those shapes stay blocked regardless
+   of this document.
+
+**Coupled decision, flagged.** `disclose_signals` is provisional pending the supervisor. If
+the signalling channel is ruled inadmissible, S_r at `n >= 3` falls with it: the only
+fallback is to treat `C_r` as unknown and marginalise it, and
+
+```
+      P(rows_r | 𝒜) = Σ_C P(C) · Π_v ℓ(v, π \ strip_C(v,𝒜) | rows_r)
+```
+
+puts `Σ_C` OUTSIDE `Π_v`, which is exactly the modularity break described in
+`ma/belief_dp.py`'s module docstring — no per-(node, parent-set) table can express it, and
+the subset DP cannot compute it. So "is the signalling channel admissible" and "can we do
+S_r at three agents" are one question, not two.
