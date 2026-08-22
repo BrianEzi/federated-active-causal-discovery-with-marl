@@ -46,6 +46,7 @@ import numpy as np
 
 from ma.belief_dp import JOINT_CONF, WindowBeliefDP
 from ma.topology import Topology
+from sa.priors import connectivity_prior_p
 from sa.scm import sample_multi, sample_scm_params
 
 PASS_ACTION = -1
@@ -110,21 +111,27 @@ class MAConfig:
     # `budget / n_agents`; the two diverge only under random turn order.
     # NOTE the semantic change from the pre-2026-08-21 meaning ("interventions per agent").
     budget: int = 10
-    # One agent acts per round, or both. Budget stays PER AGENT under turn-taking, which
-    # is deliberate: a shared pool would halve each agent's interventions and with them the
-    # number of clean rounds, confounding the protocol change with a data-quantity change.
-    # An episode therefore runs up to 2*budget rounds instead of budget rounds, and the
-    # total row count doubles. That dilutes the clean FRACTION but not the clean COUNT,
-    # and the regime rules score the two regimes separately, so only the count matters.
+    # One agent acts per round, or both. STALE COMMENT REMOVED 2026-08-22: this block used
+    # to say the budget stays PER AGENT under turn-taking. It has been a shared pool since
+    # the turn-budget spec (see `budget` above), and the two statements sat three lines
+    # apart contradicting each other.
     turn_order: str = SIMULTANEOUS
-    # Which intervention modes an agent may choose. `(CLAMP,)` is the clamp-only arm: it
-    # halves the action space without removing the coordination problem, which becomes one
-    # of targeting and timing rather than of mode. Kept as an ARM, not a deletion -- whether
-    # clamp really dominates vary under turn-taking is the open question, and a policy
-    # given both that converges on clamp anyway is the evidence for it.
-    action_modes: Tuple[str, ...] = MODES
+    # CLAMP ONLY, adopted as the default on 2026-08-22. This is a TRADE, not a proven
+    # equivalence, and the size of the trade is measured: paired over 10 seeds, both-modes
+    # leads by +0.018 with a bootstrap CI of [-0.005, +0.041], ahead on 6 seeds, tied on 2,
+    # behind on 2. So the cost is at most ~4pp and is not distinguishable from zero, and it
+    # buys a halved action space and one less axis to sweep as agents are added.
+    # The coordination problem is untouched -- it becomes one of targeting and timing
+    # rather than of mode -- and a policy given both modes converges on clamp anyway
+    # (81-91% of clamps on its own private node).
+    # Pass `action_modes=MODES` to restore both. `tb_both` remains a live arm.
+    action_modes: Tuple[str, ...] = (CLAMP,)
     identify_threshold: float = 0.7
-    prior_p: float = 0.5
+    # None means "scale with d" -- `2 ln(d)/d`, the FULL-CONNECTIVITY threshold with an
+    # empirical factor of two. See `sa.priors.connectivity_prior_p` for the measurement and
+    # for why the percolation threshold `1/d` is the wrong target here. A float overrides.
+    # NOTE this CHANGES the graph distribution: at d=5 it is 0.644, not 0.5.
+    prior_p: Optional[float] = None
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
     score_rule: str = JOINT_CONF
     # One bit per round: "I clamped something you cannot see". OFF by default -- the no-bit
@@ -161,6 +168,15 @@ class MAConfig:
     # constant in the window size. That is the same axis the confounding enumeration
     # already costs, so no new scaling debt is acquired.
     reward_criterion: str = "u14"
+
+    def __post_init__(self):
+        # Resolve the scaling prior ONCE, here, so that everything downstream -- the
+        # generator, the posterior's prior, and the config written into every results
+        # JSON -- sees the same float. Resolving lazily at each use site is how a
+        # generator and its prior drift apart, which is the misspecification
+        # `ma/topology.py` exists to prevent.
+        if self.prior_p is None:
+            self.prior_p = connectivity_prior_p(self.topology.d)
 
 
 @dataclass
@@ -378,7 +394,7 @@ class TwoAgentEnv:
             # node, and there ALL is unreachable: an agent gets one action per round and
             # has no authority over the other's private nodes, so "all hidden clamped" can
             # never fire -- the regime machinery would be silently dead. See the guard in
-            # __init__ and tests/test_env2_turns.py::test_clean_rounds_are_reachable.
+            # __init__ and tests/test_env_turns.py::test_clean_rounds_are_reachable.
             hidden_clamped = bool(hidden) and any(
                 targets.get(node, None) == 0.0 for node in hidden)
             self.clean[name] = np.concatenate(

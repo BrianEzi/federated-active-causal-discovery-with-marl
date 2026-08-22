@@ -1,4 +1,4 @@
-# State of truth — 21 August 2026
+# State of truth — 22 August 2026
 
 **Read this before citing any number from this repository.**
 
@@ -46,6 +46,31 @@ also yields interventional information about that node's children. What rules ou
 reading is greedy: an agent optimising exactly that self-information targets the node at
 chance or below, and scores a third as well.
 
+### The regime-bit ablation (22 August)
+
+Round-robin, clamp-only, 10 seeds each, `nobit_clamp` against `tb_clamp`.
+Source: `results/ma_fixed/nobit_clamp_s*.json`, `results/night_summary.json`.
+
+| claim | number |
+|---|---|
+| Without the bit the task collapses | learned **0.007**, exactly the pass-only floor; **10/10 seeds** flagged collapsed |
+| Paired against the with-bit arm | **+0.540**, CI [+0.515, +0.565], ahead on 10/10 |
+| Learned falls BELOW its own random floor | 0.007 against 0.040 |
+| Private-clamp share collapses with it | 5.6% against 81.6%; chance is 25% |
+
+**State this carefully.** The `random` baseline also falls, 0.380 to 0.040, and a random
+policy reads no observations at all. So the bit is not merely a policy input: turning it off
+changes what is **identifiable**, and no policy succeeds. The defensible claim is *"the
+federation channel is necessary for the task to be solvable"*, NOT *"the agent learns to
+exploit a communication channel"*. Scoring each arm against its own floor is what makes the
+difference visible, and is why arms are never compared on raw success alone.
+
+### Turn order (22 August)
+
+Round-robin beats random turn order: **+0.028**, CI [+0.011, +0.045], ahead on 8/10 seeds,
+10 shared seeds. Small, but the interval excludes zero. The free-rider index also drops,
+0.82 to **0.61**: with turns not guaranteed, one agent coasts.
+
 ### Single-agent criterion work
 
 | claim | evidence |
@@ -57,6 +82,13 @@ chance or below, and scores a third as well.
 | Varying de-confounds nothing for a partner | rescue 0.000 at scale 2.0 and 1.0 |
 
 ---
+
+## Changed on 22 August, invalidating earlier measurements
+
+| change | consequence |
+|---|---|
+| `prior_p` 0.5 → `2 ln(d)/d` (0.597 at `d=6`) | the graph distribution the environment generates has MOVED. **Every two-agent number in this file was measured at `p = 0.5`** and does not carry over without a re-run. Rung 0 of the n-agent ladder is where that gets paid |
+| `action_modes` both → `(CLAMP,)` | a default change only; `tb_both` is still runnable and the two arms differ by at most ~4pp |
 
 ## Retracted
 
@@ -82,7 +114,6 @@ chance or below, and scores a third as well.
 | question | why it matters | what would settle it |
 |---|---|---|
 | **Does confinement hold for `n > 2` agents?** | **Everything in the scaling plan rests on it.** With overlapping shared sets, a third agent's private node may confound a pair visible to a fourth. If it fails, the belief needs full MAG machinery and the score stops decomposing | a structural enumeration, like the original — cheap |
-| Does the **regime bit** earn its place? | every current number has disclosure ON; without the ablation we cannot claim the federation channel matters | the no-bit arm, ~30 min |
 | Is the learned policy better than a **proper** decentralised baseline? | our greedy conditions on nothing; SGA is the literature's version and turn-taking makes it implementable | implement sequential greedy and joint greedy |
 | What `n_obs` does `d ≥ 5` need? | blocks any single-agent scaling claim | same script, sweep `n_obs` |
 | `prior_p = f(d)` — which threshold? | at `d=30`, fixed `p=0.5` gives expected degree 14.5 against a literature norm of 2–4. **Connectivity needs `ln(d)/d`, percolation only `1/d`** — and we want connected graphs | sweep, and state which threshold we chose and why |

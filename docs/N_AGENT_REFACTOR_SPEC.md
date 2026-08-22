@@ -1,6 +1,12 @@
 # n-agent refactor — spec for review
 
-**Drafted overnight 21/22 August. NOT IMPLEMENTED. Needs sign-off before any code.**
+**Drafted overnight 21/22 August. APPROVED by the student 22 August 2026.**
+
+Signed off with the standing caveat that it may be adjusted as the work proceeds if
+something looks wrong. The gates in section 5 are NOT part of that latitude: rung 0 --
+two agents on refactored code reproducing today's numbers -- stays mandatory, because a
+refactor that moves the numbers has broken something and there is no other way to find
+out. Still NOT IMPLEMENTED; `ma/topology.py` (section 8) is the first change.
 
 Goal: reach **5 agents and ~30 nodes**, scaling **incrementally in both axes**. This document
 says what changes, in what order, what breaks, and what each step must prove before the next

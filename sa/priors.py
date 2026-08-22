@@ -91,6 +91,45 @@ def expected_degree_p(d: int, degree: float = 2.0) -> float:
     return float(np.clip(degree / (d - 1), 1e-6, 1 - 1e-6))
 
 
+def connectivity_prior_p(d: int) -> float:
+    """`p = 2 ln(d) / d` -- the default edge probability, scaled with `d`.
+
+    Two DIFFERENT thresholds get conflated here and the distinction decides the answer.
+    The GIANT-COMPONENT (percolation) threshold is `1/d`; above it one component holds a
+    constant fraction of the nodes. The FULL-CONNECTIVITY threshold is `ln(d)/d`; above it
+    every node is in one component with no isolated stragglers.
+
+    **We want the second**, because a disconnected graph splits the agents into independent
+    subproblems: no path crosses the private/shared boundary, so there is no latent
+    confounding and nothing to coordinate about. Those episodes cannot test what this
+    project is building.
+
+    The factor of two is empirical, not asymptotic. `ln(d)/d` is the threshold at which
+    connectivity becomes *typical* as `d -> infinity`; at the finite sizes here it is far
+    too weak, measured at 28-51% connected across d=5..30. Doubling it clears the constant.
+
+    **This does NOT guarantee a single component**, and nothing short of rejection sampling
+    would -- rejection would distort the prior away from the generator, which is the exact
+    misspecification `ma/topology.py` is written to avoid. Measured over 400 draws per size
+    (`scripts/sa_graph_density.py`, `results/graph_density.json`):
+
+        d      5      8     10     15     20     30
+        p   .644   .520   .461   .361   .300   .227
+        connected  .92   .95   .97    .97    .97    .99
+        degree    2.58  3.63  4.18   5.08   5.77   6.53
+
+    So connectivity stays in the 92-99% band, and mean degree drifts up from 2.6 to 6.5 --
+    inside the ER-2..ER-6 band the literature uses, at the dense end of it.
+
+    For contrast, at the sizes this project targets: fixed `p = 0.5` gives degree 14.5 at
+    d=30, and ER-2 gives **1% connected** at d=30 and is unusable. Connectivity is reported
+    per episode either way, and every headline is split by it rather than pooled.
+    """
+    if d < 2:
+        return 0.0
+    return float(np.clip(2.0 * np.log(d) / d, 1e-6, 1 - 1e-6))
+
+
 def expected_edges_p(d: int, edges: float) -> float:
     """The `p` giving `edges` expected adjacencies before conditioning on acyclicity."""
     n_pairs = d * (d - 1) // 2

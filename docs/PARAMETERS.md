@@ -10,7 +10,7 @@ checked* — and the third is only damaging if we don't know which one it is.
 - **DERIVED** — follows from a definition, a proof, or a cited result
 - **ASSERTED** — chosen by judgement and never swept. **These are the exposure.**
 
-Defaults below are read from the code as of 21 August 2026.
+Defaults below are read from the code as of **22 August 2026**.
 
 ---
 
@@ -22,12 +22,12 @@ Defaults below are read from the code as of 21 August 2026.
 | `n_int` | 100 | **ASSERTED** | never justified, never swept. Interacts with the round budget: it sets how much evidence one clamp carries, which is the open question "can an agent locate where confounding was removed" |
 | `budget` | 10 rounds | **ASSERTED**, semantics DERIVED | a shared pool of rounds follows from internalising free-riding (`TURN_BUDGET_SPEC` §2); the *value* 10 is a judgement call |
 | `turn_order` | `simultaneous` | **DERIVED** | default kept only so pre-21-August commands reproduce. Turn-taking is the supervisor's directive and is opted into explicitly |
-| `action_modes` | both | **MEASURED**, and the default is stale | clamp-only costs ≤4pp (paired: ahead 6/10, tied 2, behind 2; CI `[-0.005, +0.041]`) and halves the action space. Adopted as a **trade** — the default should follow |
+| `action_modes` | **`(CLAMP,)`** | **MEASURED** | clamp-only costs ≤4pp (paired: ahead 6/10, tied 2, behind 2; CI `[-0.005, +0.041]`) and halves the action space. Adopted as a **trade**, not an equivalence, and made the default on 2026-08-22. `tb_both` remains a live arm; pass `action_modes=MODES` to restore both |
 | `identify_threshold` | 0.7 | **ASSERTED, and known not to scale** | inherited from the single-agent case. Measured 21 August: among graphs identifiable without acting, the true DAG clears 0.7 only **40%** of the time at `d=5,6`. **The most exposed parameter in this table** |
-| `prior_p` | 0.5 | **ASSERTED, and known to be wrong at scale** | at `d=30` gives expected degree **14.5** against a literature norm of 2–4. Must become `f(d)`. Note the two thresholds differ: percolation is `1/d`, but *connectivity* — which is what we want — needs `ln(d)/d` |
+| `prior_p` | **`2 ln(d)/d`** (0.597 at `d=6`) | **MEASURED** | applied 2026-08-22, resolved in `MAConfig.__post_init__` so generator and prior cannot drift apart. 92–99% connected across `d=5..30`, mean degree 2.6–6.5. Fixed `p=0.5` gave degree **14.5** at `d=30`; ER-2 gives **1% connected** there. **Does not guarantee connectedness** — only rejection sampling would, and that would distort the prior away from the generator. The single-agent line deliberately keeps `p=0.5`: it IS the uniform-over-DAGs prior and GATE 1 is calibrated against it |
 | `intervene_scale` | 2.0 | **ASSERTED** | only affects `vary`, which clamp-only removes |
 | `score_rule` | `joint_conf` | **MEASURED** | the four rules were compared; `pooled` cannot identify a confounded agent at all, `subset` creates a valley the learner cannot cross |
-| `disclose_regime` | `False` | **ASSERTED**, and every reported number sets it `True` | the no-bit arm was the baseline. **The ablation has not been run**, so we cannot yet claim the bit earns its place |
+| `disclose_regime` | `False` | **MEASURED**, and every reported number sets it `True` | the ablation ran 2026-08-22: with the bit OFF, **10/10 seeds collapse** to the pass-only floor (0.007), paired +0.540, CI [+0.515, +0.565]. Read it carefully though — the RANDOM baseline falls too, 0.380 to 0.040, and random reads no observations at all. So the bit changes what is IDENTIFIABLE, not just what the policy can condition on. The defensible claim is 'unsolvable without it', not 'the agent exploits the channel' |
 | `disclose_shared_targets` | `True` | **DERIVED** | shared columns are visible to both agents, so a partner could infer the target from the data anyway |
 | `disclose_signals` | `True` | **ASSERTED, provisional** | pending supervisor confirmation; removable with one flag |
 | `step_cost` | 0.0 | **MEASURED** | at 0.05 a random-level policy has expected value **−0.255** against 0.000 for passing, so passing was optimal and every "collapse" was correct behaviour. **Coupled to the absence of voluntary termination** — changing one alone re-opens the collapse |
@@ -57,11 +57,16 @@ Defaults below are read from the code as of 21 August 2026.
 
 **The three parameters most likely to be challenged, in order:**
 
+0. **All two-agent numbers predate the `prior_p` change** of 2026-08-22 and were measured
+   at `p = 0.5`, i.e. on a sparser and less often connected graph distribution than the
+   code now generates. **They do not carry over without a re-run.** This is the price of the
+   fix and it was taken deliberately; rung 0 of the n-agent ladder is the natural place to
+   pay it.
 1. **`identify_threshold = 0.7`** — asserted, inherited, and *measured not to scale*. We know
    the failure mode and have a proposed fix (split GATE 1 into a leak check and a power
    check, and raise `n_obs` with `d`). Not yet implemented.
-2. **`prior_p = 0.5`** — asserted, and demonstrably wrong at `d = 30`. Blocking for any
-   scaling claim.
+2. ~~**`prior_p = 0.5`**~~ — **resolved 2026-08-22**; see the row above.
+   The two-agent numbers measured under it do not carry over.
 3. **`n_int = 100`** — asserted, never swept, and it controls how much evidence a single
    de-confounding clamp delivers. That is close to the centre of the thesis.
 

@@ -80,13 +80,27 @@ def main(argv=None) -> dict:
 
     report = {
         "arm": args.arm, "seed": args.seed,
-        "config": {"n_obs": args.n_obs, "n_int": args.n_int, "budget": args.budget,
-                   "rule": args.rule, "disclose_regime": args.disclose_regime,
-                   "turn_order": args.turn_order,
-                   "action_modes": list(modes),
+        # Read off the RESOLVED config, not off `args`. `prior_p` is derived from `d` when
+        # it is left unset, and `identify_threshold` has no CLI flag at all, so logging the
+        # arguments would have recorded neither -- and the 2026-08-22 prior change is
+        # exactly the kind of thing that later makes a results file unattributable.
+        # Same lesson as "log the raw quantity, never the verdict".
+        "config": {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
+                   "rule": config.score_rule,
+                   "disclose_regime": config.disclose_regime,
+                   "turn_order": config.turn_order,
+                   "action_modes": list(config.action_modes),
+                   "prior_p": config.prior_p,
+                   "identify_threshold": config.identify_threshold,
+                   "intervene_scale": config.intervene_scale,
+                   "reward_criterion": config.reward_criterion,
+                   "topology": {"name": topology.name, "d": topology.d,
+                                "a_private": list(topology.a_private),
+                                "b_private": list(topology.b_private),
+                                "exposed": list(topology.exposed)},
                    "train_episodes": args.train_episodes,
                    "potential_shaping": args.potential_shaping,
-                   "step_cost": args.step_cost},
+                   "step_cost": config.step_cost},
         "train_seconds": train_seconds,
         # The collapse diagnostic. A seed that never sampled the terminal reward has a
         # different problem from one that sampled it and could not exploit it.

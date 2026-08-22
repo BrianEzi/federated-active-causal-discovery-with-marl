@@ -67,6 +67,12 @@ class EnvConfig:
     # p = 0.5 is exactly the uniform-over-DAGs prior; sparsity (p < 0.5) is close to
     # vacuous below d ~ 8, so it stays the default here and becomes a real lever at scale.
     prior: str = "erdos_renyi"
+    # DELIBERATELY NOT the scaling `2 ln(d)/d` that `ma/env.py` adopted on 2026-08-22.
+    # Two reasons, both specific to the single-agent line. p = 0.5 IS the uniform-over-DAGs
+    # prior (see sa/priors.py), which is the stated baseline here; and GATE 1's target is
+    # calibrated against it -- the ~14%-against-16% figure above is a p = 0.5 number, so
+    # moving the default would silently invalidate the gate rather than fail it.
+    # Use `sa.priors.connectivity_prior_p(d)` explicitly when scaling this line to large d.
     prior_p: float = 0.5
     # Append per-node intervention counts to the observation.
     #

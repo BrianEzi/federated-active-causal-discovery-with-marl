@@ -1411,7 +1411,7 @@ top would be void -- the same shape as the unearnable metric of 2026-08-19. Chan
 Because a partially-clean block still carries live confounding while the scorer treats a
 clean block as confounding-free, `TwoAgentEnv2` now REFUSES a multi-private topology with a
 `NotImplementedError` naming the reason, rather than scoring wrong data quietly. Reachability
-is asserted per protocol in `tests/test_env2_turns.py::test_clean_rounds_are_reachable`.
+is asserted per protocol in `tests/test_env_turns.py::test_clean_rounds_are_reachable`.
 
 [CORRECTED] **Round-robin ends episodes early in the obvious implementation.** If the
 rotation hands the turn to an agent with no budget left, its only legal move is a pass,
@@ -1568,3 +1568,42 @@ the evidence for the rule.
 exhaustive -- 5000 DAGs each. Exhaustive enumeration is infeasible at `d=10,11`. The result
 is therefore "no counterexample in 230k projections", not a proof. A proof along the lines of
 the corrected argument above is worth writing for the thesis.
+
+---
+
+## 2026-08-22 — ablation results, and three defaults changed
+
+**[MEASURED] The regime-bit ablation.** `nobit_clamp`, 10 seeds, round-robin, clamp-only.
+Learned **0.007** = the pass-only floor, 10/10 seeds collapsed, paired +0.540 CI
+[+0.515, +0.565]. Private-clamp share 5.6% against 81.6% with the bit.
+
+**[CORRECTED] What the ablation licenses.** The first reading was "the federation channel
+earns its place". The `random` baseline falls too, 0.380 to 0.040, and random reads no
+observations at all — so the bit changes what is IDENTIFIABLE, not only what the policy
+can condition on. Claim: *necessary for solvability*. Not: *the agent exploits a channel*.
+
+**[MEASURED] Turn order.** Round-robin over random: +0.028, CI [+0.011, +0.045], 8/10 seeds.
+Free-rider index 0.82 against 0.61.
+
+**[MEASURED] Clamp-only, five more seeds.** Unchanged at +0.018, CI [-0.005, +0.041], 6/10.
+The 10 pending `tb_both` seeds 10-19 will settle it.
+
+**[DECIDED] `action_modes` defaults to `(CLAMP,)`.** A trade of at most ~4pp for a halved
+action space and one fewer axis to sweep as agents are added. Broke 7 tests, all of which
+were asserting vary-specific mechanism; they now opt into `MODES` explicitly. `tb_both`
+stays a live arm.
+
+**[DECIDED] `prior_p` becomes `2 ln(d)/d`**, resolved in `MAConfig.__post_init__`. At the
+current `d=6` that is 0.597, not 0.5. **This moves the graph distribution, so every
+two-agent number on record is now measured under a superseded generator.** Deliberate: the
+old fixed value gave mean degree 14.5 at `d=30`. It does NOT guarantee connectedness
+(92-99%); only rejection sampling would, and that would distort the prior away from the
+generator. The single-agent line keeps `p=0.5` — it IS the uniform-over-DAGs prior and
+GATE 1 is calibrated against it.
+
+**[DECIDED] `docs/N_AGENT_REFACTOR_SPEC.md` approved.** Adjustable as work proceeds, except
+the rung-0 gate.
+
+**[NOTED] Stale comment removed.** `MAConfig.turn_order` still carried the pre-turn-budget
+claim that the budget was per-agent, three lines below the `budget` field saying it is a
+shared pool. Two contradictory comments on adjacent fields, both written by us.

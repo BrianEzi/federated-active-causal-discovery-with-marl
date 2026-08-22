@@ -41,5 +41,11 @@ results/myriad_rescue/marl_sa_fast/
 
 # Untracked scratch that accumulated at the repo root
 logs/
+# ...but docs/logs/ is the experiment record, not run output. The rule above was
+# silently swallowing every NEW file there, which directly undercuts the standing
+# practice of logging measurements as they happen. Existing files were tracked, so
+# this only ever bit on the first write of a new log.
+!docs/logs/
+!docs/logs/**
 wandb/
 wandb_cluster/
