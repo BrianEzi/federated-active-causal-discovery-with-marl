@@ -52,3 +52,29 @@ logs/
 !docs/logs/**
 wandb/
 wandb_cluster/
+
+# ---------------------------------------------------------------------------------------
+# Deliberately local, 2026-08-22
+# ---------------------------------------------------------------------------------------
+#
+# thesis/   The dissertation LaTeX. Already versioned by Overleaf, and a second copy in git
+#           is a second place for it to diverge. Overleaf is the single source of truth.
+#
+# textbook/ Background reading written for the author's own understanding. Nothing in the
+#           codebase depends on it and no reported number comes from it.
+#           NOTE: textbook/verification/*.py WAS tracked until today and is preserved in
+#           history -- recover with `git show af2b4b2:textbook/verification/v1_graph_space.py`.
+#
+# temp.py   Root-level scratch.
+thesis/
+textbook/
+temp.py
+
+# The v1 analysis notebooks were untracked on 2026-08-22: rendered charts and embedded
+# outputs, 5.2 MB of the repository, none of it a source for any reported number. The five
+# kaggle_* run notebooks stay tracked -- those are how jobs were actually launched.
+# All of them remain in history: `git show af2b4b2:legacy/notebooks/sa_findings.ipynb`.
+legacy/notebooks/run_analysis_*.ipynb
+legacy/notebooks/comparative_run_analysis_suite.ipynb
+legacy/notebooks/overnight_analysis_*.ipynb
+legacy/notebooks/sa_findings.ipynb
