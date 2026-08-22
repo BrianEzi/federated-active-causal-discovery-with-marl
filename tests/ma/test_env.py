@@ -17,8 +17,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env import AGENTS, CLAMP, MAConfig, TwoAgentEnv, VARY
+from ma.env import AGENTS, CLAMP, MAConfig, MODES, TwoAgentEnv, VARY
 from ma.topology import Topology
+from sa.priors import connectivity_prior_p
 
 
 @pytest.fixture(scope="module")
@@ -27,6 +28,11 @@ def topology():
 
 
 def make(topology, **kwargs):
+    # BOTH modes, explicitly. The default became clamp-only on 2026-08-22, but these are
+    # MECHANISM gates -- several assert vary-specific semantics (a vary cleans nothing, a
+    # clamp wins a collision), and those properties still have to hold for any caller who
+    # opts back into `MODES`. Testing them requires the mode to exist.
+    kwargs.setdefault("action_modes", MODES)
     config = MAConfig(topology=topology, n_obs=200, n_int=50, budget=3, **kwargs)
     return TwoAgentEnv(config)
 
@@ -148,8 +154,12 @@ def test_episodes_are_deterministic_under_a_fixed_seed(topology):
     assert np.allclose(first_trace, second_trace, atol=0)
 
 
-def test_budget_is_per_agent_not_a_shared_pool(topology):
-    """One agent exhausting itself must not end the other's episode."""
+def test_passing_does_not_consume_the_partners_opportunities(topology):
+    """Under SIMULTANEOUS action both agents act every round, so a round A wastes by passing
+    is still a round B gets to use. Renamed 2026-08-22: the old name said the budget was
+    per-agent, which stopped being true at the turn-budget change -- it is a shared pool of
+    ROUNDS. Under simultaneous action the two readings coincide, which is why this kept
+    passing under a name that contradicted the config it was testing."""
     env = make(topology)
     result = env.reset(seed=29)
     a_pass = env.windows["A"].pass_index
@@ -172,3 +182,36 @@ def test_observation_features_are_all_in_unit_range(topology):
         assert obs.shape == (env.obs_size(name),)
         assert np.isfinite(obs).all()
         assert (obs >= -1e-9).all() and (obs <= 1 + 1e-9).all()
+
+
+# -- defaults, guarded ------------------------------------------------------------------
+#
+# Both of these changed on 2026-08-22 and both change measured numbers, so they are pinned
+# here rather than left to a docstring. A default that drifts silently is how this project
+# lost a budget's meaning once already.
+
+
+def test_clamp_only_is_the_default(topology):
+    """Adopted as a TRADE, not a proven equivalence: paired over 10 seeds both-modes led by
+    +0.018, CI [-0.005, +0.041], ahead on 6, tied on 2, behind on 2. Restore both with
+    `action_modes=MODES`."""
+    assert MAConfig(topology=topology).action_modes == (CLAMP,)
+    assert MAConfig(topology=topology, action_modes=MODES).action_modes == MODES
+
+
+def test_prior_p_scales_with_d_and_resolves_once(topology):
+    """`None` means `2 ln(d)/d`, resolved in __post_init__ so the generator, the posterior's
+    prior and the logged config cannot disagree. An explicit float still wins."""
+    cfg = MAConfig(topology=topology)
+    assert cfg.prior_p == pytest.approx(connectivity_prior_p(topology.d))
+    assert cfg.prior_p != 0.5, "the old fixed default must not survive as a coincidence"
+    assert MAConfig(topology=topology, prior_p=0.5).prior_p == 0.5
+
+
+def test_the_scaling_prior_beats_a_fixed_p_on_connectedness_at_scale():
+    """The reason for the rule. At d=30 a fixed p=0.5 gives a mean degree near 14.5, far
+    outside the literature's 2-6 band, while ER-2 gives 1% connected graphs. See
+    scripts/sa_graph_density.py for the measurement this pins."""
+    assert connectivity_prior_p(30) < 0.25 < connectivity_prior_p(10) < connectivity_prior_p(5)
+    assert 2.0 < connectivity_prior_p(30) * 29 < 7.0, "mean degree stays in the ER-2..ER-6 band"
+

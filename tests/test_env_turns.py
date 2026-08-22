@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env import (AGENTS, CLAMP, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
+from ma.env import (AGENTS, CLAMP, MODES, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
                      MAConfig, TwoAgentEnv)
 from ma.topology import Topology
 
@@ -21,6 +21,9 @@ T_2_2_2 = Topology(name="T1", a_private=(0, 1), b_private=(2, 3), exposed=(4, 5)
 
 
 def _env(**kw) -> TwoAgentEnv:
+    # BOTH modes -- see tests/ma/test_env.py:make. Turn-order semantics must hold
+    # whichever action modes are enabled, and one test here is vary-specific.
+    kw.setdefault("action_modes", MODES)
     config = MAConfig(topology=T_1_1_3, n_obs=200, n_int=50, budget=3,
                        disclose_regime=True, **kw)
     return TwoAgentEnv(config, seed=0)
@@ -80,7 +83,7 @@ def test_simultaneous_is_unchanged():
 # NOTE. Five tests were REMOVED here on 2026-08-21, not fixed. They pinned the pre-spec
 # rules -- a per-agent intervention budget, the consecutive-pass tally, and "a forfeited turn
 # generates no data" -- all of which `docs/TURN_BUDGET_SPEC.md` deliberately replaces. Their
-# successors live in `tests/test_env2_turn_budget.py`, numbered to the spec's section 12.
+# successors live in `tests/test_env_turn_budget.py`, numbered to the spec's section 12.
 # A test that encodes a superseded decision is worse than no test: it argues for the old
 # design every time someone runs it.
 

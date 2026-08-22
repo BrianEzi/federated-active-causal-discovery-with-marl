@@ -10,6 +10,14 @@ definition -- it orients each confounding edge by an arbitrary topological tie-b
 the DP implements a reformulation that marginalises the orientation instead. It is checked
 for internal consistency here and compared to the old rule by measurement, not identity.
 See `ma/belief_dp.py`'s module docstring.
+
+!! DO NOT MOVE THIS FILE TO legacy/tests/ !!
+
+It imports from `legacy/`, which makes it look like the nineteen retired v1 test files moved
+out on 2026-08-22. It is the opposite. Here v1 is the **independent reference oracle** for
+CURRENT code: the value of the check is precisely that the reference shares no code with the
+thing under test, so a shared bug cannot hide in both. If `legacy/ma_v1/` is ever deleted,
+convert this to a frozen fixture FIRST -- never drop the check.
 """
 from __future__ import annotations
 

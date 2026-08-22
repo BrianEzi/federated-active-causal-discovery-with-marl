@@ -8,6 +8,14 @@ implementation lives here as a reference and the two are compared on real enviro
 Written after the optimisation, deliberately over the whole hypothesis space rather than a
 summary statistic: a bug that shifts a handful of low-mass hypotheses would not move the
 posterior mass on the truth, and would be invisible to a coarser check.
+
+!! DO NOT MOVE THIS FILE TO legacy/tests/ !!
+
+It imports from `legacy/`, which makes it look like the nineteen retired v1 test files moved
+out on 2026-08-22. It is the opposite. Here v1 is the **independent reference oracle** for
+CURRENT code: the value of the check is precisely that the reference shares no code with the
+thing under test, so a shared bug cannot hide in both. If `legacy/ma_v1/` is ever deleted,
+convert this to a frozen fixture FIRST -- never drop the check.
 """
 from __future__ import annotations
 

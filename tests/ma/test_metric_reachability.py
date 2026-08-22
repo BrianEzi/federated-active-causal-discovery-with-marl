@@ -8,7 +8,7 @@ unconfounded-only number wearing a general label, and nothing flagged it: the me
 returned plausible values, the tests passed, and the runs completed.
 
 The general lesson, and the reason this is a separate file rather than another case in
-test_evaluate2.py: a metric can be WELL-FORMED and still be UNEARNABLE. Checking that the
+test_evaluate.py: a metric can be WELL-FORMED and still be UNEARNABLE. Checking that the
 truth belongs to its own credit set is not enough, because the bug was in the mapping from
 posterior index to credit set, not in the set. What catches it is asking whether the metric
 can be earned at all, separately WITHIN EACH REGIME the experiment claims to cover.
