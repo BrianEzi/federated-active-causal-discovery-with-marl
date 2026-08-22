@@ -239,3 +239,23 @@ def test_three_agent_smoke_environment():
     assert len(step_res.identified) == 3
     assert len(step_res.n_interventions) == 3
 
+
+def test_pre_refactor_checkpoints_still_load():
+    """REGRESSION, 2026-08-22. The n-agent refactor switched agents from "A"/"B" to
+    integers and silently broke `IndependentPPO.load` for every checkpoint written before
+    it -- which is every policy behind the current headline numbers. It surfaced only as a
+    bare KeyError deep inside the shape check, with nothing naming the cause.
+
+    "Save the policies" was paid for once already, when ten trained pairs were evaluated and
+    then discarded. Saving them is worth nothing if they cannot be read back."""
+    from ma.policy import _upgrade_checkpoint_keys
+
+    old_format = {"nets": {"A": "wA", "B": "wB"}, "obs_size": {"A": 10, "B": 11},
+                  "hidden": 128, "seed": 0}
+    upgraded = _upgrade_checkpoint_keys(dict(old_format))
+    assert upgraded["nets"] == {0: "wA", 1: "wB"}
+    assert upgraded["obs_size"] == {0: 10, 1: 11}
+    assert upgraded["hidden"] == 128, "untouched fields must survive"
+
+    already_new = {"nets": {0: "w0", 1: "w1"}, "obs_size": {0: 10, 1: 11}}
+    assert _upgrade_checkpoint_keys(dict(already_new))["nets"] == {0: "w0", 1: "w1"}

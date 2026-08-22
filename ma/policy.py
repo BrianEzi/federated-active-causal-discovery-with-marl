@@ -70,6 +70,31 @@ class PPOConfig:
     potential_shaping: float = 0.0
 
 
+
+def _upgrade_checkpoint_keys(blob: dict) -> dict:
+    """Translate pre-2026-08-22 checkpoints, which keyed agents by name, to integer keys.
+
+    FORMAT VERSIONING, not a semantic shim. The n-agent refactor switched agents from the
+    strings "A"/"B" to integers 0..n-1, and silently broke `load` for every checkpoint
+    written before it -- including every policy behind the current headline numbers. The
+    failure was a bare KeyError deep in the shape check, with nothing pointing at the cause.
+
+    This is safe in a way `a_private`/`b_private` accessors were not: it reads a serialised
+    artefact whose format is known and fixed, and the mapping ("A", "B") -> (0, 1) is exact
+    because names never went past two agents. Nothing about live semantics changes.
+
+    "Save the policies" was a lesson paid for once already, when ten trained pairs were
+    evaluated and discarded. Saving them is not enough if they cannot be read back.
+    """
+    names = ("A", "B")
+    for field in ("nets", "obs_size"):
+        table = blob.get(field)
+        if isinstance(table, dict) and any(k in table for k in names):
+            blob[field] = {names.index(k) if k in names else k: v
+                           for k, v in table.items()}
+    return blob
+
+
 class ActorCritic(nn.Module):
     """Deliberately small and feedforward. The observation is a belief summary, so the
     problem is close to a proper MDP and recurrence has nothing obvious to add; adding it
@@ -302,6 +327,7 @@ class IndependentPPO:
         import torch as _torch
 
         blob = _torch.load(path, map_location=DEVICE, weights_only=False)
+        blob = _upgrade_checkpoint_keys(blob)
         for agent in env.topology.agents:
             if blob["obs_size"][agent] != env.obs_size(agent):
                 raise ValueError(
