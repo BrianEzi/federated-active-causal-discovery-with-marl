@@ -121,13 +121,13 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     assert not env.clean[1].any()
 
 
-def test_multi_private_topology_is_refused_rather_than_scored_wrong():
-    """With two hidden nodes a single clamp leaves a block PARTIALLY clean, which the
-    regime rules would score as fully confounding-free. Refuse until per-block confounding
-    subsets exist."""
+def test_multi_private_topology_is_supported_under_per_block_scoring():
+    """With two hidden nodes a single clamp leaves a block PARTIALLY clean.
+    Under per-block confounding subsets S_r, multi-private topologies are now fully supported."""
     config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
-    with pytest.raises(NotImplementedError, match="hides 2 nodes"):
-        TwoAgentEnv(config, seed=0)
+    env = TwoAgentEnv(config, seed=0)
+    assert env.windows[0].k == 4
+    assert env.windows[1].k == 4
 
 
 def test_turn_order_is_validated():

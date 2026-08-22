@@ -147,8 +147,8 @@ class RegimeScorer:
 
     def log_posterior(self, samples: np.ndarray, known_intervened: np.ndarray,
                       clean: np.ndarray, rule: str) -> np.ndarray:
-        """Posterior over the agent's DAGs. `clean` is the per-row regime bit."""
-        clean = np.asarray(clean, dtype=bool)
+        """Posterior over the agent's DAGs. `clean` is the per-row regime values (0.0 to 1.0)."""
+        clean = np.asarray(clean, dtype=float)
         score = self.view.score
         cache: Dict[Tuple[str, int, Tuple[int, ...]], float] = {}
 
@@ -170,26 +170,16 @@ class RegimeScorer:
             raise ValueError(rule)
 
         all_rows = np.ones(len(samples), dtype=bool)
-        dirty_rows = ~clean
-        has_clean = bool(clean.any())
+        has_clean = bool((clean > 0.0).any())
 
-        # With no clean rows there is no regime split to exploit, so POOLED, SUBSET and
-        # JOINT all reduce to scoring everything once.
-        #
-        # JOINT_CONF deliberately does NOT reduce. Without clean data an agent genuinely
-        # cannot tell a real shared edge from a confounding artefact, and the whole point
-        # of the rule is to represent that rather than assume it away. The consequence is
-        # visible and intended: JOINT_CONF starts LOWER than the others at p(clamp)=0,
-        # because it is spreading mass over hypotheses the others silently exclude. What
-        # it buys is that clamping then resolves the ambiguity.
         if rule in (POOLED, SUBSET, JOINT) and not has_clean:
             groups = [("all", all_rows)]
         elif rule == POOLED:
             groups = [("all", all_rows)]
         elif rule == SUBSET:
-            groups = [("clean", clean)]
+            groups = [("clean", clean > 0.0)]
         elif rule == JOINT:
-            groups = [("clean", clean), ("dirty", dirty_rows)]
+            groups = [("clean", clean > 0.0), ("dirty", clean <= 0.0)]
         else:
             groups = None                        # JOINT_CONF handled below
 
@@ -208,18 +198,38 @@ class RegimeScorer:
                 log_post += slot_scores(tag, rows)[self.clean_slots].sum(axis=1)
             return _normalise(log_post)
 
-        # JOINT_CONF: score every (DAG, confounded-subset) pair, then marginalise S out.
-        clean_scores = slot_scores("clean", clean)
-        dirty_scores = slot_scores("dirty", dirty_rows)
-        table = (clean_scores[self.clean_slots].sum(axis=1)[:, None]
-                 + dirty_scores[self.dirty_slots].sum(axis=2))
-        # Uniform prior over subsets. A sparsity prior favouring fewer confounded pairs
-        # would be defensible and is NOT applied, because it would bias the comparison
-        # towards finding no confounding, which is the thing being measured.
+        # JOINT_CONF: score every (DAG, confounded-subset) pair across all distinct regimes,
+        # then marginalise S out.
+        unique_f = np.unique(clean)
+        table = np.zeros((n_dags, self.n_subsets))
 
-        # Row-wise log-sum-exp. A single global shift underflows every entry of the
-        # weaker rows to zero and then log(0) = -inf, which silently deletes hypotheses
-        # rather than ranking them.
+        for f_val in unique_f:
+            f = float(f_val)
+            rows = (clean == f_val)
+            q = 1.0 - f
+            s_f = slot_scores(f"regime_{f:.4f}", rows)
+
+            clean_term = s_f[self.clean_slots].sum(axis=1)  # [n_dags]
+            dirty_term = s_f[self.dirty_slots].sum(axis=2)  # [n_dags, n_subsets]
+
+            if f == 1.0:
+                table += clean_term[:, None]
+            elif f == 0.0:
+                table += dirty_term
+            else:
+                node_clean = s_f[self.clean_slots]           # [n_dags, k]
+                node_dirty = s_f[self.dirty_slots]           # [n_dags, n_subsets, k]
+                is_conf = (self.clean_slots[:, None, :] != self.dirty_slots)  # [n_dags, n_subsets, k]
+                log_1_minus_q = np.log(1.0 - q)
+                log_q = np.log(q)
+                mixed_node = np.where(
+                    is_conf,
+                    np.logaddexp(log_1_minus_q + node_clean[:, None, :], log_q + node_dirty),
+                    node_clean[:, None, :]
+                )
+                table += mixed_node.sum(axis=2)
+
+        # Row-wise log-sum-exp.
         shift = table.max(axis=1, keepdims=True)
         marginal = np.log(np.exp(table - shift).sum(axis=1)) + shift.ravel()
         return _normalise(marginal)

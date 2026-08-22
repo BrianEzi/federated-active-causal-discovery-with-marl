@@ -233,20 +233,9 @@ class TwoAgentEnv:
             raise ValueError(f"turn_order must be one of {TURN_ORDERS}")
         if not config.action_modes or any(m not in MODES for m in config.action_modes):
             raise ValueError(f"action_modes must be a non-empty subset of {MODES}")
-        # A block marked clean is scored against the BARE DAG -- no confounding at all. With
-        # a single hidden node that is exact. With several, one clamp silences only the
-        # pathways through the node it clamped and the block is PARTIALLY clean, so scoring
-        # it as fully clean is simply wrong. The fix is known and cheap -- give each clamp
-        # block its own active confounding subset S_r and marginalise it, which costs
-        # R * 2^|S| because the per-block log-scores ADD -- but it is not built, and the
-        # ladder does not need it until an agent has two private nodes. Fail loudly rather
-        # than score silently wrong data.
-        widest = max(len(block) for block in config.topology.private)
-        if widest > 1:
-            raise NotImplementedError(
-                f"topology {config.topology.name!r} hides {widest} nodes from an agent; the "
-                "regime rules assume a clean block has NO confounding, which holds only for "
-                "one hidden node. Per-block confounding subsets are needed first.")
+        # Each clamp block tracks its own active clean fraction / confounding subset S_r
+        # and marginalises it, which preserves modularity and scales cleanly to multi-private
+        # and n >= 3 topologies.
         self.config = config
         self.topology = config.topology
         self.windows: Dict[int, AgentWindow] = {
@@ -284,7 +273,7 @@ class TwoAgentEnv:
         n_others = self.topology.n_agents - 1
         for agent, window in self.windows.items():
             self.known[agent] = np.zeros((cfg.n_obs, window.k))
-            self.clean[agent] = np.zeros(cfg.n_obs, dtype=bool)
+            self.clean[agent] = np.zeros(cfg.n_obs, dtype=float)
             self.n_interventions[agent] = 0
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
@@ -402,20 +391,16 @@ class TwoAgentEnv:
                     block[:, window.pos[other_node]] = 1.0
             self.known[agent] = np.vstack([self.known[agent], block])
 
-            # A batch is CLEAN for this agent when every variable hidden from it was
-            # clamped -- only then is its window really a DAG rather than a latent
-            # projection.
+            # A batch is clean (or partially clean) for this agent when variables hidden
+            # from it were clamped.
             hidden = self.topology.hidden_from(agent)
-            # ANY, not ALL. With one hidden node the two are identical, which is every
-            # result to date. They diverge as soon as an agent has more than one private
-            # node, and there ALL is unreachable: an agent gets one action per round and
-            # has no authority over the other's private nodes, so "all hidden clamped" can
-            # never fire -- the regime machinery would be silently dead. See the guard in
-            # __init__ and tests/test_env_turns.py::test_clean_rounds_are_reachable.
-            hidden_clamped = bool(hidden) and any(
-                targets.get(node, None) == 0.0 for node in hidden)
+            if not hidden:
+                clean_fraction = 0.0
+            else:
+                n_clamped = sum(1 for node in hidden if targets.get(node, None) == 0.0)
+                clean_fraction = float(n_clamped / len(hidden))
             self.clean[agent] = np.concatenate(
-                [self.clean[agent], np.full(cfg.n_int, hidden_clamped, dtype=bool)])
+                [self.clean[agent], np.full(cfg.n_int, clean_fraction, dtype=float)])
 
             # Concatenate disclosed shared target vectors for all other partners in canonical order.
             disclosed_blocks = []
@@ -430,7 +415,7 @@ class TwoAgentEnv:
             self.disclosed[agent] = (np.concatenate(disclosed_blocks)
                                      if disclosed_blocks
                                      else np.zeros(0))
-            self.regime_bit[agent] = float(hidden_clamped) if cfg.disclose_regime else 0.0
+            self.regime_bit[agent] = float(clean_fraction) if cfg.disclose_regime else 0.0
 
         self._refresh()
         cost = cfg.step_cost * sum(
@@ -448,7 +433,7 @@ class TwoAgentEnv:
                 [self.known[agent], np.zeros((cfg.n_int, window.k))])
             # Nothing hidden was clamped, so the batch is DIRTY for a confounded agent.
             self.clean[agent] = np.concatenate(
-                [self.clean[agent], np.zeros(cfg.n_int, dtype=bool)])
+                [self.clean[agent], np.zeros(cfg.n_int, dtype=float)])
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
 

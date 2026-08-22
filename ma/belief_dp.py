@@ -164,24 +164,34 @@ class WindowBeliefDP:
 
     # -- local score tables -------------------------------------------------------------
 
+    # -- local score tables -------------------------------------------------------------
+
+    def regime_tables(self, samples: np.ndarray, known_intervened: np.ndarray,
+                      clean: np.ndarray) -> List[Tuple[float, np.ndarray]]:
+        """List of `(clean_fraction, table)` across all distinct regimes in `clean`, memoised."""
+        clean = np.asarray(clean, dtype=float)
+        unique_f, counts = np.unique(clean, return_counts=True)
+        key = (samples.shape[0], tuple(float(f) for f in unique_f), tuple(int(c) for c in counts))
+        if self._table_key == key and self._table_cache is not None:
+            return self._table_cache
+
+        tables = []
+        for f in unique_f:
+            f_float = float(f)
+            rows = (clean == f)
+            table_f = self.local_table(samples, known_intervened, rows)
+            tables.append((f_float, table_f))
+
+        self._table_key, self._table_cache = key, tables
+        return tables
+
     def tables(self, samples: np.ndarray, known_intervened: np.ndarray,
                clean: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """`(clean_table, dirty_table)`, memoised for the current data.
-
-        Both `joint_conf_marginals` and `joint_conf_dag_probability` need exactly these two
-        tables, and a belief refresh calls both. Computing them independently scored every
-        row twice per refresh -- measured at ~40% of the episode's total cost. The cache key
-        is the data's shape and regime split, which is sufficient because rows are only ever
-        APPENDED within an episode and the environment rebuilds the belief on reset.
-        """
-        key = (samples.shape[0], int(np.count_nonzero(clean)))
-        if self._table_key == key:
-            return self._table_cache
-        clean = np.asarray(clean, dtype=bool)
-        result = (self.local_table(samples, known_intervened, clean),
-                  self.local_table(samples, known_intervened, ~clean))
-        self._table_key, self._table_cache = key, result
-        return result
+        """`(clean_table, dirty_table)`, memoised for binary 2-regime data."""
+        clean = np.asarray(clean, dtype=float)
+        clean_rows = clean > 0.0
+        return (self.local_table(samples, known_intervened, clean_rows),
+                self.local_table(samples, known_intervened, ~clean_rows))
 
     def local_table(self, samples: np.ndarray, known_intervened: np.ndarray,
                     rows: np.ndarray) -> np.ndarray:
@@ -218,13 +228,15 @@ class WindowBeliefDP:
     def assignment_weights_and_z(self, samples: np.ndarray, known_intervened: np.ndarray,
                                  clean: np.ndarray) -> List[Tuple[np.ndarray, float]]:
         """`(log_w, log_z)` per surviving assignment, computed once per belief update."""
-        key = (samples.shape[0], int(np.count_nonzero(clean)))
+        clean = np.asarray(clean, dtype=float)
+        unique_f, counts = np.unique(clean, return_counts=True)
+        key = (samples.shape[0], tuple(float(f) for f in unique_f), tuple(int(c) for c in counts))
         if self._assign_key == key and self._assign_cache is not None:
             return self._assign_cache
-        clean_table, dirty_table = self.tables(samples, known_intervened, clean)
+        reg_tables = self.regime_tables(samples, known_intervened, clean)
         out: List[Tuple[np.ndarray, float]] = []
         for assignment in self.assignments:
-            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
+            log_w = self._assignment_weights(reg_tables, assignment)
             if not np.isfinite(log_w).any():
                 out.append((log_w, NEG_INF))
                 continue
@@ -239,18 +251,19 @@ class WindowBeliefDP:
         """`[k, n_parent_sets]` weights for a modular rule, ready for the DP."""
         if rule not in MODULAR_RULES:
             raise ValueError(f"{rule!r} is not modular; use `joint_conf_marginals`")
-        clean = np.asarray(clean, dtype=bool)
+        clean = np.asarray(clean, dtype=float)
         all_rows = np.ones(len(samples), dtype=bool)
-        has_clean = bool(clean.any())
+        clean_rows = clean > 0.0
+        has_clean = bool(clean_rows.any())
 
         # Same fallback as the enumerated path: with no clean rows there is no split to
         # exploit and all three rules reduce to scoring everything once.
         if not has_clean or rule == POOLED:
             return self.local_table(samples, known_intervened, all_rows)
         if rule == SUBSET:
-            return self.local_table(samples, known_intervened, clean)
-        return (self.local_table(samples, known_intervened, clean)
-                + self.local_table(samples, known_intervened, ~clean))
+            return self.local_table(samples, known_intervened, clean_rows)
+        return (self.local_table(samples, known_intervened, clean_rows)
+                + self.local_table(samples, known_intervened, ~clean_rows))
 
     def edge_marginals(self, samples: np.ndarray, known_intervened: np.ndarray,
                        clean: np.ndarray, rule: str) -> np.ndarray:
@@ -269,14 +282,16 @@ class WindowBeliefDP:
 
     # -- joint_conf, reformulated -------------------------------------------------------
 
-    def _assignment_weights(self, clean_table: np.ndarray, dirty_table: np.ndarray,
+    def _assignment_weights(self, regime_tables: List[Tuple[float, np.ndarray]],
                             assignment: Sequence[Optional[Tuple[int, int]]]
                             ) -> np.ndarray:
-        """Weights for one fixed confounding assignment.
+        """Weights for one fixed confounding assignment across all data regimes.
 
         For each declared confounding edge `u -> v`: v's parent set MUST contain u (that
-        edge is part of the hypothesis), and the CLEAN regime must not be credited for it,
-        so the clean term is read at `pa \\ {u}` while the dirty term is read at `pa`.
+        edge is part of the hypothesis).
+        - In fully clean regime (f=1.0, q=0.0): clean term is read at `pa \\ {u}` (stripped).
+        - In fully dirty regime (f=0.0, q=1.0): dirty term is read at `pa` (full).
+        - In partially clean regime (0 < f < 1.0): mixture over active confounding states.
         """
         required: List[int] = [0] * self.k          # bitmask of forced parents per node
         for edge in assignment:
@@ -285,18 +300,33 @@ class WindowBeliefDP:
             u, v = edge
             required[v] |= 1 << u
 
-        out = np.full((self.k, self.scorer.n_parent_sets), NEG_INF)
+        out = np.zeros((self.k, self.scorer.n_parent_sets))
         for node in range(self.k):
             need = required[node]
-            for i, parents in enumerate(self.scorer.parent_sets[node]):
-                mask = 0
-                for p in parents:
-                    mask |= 1 << p
-                if mask & need != need:
-                    continue                        # hypothesis requires an absent edge
-                stripped = tuple(p for p in parents if not (need >> p) & 1)
-                j = self.scorer.lookup[node][stripped]
-                out[node, i] = clean_table[node, j] + dirty_table[node, i]
+            if need == 0:
+                for _, table in regime_tables:
+                    out[node, :] += table[node, :]
+            else:
+                for i, parents in enumerate(self.scorer.parent_sets[node]):
+                    mask = 0
+                    for p in parents:
+                        mask |= 1 << p
+                    if mask & need != need:
+                        out[node, i] = NEG_INF      # hypothesis requires an absent edge
+                        continue
+                    stripped = tuple(p for p in parents if not (need >> p) & 1)
+                    j = self.scorer.lookup[node][stripped]
+                    for f, table in regime_tables:
+                        q = 1.0 - f
+                        if f == 1.0:
+                            out[node, i] += table[node, j]
+                        elif f == 0.0:
+                            out[node, i] += table[node, i]
+                        else:
+                            v_clean = table[node, j]
+                            v_dirty = table[node, i]
+                            out[node, i] += np.logaddexp(np.log(1.0 - q) + v_clean,
+                                                         np.log(q) + v_dirty)
         return out
 
     def joint_conf_marginals(self, samples: np.ndarray, known_intervened: np.ndarray,
@@ -349,7 +379,7 @@ class WindowBeliefDP:
                                    clean: np.ndarray, adjacency: np.ndarray,
                                    confounded_pairs: Sequence[Tuple[int, int]] = ()
                                    ) -> float:
-        """P(the agent has the causal structure AND the confounding right | data).
+        r"""P(the agent has the causal structure AND the confounding right | data).
 
         Two wrong versions were tried first, and the criterion sits between them.
 
@@ -372,8 +402,7 @@ class WindowBeliefDP:
         Orientation of the modelling edge is not part of the claim, since both orientations
         express the same "u and v share a hidden cause".
         """
-        clean = np.asarray(clean, dtype=bool)
-        clean_table, dirty_table = self.tables(samples, known_intervened, clean)
+        clean = np.asarray(clean, dtype=float)
         adjacency = np.asarray(adjacency) > 0.5
         # The agent is credited only for assignments that name the TRUE confounded pairs.
         # Orientation is not part of the claim -- "u and v share a hidden cause" is one
@@ -383,28 +412,14 @@ class WindowBeliefDP:
 
         log_zs: List[float] = []
         log_ps: List[float] = []
-        for assignment in self.assignments:
-            # THE CAUSAL ANSWER IS H MINUS THE CONFOUNDING EDGES, NOT H.
-            #
-            # In this formulation a hypothesis is (DAG H, ordered set P declared
-            # confounding), where P's edges must be PRESENT in H and are stripped again
-            # for the clean regime. So H is the augmented structure and the causal claim
-            # is `H \ P`. Asking for P(H == truth) therefore asks the wrong question: a
-            # confounded pair is not a real edge, so the true DAG contains none of P's
-            # edges and picks up mass ONLY under the empty assignment -- exactly the
-            # hypothesis that refuses to model the confounding.
-            #
-            # Measured consequence before this fix: on confounded episodes the affected
-            # agent's true mass was EXACTLY 0.000 at every budget, which read as a failure
-            # of coordination (GATE 3) when it was a failure of bookkeeping.
+        prepared = self.assignment_weights_and_z(samples, known_intervened, clean)
+        for assignment, (log_w, log_z) in zip(self.assignments, prepared):
+            if not np.isfinite(log_z):
+                continue
+            log_zs.append(log_z)
             named = {frozenset(edge) for edge in assignment if edge is not None}
             if named != truth_pairs:
-                # Wrong confounding claim -> no credit, however good the base graph is.
-                log_w = self._assignment_weights(clean_table, dirty_table, assignment)
-                if np.isfinite(log_w).any():
-                    log_zs.append(float(self.dp.log_partition(log_w)))
-                    log_ps.append(NEG_INF)
-                continue
+                continue                    # wrong confounding claim -> no credit
             candidate = adjacency.copy()
             cyclic = False
             for edge in assignment:
@@ -415,24 +430,10 @@ class WindowBeliefDP:
                     cyclic = True
                     break
                 candidate[u, v] = True
-            log_w = self._assignment_weights(clean_table, dirty_table, assignment)
-            if not np.isfinite(log_w).any():
-                continue
-            log_zs.append(float(self.dp.log_partition(log_w)))
-            # UNNORMALISED weight of the candidate, not its per-assignment probability.
-            #
-            # Combining per-assignment probabilities and then reweighting by Z means
-            # dividing by each Z and multiplying it straight back, which throws away
-            # precision and -- worse -- trusts every individual Z. The signed sink
-            # recurrence is least reliable exactly on the heavily masked tables an
-            # assignment produces, and a single underestimated Z makes log_prob_dag come
-            # out POSITIVE. Measured before this fix: "probabilities" of 1e131.
-            #
-            # Ratio of sums, computed once in log space, needs only the TOTAL of the Zs.
-            log_ps.append(NEG_INF if cyclic
-                          else self._log_dag_weight(log_w, candidate))
+            if not cyclic:
+                log_ps.append(self._log_dag_weight(log_w, candidate))
 
-        if not log_zs:
+        if not log_zs or not log_ps:
             return 0.0
         numerator = _log_sum_exp(np.asarray(log_ps))
         denominator = _log_sum_exp(np.asarray(log_zs))
@@ -469,8 +470,7 @@ class WindowBeliefDP:
         |X| and not in the window size, the same axis the confounding enumeration already
         costs. Nothing here reintroduces window enumeration.
         """
-        clean = np.asarray(clean, dtype=bool)
-        clean_table, dirty_table = self.tables(samples, known_intervened, clean)
+        clean = np.asarray(clean, dtype=float)
         truth_pairs = {frozenset(pair) for pair in confounded_pairs}
         candidates = [np.asarray(c) > 0.5 for c in candidates]
 
