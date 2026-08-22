@@ -39,7 +39,7 @@ import time
 import numpy as np
 
 from ma.baselines import GreedyAgent, RandomAgent
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
@@ -54,14 +54,14 @@ def argmax_diagnostic(env, episodes, seed):
     """
     from ma.baselines import _partition_entropy, enumerated_posterior
 
-    agents = {n: GreedyAgent(n, env, seed=seed) for n in AGENTS}
+    agents = {a: GreedyAgent(a, env, seed=seed) for a in env.topology.agents}
 
     def best_set(agent):
-        window = env.windows[agent.name]
-        clean = (env.clean[agent.name] if env.config.disclose_regime
+        window = env.windows[agent.agent]
+        clean = (env.clean[agent.agent] if env.config.disclose_regime
                  else np.zeros(len(env.samples), dtype=bool))
         post = enumerated_posterior(window, env.samples[:, window.nodes],
-                                    env.known[agent.name], clean, agent.rule)
+                                    env.known[agent.agent], clean, agent.rule)
         scores = np.full(len(agent.candidates), -np.inf)
         for slot, action in enumerate(agent.candidates):
             node, _mode = window.actions[action]
@@ -77,15 +77,15 @@ def argmax_diagnostic(env, episodes, seed):
     for episode in range(episodes):
         result = env.reset(seed=seed * 100_000 + episode)
         while not result.done:
-            info = {n: best_set(agents[n]) for n in AGENTS}
-            for n in AGENTS:
-                node_tied += (info[n][0] > 1)
+            info = {a: best_set(agents[a]) for a in env.topology.agents}
+            for a in env.topology.agents:
+                node_tied += (info[a][0] > 1)
             rounds += 1
-            if info["A"][1] == info["B"][1]:
+            if info[0][1] == info[1][1]:
                 collisions += 1
-                collisions_tied += (min(info["A"][0], info["B"][0]) > 1)
-            actions = {n: agents[n](env, result) for n in AGENTS}
-            result = env.step(actions["A"], actions["B"])
+                collisions_tied += (min(info[0][0], info[1][0]) > 1)
+            actions = {a: agents[a](env, result) for a in env.topology.agents}
+            result = env.step(actions)
     return {
         "rounds": rounds,
         "fraction_with_a_target_tie": float(node_tied / max(2 * rounds, 1)),
@@ -110,18 +110,18 @@ def play(env, policies, episodes, seed, only=None):
         if only is not None and confounded != only:
             continue
         while not result.done:
-            actions = {n: policies[n](env, result) for n in AGENTS}
+            actions = {a: policies[a](env, result) for a in env.topology.agents}
             targets = {}
-            for name, index in actions.items():
-                node, _mode = env.windows[name].actions[index]
-                targets[name] = node
+            for agent, index in actions.items():
+                node, _mode = env.windows[agent].actions[index]
+                targets[agent] = node
             # A collision is two agents spending the round on the SAME variable. Passing
             # (-1) is not a collision -- neither agent spent anything.
-            if targets["A"] != -1 and targets["A"] == targets["B"]:
+            if targets[0] != -1 and targets[0] == targets[1]:
                 collisions += 1
-            if targets["A"] != -1 or targets["B"] != -1:
+            if any(t != -1 for t in targets.values()):
                 rounds += 1
-            result = env.step(actions["A"], actions["B"])
+            result = env.step(actions)
         solved.append(float(result.info["both_identified"]))
     solved = np.asarray(solved)
     return {"n": int(len(solved)),
@@ -148,10 +148,10 @@ def main(argv=None):
         disclose_regime=args.disclose_regime))
 
     arms = {
-        "random": {n: RandomAgent(n, seed=args.seed + 1, allow_clamp=True) for n in AGENTS},
-        "greedy": {n: GreedyAgent(n, env, seed=args.seed) for n in AGENTS},
-        "greedy_split": {"A": GreedyAgent("A", env, seed=args.seed, tie_break="low"),
-                         "B": GreedyAgent("B", env, seed=args.seed, tie_break="high")},
+        "random": {a: RandomAgent(a, seed=args.seed + 1, allow_clamp=True) for a in env.topology.agents},
+        "greedy": {a: GreedyAgent(a, env, seed=args.seed) for a in env.topology.agents},
+        "greedy_split": {0: GreedyAgent(0, env, seed=args.seed, tie_break="low"),
+                         1: GreedyAgent(1, env, seed=args.seed, tie_break="high")},
     }
 
     started = time.time()

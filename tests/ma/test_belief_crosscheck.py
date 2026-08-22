@@ -39,16 +39,16 @@ def test_dp_and_enumeration_agree_on_edge_marginals(topology, rule):
         # Two rounds, so the clean/dirty split is genuinely exercised rather than every
         # row landing in one regime.
         for action in (1, 3):
-            env.step(action, action)
-        for name in ("A", "B"):
-            window = env.windows[name]
-            clean = (env.clean[name] if env.config.disclose_regime
+            env.step({0: action, 1: action})
+        for agent in env.topology.agents:
+            window = env.windows[agent]
+            clean = (env.clean[agent] if env.config.disclose_regime
                      else np.zeros(len(env.samples), dtype=bool))
             posterior = enumerated_posterior(
-                window, env.samples[:, window.nodes], env.known[name], clean, rule)
+                window, env.samples[:, window.nodes], env.known[agent], clean, rule)
             implied = np.tensordot(
                 posterior, _Window.get(window.k).dags.astype(float), axes=(0, 0))
-            worst = max(worst, float(np.abs(implied - env.marginals[name]).max()))
+            worst = max(worst, float(np.abs(implied - env.marginals[agent]).max()))
     assert worst < TOL, f"{rule}: worst disagreement {worst:.3e}"
 
 
@@ -59,9 +59,9 @@ def test_a_regime_split_actually_occurs(topology):
                                  score_rule=JOINT_CONF, disclose_regime=True))
     env.reset(seed=0)
     from ma.env import CLAMP
-    b_clamp = env.windows["B"].actions.index((topology.private[1][0], CLAMP))
-    env.step(0, b_clamp)
-    assert env.clean["A"].any() and not env.clean["A"].all(), (
+    b_clamp = env.windows[1].actions.index((topology.private[1][0], CLAMP))
+    env.step({0: 0, 1: b_clamp})
+    assert env.clean[0].any() and not env.clean[0].all(), (
         "need both clean and dirty rows for the regime rules to differ")
 
 
@@ -70,9 +70,9 @@ def test_marginals_are_a_valid_probability_field(topology):
         env = TwoAgentEnv(MAConfig(topology=topology, n_obs=300, n_int=50, budget=2,
                                      score_rule=rule))
         env.reset(seed=9)
-        env.step(0, 2)
-        for name in ("A", "B"):
-            m = env.marginals[name]
+        env.step({0: 0, 1: 2})
+        for agent in env.topology.agents:
+            m = env.marginals[agent]
             assert np.isfinite(m).all()
             assert (m >= -1e-12).all() and (m <= 1 + 1e-12).all()
             assert np.allclose(np.diag(m), 0.0, atol=1e-12)

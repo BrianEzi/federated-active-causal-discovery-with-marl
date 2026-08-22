@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from ma.baselines import GreedyAgent
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.topology import Topology, two_agent
 
 
@@ -28,7 +28,7 @@ def env():
 
 def test_rejects_an_unknown_convention(env):
     with pytest.raises(ValueError):
-        GreedyAgent("A", env, tie_break="lowest")
+        GreedyAgent(0, env, tie_break="lowest")
 
 
 def test_low_and_high_pick_the_extremes_of_the_tied_set(env):
@@ -37,8 +37,8 @@ def test_low_and_high_pick_the_extremes_of_the_tied_set(env):
     Driven directly rather than through an episode: a synthetic score vector with a known
     tied set, so the expected answer is known by inspection.
     """
-    low = GreedyAgent("A", env, tie_break="low")
-    high = GreedyAgent("A", env, tie_break="high")
+    low = GreedyAgent(0, env, tie_break="low")
+    high = GreedyAgent(0, env, tie_break="high")
     assert low.candidates == high.candidates
     assert len(low.candidates) >= 2
 
@@ -63,8 +63,8 @@ def test_a_singleton_argmax_makes_the_convention_irrelevant(env):
     action every convention returns it, so the arms coincide -- which is exactly what the
     measurement found at the node level in ~94% of rounds.
     """
-    low = GreedyAgent("A", env, tie_break="low")
-    high = GreedyAgent("A", env, tie_break="high")
+    low = GreedyAgent(0, env, tie_break="low")
+    high = GreedyAgent(0, env, tie_break="high")
     scores = np.zeros(len(low.candidates))
     scores[2] = 1.0                                  # a unique maximum
 
@@ -75,17 +75,17 @@ def test_a_singleton_argmax_makes_the_convention_irrelevant(env):
 
 def test_default_is_unchanged(env):
     """The diagnostic must not silently alter the arm the gates were measured with."""
-    assert GreedyAgent("A", env).tie_break == "random"
+    assert GreedyAgent(0, env).tie_break == "random"
 
 
 def test_both_agents_run_and_choose_a_real_action(env):
     """End to end: the convention survives a live episode and yields valid actions."""
-    agents = {"A": GreedyAgent("A", env, seed=0, tie_break="low"),
-              "B": GreedyAgent("B", env, seed=0, tie_break="high")}
+    agents = {0: GreedyAgent(0, env, seed=0, tie_break="low"),
+              1: GreedyAgent(1, env, seed=0, tie_break="high")}
     result = env.reset(seed=0)
-    for name in AGENTS:
-        index = agents[name](env, result)
-        assert index in agents[name].candidates
-        node, mode = env.windows[name].actions[index]
+    for agent in env.topology.agents:
+        index = agents[agent](env, result)
+        assert index in agents[agent].candidates
+        node, mode = env.windows[agent].actions[index]
         assert node != -1
         assert mode in ("vary", "clamp")

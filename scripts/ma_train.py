@@ -17,8 +17,8 @@ import time
 import numpy as np
 
 from ma.baselines import make_baselines
-from ma.env import (AGENTS, CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
-                     MAConfig, TwoAgentEnv)
+from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
+                    MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
 from ma.policy import IndependentPPO, PPOConfig
 from ma.topology import Topology, two_agent
@@ -121,14 +121,14 @@ def main(argv=None) -> dict:
     }
 
     arms = {"learned": ppo.policies(deterministic=False)}
-    reference = {name: make_baselines(env, name, seed=args.seed) for name in AGENTS}
+    reference = {agent: make_baselines(env, agent, seed=args.seed) for agent in env.topology.agents}
     # `random_vary` has no legal actions in the clamp-only arm, so it is dropped rather
     # than reported as an empty comparison. Its absence is visible in the report's arm list.
     labels = ["random_clamp", "greedy", "pass"]
     if not args.clamp_only:
         labels.insert(1, "random_vary")
     for label in labels:
-        arms[label] = {name: reference[name][label] for name in AGENTS}
+        arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
 
     for label, policies in arms.items():
         t0 = time.time()

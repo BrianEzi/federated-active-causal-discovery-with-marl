@@ -53,12 +53,6 @@ PASS_ACTION = -1
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
-AGENTS = ("A", "B")
-# TRANSITIONAL, 2026-08-22. `ma/topology.py` now indexes agents by INTEGER (0..n-1); this
-# module still keys its dicts, observations and reports by name. The translation lives here
-# and only here, so that converting env to integers later is a contained change rather than
-# a hunt. Nothing outside this module should build a name from an index or vice versa.
-AGENT_INDEX = {name: i for i, name in enumerate(AGENTS)}
 
 # Turn protocols. SIMULTANEOUS is the original and every result before 2026-08-20 was
 # measured under it; it is kept so those numbers stay reproducible, not because it is
@@ -187,23 +181,24 @@ class MAConfig:
 
 @dataclass
 class StepResult:
-    beliefs: Dict[str, np.ndarray]     # edge marginals per agent
-    identified: Dict[str, bool]
+    beliefs: Dict[int, np.ndarray]     # edge marginals per agent
+    identified: Dict[int, bool]
     done: bool
     reward: float
-    n_interventions: Dict[str, int]
+    n_interventions: Dict[int, int]
     info: dict = field(default_factory=dict)
 
 
 class AgentWindow:
     """One agent's view: its columns, its authority, and its DP belief."""
 
-    def __init__(self, name: str, topology: Topology,
+    def __init__(self, agent: int, topology: Topology,
                  modes: Sequence[str] = MODES):
-        self.name = name
+        self.agent: int = int(agent)
+        self.topology: Topology = topology
         self.modes: Tuple[str, ...] = tuple(modes)
-        self.nodes: List[int] = list(topology.observed_by(AGENT_INDEX[name]))
-        self.authority: List[int] = list(topology.may_intervene_on(AGENT_INDEX[name]))
+        self.nodes: List[int] = list(topology.observed_by(self.agent))
+        self.authority: List[int] = list(topology.may_intervene_on(self.agent))
         self.shared: List[int] = list(topology.exposed)
         self.private: List[int] = [n for n in self.nodes if n not in self.shared]
         self.k = len(self.nodes)
@@ -222,11 +217,16 @@ class AgentWindow:
 
     @property
     def obs_size(self) -> int:
-        return self.k * (self.k - 1) + 1 + len(self.shared) + 1 + len(SIGNALS)
+        n_others = self.topology.n_agents - 1
+        return (self.k * (self.k - 1)
+                + 1
+                + n_others * len(self.shared)
+                + 1
+                + n_others * len(SIGNALS))
 
 
 class TwoAgentEnv:
-    """One SCM, two agents, simultaneous hard interventions."""
+    """One SCM, n agents, simultaneous hard interventions."""
 
     def __init__(self, config: MAConfig, seed: int = 0):
         if config.turn_order not in TURN_ORDERS:
@@ -241,8 +241,7 @@ class TwoAgentEnv:
         # R * 2^|S| because the per-block log-scores ADD -- but it is not built, and the
         # ladder does not need it until an agent has two private nodes. Fail loudly rather
         # than score silently wrong data.
-        widest = max(len(config.topology.hidden_from(AGENT_INDEX[name]))
-                     for name in AGENTS)
+        widest = max(len(block) for block in config.topology.private)
         if widest > 1:
             raise NotImplementedError(
                 f"topology {config.topology.name!r} hides {widest} nodes from an agent; the "
@@ -250,11 +249,19 @@ class TwoAgentEnv:
                 "one hidden node. Per-block confounding subsets are needed first.")
         self.config = config
         self.topology = config.topology
-        self.windows: Dict[str, AgentWindow] = {
-            name: AgentWindow(name, config.topology, config.action_modes)
-            for name in AGENTS}
+        self.windows: Dict[int, AgentWindow] = {
+            agent: AgentWindow(agent, config.topology, config.action_modes)
+            for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
         self.reset(seed)
+
+    @property
+    def agents(self) -> Tuple[int, ...]:
+        return self.topology.agents
+
+    @property
+    def n_agents(self) -> int:
+        return self.topology.n_agents
 
     # -- episode ------------------------------------------------------------------------
 
@@ -269,44 +276,45 @@ class TwoAgentEnv:
         self.params = sample_scm_params(self.true_adjacency, self._rng)
         self.samples, _ = sample_multi(self.params, cfg.n_obs, self._rng)
 
-        self.known: Dict[str, np.ndarray] = {}
-        self.clean: Dict[str, np.ndarray] = {}
-        self.n_interventions: Dict[str, int] = {}
-        self.disclosed: Dict[str, np.ndarray] = {}
-        self.regime_bit: Dict[str, float] = {}
-        for name, window in self.windows.items():
-            self.known[name] = np.zeros((cfg.n_obs, window.k))
-            self.clean[name] = np.zeros(cfg.n_obs, dtype=bool)
-            self.n_interventions[name] = 0
-            self.disclosed[name] = np.zeros(len(window.shared))
-            self.regime_bit[name] = 0.0
+        self.known: Dict[int, np.ndarray] = {}
+        self.clean: Dict[int, np.ndarray] = {}
+        self.n_interventions: Dict[int, int] = {}
+        self.disclosed: Dict[int, np.ndarray] = {}
+        self.regime_bit: Dict[int, float] = {}
+        n_others = self.topology.n_agents - 1
+        for agent, window in self.windows.items():
+            self.known[agent] = np.zeros((cfg.n_obs, window.k))
+            self.clean[agent] = np.zeros(cfg.n_obs, dtype=bool)
+            self.n_interventions[agent] = 0
+            self.disclosed[agent] = np.zeros(n_others * len(window.shared))
+            self.regime_bit[agent] = 0.0
 
-        self._credit_cache: Dict[str, np.ndarray] = {}
+        self._credit_cache: Dict[int, np.ndarray] = {}
         self.round = 0
         self.rounds_used = 0
-        self.active: Optional[str] = None
+        self.active: Optional[int] = None
         # Per-agent behaviour, logged separately and never as a max across agents: an idle
         # agent hides inside an average, and free-riding is exactly what we need to see.
-        self.forfeits: Dict[str, int] = {n: 0 for n in AGENTS}
+        self.forfeits: Dict[int, int] = {a: 0 for a in self.topology.agents}
         # Clamps split by TARGET REGION. Clamping a shared node does nothing for a partner;
         # only clamping one's own private node de-confounds for them. An aggregate clamp
         # fraction cannot tell those apart, so it cannot measure altruism.
-        self.clamps_private: Dict[str, int] = {n: 0 for n in AGENTS}
-        self.clamps_shared: Dict[str, int] = {n: 0 for n in AGENTS}
-        self.signals: Dict[str, str] = {n: NO_INTERVENTION for n in AGENTS}
-        self.done_bit: Dict[str, float] = {n: 0.0 for n in AGENTS}
+        self.clamps_private: Dict[int, int] = {a: 0 for a in self.topology.agents}
+        self.clamps_shared: Dict[int, int] = {a: 0 for a in self.topology.agents}
+        self.signals: Dict[int, str] = {a: NO_INTERVENTION for a in self.topology.agents}
+        self.done_bit: Dict[int, float] = {a: 0.0 for a in self.topology.agents}
         self.connected = _is_connected(self.true_adjacency)
-        self.last_chosen: Dict[str, Tuple[int, Optional[str]]] = {
-            n: (PASS_ACTION, None) for n in AGENTS}
+        self.last_chosen: Dict[int, Tuple[int, Optional[str]]] = {
+            a: (PASS_ACTION, None) for a in self.topology.agents}
         self._refresh()
         return self._result(reward=0.0)
 
     # -- turn taking --------------------------------------------------------------------
 
-    def active_agent(self) -> Optional[str]:
-        """Whose turn it is, or None when both act. Round-robin alternates from A; random
-        draws from the environment's own stream, so the choice is part of the episode seed
-        and an evaluation is reproducible without the policy having to record it."""
+    def active_agent(self) -> Optional[int]:
+        """Whose turn it is, or None when all act. Round-robin alternates through agents;
+        random draws from the environment's own stream, so the choice is part of the episode
+        seed and an evaluation is reproducible without the policy having to record it."""
         order = self.config.turn_order
         if order == SIMULTANEOUS:
             return None
@@ -314,24 +322,24 @@ class TwoAgentEnv:
         # skip over: whoever the rotation names may act. The episode simply stops when the
         # pool runs out.
         if order == ROUND_ROBIN:
-            return AGENTS[self.round % len(AGENTS)]
-        return str(self._rng.choice(AGENTS))
+            return self.topology.agents[self.round % self.topology.n_agents]
+        return int(self._rng.choice(self.topology.agents))
 
-    def step(self, action_a: int, action_b: int) -> StepResult:
+    def step(self, actions: Dict[int, int]) -> StepResult:
         cfg = self.config
-        actions = {"A": int(action_a), "B": int(action_b)}
-        for name, index in actions.items():
-            if not 0 <= index < self.windows[name].n_actions:
-                raise ValueError(f"action {index} out of range for {name}")
+        actions = {agent: int(actions[agent]) for agent in self.topology.agents}
+        for agent, index in actions.items():
+            if not 0 <= index < self.windows[agent].n_actions:
+                raise ValueError(f"action {index} out of range for agent {agent}")
 
         # Under turn-taking the inactive agent is FORCED to pass. Its submitted action is
-        # discarded rather than rejected: the policy is queried for both agents every round
+        # discarded rather than rejected: the policy is queried for all agents every round
         # and the environment, not the policy, owns the protocol.
         self.active = self.active_agent()
         if cfg.turn_order != SIMULTANEOUS:
-            for name in AGENTS:
-                if name != self.active:            # active None => everyone passes
-                    actions[name] = self.windows[name].pass_index
+            for agent in self.topology.agents:
+                if agent != self.active:            # active None => everyone passes
+                    actions[agent] = self.windows[agent].pass_index
         self.round += 1
 
         # THERE IS NO VOLUNTARY TERMINATION. Declining is a forfeit: it burns the round and
@@ -340,19 +348,19 @@ class TwoAgentEnv:
         # might still score a discounted +1 -- so early exit is dominated rather than
         # tempting. Removing the mechanism also removes the entire class of rule that
         # collapsed 5/10 seeds on 20 August. `passed` survives as a DIAGNOSTIC only.
-        passed = all(actions[n] == self.windows[n].pass_index for n in AGENTS)
+        passed = all(actions[a] == self.windows[a].pass_index for a in self.topology.agents)
         self.rounds_used += 1
 
         # What was ACTUALLY applied, after the protocol has had its say. Consumers must
         # tally from this rather than from the submitted actions: under turn-taking the
         # inactive agent still submits a move and it is discarded, so counting submissions
         # double-counts the moves and corrupts any per-move statistic.
-        self.last_chosen = {n: self.windows[n].actions[actions[n]] for n in AGENTS}
+        self.last_chosen = {a: self.windows[a].actions[actions[a]] for a in self.topology.agents}
         self._record_signals()
         self._tally(cfg)
 
         if passed:
-            # A forfeited round still GENERATES DATA. Both agents receive it -- samples are
+            # A forfeited round still GENERATES DATA. All agents receive it -- samples are
             # shared, so there is no asymmetry -- and because every round produces a batch,
             # total data volume is constant at `n_obs + budget * n_int` instead of varying
             # with how much the policy chose to act. That confound is present in every
@@ -361,13 +369,13 @@ class TwoAgentEnv:
             self._refresh()
             return self._result(reward=0.0, passed=True)
 
-        # Both act on the SAME system. On a collision the more restrictive assignment wins:
+        # All act on the SAME system. On a collision the more restrictive assignment wins:
         # a clamp fixes the variable outright, so a simultaneous vary cannot also hold.
         targets: Dict[int, float] = {}
-        chosen: Dict[str, Tuple[int, Optional[str]]] = {}
-        for name in AGENTS:
-            node, mode = self.windows[name].actions[actions[name]]
-            chosen[name] = (node, mode)
+        chosen: Dict[int, Tuple[int, Optional[str]]] = {}
+        for agent in self.topology.agents:
+            node, mode = self.windows[agent].actions[actions[agent]]
+            chosen[agent] = (node, mode)
             if node == PASS_ACTION:
                 continue
             scale = 0.0 if mode == CLAMP else cfg.intervene_scale
@@ -377,25 +385,27 @@ class TwoAgentEnv:
                                       intervene_nodes=targets)
         self.samples = np.vstack([self.samples, new_samples])
 
-        for name in AGENTS:
-            window = self.windows[name]
+        for agent in self.topology.agents:
+            window = self.windows[agent]
             block = np.zeros((cfg.n_int, window.k))
             # An agent always knows its OWN intervention.
-            own_node, _ = chosen[name]
+            own_node, _ = chosen[agent]
             if own_node != PASS_ACTION:
                 block[:, window.pos[own_node]] = 1.0
-            # And the other's, but only on SHARED nodes -- those columns are visible to
-            # both, so this discloses nothing private.
-            other = "B" if name == "A" else "A"
-            other_node, _ = chosen[other]
-            if other_node != PASS_ACTION and other_node in window.shared:
-                block[:, window.pos[other_node]] = 1.0
-            self.known[name] = np.vstack([self.known[name], block])
+            # And others', but only on SHARED nodes -- those columns are visible to
+            # all, so this discloses nothing private.
+            for other in self.topology.agents:
+                if other == agent:
+                    continue
+                other_node, _ = chosen[other]
+                if other_node != PASS_ACTION and other_node in window.shared:
+                    block[:, window.pos[other_node]] = 1.0
+            self.known[agent] = np.vstack([self.known[agent], block])
 
             # A batch is CLEAN for this agent when every variable hidden from it was
             # clamped -- only then is its window really a DAG rather than a latent
             # projection.
-            hidden = self.topology.hidden_from(AGENT_INDEX[name])
+            hidden = self.topology.hidden_from(agent)
             # ANY, not ALL. With one hidden node the two are identical, which is every
             # result to date. They diverge as soon as an agent has more than one private
             # node, and there ALL is unreachable: an agent gets one action per round and
@@ -404,17 +414,27 @@ class TwoAgentEnv:
             # __init__ and tests/test_env_turns.py::test_clean_rounds_are_reachable.
             hidden_clamped = bool(hidden) and any(
                 targets.get(node, None) == 0.0 for node in hidden)
-            self.clean[name] = np.concatenate(
-                [self.clean[name], np.full(cfg.n_int, hidden_clamped, dtype=bool)])
+            self.clean[agent] = np.concatenate(
+                [self.clean[agent], np.full(cfg.n_int, hidden_clamped, dtype=bool)])
 
-            self.disclosed[name] = np.zeros(len(window.shared))
-            if cfg.disclose_shared_targets and other_node in window.shared:
-                self.disclosed[name][window.shared.index(other_node)] = 1.0
-            self.regime_bit[name] = float(hidden_clamped) if cfg.disclose_regime else 0.0
+            # Concatenate disclosed shared target vectors for all other partners in canonical order.
+            disclosed_blocks = []
+            for other in self.topology.agents:
+                if other == agent:
+                    continue
+                other_block = np.zeros(len(window.shared))
+                other_node, _ = chosen[other]
+                if cfg.disclose_shared_targets and other_node in window.shared:
+                    other_block[window.shared.index(other_node)] = 1.0
+                disclosed_blocks.append(other_block)
+            self.disclosed[agent] = (np.concatenate(disclosed_blocks)
+                                     if disclosed_blocks
+                                     else np.zeros(0))
+            self.regime_bit[agent] = float(hidden_clamped) if cfg.disclose_regime else 0.0
 
         self._refresh()
         cost = cfg.step_cost * sum(
-            1 for name in AGENTS if chosen[name][0] != PASS_ACTION)
+            1 for a in self.topology.agents if chosen[a][0] != PASS_ACTION)
         return self._result(reward=-cost)
 
     def _append_observational_batch(self) -> None:
@@ -422,14 +442,15 @@ class TwoAgentEnv:
         cfg = self.config
         new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng)
         self.samples = np.vstack([self.samples, new_samples])
-        for name, window in self.windows.items():
-            self.known[name] = np.vstack(
-                [self.known[name], np.zeros((cfg.n_int, window.k))])
+        n_others = self.topology.n_agents - 1
+        for agent, window in self.windows.items():
+            self.known[agent] = np.vstack(
+                [self.known[agent], np.zeros((cfg.n_int, window.k))])
             # Nothing hidden was clamped, so the batch is DIRTY for a confounded agent.
-            self.clean[name] = np.concatenate(
-                [self.clean[name], np.zeros(cfg.n_int, dtype=bool)])
-            self.disclosed[name] = np.zeros(len(window.shared))
-            self.regime_bit[name] = 0.0
+            self.clean[agent] = np.concatenate(
+                [self.clean[agent], np.zeros(cfg.n_int, dtype=bool)])
+            self.disclosed[agent] = np.zeros(n_others * len(window.shared))
+            self.regime_bit[agent] = 0.0
 
     def _tally(self, cfg) -> None:
         """Per-agent accounting, from what was APPLIED, in exactly one place.
@@ -438,40 +459,43 @@ class TwoAgentEnv:
         Counting the inactive agent as forfeiting would make every agent forfeit every round
         it did not hold, which measures the protocol rather than the policy.
         """
-        for name in AGENTS:
-            if cfg.turn_order != SIMULTANEOUS and name != self.active:
+        for agent in self.topology.agents:
+            if cfg.turn_order != SIMULTANEOUS and agent != self.active:
                 continue
-            node, mode = self.last_chosen[name]
+            node, mode = self.last_chosen[agent]
             if node == PASS_ACTION:
-                self.forfeits[name] += 1
+                self.forfeits[agent] += 1
                 continue
-            self.n_interventions[name] += 1
+            self.n_interventions[agent] += 1
             if mode == CLAMP:
-                if node in self.windows[name].shared:
-                    self.clamps_shared[name] += 1
+                if node in self.windows[agent].shared:
+                    self.clamps_shared[agent] += 1
                 else:
-                    self.clamps_private[name] += 1
+                    self.clamps_private[agent] += 1
 
     def _record_signals(self) -> None:
         """The free broadcast, derived from what was actually applied this round."""
-        for name in AGENTS:
-            node, _mode = self.last_chosen[name]
+        for agent in self.topology.agents:
+            node, _mode = self.last_chosen[agent]
             if node == PASS_ACTION:
-                self.signals[name] = NO_INTERVENTION
-            elif node in self.windows[name].shared:
-                self.signals[name] = SHARED_SIGNAL
+                self.signals[agent] = NO_INTERVENTION
+            elif node in self.windows[agent].shared:
+                self.signals[agent] = SHARED_SIGNAL
             else:
-                self.signals[name] = PRIVATE_SIGNAL
+                self.signals[agent] = PRIVATE_SIGNAL
 
-    def _signal_onehot(self, name: str) -> np.ndarray:
-        """The PARTNER's signal, one-hot. Zeros when disclosure is switched off, so the
-        observation width does not change with the flag and a checkpoint stays loadable."""
-        out = np.zeros(len(SIGNALS))
-        if not self.config.disclose_signals:
-            return out
-        other = "B" if name == "A" else "A"
-        out[SIGNALS.index(self.signals[other])] = 1.0
-        return out
+    def _signal_onehot(self, agent: int) -> np.ndarray:
+        """The partners' signals, one-hot blocks concatenated in canonical agent order.
+        Zeros when disclosure is switched off."""
+        blocks = []
+        for other in self.topology.agents:
+            if other == agent:
+                continue
+            out = np.zeros(len(SIGNALS))
+            if self.config.disclose_signals:
+                out[SIGNALS.index(self.signals[other])] = 1.0
+            blocks.append(out)
+        return np.concatenate(blocks) if blocks else np.zeros(0)
 
     def _update_done_bits(self) -> None:
         """Each agent's confidence in ITS OWN answer, from ITS OWN posterior.
@@ -484,11 +508,11 @@ class TwoAgentEnv:
         Concentration is measured on the edge marginals: how far the belief sits from
         maximum uncertainty. Cheap, truth-free, and monotone in how settled the posterior is.
         """
-        for name, window in self.windows.items():
-            marginals = self.marginals[name]
+        for agent, window in self.windows.items():
+            marginals = self.marginals[agent]
             off_diagonal = marginals[~np.eye(window.k, dtype=bool)]
             # Mean distance from 0.5, rescaled to [0, 1]: 0 is a coin flip on every edge.
-            self.done_bit[name] = float(np.mean(np.abs(off_diagonal - 0.5)) * 2.0)
+            self.done_bit[agent] = float(np.mean(np.abs(off_diagonal - 0.5)) * 2.0)
 
     # -- belief -------------------------------------------------------------------------
 
@@ -498,18 +522,18 @@ class TwoAgentEnv:
         scoring everything once. Keeping the mask correct internally means the no-bit arm
         differs from the with-bit arm in exactly one place -- what the agent is told."""
         cfg = self.config
-        self.marginals: Dict[str, np.ndarray] = {}
-        for name, window in self.windows.items():
-            clean = (self.clean[name] if cfg.disclose_regime
+        self.marginals: Dict[int, np.ndarray] = {}
+        for agent, window in self.windows.items():
+            clean = (self.clean[agent] if cfg.disclose_regime
                      else np.zeros(len(self.samples), dtype=bool))
-            self.marginals[name] = window.belief.edge_marginals(
-                self.samples[:, window.nodes], self.known[name], clean, cfg.score_rule)
+            self.marginals[agent] = window.belief.edge_marginals(
+                self.samples[:, window.nodes], self.known[agent], clean, cfg.score_rule)
         self._update_done_bits()
 
-    def true_mass(self, name: str) -> float:
-        window = self.windows[name]
+    def true_mass(self, agent: int) -> float:
+        window = self.windows[agent]
         cfg = self.config
-        clean = (self.clean[name] if cfg.disclose_regime
+        clean = (self.clean[agent] if cfg.disclose_regime
                  else np.zeros(len(self.samples), dtype=bool))
         rule = cfg.score_rule
         if rule == JOINT_CONF:
@@ -519,11 +543,11 @@ class TwoAgentEnv:
             # the confounding right as well as the causal edges; see the method docstring
             # for the two wrong criteria that preceded this one.
             return float(window.belief.joint_conf_dag_probability(
-                self.samples[:, window.nodes], self.known[name], clean,
+                self.samples[:, window.nodes], self.known[agent], clean,
                 window.induced(self.true_adjacency),
-                confounded_pairs=self._confounded_positions(name)))
+                confounded_pairs=self._confounded_positions(agent)))
         return float(np.exp(window.belief.log_prob_dag(
-            self.samples[:, window.nodes], self.known[name], clean, rule,
+            self.samples[:, window.nodes], self.known[agent], clean, rule,
             window.induced(self.true_adjacency))))
 
     def _u14_state(self):
@@ -540,100 +564,100 @@ class TwoAgentEnv:
         This is the same object `ma/evaluate2.py` reports, so the reward and the reported
         number cannot drift apart -- which is exactly how they drifted apart before.
         """
-        from ma.evaluate import credit_candidates, union_graph
+        from ma.evaluate import credit_candidates
         from sa.graphs import is_acyclic, mec_signature
 
         mass, best_graph = {}, {}
-        for name in AGENTS:
-            window = self.windows[name]
+        for agent in self.topology.agents:
+            window = self.windows[agent]
             truth = window.induced(self.true_adjacency)
-            clean = (self.clean[name] if self.config.disclose_regime
+            clean = (self.clean[agent] if self.config.disclose_regime
                      else np.zeros(len(self.samples), dtype=bool))
             # Cached per episode: the true graph is fixed for its whole duration, so the
             # credit set is too, and it was being rebuilt at every step.
-            cached = self._credit_cache.get(name)
+            cached = self._credit_cache.get(agent)
             if cached is None:
                 cached = credit_candidates(window, truth)
-                self._credit_cache[name] = cached
+                self._credit_cache[agent] = cached
             candidates = cached
-            pairs = self._confounded_positions(name)
-            mass[name] = float(window.belief.joint_conf_set_probability(
-                self.samples[:, window.nodes], self.known[name], clean,
+            pairs = self._confounded_positions(agent)
+            mass[agent] = float(window.belief.joint_conf_set_probability(
+                self.samples[:, window.nodes], self.known[agent], clean,
                 candidates, pairs))
             # Representative for the union check. Only consulted when the agent is
             # credited, and every credited answer is Markov equivalent to the truth with
             # its private edges exact, so any member is a valid stand-in.
-            best_graph[name] = candidates[0] if len(candidates) else truth
+            best_graph[agent] = candidates[0] if len(candidates) else truth
 
         threshold = self.config.identify_threshold
         d = self.topology.d
         union = np.zeros((d, d), dtype=np.int8)
-        for name in AGENTS:
-            window = self.windows[name]
-            graph = np.asarray(best_graph[name])
+        for agent in self.topology.agents:
+            window = self.windows[agent]
+            graph = np.asarray(best_graph[agent])
             for i, u in enumerate(window.nodes):
                 for j, v in enumerate(window.nodes):
                     if graph[i, j]:
                         union[u, v] = 1
-        both = bool(all(mass[n] >= threshold for n in AGENTS)
-                    and is_acyclic(union)
-                    and mec_signature(union) == mec_signature(
-                        np.asarray(self.true_adjacency)))
-        return mass, both
+        all_identified = bool(all(mass[a] >= threshold for a in self.topology.agents)
+                              and is_acyclic(union)
+                              and mec_signature(union) == mec_signature(
+                                  np.asarray(self.true_adjacency)))
+        return mass, all_identified
 
-    def _confounded_positions(self, name: str):
+    def _confounded_positions(self, agent: int):
         """Truly confounded shared pairs, as WINDOW positions.
 
         Read from the generating graph via the latent projection, so it is ground truth and
         never visible to the agent -- it is used only to score identification."""
         from ma.projection import bidirected_pairs
-        window = self.windows[name]
+        window = self.windows[agent]
         pairs = bidirected_pairs(self.true_adjacency, tuple(window.nodes))
         return tuple((window.pos[u], window.pos[v]) for u, v in pairs)
 
     # -- observation and result ---------------------------------------------------------
 
-    def observation(self, name: str) -> np.ndarray:
+    def observation(self, agent: int) -> np.ndarray:
         """Edge marginals, remaining budget, and whatever was disclosed.
 
         Every feature is on [0, 1]. Raw counts were a real bug once: the budget feature sat
         at 20.0 beside probabilities in [0, 1] and dominated the first layer.
         """
-        window = self.windows[name]
-        marginals = self.marginals[name]
+        window = self.windows[agent]
+        marginals = self.marginals[agent]
         off_diagonal = ~np.eye(window.k, dtype=bool)
-        # ROUNDS left in the shared pool -- the same number for both agents now, because
+        # ROUNDS left in the shared pool -- the same number for all agents now, because
         # the budget is shared. It was per-agent interventions before 2026-08-21.
         budget_left = np.array(
             [(self.config.budget - self.rounds_used) / max(self.config.budget, 1)])
         return np.concatenate([marginals[off_diagonal], budget_left,
-                               self.disclosed[name],
-                               np.array([self.regime_bit[name]]),
-                               self._signal_onehot(name)])
+                               self.disclosed[agent],
+                               np.array([self.regime_bit[agent]]),
+                               self._signal_onehot(agent)])
 
     def _result(self, reward: float, passed: bool = False) -> StepResult:
         threshold = self.config.identify_threshold
         if self.config.reward_criterion == "u14":
-            mass, both = self._u14_state()
-            identified = {name: mass[name] >= threshold for name in AGENTS}
+            mass, all_identified = self._u14_state()
+            identified = {a: mass[a] >= threshold for a in self.topology.agents}
         else:
-            mass = {name: self.true_mass(name) for name in AGENTS}
-            identified = {name: mass[name] >= threshold for name in AGENTS}
-            both = all(identified.values())
+            mass = {a: self.true_mass(a) for a in self.topology.agents}
+            identified = {a: mass[a] >= threshold for a in self.topology.agents}
+            all_identified = all(identified.values())
         # The SHARED pool is what ends an episode, together with joint success. Declining
         # never ends it -- see docs/TURN_BUDGET_SPEC.md section 4.
         out_of_budget = self.rounds_used >= self.config.budget
-        if both:
+        if all_identified:
             reward += 1.0                       # shared terminal reward [U15]
         return StepResult(
-            beliefs={n: self.marginals[n].copy() for n in AGENTS},
+            beliefs={a: self.marginals[a].copy() for a in self.topology.agents},
             identified=identified,
             # `passed` is DELIBERATELY absent: declining never terminates an episode.
             # It remains in `info` as a diagnostic only. See TURN_BUDGET_SPEC section 4.
-            done=both or out_of_budget,
+            done=all_identified or out_of_budget,
             reward=reward,
             n_interventions=dict(self.n_interventions),
-            info={"true_mass": mass, "both_identified": both, "passed": passed,
+            info={"true_mass": mass, "both_identified": all_identified, "passed": passed,
                   # Per agent, never a max across agents: an idle agent hides inside an
                   # average, and free-riding is the thing we most need to see.
                   "interventions": dict(self.n_interventions),
@@ -648,14 +672,15 @@ class TwoAgentEnv:
                   # every other round, so `n_interventions` is roughly half the episode
                   # length -- reporting one as the other understates duration by 2x.
                   "rounds": self.round, "active": self.active,
-                  "budget_left": {n: self.config.budget - self.n_interventions[n]
-                                  for n in AGENTS}},
+                  "budget_left": {a: self.config.budget - self.n_interventions[a]
+                                  for a in self.topology.agents}},
         )
 
     # -- convenience --------------------------------------------------------------------
 
-    def n_actions(self, name: str) -> int:
-        return self.windows[name].n_actions
+    def n_actions(self, agent: int) -> int:
+        return self.windows[agent].n_actions
 
-    def obs_size(self, name: str) -> int:
-        return self.windows[name].obs_size
+    def obs_size(self, agent: int) -> int:
+        return self.windows[agent].obs_size
+

@@ -26,7 +26,7 @@ import pathlib
 import time
 
 from ma.baselines import RandomAgent
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.topology import Topology, two_agent
 from scripts.ma_gates2 import play
 
@@ -49,8 +49,8 @@ def main(argv=None) -> dict:
     assert env.config.reward_criterion == "u14", env.config.reward_criterion
 
     started = time.time()
-    never = {n: RandomAgent(n, seed=args.seed + 2, allow_clamp=False) for n in AGENTS}
-    mixed = {n: RandomAgent(n, seed=args.seed + 3, allow_clamp=True) for n in AGENTS}
+    never = {a: RandomAgent(a, seed=args.seed + 2, allow_clamp=False) for a in env.topology.agents}
+    mixed = {a: RandomAgent(a, seed=args.seed + 3, allow_clamp=True) for a in env.topology.agents}
     g_never = play(env, never, args.episodes, args.seed, only=True)
     print(f"never-clamp  n={g_never['n']}  rate {g_never['rate']:.3f}", flush=True)
     g_mixed = play(env, mixed, args.episodes, args.seed, only=True)

@@ -35,7 +35,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ma.env import AGENTS, TwoAgentEnv
+from ma.env import TwoAgentEnv
 
 DEVICE = torch.device("cpu")
 
@@ -101,24 +101,24 @@ class IndependentPPO:
         torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
         self.nets = {
-            name: ActorCritic(env.obs_size(name), env.n_actions(name), config.hidden)
-            for name in AGENTS}
-        self.opts = {name: torch.optim.Adam(net.parameters(), lr=config.lr)
-                     for name, net in self.nets.items()}
+            agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden)
+            for agent in env.topology.agents}
+        self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
+                     for agent, net in self.nets.items()}
         self.history: List[dict] = []
         self.first_success_episode: Optional[int] = None
 
     # -- rollout ------------------------------------------------------------------------
 
-    def _act(self, name: str, obs: np.ndarray, mask_pass: bool):
+    def _act(self, agent: int, obs: np.ndarray, mask_pass: bool):
         # Rollout only -- gradients come from the recomputed forward pass in `update`, so
         # nothing here needs the graph. Without no_grad these floats drag a live autograd
         # graph into the buffers.
         with torch.no_grad():
-            logits, value = self.nets[name](torch.as_tensor(obs, dtype=torch.float32))
+            logits, value = self.nets[agent](torch.as_tensor(obs, dtype=torch.float32))
             if mask_pass:
                 logits = logits.clone()
-                logits[self.env.windows[name].pass_index] = -1e9
+                logits[self.env.windows[agent].pass_index] = -1e9
             dist = torch.distributions.Categorical(logits=logits)
             action = dist.sample()
             return (int(action), float(dist.log_prob(action)), float(value),
@@ -126,28 +126,28 @@ class IndependentPPO:
 
     def collect(self, episodes: int, episode_offset: int, mask_pass: bool) -> Dict[str, dict]:
         cfg = self.config
-        buffers = {name: {k: [] for k in
-                          ("obs", "action", "logp", "value", "reward", "done")}
-                   for name in AGENTS}
+        buffers = {agent: {k: [] for k in
+                           ("obs", "action", "logp", "value", "reward", "done")}
+                   for agent in self.env.topology.agents}
         entropies: List[float] = []
         solved = 0
 
         for episode in range(episodes):
             result = self.env.reset(seed=int(self.rng.integers(1 << 30)))
-            potential = {n: -belief_entropy(result.beliefs[n]) for n in AGENTS}
+            potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
             while not result.done:
-                obs = {n: self.env.observation(n) for n in AGENTS}
-                picks = {n: self._act(n, obs[n], mask_pass) for n in AGENTS}
-                result = self.env.step(picks["A"][0], picks["B"][0])
-                new_potential = {n: -belief_entropy(result.beliefs[n]) for n in AGENTS}
-                for name in AGENTS:
+                obs = {a: self.env.observation(a) for a in self.env.topology.agents}
+                picks = {a: self._act(a, obs[a], mask_pass) for a in self.env.topology.agents}
+                result = self.env.step({a: picks[a][0] for a in self.env.topology.agents})
+                new_potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
+                for agent in self.env.topology.agents:
                     shaped = result.reward
                     if cfg.potential_shaping:
                         shaped += cfg.potential_shaping * (
-                            cfg.gamma * new_potential[name] - potential[name])
-                    action, logp, value, entropy = picks[name]
-                    buf = buffers[name]
-                    buf["obs"].append(obs[name])
+                            cfg.gamma * new_potential[agent] - potential[agent])
+                    action, logp, value, entropy = picks[agent]
+                    buf = buffers[agent]
+                    buf["obs"].append(obs[agent])
                     buf["action"].append(action)
                     buf["logp"].append(logp)
                     buf["value"].append(value)
@@ -160,9 +160,9 @@ class IndependentPPO:
                 if self.first_success_episode is None:
                     self.first_success_episode = episode_offset + episode
 
-        for name in AGENTS:
-            for key in buffers[name]:
-                buffers[name][key] = np.asarray(buffers[name][key], dtype=np.float32)
+        for agent in self.env.topology.agents:
+            for key in buffers[agent]:
+                buffers[agent][key] = np.asarray(buffers[agent][key], dtype=np.float32)
         return {"buffers": buffers, "entropy": float(np.mean(entropies)),
                 "solve_rate": solved / episodes}
 
@@ -181,10 +181,10 @@ class IndependentPPO:
         returns = advantages + values
         return advantages, returns
 
-    def update(self, buffers: Dict[str, dict]) -> None:
+    def update(self, buffers: Dict[int, dict]) -> None:
         cfg = self.config
-        for name in AGENTS:
-            buf = buffers[name]
+        for agent in self.env.topology.agents:
+            buf = buffers[agent]
             advantages, returns = self._advantages(buf)
             # Normalise over the whole batch, AFTER computing returns. Normalising before
             # would corrupt the critic's target -- the exact advantage-normalisation bug
@@ -199,7 +199,7 @@ class IndependentPPO:
             ret = torch.as_tensor(returns, dtype=torch.float32)
 
             for _ in range(cfg.epochs):
-                logits, values = self.nets[name](obs)
+                logits, values = self.nets[agent](obs)
                 dist = torch.distributions.Categorical(logits=logits)
                 logp = dist.log_prob(actions)
                 ratio = torch.exp(logp - old_logp)
@@ -209,10 +209,10 @@ class IndependentPPO:
                 entropy = dist.entropy().mean()
                 loss = (policy_loss + cfg.value_coef * value_loss
                         - cfg.entropy_coef * entropy)
-                self.opts[name].zero_grad()
+                self.opts[agent].zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.nets[name].parameters(), 0.5)
-                self.opts[name].step()
+                nn.utils.clip_grad_norm_(self.nets[agent].parameters(), 0.5)
+                self.opts[agent].step()
 
     def train(self, verbose: bool = False) -> List[dict]:
         cfg = self.config
@@ -232,11 +232,11 @@ class IndependentPPO:
 
     # -- use ----------------------------------------------------------------------------
 
-    def policy(self, name: str, deterministic: bool = False):
+    def policy(self, agent: int, deterministic: bool = False):
         def act(env: TwoAgentEnv, result) -> int:
-            obs = torch.as_tensor(env.observation(name), dtype=torch.float32)
+            obs = torch.as_tensor(env.observation(agent), dtype=torch.float32)
             with torch.no_grad():
-                logits, _ = self.nets[name](obs)
+                logits, _ = self.nets[agent](obs)
             if deterministic:
                 return int(torch.argmax(logits))
             return int(torch.distributions.Categorical(logits=logits).sample())
@@ -244,13 +244,13 @@ class IndependentPPO:
         act.reset = lambda seed=None: None
         return act
 
-    def policies(self, deterministic: bool = False) -> Dict[str, object]:
-        return {name: self.policy(name, deterministic) for name in AGENTS}
+    def policies(self, deterministic: bool = False) -> Dict[int, object]:
+        return {agent: self.policy(agent, deterministic) for agent in self.env.topology.agents}
 
     # -- persistence --------------------------------------------------------------------
 
     def save(self, path) -> None:
-        """Write both agents' weights, with the shapes needed to rebuild them.
+        """Write all agents' weights, with the shapes needed to rebuild them.
 
         Added after the fact, and the omission had a cost worth recording: ten trained
         two-agent policies were evaluated, reported, and then discarded, because nothing
@@ -267,11 +267,11 @@ class IndependentPPO:
         path = pathlib.Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         _torch.save({
-            "nets": {name: net.state_dict() for name, net in self.nets.items()},
+            "nets": {agent: net.state_dict() for agent, net in self.nets.items()},
             "hidden": self.config.hidden,
             "seed": self.config.seed,
-            "obs_size": {name: self.env.obs_size(name) for name in AGENTS},
-            "n_actions": {name: self.env.n_actions(name) for name in AGENTS},
+            "obs_size": {agent: self.env.obs_size(agent) for agent in self.env.topology.agents},
+            "n_actions": {agent: self.env.n_actions(agent) for agent in self.env.topology.agents},
             "topology": self.env.topology.name,
             "score_rule": self.env.config.score_rule,
             "disclose_regime": self.env.config.disclose_regime,
@@ -279,15 +279,15 @@ class IndependentPPO:
 
     @classmethod
     def load(cls, path, env: TwoAgentEnv, config: Optional[PPOConfig] = None):
-        """Rebuild a trained pair against `env`, refusing a mismatched environment."""
+        """Rebuild a trained set against `env`, refusing a mismatched environment."""
         import torch as _torch
 
         blob = _torch.load(path, map_location=DEVICE, weights_only=False)
-        for name in AGENTS:
-            if blob["obs_size"][name] != env.obs_size(name):
+        for agent in env.topology.agents:
+            if blob["obs_size"][agent] != env.obs_size(agent):
                 raise ValueError(
                     "checkpoint is for a different environment: agent %s has obs_size %d, "
-                    "this env has %d" % (name, blob["obs_size"][name], env.obs_size(name)))
+                    "this env has %d" % (agent, blob["obs_size"][agent], env.obs_size(agent)))
         if blob.get("score_rule") != env.config.score_rule:
             # Cross-rule numbers are void -- a joint_conf-trained policy scored under
             # `subset` collapses below random. Performance belongs to the (policy, rule)
@@ -296,6 +296,7 @@ class IndependentPPO:
                              % (blob.get("score_rule"), env.config.score_rule))
         learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
                                                   seed=blob["seed"]))
-        for name in AGENTS:
-            learner.nets[name].load_state_dict(blob["nets"][name])
+        for agent in env.topology.agents:
+            learner.nets[agent].load_state_dict(blob["nets"][agent])
         return learner
+

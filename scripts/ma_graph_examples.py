@@ -31,28 +31,22 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from ma.baselines import _PerDagIndex, _Window, enumerated_posterior
-from ma.belief_dp import JOINT_CONF
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import credit_set, evaluate_episode, union_graph
-from ma.policy import IndependentPPO, PPOConfig
+from ma.policy import IndependentPPO
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
 from sa.graphs import is_acyclic, mec_signature
 
 
-def joint_grid(env: TwoAgentEnv, name: str) -> np.ndarray:
-    """Normalised posterior over (assignment, DAG), shape [n_assign, n_dags].
-
-    Rebuilds the same grid `enumerated_posterior` marginalises away, because the identity
-    of the winning ASSIGNMENT is the whole point here -- it is the agent's claim about what
-    is confounded.
-    """
-    window = env.windows[name]
+def joint_grid(env: TwoAgentEnv, agent: int) -> np.ndarray:
+    """`[n_assignments, 543]` matrix of posterior probabilities for one agent."""
+    window = env.windows[agent]
     belief = window.belief
     space = _Window.get(window.k)
     samples = env.samples[:, window.nodes]
-    known = env.known[name]
-    clean = (env.clean[name] if env.config.disclose_regime
+    known = env.known[agent]
+    clean = (env.clean[agent] if env.config.disclose_regime
              else np.zeros(len(env.samples), dtype=bool))
     index = _PerDagIndex.get(window.k, belief.assignments, belief.scorer)
     nodes = np.arange(window.k)
@@ -73,15 +67,15 @@ def joint_grid(env: TwoAgentEnv, name: str) -> np.ndarray:
     return weights / weights.sum()
 
 
-def describe_agent(env: TwoAgentEnv, name: str) -> Dict:
+def describe_agent(env: TwoAgentEnv, agent: int) -> Dict:
     """One agent's answer, in a form that can be drawn."""
-    window = env.windows[name]
+    window = env.windows[agent]
     space = _Window.get(window.k)
     truth = window.induced(env.true_adjacency)
 
-    grid = joint_grid(env, name)
+    grid = joint_grid(env, agent)
     a_star, d_star = np.unravel_index(int(np.argmax(grid)), grid.shape)
-    assignment = env.windows[name].belief.assignments[a_star]
+    assignment = env.windows[agent].belief.assignments[a_star]
     hypothesis = np.asarray(space.dags[d_star], dtype=int)
 
     # The CAUSAL claim is H minus the confounding edges, never H itself.
@@ -93,15 +87,15 @@ def describe_agent(env: TwoAgentEnv, name: str) -> Dict:
             claimed.append([int(edge[0]), int(edge[1])])
 
     posterior = enumerated_posterior(
-        window, env.samples[:, window.nodes], env.known[name],
-        env.clean[name] if env.config.disclose_regime
+        window, env.samples[:, window.nodes], env.known[agent],
+        env.clean[agent] if env.config.disclose_regime
         else np.zeros(len(env.samples), dtype=bool),
         env.config.score_rule)
     credit = credit_set(window, truth)
-    pairs = env._confounded_positions(name)
+    pairs = env._confounded_positions(agent)
     mass = float(window.belief.joint_conf_set_probability(
-        env.samples[:, window.nodes], env.known[name],
-        env.clean[name] if env.config.disclose_regime
+        env.samples[:, window.nodes], env.known[agent],
+        env.clean[agent] if env.config.disclose_regime
         else np.zeros(len(env.samples), dtype=bool),
         space.dags[credit], pairs))
 
@@ -140,24 +134,24 @@ def run_episode(env: TwoAgentEnv, policies, seed: int) -> Dict:
     # then labelled "confounded", which mislabels every episode confounded only for B --
     # the same "a number that means something narrower than its name" failure this project
     # has been chasing all month, resurfacing in the display layer.
-    confounded_by = {n: bool(bidirected_pairs(env.true_adjacency,
-                                              env.topology.observed_by(n)))
-                     for n in AGENTS}
+    confounded_by = {a: bool(bidirected_pairs(env.true_adjacency,
+                                              env.topology.observed_by(a)))
+                     for a in env.topology.agents}
     confounded = any(confounded_by.values())
     moves: List[Dict] = []
     while not result.done:
-        actions = {n: policies[n](env, result) for n in AGENTS}
+        actions = {a: policies[a](env, result) for a in env.topology.agents}
         row = {}
-        for name, index in actions.items():
-            node, mode = env.windows[name].actions[index]
-            row[name] = {"node": None if node == -1 else int(node),
-                         "mode": "pass" if node == -1 else mode}
+        for agent, index in actions.items():
+            node, mode = env.windows[agent].actions[index]
+            row[agent] = {"node": None if node == -1 else int(node),
+                          "mode": "pass" if node == -1 else mode}
         moves.append(row)
-        result = env.step(actions["A"], actions["B"])
+        result = env.step(actions)
 
     report = evaluate_episode(env)
-    agents = {name: describe_agent(env, name) for name in AGENTS}
-    union = union_graph(env, {n: agents[n]["map_index"] for n in AGENTS})
+    agents = {agent: describe_agent(env, agent) for agent in env.topology.agents}
+    union = union_graph(env, {a: agents[a]["map_index"] for a in env.topology.agents})
     return {
         "seed": seed,
         "confounded": confounded,
@@ -173,9 +167,9 @@ def run_episode(env: TwoAgentEnv, policies, seed: int) -> Dict:
         "success": bool(report["success"]),
         "moves": moves,
         "n_moves": sum(1 for m in moves
-                       for name in AGENTS if m[name]["node"] is not None),
+                       for a in env.topology.agents if m[a]["node"] is not None),
         "clamps": sum(1 for m in moves
-                      for name in AGENTS if m[name]["mode"] == "clamp"),
+                      for a in env.topology.agents if m[a]["mode"] == "clamp"),
     }
 
 

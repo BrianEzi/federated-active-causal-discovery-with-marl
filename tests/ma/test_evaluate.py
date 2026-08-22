@@ -29,8 +29,8 @@ def env(topology):
 def test_the_truth_is_always_in_its_own_credit_set(env):
     """Trivial, and exactly the kind of thing that silently breaks: if the criterion cannot
     credit the correct answer, every success rate is measured against nothing."""
-    for name in ("A", "B"):
-        window = env.windows[name]
+    for agent in env.topology.agents:
+        window = env.windows[agent]
         for seed in range(12):
             env.reset(seed=seed)
             truth = window.induced(env.true_adjacency)
@@ -46,7 +46,7 @@ def test_credit_requires_private_incident_edges_to_be_exactly_right(env, topolog
     must be oriented correctly, not merely present. At (1,1,3) that is 3 edges per agent,
     so this part is not vacuous at the starting topology."""
     from ma.baselines import _Window
-    window = env.windows["A"]
+    window = env.windows[0]
     private = [window.pos[n] for n in window.private]
     assert len(private) == 1
     p = private[0]
@@ -65,7 +65,7 @@ def test_credit_allows_shared_reorientation_within_the_equivalence_class(env):
     """Part 2 relaxes SHARED-shared edges to CPDAG resolution. So the credit set must be
     able to contain graphs other than the truth -- otherwise the relaxation is not
     implemented and the criterion is silently stricter than specified."""
-    window = env.windows["A"]
+    window = env.windows[0]
     sizes = []
     for seed in range(25):
         env.reset(seed=seed)
@@ -78,7 +78,7 @@ def test_credit_allows_shared_reorientation_within_the_equivalence_class(env):
 
 def test_every_credited_graph_is_markov_equivalent_to_the_truth(env):
     from ma.baselines import _Window
-    window = env.windows["B"]
+    window = env.windows[1]
     for seed in range(8):
         env.reset(seed=seed)
         truth = window.induced(env.true_adjacency)
@@ -95,10 +95,10 @@ def test_union_of_two_correct_windows_reproduces_the_true_graph(env):
     for seed in range(10):
         env.reset(seed=seed)
         indices = {}
-        for name in ("A", "B"):
-            window = env.windows[name]
+        for agent in env.topology.agents:
+            window = env.windows[agent]
             truth = window.induced(env.true_adjacency)
-            indices[name] = next(
+            indices[agent] = next(
                 i for i, dag in enumerate(_Window.get(window.k).dags)
                 if np.array_equal(dag, truth))
         union = union_graph(env, indices)
@@ -120,7 +120,7 @@ def test_the_acyclicity_check_can_actually_fail(env, topology):
 
 def test_evaluate_episode_reports_every_part_of_the_criterion(env):
     env.reset(seed=41)
-    env.step(0, 2)
+    env.step({0: 0, 1: 2})
     report = evaluate_episode(env)
     for key in ("per_agent", "private_and_shared_ok", "union_acyclic",
                 "union_equivalent", "success"):
@@ -137,7 +137,7 @@ def test_success_is_never_true_when_a_part_fails(env):
     that would raise every reported number and never raise an error."""
     for seed in range(15):
         env.reset(seed=seed)
-        env.step(1, 3)
+        env.step({0: 1, 1: 3})
         report = evaluate_episode(env)
         parts = (report["union_acyclic"], report["union_equivalent"],
                  *report["private_and_shared_ok"].values())

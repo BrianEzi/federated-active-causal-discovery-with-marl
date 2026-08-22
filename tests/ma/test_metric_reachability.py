@@ -21,7 +21,7 @@ import numpy as np
 import pytest
 
 from ma.baselines import RandomAgent
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import agent_report, credit_set, evaluate_episode
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
@@ -36,16 +36,15 @@ def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2
     """Run a clamping random pair and bucket episodes by whether confounding is present."""
     env = TwoAgentEnv(MAConfig(topology=topology, n_obs=1000, n_int=100, budget=budget,
                                  disclose_regime=True))
-    policies = {n: RandomAgent(n, seed=seed, allow_clamp=True) for n in AGENTS}
+    policies = {a: RandomAgent(a, seed=seed, allow_clamp=True) for a in env.topology.agents}
     clean_eps, dirty_eps = [], []
     for episode in range(episodes):
         result = env.reset(seed=episode)
         while not result.done:
-            result = env.step(*(policies[n](env, result) for n in AGENTS))
-        confounded = (bool(bidirected_pairs(env.true_adjacency,
-                                            env.topology.observed_by(0)))
-                      or bool(bidirected_pairs(env.true_adjacency,
-                                               env.topology.observed_by(1))))
+            result = env.step({a: policies[a](env, result) for a in env.topology.agents})
+        confounded = any(bool(bidirected_pairs(env.true_adjacency,
+                                               env.topology.observed_by(a)))
+                         for a in env.topology.agents)
         row = evaluate_episode(env)
         (dirty_eps if confounded else clean_eps).append(row)
     return clean_eps, dirty_eps
@@ -69,7 +68,7 @@ def split_70(topology):
 
 
 @pytest.mark.slow
-def test_confounded_episodes_can_be_scored(split_70):
+def test_confounded_episodes_can_be_scored(split_70, topology):
     """THE REGRESSION. Reported success was structurally 0.000 here.
 
     A rate of zero on a whole regime is not a hard task -- it is an unearnable metric, and
@@ -77,21 +76,21 @@ def test_confounded_episodes_can_be_scored(split_70):
     """
     _, dirty = split_70
     assert len(dirty) >= 5, "need confounded episodes for this test to mean anything"
-    credited = [r["per_agent"][name]["mass_credit"]
-                for r in dirty for name in AGENTS]
+    credited = [r["per_agent"][agent]["mass_credit"]
+                for r in dirty for agent in topology.agents]
     assert max(credited) > 0.0, (
         "no confounded episode gave ANY agent non-zero credit mass -- the metric cannot "
         "be earned in the regime the two-agent design exists to study")
 
 
 @pytest.mark.slow
-def test_unconfounded_episodes_can_be_scored(split_70):
+def test_unconfounded_episodes_can_be_scored(split_70, topology):
     """The control. If this fails too, the metric is broken outright rather than blind to
     one regime, which is a different diagnosis."""
     clean, _ = split_70
     assert len(clean) >= 5
-    assert max(r["per_agent"][name]["mass_credit"]
-               for r in clean for name in AGENTS) > 0.0
+    assert max(r["per_agent"][agent]["mass_credit"]
+               for r in clean for agent in topology.agents) > 0.0
 
 
 @pytest.mark.slow
@@ -110,9 +109,9 @@ def test_credit_mass_never_exceeds_equivalence_mass(topology):
                                  disclose_regime=True))
     for episode in range(8):
         env.reset(seed=episode)
-        env.step(0, 2)
-        for name in AGENTS:
-            row = agent_report(env, name)
+        env.step({0: 0, 1: 2})
+        for agent in env.topology.agents:
+            row = agent_report(env, agent)
             assert row["mass_credit"] <= row["mass_equivalent"] + 1e-9
 
 
@@ -124,8 +123,8 @@ def test_the_truth_is_in_its_own_credit_set(topology):
     from ma.baselines import _Window
     for episode in range(10):
         env.reset(seed=episode)
-        for name in AGENTS:
-            window = env.windows[name]
+        for agent in env.topology.agents:
+            window = env.windows[agent]
             truth = window.induced(env.true_adjacency)
             mask = credit_set(window, truth)
             index = next(i for i, dag in enumerate(_Window.get(window.k).dags)

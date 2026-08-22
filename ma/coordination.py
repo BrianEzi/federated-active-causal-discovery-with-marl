@@ -79,7 +79,7 @@ def _eig_scores(masked: MaskedSpace, posterior: np.ndarray,
     return out
 
 
-def _local_view_scores(masked: MaskedSpace, posterior: np.ndarray, agent: str,
+def _local_view_scores(masked: MaskedSpace, posterior: np.ndarray, agent: int,
                        authority: Sequence[int]) -> np.ndarray:
     """What an agent computes from ITS OWN view, with no communication.
 
@@ -143,9 +143,8 @@ def run_arm(masked: MaskedSpace, arm: str, n_episodes: int, n_obs: int, n_int: i
     flat = parent_ids + (np.arange(masked.d) * engine.n_parent_sets)[None, :]
 
     prior = masked.uniform_prior()
-    authority = {"A": topology.may_intervene_on(0),
-                 "B": topology.may_intervene_on(1)}
-    n_agents = 2
+    authority = {agent: topology.may_intervene_on(agent) for agent in topology.agents}
+    n_agents = topology.n_agents
 
     spent, solved, confounded = [], [], []
     for episode in range(n_episodes):
@@ -180,7 +179,7 @@ def run_arm(masked: MaskedSpace, arm: str, n_episodes: int, n_obs: int, n_int: i
                 targets = [best]
             else:
                 targets = []
-                for agent in ("A", "B"):
+                for agent in topology.agents:
                     local = _local_view_scores(masked, posterior, agent, authority[agent])
                     best = int(np.argmax(local))
                     if local[best] > 1e-9:
@@ -200,10 +199,9 @@ def run_arm(masked: MaskedSpace, arm: str, n_episodes: int, n_obs: int, n_int: i
         spent.append(float(used if identified else budget))
         solved.append(float(identified))
         confounded.append(float(bool(
-            latent_projection_pairs(true_adjacency, topology.observed_by(0),
-                                    topology.hidden_from(0))
-            or latent_projection_pairs(true_adjacency, topology.observed_by(1),
-                                       topology.hidden_from(1)))))
+            any(latent_projection_pairs(true_adjacency, topology.observed_by(agent),
+                                        topology.hidden_from(agent))
+                for agent in topology.agents))))
 
     spent = np.array(spent)
     return {

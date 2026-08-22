@@ -43,7 +43,7 @@ import time
 import numpy as np
 
 from ma.baselines import ForcedClampAgent, GreedyAgent, RandomAgent, make_baselines
-from ma.env import AGENTS, MAConfig, TwoAgentEnv
+from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
@@ -60,8 +60,8 @@ def singleton_fraction(env: TwoAgentEnv, draws: int, seed: int) -> dict:
     for _ in range(draws):
         adjacency = env.topology.sample_dag(rng, p=env.config.prior_p)
         alone = True
-        for name in AGENTS:
-            window = env.windows[name]
+        for agent in env.topology.agents:
+            window = env.windows[agent]
             space = _Window.get(window.k)
             # Class SIZE from the precomputed partition. This was a full 543-graph
             # signature pass per draw per agent -- 10,000 passes at --draws 5000.
@@ -82,18 +82,19 @@ def play(env: TwoAgentEnv, policies, episodes: int, seed: int, only=None):
     solved, clamps, moves = [], 0, 0
     for episode in range(episodes):
         result = env.reset(seed=seed * 100_000 + episode)
-        confounded = bool(bidirected_pairs(env.true_adjacency,
-                                           env.topology.observed_by(0)))
+        confounded = any(bool(bidirected_pairs(env.true_adjacency,
+                                               env.topology.observed_by(agent)))
+                         for agent in env.topology.agents)
         if only is not None and confounded != only:
             continue
         while not result.done:
-            actions = {n: policies[n](env, result) for n in AGENTS}
-            for name, index in actions.items():
-                node, mode = env.windows[name].actions[index]
+            actions = {a: policies[a](env, result) for a in env.topology.agents}
+            for agent, index in actions.items():
+                node, mode = env.windows[agent].actions[index]
                 if node != -1:
                     moves += 1
                     clamps += (mode == "clamp")
-            result = env.step(actions["A"], actions["B"])
+            result = env.step(actions)
         solved.append(float(result.info["both_identified"]))
     solved = np.asarray(solved)
     return {"n": int(len(solved)),
@@ -167,10 +168,9 @@ def main(argv=None) -> dict:
     observational, unconfounded_only = [], []
     for episode in range(args.episodes):
         result = gate1_env.reset(seed=args.seed * 7919 + episode)
-        confounded = (bool(bidirected_pairs(gate1_env.true_adjacency,
-                                            gate1_env.topology.observed_by(0)))
-                      or bool(bidirected_pairs(gate1_env.true_adjacency,
-                                               gate1_env.topology.observed_by(1))))
+        confounded = any(bool(bidirected_pairs(gate1_env.true_adjacency,
+                                               gate1_env.topology.observed_by(agent)))
+                         for agent in gate1_env.topology.agents)
         observational.append(float(result.info["both_identified"]))
         if not confounded:
             unconfounded_only.append(float(result.info["both_identified"]))
@@ -190,8 +190,8 @@ def main(argv=None) -> dict:
           f"-> {'PASS' if passed1 else 'FAIL: ' + side}", flush=True)
 
     # -- GATE 2 --------------------------------------------------------------------------
-    greedy = {n: GreedyAgent(n, env, seed=args.seed) for n in AGENTS}
-    rand = {n: RandomAgent(n, seed=args.seed + 1, allow_clamp=True) for n in AGENTS}
+    greedy = {a: GreedyAgent(a, env, seed=args.seed) for a in env.topology.agents}
+    rand = {a: RandomAgent(a, seed=args.seed + 1, allow_clamp=True) for a in env.topology.agents}
     g2_greedy = play(env, greedy, args.episodes, args.seed, only=False)
     g2_random = play(env, rand, args.episodes, args.seed, only=False)
     passed2 = bool(g2_greedy["ci"][0] > g2_random["ci"][1])
@@ -213,8 +213,8 @@ def main(argv=None) -> dict:
     g3_env = TwoAgentEnv(MAConfig(
         topology=topology, n_obs=args.n_obs, n_int=args.n_int,
         budget=args.gate3_budget, disclose_regime=args.disclose_regime))
-    never = {n: RandomAgent(n, seed=args.seed + 2, allow_clamp=False) for n in AGENTS}
-    forced = {n: RandomAgent(n, seed=args.seed + 3, allow_clamp=True) for n in AGENTS}
+    never = {a: RandomAgent(a, seed=args.seed + 2, allow_clamp=False) for a in env.topology.agents}
+    forced = {a: RandomAgent(a, seed=args.seed + 3, allow_clamp=True) for a in env.topology.agents}
     g3_never = play(g3_env, never, args.episodes, args.seed, only=True)
     g3_forced = play(g3_env, forced, args.episodes, args.seed, only=True)
     headroom = g3_forced["rate"] - g3_never["rate"]

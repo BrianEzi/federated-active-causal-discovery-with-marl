@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.env import (AGENTS, CLAMP, MODES, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
-                     MAConfig, TwoAgentEnv)
+from ma.env import (CLAMP, MODES, RANDOM_TURN, ROUND_ROBIN, SIMULTANEOUS,
+                    MAConfig, TwoAgentEnv)
 from ma.topology import Topology, two_agent
 
 T_1_1_3 = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
@@ -29,14 +29,14 @@ def _env(**kw) -> TwoAgentEnv:
     return TwoAgentEnv(config, seed=0)
 
 
-def _clamp_own_private(env: TwoAgentEnv, name: str) -> int:
+def _clamp_own_private(env: TwoAgentEnv, agent: int) -> int:
     """The action index that clamps this agent's own private node."""
-    window = env.windows[name]
-    private = set(env.topology.private[0] if name == "A" else env.topology.private[1])
+    window = env.windows[agent]
+    private = set(env.topology.private[agent])
     for index, (node, mode) in enumerate(window.actions):
         if node in private and mode == CLAMP:
             return index
-    raise AssertionError(f"{name} has no clamp action on its own private node")
+    raise AssertionError(f"Agent {agent} has no clamp action on its own private node")
 
 
 # -- protocol ---------------------------------------------------------------------------
@@ -46,11 +46,11 @@ def test_round_robin_alternates_and_only_one_agent_acts():
     actors = []
     for _ in range(4):
         before = dict(env.n_interventions)
-        env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
-        moved = [n for n in AGENTS if env.n_interventions[n] > before[n]]
+        env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
+        moved = [a for a in env.topology.agents if env.n_interventions[a] > before[a]]
         assert len(moved) == 1, f"expected exactly one mover, got {moved}"
         actors.append(moved[0])
-    assert actors == ["A", "B", "A", "B"]
+    assert actors == [0, 1, 0, 1]
 
 
 def test_random_turn_order_uses_both_agents_and_still_moves_one():
@@ -58,21 +58,21 @@ def test_random_turn_order_uses_both_agents_and_still_moves_one():
     actors = []
     for _ in range(6):
         before = dict(env.n_interventions)
-        result = env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
-        moved = [n for n in AGENTS if env.n_interventions[n] > before[n]]
+        result = env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
+        moved = [a for a in env.topology.agents if env.n_interventions[a] > before[a]]
         assert len(moved) == 1
         actors.append(moved[0])
         if result.done:
             break
-    assert set(actors) == set(AGENTS), "random selection never chose one of the agents"
+    assert set(actors) == set(env.topology.agents), "random selection never chose one of the agents"
 
 
 def test_simultaneous_is_unchanged():
     """The legacy protocol must still let both agents move in one round -- every result
     before 2026-08-20 was measured under it and has to stay reproducible."""
     env = _env(turn_order=SIMULTANEOUS)
-    env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
-    assert env.n_interventions == {"A": 1, "B": 1}
+    env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
+    assert env.n_interventions == {0: 1, 1: 1}
 
 
 
@@ -96,16 +96,16 @@ def test_clean_rounds_are_reachable(order):
     is constant, every rule collapses to `pooled`, and any confounding result measured on
     top of it is void."""
     env = _env(turn_order=order)
-    env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
+    env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
     # B clamping its private node is exactly what makes A's rows clean, and vice versa.
-    assert env.clean["A"].any() or env.clean["B"].any()
+    assert env.clean[0].any() or env.clean[1].any()
 
 
 def test_clean_marks_only_the_rows_of_the_clamped_round():
     env = _env(turn_order=ROUND_ROBIN)
     n_obs = env.config.n_obs
-    env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))   # A clamps
-    clean_b = env.clean["B"]
+    env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})   # A clamps
+    clean_b = env.clean[1]
     assert not clean_b[:n_obs].any(), "the observational block is never clean"
     assert clean_b[n_obs:].all(), "the clamped round should be clean end to end"
 
@@ -114,11 +114,11 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     """Varying a hidden node leaves it a live variance source, so it de-confounds nothing.
     This is the asymmetry that motivates clamp-only."""
     env = _env(turn_order=ROUND_ROBIN)
-    window = env.windows["A"]
+    window = env.windows[0]
     vary = next(i for i, (node, mode) in enumerate(window.actions)
                 if node in env.topology.private[0] and mode != CLAMP)
-    env.step(vary, env.windows["B"].pass_index)
-    assert not env.clean["B"].any()
+    env.step({0: vary, 1: env.windows[1].pass_index})
+    assert not env.clean[1].any()
 
 
 def test_multi_private_topology_is_refused_rather_than_scored_wrong():
@@ -142,7 +142,7 @@ def test_random_turn_order_is_reproducible_from_the_seed():
         env = _env(turn_order=RANDOM_TURN)
         seen = []
         for _ in range(5):
-            result = env.step(_clamp_own_private(env, "A"), _clamp_own_private(env, "B"))
+            result = env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
             seen.append(env.active)
             if result.done:
                 break

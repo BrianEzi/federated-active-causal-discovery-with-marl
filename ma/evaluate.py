@@ -29,7 +29,7 @@ import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
 from ma.belief_dp import JOINT_CONF
-from ma.env import AGENTS, TwoAgentEnv
+from ma.env import TwoAgentEnv
 from sa.graphs import is_acyclic, mec_signature
 
 
@@ -96,14 +96,14 @@ def credit_candidates(window, truth: np.ndarray) -> np.ndarray:
     return np.asarray(out)
 
 
-def agent_report(env: TwoAgentEnv, name: str) -> Dict[str, float]:
+def agent_report(env: TwoAgentEnv, agent: int) -> Dict[str, float]:
     """Posterior mass on each of the criteria, for one agent."""
-    window = env.windows[name]
+    window = env.windows[agent]
     truth = window.induced(env.true_adjacency)
-    clean = (env.clean[name] if env.config.disclose_regime
+    clean = (env.clean[agent] if env.config.disclose_regime
              else np.zeros(len(env.samples), dtype=bool))
     posterior = enumerated_posterior(
-        window, env.samples[:, window.nodes], env.known[name], clean,
+        window, env.samples[:, window.nodes], env.known[agent], clean,
         env.config.score_rule)
     space = _Window.get(window.k)
 
@@ -122,9 +122,9 @@ def agent_report(env: TwoAgentEnv, name: str) -> Dict[str, float]:
         # the confounding -- and the reported success rate was EXACTLY 0.000 on every
         # confounded episode. The metric could not score the case the design exists for.
         candidates = space.dags[credit]
-        pairs = env._confounded_positions(name)
+        pairs = env._confounded_positions(agent)
         mass_credit = window.belief.joint_conf_set_probability(
-            env.samples[:, window.nodes], env.known[name], clean, candidates, pairs)
+            env.samples[:, window.nodes], env.known[agent], clean, candidates, pairs)
         # MAP over CAUSAL graphs, restricted to the credit set. Only used for the union
         # check, and if the agent is not credited then success is already false, so the
         # restriction costs nothing. Credit sets are small -- they range over the shared
@@ -132,7 +132,7 @@ def agent_report(env: TwoAgentEnv, name: str) -> Dict[str, float]:
         best, map_index = -1.0, int(np.argmax(posterior))
         for local, index in enumerate(np.flatnonzero(credit)):
             value = window.belief.joint_conf_dag_probability(
-                env.samples[:, window.nodes], env.known[name], clean,
+                env.samples[:, window.nodes], env.known[agent], clean,
                 space.dags[index], pairs)
             if value > best:
                 best, map_index = value, int(index)
@@ -148,18 +148,18 @@ def agent_report(env: TwoAgentEnv, name: str) -> Dict[str, float]:
     }
 
 
-def union_graph(env: TwoAgentEnv, map_indices: Dict[str, int]) -> np.ndarray:
-    """Stitch both agents' MAP window graphs into a global adjacency.
+def union_graph(env: TwoAgentEnv, map_indices: Dict[int, int]) -> np.ndarray:
+    """Stitch all agents' MAP window graphs into a global adjacency.
 
-    Shared edges are claimed by both agents. Disagreement is resolved by OR, which is the
+    Shared edges are claimed by multiple agents. Disagreement is resolved by OR, which is the
     permissive choice: it can only create cycles, never hide them, so the acyclicity check
     below sees the worst case rather than a tidied-up one.
     """
     d = env.topology.d
     union = np.zeros((d, d), dtype=np.int8)
-    for name in AGENTS:
-        window = env.windows[name]
-        dag = _Window.get(window.k).dags[map_indices[name]]
+    for agent in env.topology.agents:
+        window = env.windows[agent]
+        dag = _Window.get(window.k).dags[map_indices[agent]]
         for i, u in enumerate(window.nodes):
             for j, v in enumerate(window.nodes):
                 if dag[i, j]:
@@ -170,8 +170,8 @@ def union_graph(env: TwoAgentEnv, map_indices: Dict[str, int]) -> np.ndarray:
 def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     """Every criterion for one finished episode."""
     threshold = env.config.identify_threshold
-    reports = {name: agent_report(env, name) for name in AGENTS}
-    map_indices = {name: reports[name]["map_index"] for name in AGENTS}
+    reports = {agent: agent_report(env, agent) for agent in env.topology.agents}
+    map_indices = {agent: reports[agent]["map_index"] for agent in env.topology.agents}
     union = union_graph(env, map_indices)
 
     acyclic = bool(is_acyclic(union))
@@ -184,20 +184,20 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     return {
         "per_agent": reports,
         "private_and_shared_ok": {
-            name: reports[name]["mass_credit"] >= threshold for name in AGENTS},
-        "exact_ok": {name: reports[name]["mass_exact"] >= threshold for name in AGENTS},
+            agent: reports[agent]["mass_credit"] >= threshold for agent in env.topology.agents},
+        "exact_ok": {agent: reports[agent]["mass_exact"] >= threshold for agent in env.topology.agents},
         "union_acyclic": acyclic,
         "union_matches_truth": matches_truth,
         "union_equivalent": globally_equivalent,
         # All three parts of [U14], which is the number to report.
-        "success": bool(all(reports[n]["mass_credit"] >= threshold for n in AGENTS)
+        "success": bool(all(reports[a]["mass_credit"] >= threshold for a in env.topology.agents)
                         and acyclic and globally_equivalent),
     }
 
 
-def run_arm(env: TwoAgentEnv, policies: Dict[str, object], episodes: int,
+def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
             seed: int = 0) -> Dict[str, object]:
-    """Play one (policy pair) over seeded episodes and score every criterion."""
+    """Play policy set over seeded episodes and score every criterion."""
     for policy in policies.values():
         if hasattr(policy, "reset"):
             policy.reset(seed)
@@ -207,8 +207,8 @@ def run_arm(env: TwoAgentEnv, policies: Dict[str, object], episodes: int,
     for episode in range(episodes):
         result = env.reset(seed=seed * 100_000 + episode)
         while not result.done:
-            actions = {n: policies[n](env, result) for n in AGENTS}
-            result = env.step(actions["A"], actions["B"])
+            actions = {a: policies[a](env, result) for a in env.topology.agents}
+            result = env.step(actions)
             # Tallied AFTER the step, from what the environment actually applied. Counting
             # the submitted actions instead double-counts under turn-taking, where the
             # inactive agent's move is discarded by the protocol.
@@ -247,25 +247,21 @@ def run_arm(env: TwoAgentEnv, policies: Dict[str, object], episodes: int,
         "union_acyclic": rate("union_acyclic"),
         "union_equivalent": rate("union_equivalent"),
         "union_matches_truth": rate("union_matches_truth"),
-        "private_and_shared_A": float(np.mean(
-            [r["private_and_shared_ok"]["A"] for r in rows])),
-        "private_and_shared_B": float(np.mean(
-            [r["private_and_shared_ok"]["B"] for r in rows])),
         # `mean_steps` is per-agent INTERVENTIONS and `mean_rounds` is episode LENGTH.
         # They coincide under simultaneous play and differ by ~2x under turn-taking, so
         # both are reported and neither may be quoted as the other across protocols.
         "mean_steps": float(np.mean([r["steps"] for r in rows])),
         "mean_rounds": float(np.mean([r["rounds"] for r in rows])),
-        **_per_agent_block(rows),
+        **_per_agent_block(env, rows),
         "clamp_fraction": float(clamps / moves) if moves else float("nan"),
     }
 
 
-def _per_agent_block(rows: List[Dict[str, object]]) -> Dict[str, object]:
+def _per_agent_block(env: TwoAgentEnv, rows: List[Dict[str, object]]) -> Dict[str, object]:
     """Per-agent behaviour, the connectedness split, and the free-rider index.
 
     `free_rider_index` is `min(interventions) / max(interventions)` across agents: 1.0 when
-    the pair pulls its weight evenly, 0.0 when one agent did nothing at all. Episodes in
+    the agents pull their weight evenly, 0.0 when one agent did nothing at all. Episodes in
     which NOBODY acted are excluded -- the ratio is undefined there and would otherwise read
     as perfect cooperation.
 
@@ -274,26 +270,24 @@ def _per_agent_block(rows: List[Dict[str, object]]) -> Dict[str, object]:
     coordinate about -- and pooling those episodes with connected ones dilutes exactly the
     effect this project exists to measure.
     """
-    from ma.env import AGENTS
-
-    def mean_over(key: str, name: str) -> float:
-        return float(np.mean([r[key][name] for r in rows]))
+    def mean_over(key: str, agent: int) -> float:
+        return float(np.mean([r[key][agent] for r in rows]))
 
     ratios = []
     for r in rows:
-        counts = [r["interventions"][n] for n in AGENTS]
+        counts = [r["interventions"][a] for a in env.topology.agents]
         if max(counts) > 0:
             ratios.append(min(counts) / max(counts))
 
     out: Dict[str, object] = {
-        "interventions_per_agent": {n: mean_over("interventions", n) for n in AGENTS},
-        "forfeits_per_agent": {n: mean_over("forfeits", n) for n in AGENTS},
-        "clamps_private_per_agent": {n: mean_over("clamps_private", n) for n in AGENTS},
-        "clamps_shared_per_agent": {n: mean_over("clamps_shared", n) for n in AGENTS},
-        "done_bit_per_agent": {n: mean_over("done_bit", n) for n in AGENTS},
+        "interventions_per_agent": {a: mean_over("interventions", a) for a in env.topology.agents},
+        "forfeits_per_agent": {a: mean_over("forfeits", a) for a in env.topology.agents},
+        "clamps_private_per_agent": {a: mean_over("clamps_private", a) for a in env.topology.agents},
+        "clamps_shared_per_agent": {a: mean_over("clamps_shared", a) for a in env.topology.agents},
+        "done_bit_per_agent": {a: mean_over("done_bit", a) for a in env.topology.agents},
         "free_rider_index": float(np.mean(ratios)) if ratios else float("nan"),
         "never_acted_episodes": float(np.mean(
-            [max(r["interventions"][n] for n in AGENTS) == 0 for r in rows])),
+            [max(r["interventions"][a] for a in env.topology.agents) == 0 for r in rows])),
         "connected_fraction": float(np.mean([r["connected"] for r in rows])),
     }
     for label, want in (("connected", True), ("disconnected", False)):

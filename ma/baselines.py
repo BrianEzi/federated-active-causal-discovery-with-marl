@@ -223,7 +223,7 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
 
 
 
-def _agent_seed(seed: int, name: str) -> int:
+def _agent_seed(seed: int, agent: int) -> int:
     """Distinct stream per agent.
 
     A and B were being constructed with the SAME seed at every call site, so their RNGs
@@ -237,21 +237,21 @@ def _agent_seed(seed: int, name: str) -> int:
     systematically wastes one of the two moves, and it makes the floor easier to beat for
     the wrong reason.
     """
-    return int(seed) * 2 + (0 if name == "A" else 1)
+    return int(seed) * 1000 + int(agent) if int(agent) >= 2 else int(seed) * 2 + int(agent)
 
 
 # -- policies ---------------------------------------------------------------------------
 
 
 class PassAgent:
-    def __init__(self, name: str, seed: int = 0):
-        self.name = name
+    def __init__(self, agent: int, seed: int = 0):
+        self.agent: int = int(agent)
 
     def reset(self, seed: Optional[int] = None) -> None:
         pass
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
-        return env.windows[self.name].pass_index
+        return env.windows[self.agent].pass_index
 
 
 class RandomAgent:
@@ -262,18 +262,18 @@ class RandomAgent:
     would conflate two different kinds of badness.
     """
 
-    def __init__(self, name: str, seed: int = 0, allow_clamp: bool = True):
-        self.name = name
+    def __init__(self, agent: int, seed: int = 0, allow_clamp: bool = True):
+        self.agent: int = int(agent)
         self.allow_clamp = allow_clamp
-        self._seed = _agent_seed(seed, name)
+        self._seed = _agent_seed(seed, self.agent)
         self.rng = np.random.default_rng(self._seed)
 
     def reset(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(
-            self._seed if seed is None else _agent_seed(seed, self.name))
+            self._seed if seed is None else _agent_seed(seed, self.agent))
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
-        window = env.windows[self.name]
+        window = env.windows[self.agent]
         candidates = [i for i, (node, mode) in enumerate(window.actions)
                       if node != -1 and (self.allow_clamp or mode == VARY)]
         return int(self.rng.choice(candidates))
@@ -287,17 +287,17 @@ class ForcedClampAgent:
     does for the partner.
     """
 
-    def __init__(self, name: str, seed: int = 0):
-        self.name = name
-        self._seed = _agent_seed(seed, name)
+    def __init__(self, agent: int, seed: int = 0):
+        self.agent: int = int(agent)
+        self._seed = _agent_seed(seed, self.agent)
         self.rng = np.random.default_rng(self._seed)
 
     def reset(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(
-            self._seed if seed is None else _agent_seed(seed, self.name))
+            self._seed if seed is None else _agent_seed(seed, self.agent))
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
-        window = env.windows[self.name]
+        window = env.windows[self.agent]
         private = [i for i, (node, mode) in enumerate(window.actions)
                    if mode == CLAMP and node in window.private]
         if not private:
@@ -321,7 +321,7 @@ class GreedyAgent:
 
     TIE_BREAKS = ("random", "low", "high")
 
-    def __init__(self, name: str, env: TwoAgentEnv, seed: int = 0,
+    def __init__(self, agent: int, env: TwoAgentEnv, seed: int = 0,
                  tie_break: str = "random"):
         """`tie_break` decides among actions of EQUAL expected gain, and it matters.
 
@@ -342,11 +342,11 @@ class GreedyAgent:
         """
         if tie_break not in self.TIE_BREAKS:
             raise ValueError("tie_break must be one of %s" % (self.TIE_BREAKS,))
-        self.name = name
+        self.agent: int = int(agent)
         self.tie_break = tie_break
-        self._seed = _agent_seed(seed, name)
+        self._seed = _agent_seed(seed, self.agent)
         self.rng = np.random.default_rng(self._seed)
-        window = env.windows[name]
+        window = env.windows[self.agent]
         self.space = _Window.get(window.k)
         self.candidates = [i for i, (node, mode) in enumerate(window.actions)
                            if node != -1]
@@ -354,14 +354,14 @@ class GreedyAgent:
 
     def reset(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(
-            self._seed if seed is None else _agent_seed(seed, self.name))
+            self._seed if seed is None else _agent_seed(seed, self.agent))
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
-        window = env.windows[self.name]
-        clean = (env.clean[self.name] if env.config.disclose_regime
+        window = env.windows[self.agent]
+        clean = (env.clean[self.agent] if env.config.disclose_regime
                  else np.zeros(len(env.samples), dtype=bool))
         posterior = enumerated_posterior(
-            window, env.samples[:, window.nodes], env.known[self.name], clean, self.rule)
+            window, env.samples[:, window.nodes], env.known[self.agent], clean, self.rule)
 
         scores = np.full(len(self.candidates), -np.inf)
         for slot, action in enumerate(self.candidates):
@@ -380,11 +380,11 @@ class GreedyAgent:
         return int(self.candidates[slot])
 
 
-def make_baselines(env: TwoAgentEnv, name: str, seed: int = 0) -> Dict[str, object]:
+def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, object]:
     return {
-        "pass": PassAgent(name, seed),
-        "random_vary": RandomAgent(name, seed, allow_clamp=False),
-        "random_clamp": RandomAgent(name, seed, allow_clamp=True),
-        "forced_clamp": ForcedClampAgent(name, seed),
-        "greedy": GreedyAgent(name, env, seed),
+        "pass": PassAgent(agent, seed),
+        "random_vary": RandomAgent(agent, seed, allow_clamp=False),
+        "random_clamp": RandomAgent(agent, seed, allow_clamp=True),
+        "forced_clamp": ForcedClampAgent(agent, seed),
+        "greedy": GreedyAgent(agent, env, seed),
     }
