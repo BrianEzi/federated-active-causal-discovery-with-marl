@@ -53,6 +53,12 @@ def main(argv=None) -> dict:
     # A trade, not a demonstration that vary is useless.
     ap.add_argument("--clamp_only", action="store_true",
                     help="restrict the action space to clamps; the vary mode is removed")
+    # None (unset) means "let MAConfig resolve it" -- 2 ln(d)/d since 2026-08-22. Exposed
+    # explicitly so a run can be PINNED to the old fixed value, which is what rung 0 of the
+    # n-agent refactor needs: isolate the topology refactor from the prior change by holding
+    # this constant while comparing against pre-refactor results measured at p=0.5.
+    ap.add_argument("--prior_p", type=float, default=None,
+                    help="override the graph prior; unset resolves to 2 ln(d)/d")
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
@@ -63,7 +69,8 @@ def main(argv=None) -> dict:
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
                        score_rule=args.rule, step_cost=args.step_cost,
-                       turn_order=args.turn_order, action_modes=modes)
+                       turn_order=args.turn_order, action_modes=modes,
+                       prior_p=args.prior_p)
     env = TwoAgentEnv(config)
     started = time.time()
 
