@@ -192,9 +192,10 @@ def test_observation_features_are_all_in_unit_range(topology):
 
 
 def test_clamp_only_is_the_default(topology):
-    """Adopted as a TRADE, not a proven equivalence: paired over 10 seeds both-modes led by
-    +0.018, CI [-0.005, +0.041], ahead on 6, tied on 2, behind on 2. Restore both with
-    `action_modes=MODES`."""
+    """Adopted as a TRADE WITH A KNOWN PRICE: paired over TWENTY seeds both-modes leads by
+    +0.021, CI [+0.001, +0.042] -- significant, if barely. The ten-seed figure that motivated
+    the change (+0.018, CI [-0.005, +0.041]) was not significant and is withdrawn. Restore
+    both modes with `action_modes=MODES`."""
     assert MAConfig(topology=topology).action_modes == (CLAMP,)
     assert MAConfig(topology=topology, action_modes=MODES).action_modes == MODES
 

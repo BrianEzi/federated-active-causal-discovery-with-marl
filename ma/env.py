@@ -116,11 +116,12 @@ class MAConfig:
     # the turn-budget spec (see `budget` above), and the two statements sat three lines
     # apart contradicting each other.
     turn_order: str = SIMULTANEOUS
-    # CLAMP ONLY, adopted as the default on 2026-08-22. This is a TRADE, not a proven
-    # equivalence, and the size of the trade is measured: paired over 10 seeds, both-modes
-    # leads by +0.018 with a bootstrap CI of [-0.005, +0.041], ahead on 6 seeds, tied on 2,
-    # behind on 2. So the cost is at most ~4pp and is not distinguishable from zero, and it
-    # buys a halved action space and one less axis to sweep as agents are added.
+    # CLAMP ONLY, adopted as the default on 2026-08-22. This is a TRADE WITH A KNOWN PRICE.
+    # At ten seeds the cost looked like nothing measurable (+0.018, CI [-0.005, +0.041]).
+    # At TWENTY it is +0.021, CI [+0.001, +0.042] -- significant, if barely. So the price is
+    # about 2pp, and it buys a halved action space and one fewer axis to sweep as agents are
+    # added. Both-modes leads on only 11 of 20 seeds, so this is a small consistent effect
+    # rather than a large unreliable one.
     # The coordination problem is untouched -- it becomes one of targeting and timing
     # rather than of mode -- and a policy given both modes converges on clamp anyway
     # (81-91% of clamps on its own private node).

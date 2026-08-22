@@ -1588,6 +1588,20 @@ Free-rider index 0.82 against 0.61.
 **[MEASURED] Clamp-only, five more seeds.** Unchanged at +0.018, CI [-0.005, +0.041], 6/10.
 The 10 pending `tb_both` seeds 10-19 will settle it.
 
+**[CORRECTED] They settled it the other way.** With all 20 seeds in from Myriad array 188663,
+`tb_both - tb_clamp` is **+0.021, CI [+0.001, +0.042] — SIGNIFICANT**, where the 10-seed
+result was +0.018, CI [-0.005, +0.041], not significant. So "clamp-only costs nothing
+measurable" was a small-sample artefact and is withdrawn.
+
+The decision stands, but its justification changes: clamp-only is now a trade with a **known
+price of about 2pp**, taken for a halved action space and one fewer axis to sweep at five
+agents. Worth noting the tension in the data — both-modes leads on only **11 of 20** seeds,
+barely better than a coin flip, while the paired mean is reliably positive. A small
+consistent effect, not a large unreliable one.
+
+This is also the second time in this project that a ten-seed comparison has reversed. Ten
+seeds is not enough to call a difference of this size either way.
+
 **[DECIDED] `action_modes` defaults to `(CLAMP,)`.** A trade of at most ~4pp for a halved
 action space and one fewer axis to sweep as agents are added. Broke 7 tests, all of which
 were asserting vary-specific mechanism; they now opt into `MODES` explicitly. `tb_both`

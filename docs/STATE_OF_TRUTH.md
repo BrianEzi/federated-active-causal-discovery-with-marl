@@ -88,7 +88,7 @@ Round-robin beats random turn order: **+0.028**, CI [+0.011, +0.045], ahead on 8
 | change | consequence |
 |---|---|
 | `prior_p` 0.5 → `2 ln(d)/d` (0.597 at `d=6`) | the graph distribution the environment generates has MOVED. **Every two-agent number in this file was measured at `p = 0.5`** and does not carry over without a re-run. Rung 0 of the n-agent ladder is where that gets paid |
-| `action_modes` both → `(CLAMP,)` | a default change only; `tb_both` is still runnable and the two arms differ by at most ~4pp |
+| `action_modes` both → `(CLAMP,)` | a default change only; `tb_both` is still runnable. The gap is **+0.021, CI [+0.001, +0.042]** at 20 seeds — small, but no longer zero |
 
 ## Retracted
 
@@ -101,7 +101,7 @@ Round-robin beats random turn order: **+0.028**, CI [+0.011, +0.045], ahead on 8
 | "A constant intervention cannot identify descendants' dependence" (our own docstring) | measured false | clamp recovers 93–98%; the mechanism is **pooling**, not collinearity |
 | **Every two-agent number before 2026-08-21** | simultaneous action, per-agent intervention budget, `step_cost = 0.05` | the turn-taking table above |
 | "1-in-10 seeds collapse, sd 0.154" (2026-08-19) | did not reproduce | 0/10 collapse, sd 0.039 |
-| "Clamp-only is proven equivalent to both modes" | paired, both-modes leads on **6/10** seeds (2 tied, 2 behind), mean +0.018, CI **[-0.005, +0.041]** | clamp-only is a **trade** costing ≤4pp for a halved action space |
+| "Clamp-only costs nothing measurable" | that was a TEN-seed result. At **20 seeds** the paired difference is **+0.021, CI [+0.001, +0.042]** — significant, if barely. Both-modes still leads on only 11/20 seeds | clamp-only is a **trade with a known price of ~2pp**, adopted as the default on 2026-08-22 for the halved action space. Not an equivalence, and no longer "indistinguishable from zero" |
 | "`n_obs=100` explains the `d=6` GATE 1 failure" | it fails at `n_obs=1000` too | the criterion is unreachable at `d ≥ 5` at this sample size |
 | "Turn-taking drains the clean regime of value" | wrong division of labour — orientation comes from the dirty regime, disambiguation from the clean one, and both score the same structure | nothing is lost structurally |
 | "Clean rows halve under turn-taking" | assumed a shared budget pool; with per-agent budgets B clamps as often as before | no reduction |
