@@ -69,7 +69,7 @@ chance or below, and scores a third as well.
 | "A constant intervention cannot identify descendants' dependence" (our own docstring) | measured false | clamp recovers 93–98%; the mechanism is **pooling**, not collinearity |
 | **Every two-agent number before 2026-08-21** | simultaneous action, per-agent intervention budget, `step_cost = 0.05` | the turn-taking table above |
 | "1-in-10 seeds collapse, sd 0.154" (2026-08-19) | did not reproduce | 0/10 collapse, sd 0.039 |
-| "Clamp-only is proven equivalent to both modes" | paired, both-modes leads on **8/10** seeds, mean +0.018, CI **[-0.005, +0.041]** | clamp-only is a **trade** costing ≤4pp for a halved action space |
+| "Clamp-only is proven equivalent to both modes" | paired, both-modes leads on **6/10** seeds (2 tied, 2 behind), mean +0.018, CI **[-0.005, +0.041]** | clamp-only is a **trade** costing ≤4pp for a halved action space |
 | "`n_obs=100` explains the `d=6` GATE 1 failure" | it fails at `n_obs=1000` too | the criterion is unreachable at `d ≥ 5` at this sample size |
 | "Turn-taking drains the clean regime of value" | wrong division of labour — orientation comes from the dirty regime, disambiguation from the clean one, and both score the same structure | nothing is lost structurally |
 | "Clean rows halve under turn-taking" | assumed a shared budget pool; with per-agent budgets B clamps as often as before | no reduction |

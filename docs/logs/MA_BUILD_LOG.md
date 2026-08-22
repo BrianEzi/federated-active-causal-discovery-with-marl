@@ -1501,7 +1501,7 @@ yields interventional information about that node's children. What rules out the
 explanation is greedy: an agent optimising exactly that self-information does not choose it.
 
 [DECIDED] **Clamp-only adopted as a TRADE, not as a proven equivalence.** Paired over the
-same 10 seeds, both-modes is ahead on **8 of 10**, mean **+0.018**, 95% CI **[-0.005,
+same 10 seeds, both-modes is ahead on **6 of 10** with **2 ties and 2 losses**, mean **+0.018**, 95% CI **[-0.005,
 +0.041]**. That is "no significant difference", not "no difference": equivalence passes at a
 +/-5pp margin and FAILS at +/-2pp. Removing vary plausibly costs ~2pp and at most ~4pp on a
 base of 0.55, bought for a halved action space (which compounds at 5 agents x 30 nodes) and a

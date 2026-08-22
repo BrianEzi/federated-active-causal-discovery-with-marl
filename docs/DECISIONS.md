@@ -45,7 +45,7 @@ Status: **firm** (measured or proved) · **provisional** (reasoned, not yet test
 | A forfeited round generates observational data | user decision; observation cannot break Markov-equivalence ties, so it cannot re-open the leak. Guarded by the pass-only baseline, measured at **0.007** | **firm** | the pass-only baseline climbing above the observationally-identifiable fraction |
 | Three-category action-type broadcast | Grimsman et al. (2018) bound greedy's quality by how much of others' decisions each agent sees | **provisional** | supervisor ruling; removable with `disclose_signals=False` |
 | Done bit from own posterior concentration, logged only | must not be the credit-set mass, which is an oracle quantity — and is already computed, so it would be *free* to leak | **firm** | — |
-| Clamp-only | a **trade**: costs ≤4pp (paired, 8/10 seeds favour both modes, CI `[-0.005, +0.041]`) for a halved action space and a non-degenerate greedy | **provisional** | more seeds resolving the +1.8pp lean as real |
+| Clamp-only | a **trade**: costs ≤4pp (paired: both modes ahead on 6/10, tied on 2, behind on 2; CI `[-0.005, +0.041]`) for a halved action space and a non-degenerate greedy | **provisional** | more seeds resolving the +1.8pp lean as real |
 
 ## Baselines
 

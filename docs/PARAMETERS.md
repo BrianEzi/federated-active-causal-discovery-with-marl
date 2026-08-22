@@ -22,7 +22,7 @@ Defaults below are read from the code as of 21 August 2026.
 | `n_int` | 100 | **ASSERTED** | never justified, never swept. Interacts with the round budget: it sets how much evidence one clamp carries, which is the open question "can an agent locate where confounding was removed" |
 | `budget` | 10 rounds | **ASSERTED**, semantics DERIVED | a shared pool of rounds follows from internalising free-riding (`TURN_BUDGET_SPEC` §2); the *value* 10 is a judgement call |
 | `turn_order` | `simultaneous` | **DERIVED** | default kept only so pre-21-August commands reproduce. Turn-taking is the supervisor's directive and is opted into explicitly |
-| `action_modes` | both | **MEASURED**, and the default is stale | clamp-only costs ≤4pp (paired, CI `[-0.005, +0.041]`) and halves the action space. Adopted as a **trade** — the default should follow |
+| `action_modes` | both | **MEASURED**, and the default is stale | clamp-only costs ≤4pp (paired: ahead 6/10, tied 2, behind 2; CI `[-0.005, +0.041]`) and halves the action space. Adopted as a **trade** — the default should follow |
 | `identify_threshold` | 0.7 | **ASSERTED, and known not to scale** | inherited from the single-agent case. Measured 21 August: among graphs identifiable without acting, the true DAG clears 0.7 only **40%** of the time at `d=5,6`. **The most exposed parameter in this table** |
 | `prior_p` | 0.5 | **ASSERTED, and known to be wrong at scale** | at `d=30` gives expected degree **14.5** against a literature norm of 2–4. Must become `f(d)`. Note the two thresholds differ: percolation is `1/d`, but *connectivity* — which is what we want — needs `ln(d)/d` |
 | `intervene_scale` | 2.0 | **ASSERTED** | only affects `vary`, which clamp-only removes |
