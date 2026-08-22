@@ -51,6 +51,7 @@ def split_by_confounding(topology, episodes: int, budget: int = 8, seed: int = 2
     return clean_eps, dirty_eps
 
 
+@pytest.mark.slow
 def test_confounded_episodes_can_be_scored(topology):
     """THE REGRESSION. Reported success was structurally 0.000 here.
 
@@ -66,6 +67,7 @@ def test_confounded_episodes_can_be_scored(topology):
         "be earned in the regime the two-agent design exists to study")
 
 
+@pytest.mark.slow
 def test_unconfounded_episodes_can_be_scored(topology):
     """The control. If this fails too, the metric is broken outright rather than blind to
     one regime, which is a different diagnosis."""
@@ -75,6 +77,7 @@ def test_unconfounded_episodes_can_be_scored(topology):
                for r in clean for name in AGENTS) > 0.0
 
 
+@pytest.mark.slow
 def test_success_is_attainable_at_all(topology):
     """Somewhere in a reasonable run, the full three-part criterion must actually fire.
     A criterion that never returns True cannot distinguish any two policies."""

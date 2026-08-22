@@ -59,6 +59,7 @@ def _reference(d, samples, intervened, prior_fn):
 
 @pytest.mark.parametrize("d", [3, 4, 5, 6])
 @pytest.mark.parametrize("n_obs", [1000, 20000])
+@pytest.mark.slow
 def test_log_partition_matches_enumeration(d, n_obs):
     """Both sample sizes, because the numerical difficulty grows steeply with `n`.
 
@@ -188,6 +189,7 @@ def test_euler_identity_holds_for_every_node(d):
     dp.edge_marginals_onepass(dp.log_weights(samples, intervened), check=True)
 
 
+@pytest.mark.perf
 def test_onepass_is_faster_than_constrained_runs():
     """The block 2 speedup, asserted at d=7 rather than the pre-registered d=6.
 

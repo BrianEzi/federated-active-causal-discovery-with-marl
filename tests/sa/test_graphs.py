@@ -180,6 +180,7 @@ def test_fast_mec_grouping_induces_the_same_partition(d):
     assert np.array_equal(fast[:, None] == fast[None, :], ref[:, None] == ref[None, :])
 
 
+@pytest.mark.slow
 def test_fast_path_reproduces_the_known_counts_at_d6():
     """d=6 exists only via the vectorised path -- the per-graph version needs ~28 minutes.
 

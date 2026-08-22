@@ -87,6 +87,7 @@ def test_a_hidden_mediator_becomes_a_directed_edge_not_a_bidirected_one():
 # -- the claim --------------------------------------------------------------------
 
 @pytest.mark.parametrize("topology", [T112, T113], ids=["(1,1,2)", "(1,1,3)"])
+@pytest.mark.slow
 def test_confounding_is_confined_to_the_shared_set(topology):
     """No bidirected edge may touch a private node, over EVERY legal graph.
 
@@ -124,6 +125,7 @@ def test_confinement_also_holds_with_two_private_nodes_each():
 # -- the correction to the section 3 numbers --------------------------------------
 
 @pytest.mark.parametrize("topology", [T112, T113], ids=["(1,1,2)", "(1,1,3)"])
+@pytest.mark.slow
 def test_the_section_3_metric_overcounts_and_the_excess_is_ancestral(topology):
     """`ma.confounding.latent_projection_pairs` flags any pair with a hidden common
     source. That is a superset of the true bidirected edges: if the two nodes are also

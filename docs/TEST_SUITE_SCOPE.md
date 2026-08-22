@@ -1,120 +1,103 @@
-# Test suite — scope for slimming
+# Test suite — what was cut, and what is left
 
-**Drafted 22 August 2026. NOT IMPLEMENTED — this is a scope, for sign-off.**
+**Implemented 22 August 2026.** Drafted as a scope, executed the same day; the measured
+outcome replaces the estimates.
 
-The suite is slow enough to have stopped being run casually, which is the real cost: a suite
-you avoid running is a suite that is not protecting anything. This document says what is in
-it, what should go, what must not go, and in what order.
-
----
-
-## 1. Inventory, measured
-
-570 tests collected across 48 files, collection alone taking 9.7 s.
-
-| tier | files | tests | what it exercises |
-|---|---:|---:|---|
-| **A — dead v1** | 19 | 111 | `legacy/src/`, `legacy/scripts/` — the retired generation |
-| **B — v1 as reference oracle** | 2 | 11 | `legacy/ma_v1/`, used to cross-check *current* code |
-| **C — active** | 27 | ~448 | `ma/`, `sa/`, current `scripts/` |
-
-Tier A runs in **68 s**. That is only a slice of the total, so **deleting it is the easy win,
-not the main one.** The main one is in tier C and needs the duration data below before
-anything is cut.
+The suite had reached 876 s over 570 tests, which is long enough that it stopped being run
+casually — and a suite you skip protects nothing.
 
 ---
 
-## 2. Tier A — delete
+## Result
 
-Nineteen files whose subject is code we retired on 21 August. They import `legacy.src.*` or
-`legacy.scripts.*`, and they currently pass, which is precisely the problem: they are green
-gates on code no result depends on any more, and they are the reason `legacy/` needed its
-internal imports rewritten during consolidation at all.
+| | tests | wall clock |
+|---|---:|---:|
+| before | 570 | **876 s** |
+| after, full suite | 462 | **484 s** |
+| after, `-m "not slow"` | 446 | **124 s** |
 
-```
-test_analyse_phase2   test_avici_buffer      test_baselines
-test_bayes_optimal_estimator                 test_curriculum
-test_episode_metrics  test_evaluate_checkpoint_config
-test_evaluator_env    test_graph_estimator   test_inductive_head
-test_jit_acceleration test_metrics           test_ppo_agent
-test_ppo_trainer      test_rewards           test_stitching
-test_sweep_phase2     test_topologies        test_two_stage_loop
-```
-
-**Move to `legacy/tests/`, do not delete outright**, and drop that directory from `testpaths`
-in `pytest.ini`. The thesis write-up still cites v1 behaviour in places, and a moved test is
-recoverable evidence of what v1 actually did; a deleted one is not. This costs nothing —
-excluded directories are not collected.
-
-**Saving: 111 tests, ~68 s, 19 files.**
-
-## 3. Tier B — must NOT go
-
-Two files import `legacy.ma_v1` and look like tier A on a `grep`. They are the opposite:
-
-- `tests/ma/test_belief_dp.py` — checks the subset DP against
-  `tests/fixtures/ma_reference_posteriors.npz`, **generated independently by
-  `legacy/ma_v1/env.py`**. This is the evidence behind the 1e-10 agreement claim in
-  `STATE_OF_TRUTH.md`.
-- `tests/test_score_regimes.py` — same pattern for the regime rules.
-
-Here v1 is the **independent oracle**, and its independence is the whole value: a
-cross-check against a reimplementation that shares no code with the thing under test. If
-`legacy/ma_v1/` is ever removed these tests must be converted to frozen fixtures **first**,
-never dropped.
-
-A comment saying so belongs at the top of both files, because the next person to grep for
-`legacy` in `tests/` will make exactly this mistake.
-
-## 4. Tier C — needs measurement before it is touched
-
-A duration run is what decides this, and **nothing in tier C should be cut on structural
-grounds alone.** The known shape of the problem:
-
-- only two files import torch (`tests/sa/test_policy.py`, `tests/test_depth.py`), so the cost
-  is unlikely to be model construction
-- the environment tests run real episodes with `n_obs = 1000` and exact posteriors, which is
-  where the time almost certainly is
-- the honest lever there is **fixture reuse and smaller `d`**, not deletion — a test that
-  stops running a real episode stops testing the thing that has broken most often
-
-The candidate actions, in the order they should be considered:
-
-1. **Session-scoped fixtures** for anything that builds a `GraphSpace` or a `DPPosterior`.
-   These are deterministic functions of `d` and are currently rebuilt per test.
-2. **A `slow` marker** with `-m "not slow"` as the default local run, full suite in CI and
-   before any commit that touches `ma/` or `sa/`. This keeps coverage while making the suite
-   runnable casually again.
-3. **Drop `d` where the test does not depend on it.** Several environment tests would prove
-   exactly as much at `d=4` as at `d=6`.
-
-## 5. Stale names, worth fixing in the same pass
-
-The consolidation renamed `env2.py` → `env.py` but not the tests that cover it:
-
-| now | should be |
-|---|---|
-| `tests/ma/test_env2.py` | `tests/ma/test_env.py` |
-| `tests/ma/test_evaluate2.py` | `tests/ma/test_evaluate.py` |
-| `tests/test_env2_turns.py` | `tests/test_env_turns.py` |
-| `tests/test_env2_turn_budget.py` | `tests/test_env_turn_budget.py` |
-
-(`test_analyse_phase2` and `test_sweep_phase2` keep their `2` — it is a phase number, not a
-generation suffix, and both are tier A anyway.)
-
-There is also a possible overlap between `test_env2_turns.py` (9 tests) and
-`test_env2_turn_budget.py` (18 tests) — the first predates the turn-budget spec. **Check
-before merging them**: the turn-budget spec's nine acceptance tests live in the second file
-and are the gate on the collapse fix, so they must survive intact whatever happens.
+The default local loop is now **2 minutes**, and nothing was deleted to get there.
 
 ---
 
-## 6. Order of work
+## 1. Nineteen dead-v1 files moved out
 
-1. Move tier A to `legacy/tests/`, exclude from `testpaths`. Contained, reversible, ~68 s.
-2. Add the "this is an oracle, do not delete" note to the two tier B files.
-3. Rename the four stale files.
-4. **Then** read the duration data and decide tier C — fixtures first, marker second.
+They tested `legacy/src/` and `legacy/scripts/`, the generation retired on 21 August: green
+gates on code no result depends on. Moved to `legacy/tests/` and dropped from `testpaths`.
 
-Steps 1–3 are mechanical and safe. Step 4 is the one that needs judgement, and it should not
-start until the numbers are in.
+**Moved, not deleted.** The write-up still refers to v1 behaviour, and a moved test is
+recoverable evidence of what v1 actually did. Run them with `pytest legacy/tests`.
+
+Saving: 111 tests, 68 s.
+
+## 2. Two files that look identical to a grep, and must NOT go
+
+`tests/ma/test_belief_dp.py` and `tests/test_score_regimes.py` also import from `legacy/`.
+There v1 is the **independent reference oracle** for current code — the check is worth
+something precisely because the reference shares no code with the thing under test, so a
+shared bug cannot hide in both. `test_belief_dp.py` is the evidence behind the 1e-10 claim in
+`STATE_OF_TRUTH.md`. Both now carry a do-not-move banner. If `legacy/ma_v1/` is ever removed,
+convert them to frozen fixtures FIRST.
+
+## 3. The real win: memoising `build_graph_space`
+
+`build_graph_space(d)` enumerates every DAG on `d` nodes and groups them into equivalence
+classes. It is a **pure function of `(d, fast)`** and a `d=6` build costs ~33 s. The suite
+called it from ~55 sites across 15 files, rebuilding the same handful of spaces over and over.
+That was the single largest cost in the 876 s run — and it was pure waste, not coverage.
+
+Cached session-wide in `tests/conftest.py`. Measured effect:
+
+| test | before | after |
+|---|---:|---:|
+| `test_sampled_singleton_fraction_is_unbiased[6-0.5]` | 41.6 s | **5.4 s** |
+| `test_confinement_also_holds_with_two_private_nodes_each` | 40.2 s | **6.0 s** |
+| `test_masked_indices_agree_with_the_generator` | 34.3 s | out of the top 15 |
+
+Two deliberate choices worth defending:
+
+- **In `conftest.py`, not in `sa/graphs.py`.** Production jobs build large spaces, and an
+  unbounded process-lifetime cache there is a memory leak waiting to happen at `d >= 8`. The
+  test session builds a few small ones and exits. The cost belongs where the benefit is.
+- **At conftest import time, not in a fixture.** Test modules do
+  `from sa.graphs import build_graph_space`, binding the function object at their own import
+  time. conftest is imported first, so patching the module attribute is picked up. A fixture
+  would run too late.
+
+Safe because `GraphSpace` is a frozen dataclass and no test assigns into its arrays. The
+arrays are ordinary mutable numpy arrays, so this is a **convention, not a guarantee**: a test
+that mutated a returned space would now corrupt every later test asking for the same `d`.
+
+## 4. Markers, not deletions, for what is genuinely expensive
+
+After the cache, seven tests held 333 s of the remaining 484 s. Every one earns its cost —
+the confinement proof, metric earnability, DP-against-enumeration, the `d=6` known counts.
+**None was cut.** They carry `@pytest.mark.slow`, so `-m "not slow"` gives a 124 s loop while
+the full suite still gates anything touching `ma/` or `sa/`.
+
+`test_onepass_is_faster_than_constrained_runs` carries `@pytest.mark.perf`: it asserts on wall
+clock, and it failed once on 22 August purely because another job was running. It measures
+something real but cannot be trusted under contention.
+
+## 5. Stale names fixed
+
+The consolidation renamed `env2.py` to `env.py` but not its tests: `tests/ma/test_env2.py`,
+`tests/ma/test_evaluate2.py`, `tests/test_env2_turns.py`, `tests/test_env2_turn_budget.py`.
+
+That collided two basenames (`tests/ma/test_env.py` against `tests/sa/test_env.py`), so
+`tests/` is now a package — without `__init__.py` pytest imports by bare basename and the
+two fail collection with "import file mismatch".
+
+(`test_analyse_phase2` and `test_sweep_phase2` keep their `2`: a phase number, not a
+generation suffix, and both moved to `legacy/tests/` anyway.)
+
+---
+
+## Still open
+
+- **`tests/ma/test_metric_reachability.py` is 179 s across three tests**, the largest single
+  block left. Worth understanding before the n-agent refactor makes it worse; it is not
+  obvious that it needs that many episodes to prove earnability.
+- **Possible overlap** between `test_env_turns.py` (9 tests) and `test_env_turn_budget.py`
+  (18), the first predating the turn-budget spec. **Check before merging them**: the spec's
+  nine acceptance tests live in the second file and are the gate on the collapse fix.
