@@ -1726,3 +1726,13 @@ is a deterministic lookup keyed by which specific hidden nodes were clamped, not
 probability. Building that is unchanged in priority from before this review: a blocker for
 n >= 3, to be built and tested at two agents (where the answer is already known) before a
 third agent exists anywhere.
+
+**[MEASURED] Rung 0 passes.** Job 188953, 20 seeds (tb_both/tb_clamp x 0-9), pinned
+`--prior_p 0.5`, same seeds as the pre-refactor baseline (`results/ma_fixed/tb_*_s0-9.json`,
+commit 504e767). Paired bootstrap: `tb_both` diff CI `[-0.037, +0.020]`, `tb_clamp` diff CI
+`[-0.019, +0.031]`, neither significant. Private-clamp share holds (90.7%->90.6%,
+82.7%->78.7%). The topology refactor's bit-identical-mask unit test now has real-training
+confirmation, not just a unit-test guarantee. **The n-agent topology refactor
+(`6bd3484`) is cleared for merge on this basis.** The env.py generalisation and S_r fix
+(`f63dcb6`, `6250384`) are separate, later commits on the same branch and are not covered
+by this specific gate -- they were reviewed on their own evidence above.
