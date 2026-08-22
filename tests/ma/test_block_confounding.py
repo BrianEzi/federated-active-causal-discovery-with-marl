@@ -44,71 +44,34 @@ def test_per_block_two_regime_equivalence():
             assert log_w.shape == (k, belief.scorer.n_parent_sets)
 
 
-def test_multi_private_partially_clean_blocks():
-    """Verify that a multi-private topology (2 private nodes per agent)
-    can be instantiated and stepped without error, correctly generating
-    partially clean blocks (f=0.5) and valid beliefs.
+def test_multi_private_topology_is_still_refused():
+    """CORRECTED 2026-08-22. This test originally asserted the multi-private topology
+    below ran to completion under the new per-block mixture. It should not have: the
+    mixture only tracks an AGGREGATE clean fraction per round (how MANY of an agent's
+    hidden nodes were clamped), never WHICH ones, so a confounding hypothesis about a
+    specific hidden node cannot be told apart from one about a different hidden node
+    whenever the round is only PARTIALLY clean. Demonstrated directly: `_assignment_weights`
+    receives only a scalar fraction per row batch, with no per-node identity anywhere in
+    its input, so two rounds with the same fraction but different clamped nodes are scored
+    identically regardless of which confounding edge is under test. See
+    ma/env.py's guard and docs/logs/MA_BUILD_LOG.md, 2026-08-22.
     """
-    # 2 agents, 2 private nodes each, 2 exposed nodes (total d=6)
-    topo = Topology(
-        name="T2_2_2",
-        private=((0, 1), (2, 3)),
-        exposed=(4, 5)
-    )
+    topo = Topology(name="T2_2_2", private=((0, 1), (2, 3)), exposed=(4, 5))
     config = MAConfig(topology=topo, n_obs=200, n_int=50, budget=6, disclose_regime=True)
-    env = TwoAgentEnv(config, seed=123)
-
-    assert env.windows[0].k == 4  # nodes {0, 1, 4, 5}
-    assert env.windows[1].k == 4  # nodes {2, 3, 4, 5}
-
-    # Step: Agent 0 clamps shared node 4, Agent 1 clamps its private node 2
-    # For Agent 0: hidden nodes are {2, 3}. Node 2 is clamped, node 3 is not -> f = 1/2 = 0.5
-    # For Agent 1: hidden nodes are {0, 1}. Neither is clamped -> f = 0/2 = 0.0
-    action_0 = env.windows[0].actions.index((4, CLAMP))
-    action_1 = env.windows[1].actions.index((2, CLAMP))
-
-    result = env.step({0: action_0, 1: action_1})
-
-    # Verify clean fractions
-    assert env.clean[0][-50:].mean() == 0.5
-    assert env.clean[1][-50:].mean() == 0.0
-
-    # Verify beliefs updated with valid marginals
-    for agent in env.topology.agents:
-        belief = result.beliefs[agent]
-        assert belief.shape == (4, 4)
-        assert np.all(belief >= 0.0) and np.all(belief <= 1.0)
-        assert np.all(np.diag(belief) == 0.0)
+    with pytest.raises(NotImplementedError, match="hide up to"):
+        TwoAgentEnv(config, seed=123)
 
 
-def test_three_agent_partially_clean_blocks():
-    """Verify that in a 3-agent topology (1 private node each), when Agent 1 clamps,
-    Agent 0 sees f = 0.5 (since hidden is {1, 2} and 1 is clamped).
+def test_three_agents_one_private_each_is_still_refused():
+    """CORRECTED 2026-08-22, same reasoning as test_multi_private_topology_is_still_refused
+    above. Also documents a gap in the ORIGINAL guard this project had before either of
+    today's attempts: it checked `max(len(block) for block in private) > 1`, which is
+    right at two agents but wrong here -- with three agents at ONE private node each, no
+    single private block exceeds size 1, yet hidden_from(agent) is the UNION of the other
+    two agents' nodes, i.e. two hidden nodes. The restored guard checks the actual hidden
+    set per agent, which correctly catches this case too.
     """
-    topo = Topology(
-        name="T_3agent",
-        private=((0,), (1,), (2,)),
-        exposed=(3, 4, 5)
-    )
+    topo = Topology(name="T_3agent", private=((0,), (1,), (2,)), exposed=(3, 4, 5))
     config = MAConfig(topology=topo, n_obs=200, n_int=50, budget=6, disclose_regime=True)
-    env = TwoAgentEnv(config, seed=456)
-
-    # Agent 0 clamps shared 3, Agent 1 clamps private 1, Agent 2 passes
-    action_0 = env.windows[0].actions.index((3, CLAMP))
-    action_1 = env.windows[1].actions.index((1, CLAMP))
-    action_2 = env.windows[2].pass_index
-
-    result = env.step({0: action_0, 1: action_1, 2: action_2})
-
-    # For Agent 0: hidden is {1, 2}. Node 1 clamped -> f = 1/2 = 0.5
-    assert env.clean[0][-50:].mean() == 0.5
-    # For Agent 1: hidden is {0, 2}. Neither clamped -> f = 0.0
-    assert env.clean[1][-50:].mean() == 0.0
-    # For Agent 2: hidden is {0, 1}. Node 1 clamped -> f = 1/2 = 0.5
-    assert env.clean[2][-50:].mean() == 0.5
-
-    # Check beliefs are non-trivial and valid
-    for agent in env.topology.agents:
-        b = result.beliefs[agent]
-        assert b.shape == (4, 4)
-        assert np.all(b >= 0.0) and np.all(b <= 1.0)
+    with pytest.raises(NotImplementedError, match="hide up to"):
+        TwoAgentEnv(config, seed=456)

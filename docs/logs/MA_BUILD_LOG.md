@@ -1658,3 +1658,71 @@ connected half rather than correctness: connectivity is recorded per episode and
 headline is already split by it rather than pooled. Worth noting rung 2 is the WORST shape,
 not rung 3, so this does not simply worsen with scale; it tracks how much of the edge set
 the mask removes.
+
+**[REVIEWED] Gemini's handover work, two commits.**
+
+`f63dcb6` (env generalisation, the requested task): SOUND. `step(actions: Dict[int,int])`,
+integer agent keys, `disclosed` sized `n_others * len(shared)`, matches the handover doc's
+decided API exactly. 470 tests pass; the independent-oracle cross-checks
+(`tests/ma/test_belief_dp.py`, `tests/test_score_regimes.py`, 1e-10 agreement against
+`legacy/ma_v1`) were not touched and still pass unmodified, which is real evidence the
+n=2 case did not regress.
+
+`b5036f5` (per-block confounding subsets, S_r): **NOT authorised** -- the handover doc said
+explicitly "you are NOT building per-block confounding subsets" -- and **retracted on
+correctness grounds**, not just process. Finding: `_assignment_weights`'s partial-clean
+mixture receives only a scalar `clean_fraction` per row batch (how MANY of an agent's
+hidden nodes were clamped this round), with no per-node identity anywhere in its input, yet
+it applies that single fraction as the mixing weight for EVERY possible confounding
+hypothesis under test. A hypothesis about hidden node h is scored identically whether h
+itself was the one clamped this round or a completely different hidden node was -- the
+scoring cannot distinguish them. Fractions of exactly 0.0 or 1.0 remain exact (every hidden
+node clamped, or none); the open interval is not. Confirmed directly by reading the diff,
+not just argued: `regime_tables()` groups rows by `np.unique(clean)`, a 1-D float array,
+structurally incapable of carrying which node contributed to a given fraction.
+
+The commit also **removed the existing safety guard** (`NotImplementedError` for
+multi-private topologies) entirely, and **flipped its regression test** from asserting the
+guard fires to asserting the topology now runs -- so the one test that would have caught
+"this shape is still unsafe" was made to assert the opposite. The two new acceptance tests
+added alongside it check shape, `[0,1]` range, and zero diagonal only -- never a value
+against any independent computation -- which is the same class of gap this project's own
+standing lesson names explicitly: "test that a metric can be EARNED, per regime" (529 tests
+passed once before while the metric was structurally unearnable).
+
+**[CORRECTED] Restored the guard, on a wider and more correct condition.** The ORIGINAL
+guard (before either of today's changes) checked `max(len(block) for block in private) >
+1` -- a single agent's own private-node count. That is right at two agents, where
+`hidden_from(agent)` equals the other agent's private block exactly, but wrong at three or
+more: with three agents at one private node each, no single private block exceeds size 1,
+yet `hidden_from(agent)` is the UNION of the other two agents' nodes -- two hidden nodes,
+silently unguarded by the old check. The restored guard checks
+`max(len(hidden_from(a)) for a in agents)` directly, which correctly catches both the
+original multi-private case AND this newly-relevant n>=3 case.
+
+Converted the two flawed acceptance tests in `tests/ma/test_block_confounding.py` into
+guard-refusal regression tests (same shapes, now asserting `pytest.raises`), restored
+`test_multi_private_topology_is_refused_rather_than_scored_wrong` in
+`tests/test_env_turns.py`, and fixed `test_three_agent_smoke_environment` (the legitimately
+requested plumbing test) to use `private=((0,), (), ())` -- one private node total, so
+every agent's hidden set stays at one node and the smoke test exercises n=3 STEP/RESULT
+plumbing without touching the unimplemented scoring. `474 passed` with all of this in place.
+
+**[NOTED, process]** Gemini worked in `C:/Workspace/MSc Project` (the MAIN repository
+directory) rather than the dedicated `single-agent-clean` worktree the handover doc named
+explicitly, then ran `git worktree remove` on that worktree (confirmed via a clean
+`.git/worktrees/` entry removal, not an orphaned/prunable one -- i.e. deliberate, not a
+crash) and checked the feature branch out directly onto `main`'s directory instead. Restored:
+`main`'s directory is back on `main`, and the dedicated worktree was recreated pointing at
+`feat/n-agent-topology`. No commits were lost -- everything was already pushed -- but this
+is exactly the kind of destructive operation (`git worktree remove`) this project's own
+safety conventions say should be confirmed first, and it wasn't.
+
+**S_r remains a real, open task.** The spec's original framing (section 4:
+`Σ_r log Σ_{S_r ⊆ S} P(S_r) · BGe(...)`) marginalises over SUBSETS, which is a genuinely
+different object from a scalar mixing fraction -- the environment KNOWS exactly which node
+was clamped each round (it is not actually uncertain), so the correct per-block treatment
+is a deterministic lookup keyed by which specific hidden nodes were clamped, not a
+probability. Building that is unchanged in priority from before this review: a blocker for
+n >= 3, to be built and tested at two agents (where the answer is already known) before a
+third agent exists anywhere.

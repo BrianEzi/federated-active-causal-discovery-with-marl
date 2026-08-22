@@ -121,13 +121,17 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     assert not env.clean[1].any()
 
 
-def test_multi_private_topology_is_supported_under_per_block_scoring():
-    """With two hidden nodes a single clamp leaves a block PARTIALLY clean.
-    Under per-block confounding subsets S_r, multi-private topologies are now fully supported."""
+def test_multi_private_topology_is_refused_rather_than_scored_wrong():
+    """RESTORED 2026-08-22. A 2026-08-22 attempt at per-block confounding subsets (S_r)
+    briefly lifted this guard, but its mixture tracks only an AGGREGATE clean fraction per
+    round -- how MANY hidden nodes were clamped, not WHICH -- so a confounding hypothesis
+    about a specific hidden node is scored identically whether that node was the one
+    clamped or a different one was. Confirmed directly against the belief_dp.py code: no
+    per-node identity reaches the scoring mixture, only a scalar fraction. Refuse until the
+    subset is tracked exactly, per docs/N_AGENT_REFACTOR_SPEC.md section 4."""
     config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
-    env = TwoAgentEnv(config, seed=0)
-    assert env.windows[0].k == 4
-    assert env.windows[1].k == 4
+    with pytest.raises(NotImplementedError, match="hide up to"):
+        TwoAgentEnv(config, seed=0)
 
 
 def test_turn_order_is_validated():

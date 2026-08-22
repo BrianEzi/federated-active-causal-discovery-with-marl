@@ -233,9 +233,38 @@ class TwoAgentEnv:
             raise ValueError(f"turn_order must be one of {TURN_ORDERS}")
         if not config.action_modes or any(m not in MODES for m in config.action_modes):
             raise ValueError(f"action_modes must be a non-empty subset of {MODES}")
-        # Each clamp block tracks its own active clean fraction / confounding subset S_r
-        # and marginalises it, which preserves modularity and scales cleanly to multi-private
-        # and n >= 3 topologies.
+        # GUARD RESTORED 2026-08-22, on a wider condition than before.
+        #
+        # A 2026-08-22 attempt at per-block confounding subsets (S_r) tracks each round's
+        # cleanliness as an AGGREGATE FRACTION -- `n_clamped / len(hidden)` -- and mixes the
+        # clean/dirty local-score tables with weight `q = 1 - fraction`, the SAME weight for
+        # EVERY possible confounding edge under test. That is wrong whenever `len(hidden) >
+        # 1`: the mixture has no way to know WHICH hidden node was actually clamped, only
+        # HOW MANY, so a hypothesis about a specific node h is scored identically whether h
+        # itself was the one clamped or a completely different hidden node was. Confirmed
+        # directly: `_assignment_weights` receives only a scalar clean-fraction per row
+        # batch, with no per-node identity anywhere in its input. Fractions of exactly 0.0
+        # or 1.0 remain exact (every hidden node was clamped, or none were); anything in
+        # between is not.
+        #
+        # THE OLD GUARD ALSO MISSED THIS CASE. It checked `max(len(block) for block in
+        # private) > 1` -- a single agent's own private-node count -- which is right at two
+        # agents (hidden_from(agent) == the OTHER agent's private block) but wrong at three
+        # or more: with three agents and ONE private node each, hidden_from(agent) is the
+        # UNION of the other two agents' single nodes, i.e. two hidden nodes, even though no
+        # single private block exceeds size 1. The correct condition checks the actual
+        # hidden set PER AGENT, not the private-block size.
+        #
+        # Fail loudly rather than score silently wrong data -- restated from the guard this
+        # replaces, because the reason has not changed, only the case it needed to also
+        # cover. See docs/logs/MA_BUILD_LOG.md, 2026-08-22, for the full finding.
+        widest_hidden = max(len(config.topology.hidden_from(a)) for a in config.topology.agents)
+        if widest_hidden > 1:
+            raise NotImplementedError(
+                f"topology {config.topology.name!r} can hide up to {widest_hidden} nodes "
+                "from a single agent (n_agents >= 3 and/or an agent with >1 private node "
+                "both count). The per-block confounding mixture cannot yet identify WHICH "
+                "hidden node was clamped, only how many, so it is not exact for this shape.")
         self.config = config
         self.topology = config.topology
         self.windows: Dict[int, AgentWindow] = {

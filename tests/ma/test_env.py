@@ -218,9 +218,18 @@ def test_the_scaling_prior_beats_a_fixed_p_on_connectedness_at_scale():
 
 
 def test_three_agent_smoke_environment():
-    """A 3-agent topology (1 private node each, 3 exposed) can be constructed, reset,
-    stepped, and returns dictionary results indexed by {0, 1, 2}."""
-    topo = Topology(name="T_3agent", private=((0,), (1,), (2,)), exposed=(3, 4, 5))
+    """A 3-agent topology can be constructed, reset, stepped, and returns dictionary
+    results indexed by {0, 1, 2}.
+
+    NOT `private=((0,), (1,), (2,))` -- one private node each still hides TWO nodes from
+    any given agent (the union of the other two agents' nodes), which is exactly the shape
+    the guard in `ma/env.py.__init__` refuses (see
+    `test_three_agents_one_private_each_is_still_refused` in
+    tests/ma/test_block_confounding.py for why). Only agent 0 has a private node here, so
+    every agent's hidden set stays at exactly one node -- this is a genuine 3-agent test of
+    the STEP/RESULT PLUMBING (three windows, three-entry dicts, n-1 partner disclosure
+    blocks) without exercising the still-unimplemented multi-hidden-node scoring."""
+    topo = Topology(name="T_3agent_1private", private=((0,), (), ()), exposed=(1, 2, 3))
     env = TwoAgentEnv(MAConfig(topology=topo, n_obs=100, n_int=20, budget=6))
     res = env.reset(seed=42)
     assert len(res.beliefs) == 3
