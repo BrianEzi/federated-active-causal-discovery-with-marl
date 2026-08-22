@@ -48,6 +48,16 @@ class PPOConfig:
     gae_lambda: float = 0.95
     clip: float = 0.2
     entropy_coef: float = 0.01
+    # PORTED FROM sa/policy.py, 2026-08-22 -- NOT yet the default, deliberately. sa/
+    # measured that at gain=default (PyTorch's), the actor head can start near-deterministic
+    # and never explore ("Without this the agent can start almost deterministic and never
+    # explore"), and separately measured entropy_coef=0.01 causing entropy to plateau at
+    # 1.09 against a 1.386 maximum (near-uniform but stuck, argmax arbitrary) -- moved to
+    # 0.003 to fix it. ma's own "1-in-10 seed collapse" investigation names entropy_coef as
+    # hypothesis #1's lever and was fixed by the turn-budget mechanism instead (hypothesis
+    # 3), so it is NOT confirmed this bites ma the same way -- hence a flag and a measured
+    # comparison, not a silent default change. See docs/logs/MA_BUILD_LOG.md, 2026-08-22.
+    orthogonal_init: bool = False
     value_coef: float = 0.5
     epochs: int = 4
     episodes_per_update: int = 16
@@ -66,13 +76,21 @@ class ActorCritic(nn.Module):
     would also reintroduce the saturating running state previously diagnosed as the cause
     of a greedy collapse."""
 
-    def __init__(self, obs_size: int, n_actions: int, hidden: int):
+    def __init__(self, obs_size: int, n_actions: int, hidden: int,
+                 orthogonal_init: bool = False):
         super().__init__()
         self.body = nn.Sequential(
             nn.Linear(obs_size, hidden), nn.Tanh(),
             nn.Linear(hidden, hidden), nn.Tanh())
         self.actor = nn.Linear(hidden, n_actions)
         self.critic = nn.Linear(hidden, 1)
+        # Ported from sa/policy.py: small-gain orthogonal init on the ACTION head only
+        # (the value head is left at PyTorch's default there too) so the initial policy
+        # starts close to uniform rather than risking a near-deterministic start that
+        # never explores. Off by default -- see PPOConfig.orthogonal_init.
+        if orthogonal_init:
+            nn.init.orthogonal_(self.actor.weight, gain=0.01)
+            nn.init.zeros_(self.actor.bias)
 
     def forward(self, obs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         latent = self.body(obs)
@@ -101,7 +119,8 @@ class IndependentPPO:
         torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
         self.nets = {
-            agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden)
+            agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden,
+                              orthogonal_init=config.orthogonal_init)
             for agent in env.topology.agents}
         self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
                      for agent, net in self.nets.items()}

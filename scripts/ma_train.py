@@ -59,6 +59,10 @@ def main(argv=None) -> dict:
     # this constant while comparing against pre-refactor results measured at p=0.5.
     ap.add_argument("--prior_p", type=float, default=None,
                     help="override the graph prior; unset resolves to 2 ln(d)/d")
+    # Both ported from sa/policy.py, 2026-08-22 -- see ma/policy.py::PPOConfig for the
+    # measured justification. Off/default until a comparison confirms they help HERE too.
+    ap.add_argument("--entropy_coef", type=float, default=0.01)
+    ap.add_argument("--orthogonal_init", action="store_true")
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
@@ -77,6 +81,7 @@ def main(argv=None) -> dict:
     ppo = IndependentPPO(env, PPOConfig(
         total_episodes=args.train_episodes, seed=args.seed,
         potential_shaping=args.potential_shaping,
+        entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
         mask_pass_updates=args.mask_pass_updates))
     history = ppo.train(verbose=True)
     train_seconds = time.time() - started
