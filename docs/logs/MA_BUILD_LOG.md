@@ -1521,3 +1521,50 @@ is idling.
 
 **Not yet done:** the no-bit ablation (does regime disclosure earn its place?), sequential and
 joint greedy baselines, and confirmation on the final `tb_clamp` seed.
+
+## 2026-08-22 -- confinement HOLDS for n agents, once the edge rule is stated properly
+
+`scripts/ma_confinement_n_agents.py`. **16 configurations, 230,529 latent projections, zero
+violations.** Bidirected edges come from `ma.projection.bidirected_pairs` -- the existing
+verified implementation, reused deliberately so this cannot pass by disagreeing with the
+two-agent result.
+
+    family     agents   private each   shared      d      verdict
+    disjoint   2,3,4    1-2            2-3         4-11   HOLDS (2 exhaustive, rest 5000 sampled)
+    overlap    3,4      1              pairwise    6-11   HOLDS
+
+[MEASURED] **Confinement generalises: every bidirected edge still has both endpoints in the
+shared set, for 2, 3 and 4 agents.** The belief stays "a DAG over my window plus one flag per
+shared pair", the score keeps decomposing, and the subset DP carries over. The single biggest
+threat to the scaling plan is retired.
+
+[CORRECTED] **My prediction was right about the conclusion and wrong about the reason, and
+the enumeration caught it.** I predicted confinement would hold because "cross-private edges
+are forbidden, so a node private to agent `i` has no hidden parent". Under partial overlap
+that is FALSE, and a counterexample appeared immediately: a node visible to agents {0, 2}
+parenting a node private to agent 1.
+
+The fault was the edge rule, not the theory. `ma/topology.py` forbids an edge between two
+nodes **each private to a different agent** -- the two-agent special case. A node visible to
+{0, 2} is private to nobody, so that rule permits the edge. But **no agent can observe both
+of its endpoints**, which is precisely the condition that motivated forbidding cross-private
+edges in the first place.
+
+[DECIDED] **The rule the n-agent refactor must encode:**
+
+>   An edge may exist only if SOME agent observes both of its endpoints.
+
+Under a disjoint partition this coincides exactly with the current rule, so nothing changes
+today. It is required the moment visibility overlaps. It is also the better statement of the
+principle: an edge no one can observe is not learnable by anyone, so admitting it to the
+hypothesis space only adds structure that no data can ever bear on.
+
+Under `cross_private` the overlap family violates confinement in all four configurations;
+under `jointly_visible` all sixteen hold. Both runs are kept
+(`results/confinement_smoke_{cross_private,jointly_visible}.json`) because the contrast is
+the evidence for the rule.
+
+[NOT DONE] The `n=4, priv=2, shared=3` cell and the overlap family are SAMPLED, not
+exhaustive -- 5000 DAGs each. Exhaustive enumeration is infeasible at `d=10,11`. The result
+is therefore "no counterexample in 230k projections", not a proof. A proof along the lines of
+the corrected argument above is worth writing for the thesis.
