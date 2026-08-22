@@ -150,32 +150,56 @@ For node `v`, the **required-parent set** under `𝒜` is as before —
 `need(v,𝒜) = {u : A(u,v) forces u→v}` — but now each bit `u` in `need(v,𝒜)` carries its
 own cited hidden node, call it `h(u,v)`.
 
-**The per-round effective requirement** (this replaces equation 1's single `P_into_v`):
+**The per-round strip set** (this replaces equation 1's single `P_into_v`):
 
 ```
-(7)   need_r(v,𝒜) = { u ∈ need(v,𝒜) : h(u,v) ∉ C_r }
+(7)   strip_r(v,𝒜) = { u ∈ need(v,𝒜) : h(u,v) ∈ C_r }
 ```
 
-Only the bits whose cited hidden node was clamped **this round** get stripped; other bits
-in the same `need(v,𝒜)`, citing a different hidden node, may stay required for this same
-round even though some bits were stripped. This is what §6 couldn't do.
+Read: a forced-parent bit is stripped for round `r` exactly when **its own cited hidden
+node** was clamped that round. Bits in the same `need(v,𝒜)` citing a different hidden node
+are unaffected and stay required for that same round. That per-bit independence is what
+§6 could not express.
+
+Note the two constraints are separate and act at different levels:
+
+- **hypothesis-space constraint** (all rounds): `π ⊇ need(v,𝒜)` — a declared proxy edge
+  must be present in `H`. Unchanged from equation (1).
+- **per-round scoring**: strip only `strip_r(v,𝒜)` from `π` before scoring that round's
+  rows. Varies round to round; `need(v,𝒜)` itself does not.
 
 **Per-round contribution and total** (generalises equation 4):
 
 ```
-(8)   contribution_r(v, π | 𝒜) = ℓ(v, π \ need_r(v,𝒜) | rows_r)
+(8)   contribution_r(v, π | 𝒜) = ℓ(v, π \ strip_r(v,𝒜) | rows_r)
 
 (9)   L(v, π | 𝒜) = Σ_r contribution_r(v, π | 𝒜)
 ```
+
+Worked example. Node `v` has two forced parents: `u` citing `h_1`, and `w` citing `h_2`,
+so `need(v,𝒜) = {u,w}` for every round. Then:
+
+```
+      C_r = {}          strip_r = {}      score ℓ(v, π)
+      C_r = {h_1}       strip_r = {u}     score ℓ(v, π\{u})
+      C_r = {h_2}       strip_r = {w}     score ℓ(v, π\{w})
+      C_r = {h_1,h_2}   strip_r = {u,w}   score ℓ(v, π\{u,w})
+```
+
+The two middle rows are the point. Both have `|C_r| = 1`, so the fraction scheme of §5
+scored them identically, and the whole-block rule of §6 called both "not fully clean" and
+scored them identically too. Here they differ, and they differ in the right direction:
+whichever confounding hypothesis that round's clamp actually silenced is the one that
+stops being charged for it.
 
 By equation (3), rounds with the **same** clamped-set `C` can be pooled into one table
 before summing — group rounds by the exact bitmask `C_r`, not by `|C_r|`:
 
 ```
-(10)  L(v, π | 𝒜) = Σ_{C ∈ observed clamped-sets} ℓ( v, π \ need_C(v,𝒜) | rows with C_r = C )
+(10)  L(v, π | 𝒜) = Σ_{C ∈ observed clamped-sets} ℓ( v, π \ strip_C(v,𝒜) | rows with C_r = C )
 ```
 
-where `need_C(v,𝒜)` is equation (7) with `C_r` replaced by the fixed value `C`. This is
+where `strip_C(v,𝒜)` is equation (7) with `C_r` replaced by the fixed value `C`. This is
 the direct generalisation of `clean_table`/`dirty_table`: instead of 2 tables, there are
 as many tables as **distinct clamped-bitmasks actually appear in the episode's data** —
 not `2^m` in the worst case, just whatever the turn sequence happened to produce.
@@ -183,7 +207,8 @@ not `2^m` in the worst case, just whatever the turn sequence happened to produce
 **Check: does this reduce to the validated m=1 case?** `Conf(u,v) = {h}` (only one
 candidate), so equation (6) gives `{∅, (u→v,h), (v→u,h)}` — 3 choices, identical to
 today's `{absent, u→v, v→u}`. Equation (7) with a single candidate `h` collapses to
-`u ∈ need ⟺ h ∉ C_r`, i.e. exactly `z_r` from §4. Equations (9)-(10) reduce exactly to
+`strip_r = {u} ⟺ h ∈ C_r`, i.e. exactly `z_r` from §4: clamped round → strip the proxy
+parent (the "clean" table), unclamped round → keep it (the "dirty" table). Equations (9)-(10) reduce exactly to
 `clean_table + dirty_table`. The new machinery is a strict generalisation, not a
 different model at m=1.
 
