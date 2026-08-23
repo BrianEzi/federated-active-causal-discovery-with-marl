@@ -26,7 +26,7 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
-from crosscheck.belief_dp import JOINT_CONF, MODULAR_RULES
+from crosscheck.belief_dp import JOINT_CONF, MODULAR_RULES, WindowBeliefDP
 from ma.env import CLAMP, VARY, AgentWindow, TwoAgentEnv
 from ma.graphs import build_graph_space, descendants
 from ma.stats import _partition_entropy
@@ -160,6 +160,14 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
     agent looking at the SAME belief. Two estimators that disagree would make every
     comparison between them meaningless.
     """
+    if not isinstance(window.belief, WindowBeliefDP):
+        raise NotImplementedError(
+            "enumerated_posterior reads the exact DP's own score tables "
+            "(belief.assignments, belief.scorer); there is no posterior to enumerate "
+            "under the constraint backend. The greedy baseline and the enumerated "
+            "report need their own constraint-side design -- an expected reduction in "
+            "bootstrap disagreement, not an expected posterior gain. Deliberately "
+            "unimplemented in Phase 1; see docs/CB_IMPLEMENTATION_PLAN.md.")
     belief = window.belief
     space = _Window.get(window.k)
     clean = np.asarray(clean, dtype=bool)

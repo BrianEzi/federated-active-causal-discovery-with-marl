@@ -97,7 +97,25 @@ def credit_candidates(window, truth: np.ndarray) -> np.ndarray:
 
 
 def agent_report(env: TwoAgentEnv, agent: int) -> Dict[str, float]:
-    """Posterior mass on each of the criteria, for one agent."""
+    """Posterior mass on each of the criteria, for one agent.
+
+    Under the constraint backend the analogues are replicate fractions, not masses
+    (`cb/backend.py` gives the criterion): strict recovery for `mass_exact`, consistency
+    alone (adjacency + confounding right, orientations sound, nothing required) for
+    `mass_equivalent`, private-pinned for `mass_credit`. `map_index` has no analogue --
+    nothing enumerates the window -- and is -1.
+    """
+    if env.config.belief_backend == "constraint":
+        window = env.windows[agent]
+        mag = env._true_mag(agent)
+        private_positions = [window.pos[n] for n in window.private]
+        return {
+            "mass_exact": float(window.belief.credit_fraction(mag, strict=True)),
+            "mass_equivalent": float(window.belief.credit_fraction(mag)),
+            "mass_credit": float(window.belief.credit_fraction(mag, private_positions)),
+            "map_index": -1,
+        }
+
     window = env.windows[agent]
     truth = window.induced(env.true_adjacency)
     clean = (env.clean[agent] if env.config.disclose_regime

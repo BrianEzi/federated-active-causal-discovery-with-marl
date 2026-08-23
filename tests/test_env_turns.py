@@ -121,20 +121,29 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     assert not env.clean[1].any()
 
 
-def test_multi_hidden_topology_is_accepted_since_the_guard_was_removed():
-    """CONVERTED 2026-08-23. This asserted `NotImplementedError` until the guard was
-    removed by instruction; see the note in `ma/env.py.__init__`.
+def test_multi_hidden_topology_is_a_backend_capability_question():
+    """CONVERTED TWICE. Originally asserted `NotImplementedError` (the guard); converted
+    2026-08-23 to assert acceptance when the guard was removed by instruction; converted
+    again 2026-08-24 when the backend boundary landed and the soundness constraint became
+    the CAPABILITY CHECK the removal note promised.
 
-    The env accepting these topologies does NOT mean the exact belief path is sound on
-    them -- it is not, and `test_clean_fraction_cannot_say_WHICH_node_was_clamped` below
-    demonstrates exactly why. The soundness constraint moves to the backend when the
-    backend boundary lands; it is no longer the environment's business.
+    Three facts, each asserted: the EXACT backend refuses a multi-hidden topology by
+    default (it scores the wrong hypothesis there -- see the test below); the refusal can
+    be overridden explicitly for demonstrations; the CONSTRAINT backend accepts the same
+    topology with no override, which is what makes rung 1 runnable at all.
     """
-    config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
-    env = TwoAgentEnv(config, seed=0)
-    assert max(len(config.topology.hidden_from(a))
-               for a in config.topology.agents) > 1
-    assert env.topology is config.topology
+    assert max(len(T_2_2_2.hidden_from(a)) for a in T_2_2_2.agents) > 1
+
+    with pytest.raises(ValueError, match="UNSOUND"):
+        TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2), seed=0)
+
+    env = TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2,
+                               allow_unsound_backend=True), seed=0)
+    assert env.topology is T_2_2_2
+
+    env = TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2,
+                               belief_backend="constraint", cb_n_boot=4), seed=0)
+    assert env.topology is T_2_2_2
 
 
 def test_clean_fraction_cannot_say_WHICH_node_was_clamped():
@@ -155,9 +164,11 @@ def test_clean_fraction_cannot_say_WHICH_node_was_clamped():
     produce DIFFERENT records. A green run here means the defect is still present.
     """
     topo = Topology(name="T_3agent_1each", private=((0,), (1,), (2,)), exposed=(3, 4, 5))
+    # allow_unsound_backend: this test EXISTS to demonstrate the unsoundness, which is
+    # exactly what the flag is for. Producing numbers with it is a different act.
     config = MAConfig(topology=topo, n_obs=100, n_int=20, budget=4,
                       turn_order=SIMULTANEOUS, action_modes=(CLAMP,),
-                      disclose_regime=True)
+                      disclose_regime=True, allow_unsound_backend=True)
 
     def clean_after_clamping(node_by_agent) -> float:
         env = TwoAgentEnv(config, seed=0)

@@ -54,11 +54,23 @@ class FisherZ:
     """
 
     def __init__(self, data: np.ndarray, intervened: Optional[np.ndarray] = None,
-                 alpha: float = 0.01):
+                 alpha: float = 0.01, foreign: Optional[np.ndarray] = None):
         self.data = np.asarray(data, dtype=float)
         self.n, self.k = self.data.shape
         self.intervened = (np.zeros_like(self.data, dtype=bool) if intervened is None
                            else np.asarray(intervened) > 0.5)
+        # `foreign[row]` -- a variable OUTSIDE the window is known to have been intervened
+        # in this row. The federated case: another agent clamped one of its private nodes,
+        # and this agent was told THAT it happened, never WHICH node (the regime bit,
+        # `disclose_regime`). Such rows are a different regime for any descendant of the
+        # clamped node, so they are excluded from the two-sample contrasts
+        # (`ancestral_evidence`, `pair_power`) exactly like rows where a known third
+        # variable was clamped -- otherwise the foreign clamp's effect on y is attributed
+        # to whichever x is under test, which is bug 5 wearing a mask the agent cannot see
+        # through. Without disclosure the mask is all-False and the contamination is the
+        # honest price of privacy.
+        self.foreign = (np.zeros(self.n, dtype=bool) if foreign is None
+                        else np.asarray(foreign) > 0)
         self.alpha = float(alpha)
         self.calls = 0
         self._cache: dict = {}
@@ -163,8 +175,9 @@ class FisherZ:
             for y in range(self.k):
                 if y == x or self.intervened[:, y].all():
                     continue
-                # y itself free, and NO third variable clamped -- see the docstring.
-                free = ~self.intervened[:, y]
+                # y itself free, NO third variable clamped, no FOREIGN clamp -- see the
+                # class docstring for the last one.
+                free = ~self.intervened[:, y] & ~self.foreign
                 others = [c for c in range(self.k) if c not in (x, y)]
                 if others:
                     free &= ~self.intervened[:, others].any(axis=1)
@@ -224,9 +237,10 @@ class FisherZ:
                 if y == x:
                     continue
                 # The same rows `ancestral_evidence` would compare: y free, no third
-                # variable clamped, split by clamp-x. Power must be computed on the sample
-                # the detection test actually gets, or it is power for a different test.
-                free = ~self.intervened[:, y]
+                # variable clamped, no foreign clamp, split by clamp-x. Power must be
+                # computed on the sample the detection test actually gets, or it is power
+                # for a different test.
+                free = ~self.intervened[:, y] & ~self.foreign
                 others = [c for c in range(self.k) if c not in (x, y)]
                 if others:
                     free &= ~self.intervened[:, others].any(axis=1)

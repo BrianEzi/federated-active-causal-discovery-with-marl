@@ -44,12 +44,20 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from cb.backend import ConstraintBackend
 from crosscheck.belief_dp import JOINT_CONF, WindowBeliefDP
 from ma.topology import Topology
 from ma.priors import connectivity_prior_p
 from ma.scm import sample_multi, sample_scm_params
 
 PASS_ACTION = -1
+
+# Belief backends. The env talks to either through the same `edge_marginals` call; they
+# differ in what identification means (posterior mass vs replicate credit fraction) and in
+# what they can soundly handle (see the capability check in `TwoAgentEnv.__init__`).
+EXACT = "exact"
+CONSTRAINT = "constraint"
+BACKENDS = (EXACT, CONSTRAINT)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -168,6 +176,20 @@ class MAConfig:
     # constant in the window size. That is the same axis the confounding enumeration
     # already costs, so no new scaling debt is acquired.
     reward_criterion: str = "u14"
+    # WHICH ENGINE HOLDS THE BELIEF. "exact" is the Bayesian subset DP
+    # (`crosscheck/belief_dp.py`); "constraint" is the bootstrap PC/FCI engine (`cb/`).
+    # The arms differ in exactly this one flag. Under "constraint", identification is the
+    # fraction of bootstrap replicates credited against the window's true MAG -- there is
+    # no posterior mass any more; see `cb/backend.py` for the criterion and for the one
+    # documented divergence (no cross-agent union check).
+    belief_backend: str = EXACT
+    cb_n_boot: int = 50            # bootstrap replicates per refresh; B is the speed knob
+    cb_alpha: float = 0.01         # CI-test level. Sweep once on known graphs, then FIX.
+    # The exact backend is UNSOUND for `widest_hidden > 1` -- it scores the wrong
+    # hypothesis (see the long note in `TwoAgentEnv.__init__`). The env refuses that
+    # combination unless this is set, which exists for demonstrations of the defect
+    # (`tests/test_env_turns.py`), never for producing numbers.
+    allow_unsound_backend: bool = False
 
     def __post_init__(self):
         # Resolve the scaling prior ONCE, here, so that everything downstream -- the
@@ -193,7 +215,8 @@ class AgentWindow:
     """One agent's view: its columns, its authority, and its DP belief."""
 
     def __init__(self, agent: int, topology: Topology,
-                 modes: Sequence[str] = MODES):
+                 modes: Sequence[str] = MODES, backend: str = EXACT,
+                 cb_n_boot: int = 50, cb_alpha: float = 0.01):
         self.agent: int = int(agent)
         self.topology: Topology = topology
         self.modes: Tuple[str, ...] = tuple(modes)
@@ -208,7 +231,15 @@ class AgentWindow:
             + [(PASS_ACTION, None)])
         self.n_actions = len(self.actions)
         self.pass_index = self.n_actions - 1
-        self.belief = WindowBeliefDP(self.k, [self.pos[n] for n in self.shared])
+        shared_positions = [self.pos[n] for n in self.shared]
+        if backend == CONSTRAINT:
+            # base_seed separates the agents' resample streams; deterministic in the agent
+            # id so identical seeded episodes reproduce bit-for-bit.
+            self.belief = ConstraintBackend(self.k, shared_positions, n_boot=cb_n_boot,
+                                            alpha=cb_alpha,
+                                            base_seed=100003 * (self.agent + 1))
+        else:
+            self.belief = WindowBeliefDP(self.k, shared_positions)
 
     def induced(self, global_adjacency: np.ndarray) -> np.ndarray:
         """The global graph restricted to this window. Well defined precisely because
@@ -256,19 +287,33 @@ class TwoAgentEnv:
         # identity never exists. Lifting the guard is what unblocks rung 1: three agents
         # with one private node each hides two nodes from every agent.
         #
-        # WHEN THE BACKEND BOUNDARY LANDS this becomes a capability check -- the exact
-        # backend declares it cannot handle `widest_hidden > 1`, the constraint backend
-        # declares it can, and the env asks rather than hard-coding. Until then, do not run
-        # the exact path on such a topology and trust the numbers.
+        # THE BACKEND BOUNDARY LANDED 2026-08-24 and this became the capability check
+        # below: the exact backend cannot handle `widest_hidden > 1`, the constraint
+        # backend can, and the env asks rather than hard-coding.
         #
         # The original guard, its wording and its three regression tests are preserved on
         # `main` and in every other worktree. Retrieve with:
         #     git show main:ma/env.py
         # See docs/STRIP_SCOPE.md section 1, and docs/logs/MA_BUILD_LOG.md 2026-08-22.
+        if config.belief_backend not in BACKENDS:
+            raise ValueError(f"belief_backend must be one of {BACKENDS}")
+        widest_hidden = max((len(config.topology.hidden_from(a))
+                             for a in config.topology.agents), default=0)
+        if (config.belief_backend == EXACT and widest_hidden > 1
+                and not config.allow_unsound_backend):
+            raise ValueError(
+                f"the exact backend is UNSOUND for widest_hidden > 1 (here "
+                f"{widest_hidden}): the clean-fraction mixture scores the wrong "
+                f"hypothesis -- see the note above and "
+                f"tests/test_env_turns.py::test_clean_fraction_cannot_say_WHICH_node_was_"
+                f"clamped. Use belief_backend='constraint', or set "
+                f"allow_unsound_backend=True to demonstrate the defect.")
         self.config = config
         self.topology = config.topology
         self.windows: Dict[int, AgentWindow] = {
-            agent: AgentWindow(agent, config.topology, config.action_modes)
+            agent: AgentWindow(agent, config.topology, config.action_modes,
+                               backend=config.belief_backend,
+                               cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
         self.reset(seed)
@@ -308,6 +353,7 @@ class TwoAgentEnv:
             self.regime_bit[agent] = 0.0
 
         self._credit_cache: Dict[int, np.ndarray] = {}
+        self._mag_cache: Dict[int, np.ndarray] = {}
         self.round = 0
         self.rounds_used = 0
         self.active: Optional[int] = None
@@ -544,9 +590,28 @@ class TwoAgentEnv:
                 self.samples[:, window.nodes], self.known[agent], clean, cfg.score_rule)
         self._update_done_bits()
 
+    def _true_mag(self, agent: int) -> np.ndarray:
+        """The window's true MAG, in window positions. Ground truth, cached per episode.
+
+        `latent_projection`, not `window.induced`: a hidden chain u -> h -> v projects to
+        a DIRECTED edge u -> v the induced subgraph does not carry, and a hidden common
+        cause projects to a bidirected edge. The MAG is what a sound engine converges to,
+        so it is what identification must be scored against."""
+        cached = self._mag_cache.get(agent)
+        if cached is None:
+            from ma.projection import latent_projection
+            cached = latent_projection(self.true_adjacency,
+                                       tuple(self.windows[agent].nodes))
+            self._mag_cache[agent] = cached
+        return cached
+
     def true_mass(self, agent: int) -> float:
         window = self.windows[agent]
         cfg = self.config
+        if cfg.belief_backend == CONSTRAINT:
+            # The strict analogue of "mass on the exact true DAG": every directed MAG edge
+            # recovered, confounding exactly right. See cb/backend.py.
+            return window.belief.credit_fraction(self._true_mag(agent), strict=True)
         clean = (self.clean[agent] if cfg.disclose_regime
                  else np.zeros(len(self.samples), dtype=bool))
         rule = cfg.score_rule
@@ -578,6 +643,22 @@ class TwoAgentEnv:
         This is the same object `ma/evaluate2.py` reports, so the reward and the reported
         number cannot drift apart -- which is exactly how they drifted apart before.
         """
+        if self.config.belief_backend == CONSTRAINT:
+            # Replicate credit fraction with private-incident edges required, mirroring
+            # [U14]'s criterion 1. The union acyclicity/MEC check does NOT port -- a
+            # replicate PAG has no representative DAG -- so the constraint verdict is
+            # per-agent credit only. Documented divergence; see cb/backend.py.
+            threshold = self.config.identify_threshold
+            mass = {}
+            for agent in self.topology.agents:
+                window = self.windows[agent]
+                private_positions = [window.pos[n] for n in window.private]
+                mass[agent] = window.belief.credit_fraction(
+                    self._true_mag(agent), private_positions)
+            all_identified = bool(all(mass[a] >= threshold
+                                      for a in self.topology.agents))
+            return mass, all_identified
+
         from ma.evaluate import credit_candidates
         from ma.graphs import is_acyclic, mec_signature
 

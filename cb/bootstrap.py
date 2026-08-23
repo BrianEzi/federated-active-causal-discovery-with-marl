@@ -35,13 +35,20 @@ class BootstrapBelief:
     """Edge-appearance frequencies over `B` resampled runs of the pipeline."""
 
     def __init__(self, directed: np.ndarray, bidirected: np.ndarray, adjacency: np.ndarray,
-                 n_boot: int, ci_tests: int, truncated_fraction: float):
+                 n_boot: int, ci_tests: int, truncated_fraction: float,
+                 replicates: Optional[np.ndarray] = None):
         self.directed = directed
         self.bidirected = bidirected
         self.adjacency = adjacency
         self.n_boot = int(n_boot)
         self.ci_tests = int(ci_tests)
         self.truncated_fraction = float(truncated_fraction)
+        # `[runs, k, k]` of `cb.orient` edge codes, one graph per replicate. Kept because
+        # identification under this engine is a PER-REPLICATE question -- "what fraction of
+        # replicates recovered the true structure" -- and frequencies alone cannot answer
+        # it: two replicates each half-right average to the same marginals as one right and
+        # one wrong. Tiny (50 x 15 x 15 int8), so it is always kept.
+        self.replicates = replicates
 
     @property
     def k(self) -> int:
@@ -60,7 +67,8 @@ class BootstrapBelief:
 def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                      n_boot: int = 50, alpha: float = 0.01, max_cond: int = 3,
                      seed: int = 0, use_interventions: bool = True,
-                     require_power: bool = True) -> BootstrapBelief:
+                     require_power: bool = True,
+                     foreign: Optional[np.ndarray] = None) -> BootstrapBelief:
     """Resample rows `n_boot` times; run skeleton + orientation on each; count edges.
 
     Rows are resampled with replacement, NOT columns: the variables are fixed by the
@@ -73,6 +81,9 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
     n, k = data.shape
     intervened = (np.zeros_like(data, dtype=bool) if intervened is None
                   else np.asarray(intervened) > 0.5)
+    # Per-row "a variable outside the window was intervened" -- see FisherZ.__init__.
+    foreign = (np.zeros(n, dtype=bool) if foreign is None
+               else np.asarray(foreign) > 0)
     rng = np.random.default_rng(seed)
 
     directed = np.zeros((k, k), dtype=float)
@@ -81,6 +92,7 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
     total_tests = 0
     truncations = 0
     runs = max(int(n_boot), 1)
+    replicates = np.zeros((runs, k, k), dtype=np.int8)
 
     for b in range(runs):
         if n_boot and b > 0:
@@ -91,7 +103,7 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
             rows = np.arange(n)
         sub, sub_int = data[rows], intervened[rows]
 
-        test = FisherZ(sub, sub_int, alpha=alpha)
+        test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])
         skel = estimate_skeleton(test, k, max_cond=max_cond)
         ancestral = test.ancestral_evidence() if use_interventions else None
         clamped = test.clamped_enough() if use_interventions else None
@@ -104,6 +116,7 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
         adjacency += skel.adjacency
         total_tests += skel.ci_tests
         truncations += int(skel.truncated)
+        replicates[b] = result.codes
 
     return BootstrapBelief(directed / runs, bidirected / runs, adjacency / runs,
-                           runs, total_tests, truncations / runs)
+                           runs, total_tests, truncations / runs, replicates)

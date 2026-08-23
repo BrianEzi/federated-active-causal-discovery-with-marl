@@ -2897,3 +2897,51 @@ sample sizes. Tests whose argument depends on effect size now hand-set weights (
 r ~ 0.66; weak latent kept as the underpowered case asserting undetermined-not-confounded).
 Fifth consecutive engine bug that passed the whole suite; the count of bugs caught by direct
 ground-truth validation vs by any downstream metric is now 5 - 0.
+
+## 2026-08-24 -- the backend boundary (Phase 1), and what the first episodes taught
+
+[DECIDED] `belief_backend: "exact" | "constraint"` on MAConfig; the arms differ in that one
+flag. `cb/backend.py` mirrors `WindowBeliefDP.edge_marginals`'s signature so `_refresh`
+does not branch at all; identification branches once in `true_mass` / `_u14_state`.
+Identification under the constraint backend is the fraction of bootstrap replicates
+credited against the window's TRUE MAG (`latent_projection`, not `window.induced` -- a
+hidden chain projects to a directed edge the induced subgraph does not carry): adjacency
+exact, bidirected pairs exact, directed claims sound, private-incident directed edges
+required (the [U14] pinning analogue). `strict=True` requires all directed edges -- the
+"exact true DAG" analogue for the non-u14 reward path.
+
+[DECIDED] The removed guard became the promised capability check: the env REFUSES
+belief_backend="exact" on `widest_hidden > 1` unless `allow_unsound_backend=True`, which
+exists for the defect demonstration in tests/test_env_turns.py, never for numbers. The
+constraint backend declares `can_handle_multi_hidden = True`.
+
+[DECIDED] The cross-agent union acyclicity/MEC check of [U14] does NOT port: a replicate
+PAG has no representative DAG (circles are honest ambiguity). Constraint-side verdict is
+per-agent credit only. Documented in cb/backend.py; the Phase-4 cross-check must expect
+this divergence.
+
+[DECIDED] `enumerated_posterior` (greedy baseline, enumerated report) raises
+NotImplementedError under the constraint backend rather than pretending: it reads the
+DP's own score tables. A constraint-side greedy is its own design problem -- expected
+reduction in bootstrap disagreement -- and is deliberately not in Phase 1.
+
+[CORRECTED] **Bug 6, the federated form of bug 5, found by driving the REAL env: another
+agent's PRIVATE clamp contaminates the ancestry contrasts, and the window's own mask
+cannot flag it.** First full episodes: agent A earned credit up to 1.00 while agent B sat
+at exactly 0.00 on every seed. B's engine reported ancestral evidence from causally inert
+nodes -- A's clamp on its private node 0 (invisible to B) reduced var(2) and var(3), and
+whatever x B tested against those y's inherited the difference. Fix: `FisherZ` takes a
+per-row `foreign` mask, excluded from ancestry/power contrasts like known third-variable
+clamps; `ConstraintBackend` derives it from the `clean` argument the env ALREADY passes
+under `disclose_regime` discipline -- the regime bit's constraint-engine meaning. The
+no-bit arm passes zeros: same information boundary, and the arms now measure whether the
+bit buys clean attribution. Verified on the probe: B goes from 0.00 everywhere to 0.75+
+on strong-confounder seeds.
+
+[MEASURED] Reachability, 15 seeds, fixed topology (privates 0|1, shared 2-4), graph
+0->2, 0->3, 1->4, 2->4, round-robin, budget 6, B=12, n_int=250, disclose_regime on, each
+agent clamping private-then-shared: identification is EARNABLE (seeds 3, 11 fully
+identify; A reaches 0.92-1.00 often) and NOT FREE (round-0 identified on 0/15 seeds).
+Failures track |w02*w03|: weak confounders are genuinely undetectable at this volume and
+read as unidentified, never as false confounding elsewhere. Pinned as
+tests/cb/test_backend.py::test_the_metric_is_earnable_and_not_free.
