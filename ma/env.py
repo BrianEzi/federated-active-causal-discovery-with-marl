@@ -184,7 +184,15 @@ class MAConfig:
     # documented divergence (no cross-agent union check).
     belief_backend: str = EXACT
     cb_n_boot: int = 50            # bootstrap replicates per refresh; B is the speed knob
-    cb_alpha: float = 0.01         # CI-test level. Sweep once on known graphs, then FIX.
+    cb_alpha: float = 0.01         # CI-test level. SWEPT 2026-08-24 (0.05 halves credit
+                                   # via noisier skeletons) and FIXED. Do not revisit
+                                   # against results.
+    # WHICH NETWORK THE POLICY USES. "mlp" is the flat ActorCritic behind every banked
+    # number; "gnn" is the role-aware per-node wrapper (ma/policy.py) around
+    # ma/nets.PerNodeActorCritic. The student wants results from the GNN; the MLP is the
+    # attribution arm. On MAConfig rather than PPOConfig because a checkpoint must be able
+    # to say what environment/architecture pair it belongs to.
+    policy_arch: str = "mlp"
     # The exact backend is UNSOUND for `widest_hidden > 1` -- it scores the wrong
     # hypothesis (see the long note in `TwoAgentEnv.__init__`). The env refuses that
     # combination unless this is set, which exists for demonstrations of the defect

@@ -35,7 +35,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ma.env import TwoAgentEnv
+from ma.env import SIGNALS, TwoAgentEnv
+from ma.nets import PerNodeActorCritic
 
 DEVICE = torch.device("cpu")
 
@@ -68,6 +69,10 @@ class PPOConfig:
     mask_pass_updates: int = 0
     # Hypothesis 3's fix. Potential-based, hence policy-invariant.
     potential_shaping: float = 0.0
+    # Aggregation rounds for the GNN (policy_arch="gnn" on MAConfig). 2 rather than 1
+    # because a node's usefulness depends on its DESCENDANTS -- multi-hop by nature; the
+    # supervised probe topping out at 0.89 with layers=1 is the standing evidence.
+    gnn_layers: int = 2
 
 
 
@@ -122,6 +127,118 @@ class ActorCritic(nn.Module):
         return self.actor(latent), self.critic(latent).squeeze(-1)
 
 
+class RolePerNodeActorCritic(PerNodeActorCritic):
+    """The GNN, made multi-agent: `PerNodeActorCritic` plus ROLE FEATURES and the routing
+    of the extra observation. The wrapper lives here, not in `ma/nets.py` -- that file is
+    verbatim-frozen by `tests/test_depth.py`, and this subclass leaves every parent module
+    and its RNG draw order untouched except `node_encoder`, which it REPLACES with a wider
+    one (a new architecture may draw fresh parameters; only the SA reproduction may not).
+
+    WHY ROLES ARE FEATURES AND NOT LEARNED. The parent is permutation-equivariant over all
+    nodes, but the multi-agent task is not: "clamp my own private node" -- the headline
+    behaviour -- is not expressible by a network that cannot tell a private node from a
+    shared one. `is_shared` and `has_authority` per node break the symmetry exactly where
+    the task does, so equivariance holds WITHIN roles and not across them.
+
+    ROUTING, per the plan: budget and the partner signals are GLOBAL (broadcast to every
+    node); the disclosed shared-target vector is PER-NODE (a shared node carries how many
+    partners just targeted it, a private node carries 0); the regime bit is global.
+
+    ACTIONS: the parent scores every window node; the action space is the AUTHORITY subset
+    plus PASS, in the environment's own action order. Selecting authority positions is the
+    action mask -- a non-authority node simply has no logit to pick. Single intervention
+    mode only (the arms train clamp-only or vary-only); two modes would need a mode head
+    the parent does not have, and silently averaging them is exactly the kind of decision
+    that has cost this project four bugs in a day.
+    """
+
+    def __init__(self, window, n_others: int, hidden: int = 128, layers: int = 2):
+        if len(window.modes) != 1:
+            raise NotImplementedError(
+                "RolePerNodeActorCritic supports a single intervention mode; "
+                f"got {window.modes}. A mode head is a design decision, not a default.")
+        super().__init__(d=window.k, hidden=hidden, include_counts=False,
+                         allow_pass=True, layers=layers)
+        k = window.k
+        self.n_others = int(n_others)
+        self.n_shared = len(window.shared)
+        self.shared_positions = [window.pos[n] for n in window.shared]
+        self.authority_positions = [window.pos[n] for n in window.authority]
+
+        role = np.zeros((k, 2), dtype=np.float32)
+        for node in window.shared:
+            role[window.pos[node], 0] = 1.0
+        for node in window.authority:
+            role[window.pos[node], 1] = 1.0
+        self.register_buffer("role", torch.as_tensor(role))
+
+        # role(2) + disclosed-count(1) + regime(1) + partner signals (global broadcast).
+        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS)
+        edge_hidden = max(hidden // 4, 8)
+        self.node_encoder = nn.Sequential(
+            nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
+            nn.Linear(hidden, hidden), nn.Tanh(),
+        )
+
+    def _split(self, obs: torch.Tensor):
+        """Slice the MA observation layout (see `TwoAgentEnv.observation`)."""
+        k = self.d
+        m = k * (k - 1)
+        i = m + 1
+        core = obs[:, :i]                                   # marginals + budget
+        disclosed = obs[:, i:i + self.n_others * self.n_shared]
+        i += self.n_others * self.n_shared
+        regime = obs[:, i:i + 1]
+        i += 1
+        signals = obs[:, i:i + self.n_others * len(SIGNALS)]
+        return core, disclosed, regime, signals
+
+    def forward(self, obs: torch.Tensor):
+        single = obs.dim() == 1
+        if single:
+            obs = obs.unsqueeze(0)
+        batch, k = obs.shape[0], self.d
+
+        core, disclosed, regime, signals = self._split(obs)
+        base = self._node_features(core)                    # parent path, verbatim modules
+
+        per_node_disclosed = torch.zeros(batch, k, 1, dtype=obs.dtype, device=obs.device)
+        if self.n_shared and self.n_others:
+            counts = disclosed.view(batch, self.n_others, self.n_shared).sum(dim=1)
+            for s_index, pos in enumerate(self.shared_positions):
+                per_node_disclosed[:, pos, 0] = counts[:, s_index]
+
+        extras = torch.cat([
+            self.role.unsqueeze(0).expand(batch, k, 2),
+            per_node_disclosed,
+            regime.unsqueeze(1).expand(batch, k, 1),
+            signals.unsqueeze(1).expand(batch, k, signals.shape[-1]),
+        ], dim=-1)
+
+        embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
+
+        if self.rounds:                                     # parent's extra rounds, on core
+            pairs = self._neighbour_pairs(core)
+            index = self._neighbour_index(obs.device)
+            for block in self.rounds:
+                neighbours = embeddings[:, index]
+                messages = block["message"](torch.cat([neighbours, pairs], dim=-1))
+                pooled_messages = torch.cat(
+                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                embeddings = block["combine"](
+                    torch.cat([embeddings, pooled_messages], dim=-1))
+
+        node_logits = self.node_score(embeddings).squeeze(-1)          # [batch, k]
+        pooled = embeddings.mean(dim=1)
+        logits = torch.cat([node_logits[:, self.authority_positions],
+                            self.pass_head(pooled)], dim=-1)
+        value = self.value_head(pooled).squeeze(-1)
+
+        if single:
+            return logits.squeeze(0), value.squeeze(0)
+        return logits, value
+
+
 def belief_entropy(marginals: np.ndarray) -> float:
     """H of the edge-marginal field, in nats -- the shaping potential's magnitude.
 
@@ -143,10 +260,19 @@ class IndependentPPO:
         self.config = config
         torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
-        self.nets = {
-            agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden,
-                              orthogonal_init=config.orthogonal_init)
-            for agent in env.topology.agents}
+        arch = getattr(env.config, "policy_arch", "mlp")
+        if arch == "gnn":
+            n_others = env.topology.n_agents - 1
+            self.nets = {
+                agent: RolePerNodeActorCritic(env.windows[agent], n_others,
+                                              hidden=config.hidden,
+                                              layers=config.gnn_layers)
+                for agent in env.topology.agents}
+        else:
+            self.nets = {
+                agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden,
+                                   orthogonal_init=config.orthogonal_init)
+                for agent in env.topology.agents}
         self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
                      for agent, net in self.nets.items()}
         self.history: List[dict] = []
@@ -319,6 +445,8 @@ class IndependentPPO:
             "topology": self.env.topology.name,
             "score_rule": self.env.config.score_rule,
             "disclose_regime": self.env.config.disclose_regime,
+            "policy_arch": getattr(self.env.config, "policy_arch", "mlp"),
+            "belief_backend": getattr(self.env.config, "belief_backend", "exact"),
         }, path)
 
     @classmethod
@@ -339,6 +467,19 @@ class IndependentPPO:
             # pair, so loading across rules is refused rather than warned about.
             raise ValueError("checkpoint was trained under rule %r, env uses %r"
                              % (blob.get("score_rule"), env.config.score_rule))
+        # Same argument, two new axes (2026-08-24): performance belongs to the
+        # (policy, backend, architecture) triple. A checkpoint predating the axes
+        # (no keys in the blob) loads only into the historical defaults.
+        blob_arch = blob.get("policy_arch", "mlp")
+        env_arch = getattr(env.config, "policy_arch", "mlp")
+        if blob_arch != env_arch:
+            raise ValueError("checkpoint was trained with policy_arch %r, env uses %r"
+                             % (blob_arch, env_arch))
+        blob_backend = blob.get("belief_backend", "exact")
+        env_backend = getattr(env.config, "belief_backend", "exact")
+        if blob_backend != env_backend:
+            raise ValueError("checkpoint was trained on belief_backend %r, env uses %r"
+                             % (blob_backend, env_backend))
         learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
                                                   seed=blob["seed"]))
         for agent in env.topology.agents:
