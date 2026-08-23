@@ -1783,3 +1783,31 @@ instrument by construction, which is precisely why interventions -- and partner 
 carry information the observational margin cannot. If anything the result sharpens the
 thesis: the value of both intervening and disclosing is the gap between this ceiling and the
 truth, and that gap is now measured at 93-99%.
+
+**[MEASURED] Which of the two sa/ settings caused the harm: BOTH, additively.** Job 193040
+isolates each against the same baseline and seeds as job 191136.
+
+    baseline  entropy_coef 0.01, default init   0.5140   entropy 1.095
+    init only orthogonal, 0.01                  0.5007   -0.0133  CI [-0.041, +0.013]  ns
+    entropy   0.003, default init               0.4953   -0.0187  CI [-0.053, +0.011]  ns
+    both      0.003 + orthogonal                0.4807   -0.0333  CI [-0.051, -0.015]  SIG
+
+Neither change alone clears significance at ten seeds; together they do, and the effect is
+ADDITIVE rather than interactive (-0.0133 + -0.0187 = -0.032, against -0.0333 measured).
+Final entropy falls monotonically across all four arms -- 1.095, 0.961, 0.818, 0.745 -- so
+both changes reduce exploration and they compound.
+
+**[DECIDED] Adopt neither.** `orthogonal_init` stays False and `entropy_coef` stays 0.01 in
+ma/. The flags remain, since they are how this was measured and how it would be re-measured
+if the environment changes. Note that ma/'s exploration need points the OPPOSITE way from
+sa/'s: sa/ lowered entropy_coef because entropy was stuck near-uniform with an arbitrary
+argmax; ma/ at 0.01 sits at 1.095 of a 1.609 maximum and gets worse when pushed down. The
+plausible reason is that two agents sharing one reward makes credit assignment harder, so
+more exploration is needed to find the cooperative behaviour at all -- but that is an
+explanation offered, not measured, and should be labelled as such.
+
+The inherit-from-sa rule is unharmed. It says ma/ should not MISS what sa/ discovered; it
+never said sa/'s settings transfer unexamined. `PerNodeActorCritic` -- the permutation-
+equivariant message-passing architecture, built in sa/ because a flat MLP measured 0.42
+accuracy against the oracle -- remains the outstanding item, and this result says nothing
+about it either way.
