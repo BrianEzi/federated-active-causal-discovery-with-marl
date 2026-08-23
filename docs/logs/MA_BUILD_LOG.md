@@ -1811,3 +1811,39 @@ never said sa/'s settings transfer unexamined. `PerNodeActorCritic` -- the permu
 equivariant message-passing architecture, built in sa/ because a flat MLP measured 0.42
 accuracy against the oracle -- remains the outstanding item, and this result says nothing
 about it either way.
+
+**[CORRECTED] The ceiling is ONE number, ~2%, not a 1.3-6.5% range across configurations.**
+The first write-up reported a per-configuration ceiling for each topology and prior, and the
+variation between them read as meaningful. It is not. The NUMERATORS are 1 to 3 detectable
+windows per row, so every per-row interval is enormous and they all overlap:
+
+    T1_1-1-3   p=0.500   5.1%   n_conf  59   CI [ 1.7%, 13.9%]
+    T1_1-1-3   p=0.644   1.5%   n_conf  65   CI [ 0.3%,  8.2%]
+    T1_2-2-2   p=0.500   2.6%   n_conf  39   CI [ 0.5%, 13.2%]
+    T1_2-2-2   p=0.597   6.2%   n_conf  48   CI [ 2.1%, 16.8%]
+    rung1      p=0.500   1.3%   n_conf 151   CI [ 0.4%,  4.7%]
+    rung1      p=0.597   1.3%   n_conf 154   CI [ 0.4%,  4.6%]
+
+    POOLED    12 detectable of 516 confounded = 2.3%, CI [1.3%, 4.0%]
+
+So the defensible claim is **~98% of confounding is structurally invisible (pooled 97.7%,
+CI [96.0%, 98.7%])**, with no evidence that topology or prior moves it. Do not quote the
+per-row figures as if they differ; they do not, at these counts.
+
+**[MEASURED] Confounding roughly DOUBLES from two agents to three, and this one IS
+resolvable** -- the confounding rate has large `n`, unlike the ceiling:
+
+    2 agents   8.8% of windows confounded   CI [ 7.7%, 10.0%]   (211 of 2400)
+    3 agents  16.9% of windows confounded   CI [15.3%, 18.7%]   (305 of 1800)
+
+Non-overlapping intervals. The mechanism is unsurprising -- at rung 1 each agent's hidden
+set is the union of the OTHER TWO agents' private nodes, so it doubles -- but the
+consequence for the scaling story is worth stating: **as agents are added the problem gets
+worse in both directions at once.** There is more confounding, and no more of it is
+observationally recoverable. Disclosure carries MORE weight at rung 1 than at two agents,
+not less.
+
+Computed via `scripts/ma_structural_ceiling.py`, which now includes the rung-1 shape. Note
+the environment still REFUSES that topology (the multi-hidden-node guard), but the ceiling
+needs only `topology.sample_dag`, so the identifiability question is answerable before the
+inference for it exists.

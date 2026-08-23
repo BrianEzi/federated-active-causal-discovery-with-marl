@@ -161,6 +161,12 @@ def main(argv=None):
     shapes = [
         two_agent("T1_1-1-3_current", (0,), (1,), (2, 3, 4)),
         two_agent("T1_2-2-2", (0, 1), (2, 3), (4, 5)),
+        # Rung 1 of the scaling ladder. The env REFUSES this shape (two hidden nodes per
+        # agent, see ma/env.py's guard) but the ceiling needs only topology.sample_dag, so
+        # the identifiability question can be answered before the inference exists. Each
+        # agent still observes 4 nodes, so it is directly comparable to the rows above --
+        # what changes is that the hidden set doubles.
+        Topology("rung1_3agents_1each", private=((0,), (1,), (2,)), exposed=(3, 4, 5)),
     ]
 
     out_rows = []

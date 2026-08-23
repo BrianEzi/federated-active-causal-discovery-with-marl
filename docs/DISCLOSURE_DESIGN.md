@@ -39,19 +39,26 @@ fraction where NO latent-free DAG over the observed nodes reproduces the observe
 conditional-independence pattern -- the most any observational-only method could detect at
 **infinite** data:
 
-    T1_1-1-3 (current)  p=0.500   ceiling 4.3%
-    T1_1-1-3 (current)  p=0.644   ceiling 1.3%
-    T1_2-2-2            p=0.500   ceiling 3.8%
-    T1_2-2-2            p=0.597   ceiling 6.5%
+    POOLED across topologies and priors:
+        12 detectable of 516 confounded windows = 2.3%, CI [1.3%, 4.0%]
 
-**93-99% of confounding is structurally invisible to the receiving agent, at any sample
-size.** The disclosing agent has none of this difficulty: the confounder is not latent from
+Reported pooled deliberately. Per-configuration numerators are 1-3 windows, so the per-row
+intervals are enormous and mutually overlapping -- there is no evidence that topology or
+prior moves the ceiling, and quoting a range across rows would be reading noise.
+
+**~98% of confounding is structurally invisible to the receiving agent, at any sample size**
+(97.7%, CI [96.0%, 98.7%]).
+
+And it does not improve with scale. At rung 1 the confounding RATE roughly doubles --
+16.9% of windows against 8.8% at two agents, CIs [15.3, 18.7] against [7.7, 10.0], non
+overlapping -- because each agent's hidden set becomes the union of two others' private
+nodes. More confounding, no more of it recoverable. The disclosing agent has none of this difficulty: the confounder is not latent from
 ITS side, it reads the answer off its own data.
 
 So the value of disclosure is not "it saves budget". It is:
 
 > disclosure closes a gap that no amount of the receiver's data or intervention budget can
-> close on its own, and that gap is 93-99% of confounded cases.
+> close on its own, and that gap is ~98% of confounded cases.
 
 ## 4. What it leaks, stated honestly
 
@@ -82,7 +89,7 @@ structurally rather than by implementation accident.
 > values, never variable identities, never counts. This is the **minimal sufficient
 > statistic** for the effect of one agent's private structure on the shared margin: any less
 > loses conditional-independence information the partner provably cannot recover
-> (93-99% of cases, measured), any more reveals private structure the partner does not need.
+> (~98% of cases, measured), any more reveals private structure the partner does not need.
 
 Precise, defensible, and it survives the obvious follow-up ("what does it leak?") because
 §4 answers it exactly.
