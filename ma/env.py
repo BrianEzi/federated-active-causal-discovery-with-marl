@@ -233,38 +233,38 @@ class TwoAgentEnv:
             raise ValueError(f"turn_order must be one of {TURN_ORDERS}")
         if not config.action_modes or any(m not in MODES for m in config.action_modes):
             raise ValueError(f"action_modes must be a non-empty subset of {MODES}")
-        # GUARD RESTORED 2026-08-22, on a wider condition than before.
+        # GUARD REMOVED 2026-08-23, deliberately, by the student's instruction.
         #
-        # A 2026-08-22 attempt at per-block confounding subsets (S_r) tracks each round's
-        # cleanliness as an AGGREGATE FRACTION -- `n_clamped / len(hidden)` -- and mixes the
-        # clean/dirty local-score tables with weight `q = 1 - fraction`, the SAME weight for
-        # EVERY possible confounding edge under test. That is wrong whenever `len(hidden) >
-        # 1`: the mixture has no way to know WHICH hidden node was actually clamped, only
-        # HOW MANY, so a hypothesis about a specific node h is scored identically whether h
-        # itself was the one clamped or a completely different hidden node was. Confirmed
-        # directly: `_assignment_weights` receives only a scalar clean-fraction per row
-        # batch, with no per-node identity anywhere in its input. Fractions of exactly 0.0
-        # or 1.0 remain exact (every hidden node was clamped, or none were); anything in
-        # between is not.
+        # This env previously refused any topology hiding more than one node from an agent.
+        # The restriction was NEVER about the science -- it was about one representation.
+        # `self.clean[agent]` carries a SCALAR fraction per row batch, `n_clamped /
+        # len(hidden)`, and `belief_dp._assignment_weights` mixes the clean and dirty score
+        # tables with weight `q = 1 - fraction`. With one hidden node the fraction is 0 or
+        # 1 and everything is exact. With two, clamping only one gives 0.5, and EVERY
+        # confounding hypothesis is scored with that same 0.5 -- the mixture knows how MANY
+        # hidden nodes were clamped, never WHICH. So a hypothesis about h1 scores
+        # identically whether h1 or h2 was the node actually clamped.
         #
-        # THE OLD GUARD ALSO MISSED THIS CASE. It checked `max(len(block) for block in
-        # private) > 1` -- a single agent's own private-node count -- which is right at two
-        # agents (hidden_from(agent) == the OTHER agent's private block) but wrong at three
-        # or more: with three agents and ONE private node each, hidden_from(agent) is the
-        # UNION of the other two agents' single nodes, i.e. two hidden nodes, even though no
-        # single private block exceeds size 1. The correct condition checks the actual
-        # hidden set PER AGENT, not the private-block size.
+        # THEREFORE, AND THIS IS THE PART THAT MUST NOT BE LOST:
         #
-        # Fail loudly rather than score silently wrong data -- restated from the guard this
-        # replaces, because the reason has not changed, only the case it needed to also
-        # cover. See docs/logs/MA_BUILD_LOG.md, 2026-08-22, for the full finding.
-        widest_hidden = max(len(config.topology.hidden_from(a)) for a in config.topology.agents)
-        if widest_hidden > 1:
-            raise NotImplementedError(
-                f"topology {config.topology.name!r} can hide up to {widest_hidden} nodes "
-                "from a single agent (n_agents >= 3 and/or an agent with >1 private node "
-                "both count). The per-block confounding mixture cannot yet identify WHICH "
-                "hidden node was clamped, only how many, so it is not exact for this shape.")
+        #   The EXACT (Bayesian) belief path is UNSOUND for `widest_hidden > 1`.
+        #   It is not slow, or approximate. It scores the wrong hypothesis.
+        #
+        # It is removed here because this worktree is moving to a constraint-based engine,
+        # which has no clean/dirty score mixture at all -- independence tests condition on
+        # the actual per-row intervention regime, so the abstraction that loses node
+        # identity never exists. Lifting the guard is what unblocks rung 1: three agents
+        # with one private node each hides two nodes from every agent.
+        #
+        # WHEN THE BACKEND BOUNDARY LANDS this becomes a capability check -- the exact
+        # backend declares it cannot handle `widest_hidden > 1`, the constraint backend
+        # declares it can, and the env asks rather than hard-coding. Until then, do not run
+        # the exact path on such a topology and trust the numbers.
+        #
+        # The original guard, its wording and its three regression tests are preserved on
+        # `main` and in every other worktree. Retrieve with:
+        #     git show main:ma/env.py
+        # See docs/STRIP_SCOPE.md section 1, and docs/logs/MA_BUILD_LOG.md 2026-08-22.
         self.config = config
         self.topology = config.topology
         self.windows: Dict[int, AgentWindow] = {

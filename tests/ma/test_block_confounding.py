@@ -44,7 +44,7 @@ def test_per_block_two_regime_equivalence():
             assert log_w.shape == (k, belief.scorer.n_parent_sets)
 
 
-def test_multi_private_topology_is_still_refused():
+def test_multi_private_topology_is_accepted_since_the_guard_was_removed():
     """CORRECTED 2026-08-22. This test originally asserted the multi-private topology
     below ran to completion under the new per-block mixture. It should not have: the
     mixture only tracks an AGGREGATE clean fraction per round (how MANY of an agent's
@@ -55,14 +55,19 @@ def test_multi_private_topology_is_still_refused():
     its input, so two rounds with the same fraction but different clamped nodes are scored
     identically regardless of which confounding edge is under test. See
     ma/env.py's guard and docs/logs/MA_BUILD_LOG.md, 2026-08-22.
+
+    CONVERTED 2026-08-23: the guard was removed by instruction, so this now asserts the
+    env ACCEPTS the shape. The unsoundness above is unchanged and is demonstrated by
+    tests/test_env_turns.py::test_clean_fraction_cannot_say_WHICH_node_was_clamped.
     """
     topo = Topology(name="T2_2_2", private=((0, 1), (2, 3)), exposed=(4, 5))
     config = MAConfig(topology=topo, n_obs=200, n_int=50, budget=6, disclose_regime=True)
-    with pytest.raises(NotImplementedError, match="hide up to"):
-        TwoAgentEnv(config, seed=123)
+    env = TwoAgentEnv(config, seed=123)
+    assert max(len(topo.hidden_from(a)) for a in topo.agents) > 1
+    assert env.topology is topo
 
 
-def test_three_agents_one_private_each_is_still_refused():
+def test_three_agents_one_private_each_is_accepted_since_the_guard_was_removed():
     """CORRECTED 2026-08-22, same reasoning as test_multi_private_topology_is_still_refused
     above. Also documents a gap in the ORIGINAL guard this project had before either of
     today's attempts: it checked `max(len(block) for block in private) > 1`, which is
@@ -70,8 +75,12 @@ def test_three_agents_one_private_each_is_still_refused():
     single private block exceeds size 1, yet hidden_from(agent) is the UNION of the other
     two agents' nodes, i.e. two hidden nodes. The restored guard checks the actual hidden
     set per agent, which correctly catches this case too.
+
+    CONVERTED 2026-08-23 with the guard's removal, as above. The three-agent shape is now
+    CONSTRUCTIBLE, which is what unblocks rung 1 for a constraint-based backend.
     """
     topo = Topology(name="T_3agent", private=((0,), (1,), (2,)), exposed=(3, 4, 5))
     config = MAConfig(topology=topo, n_obs=200, n_int=50, budget=6, disclose_regime=True)
-    with pytest.raises(NotImplementedError, match="hide up to"):
-        TwoAgentEnv(config, seed=456)
+    env = TwoAgentEnv(config, seed=456)
+    assert max(len(topo.hidden_from(a)) for a in topo.agents) > 1
+    assert env.topology is topo

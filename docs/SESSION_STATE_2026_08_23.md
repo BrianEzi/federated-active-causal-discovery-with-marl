@@ -35,8 +35,10 @@ Report: https://claude.ai/code/artifact/ee44cf12-968c-4cae-b809-ad8585c917ae
 ## Decisions waiting on the student
 
 - **Merge `feat/n-agent-topology` → `main`.** Rung 0 passed (paired CI includes zero,
-  private-clamp share holds). Fast-forward is not possible — `main` has moved — so this is a
-  real merge.
+  private-clamp share holds). **CORRECTED 2026-08-23: this said "fast-forward is not possible
+  — `main` has moved — so this is a real merge". That was wrong.** `origin/main` was an
+  ancestor of the branch (0 commits behind, 22 ahead), and the merge was a clean fast-forward.
+  Done on 2026-08-23; `main` is now at `c58543e`.
 - **Mirco, and it is ONE question:** is an existential confounding claim about SHARED
   variables admissible, and is the clique-structure leak acceptable? `docs/DISCLOSURE_DESIGN.md`
   §7 has the framing. If refused outright, the ceiling says cross-boundary discovery is

@@ -1,15 +1,18 @@
-jax==0.4.30
-jaxlib==0.4.30
-flax==0.8.4
-orbax-checkpoint==0.5.3
-optax==0.2.2
-chex==0.1.86
+# Rewritten 2026-08-23. The previous file could not build a working environment: it
+# pinned the JAX/AVICI stack (jax, jaxlib, flax, orbax, optax, chex, dm-haiku, avici),
+# none of which is imported anywhere in the tree, and it OMITTED torch -- which
+# ma/policy.py imports and every training run needs. See docs/STRIP_SCOPE.md section 6.
+#
+# Verified by grepping every module-level and function-level import across ma/, sa/,
+# scripts/ and tests/. These four are the complete set of hard dependencies.
+
 numpy==1.26.4
 scipy==1.13.1
-dm-haiku==0.0.12
+torch==2.10.0
 pytest==7.4.4
-wandb==0.17.9
-avici
-matplotlib==3.9.2
-networkx==3.3
 
+# Optional. `wandb` is imported lazily inside sa/tracking.py and scripts/ma_wandb_sync.py,
+# and both handle ImportError -- tests/test_tracking.py asserts the absent-wandb path
+# works. Install only if syncing runs to Weights & Biases.
+#
+# wandb==0.17.9
