@@ -186,12 +186,26 @@ class FisherZ:
                     continue
                 if a.std() < 1e-12 and b.std() < 1e-12:
                     continue
+                # THIRD CHANNEL, FIRST-ORDER, added 2026-08-24: within the intervened
+                # rows x's values are EXOGENOUS -- set by the experimenter, not by x's
+                # parents -- so any correlation with y there is causation, read directly.
+                # This is what a randomised (vary-mode, scale > 0) intervention buys: the
+                # mean and variance channels detect a clamp-to-0 only through second-order
+                # effects (detectable variance ratio needs |r| >~ 0.5 at our block sizes),
+                # while a correlation against randomised values has 1/sqrt(n) power
+                # (|r| ~ 0.2 at n=250). On clamp-to-0 data x is constant in these rows and
+                # the channel is inert by the spread guard -- purely additive.
+                a_x = self.data[clamped & free, x]
+                if a_x.std() > 1e-12 and a.std() > 1e-12:
+                    _, p_corr = stats.pearsonr(a_x, a)
+                else:
+                    p_corr = np.nan
                 _, p_mean = stats.ttest_ind(a, b, equal_var=False)
                 try:
                     _, p_var = stats.levene(a, b)
                 except ValueError:
                     p_var = np.nan
-                fired = [q for q in (p_mean, p_var) if np.isfinite(q)]
+                fired = [q for q in (p_mean, p_var, p_corr) if np.isfinite(q)]
                 if fired and min(fired) < self.alpha:
                     out[x, y] = True
         return out
@@ -267,9 +281,33 @@ class FisherZ:
                 if not np.isfinite(r):
                     continue
                 r2 = min(r * r, 0.999999)
+
+                # SECOND-ORDER CHANNEL (clamp-to-0): the variance test's detectable
+                # log-ratio at these sample sizes.
                 effect = abs(np.log(1.0 - r2))    # |log variance ratio| if r were causal
                 se = np.sqrt(2.0 / (n1 - 1) + 2.0 / (n2 - 1))
-                out[x, y] = bool(effect / se >= z_alpha + z_power)
+                if effect / se >= z_alpha + z_power:
+                    out[x, y] = True
+                    continue
+
+                # FIRST-ORDER CHANNEL (randomised interventions): if x's intervened
+                # values vary, the detection instrument is the correlation of y against
+                # those exogenous values. Had the pure-regime dependence r been causal,
+                # the intervened-rows correlation would be r*s / sqrt(1 + r^2 (s^2 - 1))
+                # with s = sigma_intervention / sigma_x(pure) -- the total-effect
+                # regression coefficient driven by the intervention's own spread. Power
+                # via Fisher z at the rows the correlation test actually gets. Inert on
+                # clamp-to-0 data (spread guard), like the detection channel it mirrors.
+                x_int = self.data[clamped & free, x]
+                sd_int = float(x_int.std())
+                sd_x = float(sub[:, 0].std())
+                if sd_int > 1e-12 and sd_x > 1e-12 and n1 > 3:
+                    s = sd_int / sd_x
+                    r_int = abs(r) * s / np.sqrt(1.0 + r2 * (s * s - 1.0))
+                    r_int = min(r_int, 0.999999)
+                    z_effect = np.arctanh(r_int) * np.sqrt(n1 - 3)
+                    if z_effect >= z_alpha + z_power:
+                        out[x, y] = True
         return out
 
     def clamped_enough(self, min_rows: int = MIN_ROWS) -> np.ndarray:

@@ -341,6 +341,15 @@ class TwoAgentEnv:
 
         self.known: Dict[int, np.ndarray] = {}
         self.clean: Dict[int, np.ndarray] = {}
+        # Per row: was ANY node hidden from this agent intervened, in EITHER mode. The
+        # constraint backend's foreign-regime mask (see cb/backend.py). Distinct from
+        # `clean`, which counts CLAMPS only -- a varied hidden node still drives its
+        # children (measured 2026-08-16: vary restores 0% of a confounded agent's
+        # identification), so it is not clean, but its rows ARE a different regime, and
+        # treating them as observational re-creates bug 6 with the mode swapped. Disclosed
+        # under the same `disclose_regime` gate as the clean bit -- one bit per round,
+        # "something you cannot see was intervened on".
+        self.hidden_intervened: Dict[int, np.ndarray] = {}
         self.n_interventions: Dict[int, int] = {}
         self.disclosed: Dict[int, np.ndarray] = {}
         self.regime_bit: Dict[int, float] = {}
@@ -348,6 +357,7 @@ class TwoAgentEnv:
         for agent, window in self.windows.items():
             self.known[agent] = np.zeros((cfg.n_obs, window.k))
             self.clean[agent] = np.zeros(cfg.n_obs, dtype=float)
+            self.hidden_intervened[agent] = np.zeros(cfg.n_obs, dtype=bool)
             self.n_interventions[agent] = 0
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
@@ -476,6 +486,9 @@ class TwoAgentEnv:
                 clean_fraction = float(n_clamped / len(hidden))
             self.clean[agent] = np.concatenate(
                 [self.clean[agent], np.full(cfg.n_int, clean_fraction, dtype=float)])
+            self.hidden_intervened[agent] = np.concatenate(
+                [self.hidden_intervened[agent],
+                 np.full(cfg.n_int, any(node in targets for node in hidden), dtype=bool)])
 
             # Concatenate disclosed shared target vectors for all other partners in canonical order.
             disclosed_blocks = []
@@ -509,6 +522,8 @@ class TwoAgentEnv:
             # Nothing hidden was clamped, so the batch is DIRTY for a confounded agent.
             self.clean[agent] = np.concatenate(
                 [self.clean[agent], np.zeros(cfg.n_int, dtype=float)])
+            self.hidden_intervened[agent] = np.concatenate(
+                [self.hidden_intervened[agent], np.zeros(cfg.n_int, dtype=bool)])
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
 
@@ -584,10 +599,21 @@ class TwoAgentEnv:
         cfg = self.config
         self.marginals: Dict[int, np.ndarray] = {}
         for agent, window in self.windows.items():
-            clean = (self.clean[agent] if cfg.disclose_regime
-                     else np.zeros(len(self.samples), dtype=bool))
+            # THE ONE BRANCH the backend boundary allows itself. Both backends receive
+            # "what the agent was told about rows it cannot account for", gated by the
+            # same disclosure flag; they differ in WHICH summary is the right one. The
+            # exact mixture needs the clamped fraction (`clean`); the constraint engine
+            # needs the mode-agnostic regime flag (`hidden_intervened`), because a varied
+            # hidden node is not clean but its rows are still foreign (bug 6's second
+            # form, caught 2026-08-24 when vary-mode zeroed a confounded agent).
+            if cfg.belief_backend == CONSTRAINT:
+                told = (self.hidden_intervened[agent] if cfg.disclose_regime
+                        else np.zeros(len(self.samples), dtype=bool))
+            else:
+                told = (self.clean[agent] if cfg.disclose_regime
+                        else np.zeros(len(self.samples), dtype=bool))
             self.marginals[agent] = window.belief.edge_marginals(
-                self.samples[:, window.nodes], self.known[agent], clean, cfg.score_rule)
+                self.samples[:, window.nodes], self.known[agent], told, cfg.score_rule)
         self._update_done_bits()
 
     def _true_mag(self, agent: int) -> np.ndarray:

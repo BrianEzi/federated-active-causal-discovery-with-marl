@@ -2988,3 +2988,38 @@ weak-confounder seeds is r, not n.
      (constraint never claims what exact denies -- currently true on all 12 seeds).
 Decision deferred to the student. The one-directional character of the divergence is the
 important safety fact: the engine fails SILENT, never WRONG.
+
+## 2026-08-24 (overnight) -- vary-mode interventions: the first-order channel, measured
+
+[DECIDED, student-approved in principle 2026-08-24 late evening] Randomised (vary-mode)
+hard interventions for the constraint engine. Two additions to `cb/citest.py`, both inert
+on clamp-to-0 data by spread guards: (1) a third `ancestral_evidence` channel -- within
+x's intervened rows x's values are exogenous, so corr(x, y) there IS causation, at
+1/sqrt(n) power; (2) a matching first-order `pair_power` branch -- predicted intervened
+correlation r*s/sqrt(1+r^2(s^2-1)), s = sd(intervention)/sd(x, pure rows), Fisher-z power.
+
+[CORRECTED] **Bug 6's second form: `clean` counts CLAMPS only (`targets[node] == 0.0`),
+so a partner's VARY on a hidden node was invisible to the foreign mask** and vary-mode
+episodes re-created the contamination with sigma=2 inflation -- agent B's mean credit was
+0.04. The env now tracks `hidden_intervened` per row (mode-agnostic), and `_refresh`
+passes the backend the summary IT needs under the same `disclose_regime` gate: the exact
+mixture gets the clamped fraction (a varied hidden node is NOT clean -- vary restores 0%
+identification, measured 2026-08-16), the constraint engine gets the regime flag (those
+rows are still foreign). B: 0.04 -> 0.53 mean credit.
+
+[MEASURED] Mode comparison, 12 seeds, scripted private-then-shared plan, B=25, n_int=250,
+budget 6, disclose_regime on, k=4:
+    cb+clamp  mean credit 0.50 / 0.32   cb+vary  0.60 / 0.51   exact+clamp  0.91 / 0.94
+Vary dominates on mean credit and above all on the confounded agent (0.51 vs 0.32) -- the
+thesis quantity. ADOPTED: constraint arms train with action_modes=(VARY,). The banked
+"+2pp for clamp-only" was an exact-engine result and does not transfer.
+
+[MEASURED] The plan's one-time alpha sweep, same 12 known-graph episodes:
+    alpha=0.01: mean credit 0.60/0.51    alpha=0.05: 0.30/0.14 (noisier skeletons)
+alpha stays 0.01. FIXED; not to be revisited against results.
+
+[MEASURED] Binary identification at threshold 0.7 remains rare (1/12) even where mean
+credit is 0.5-0.6: boundary detections genuinely flip under resampling, so the replicate
+fraction plateaus near the per-detection power. This is a criterion-calibration question
+(0.7 was set for posterior MASS), flagged for the student -- NOT changed tonight. The
+training reward can still be earned (sparse) and the entropy shaping supplies gradient.
