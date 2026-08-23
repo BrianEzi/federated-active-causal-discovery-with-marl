@@ -1847,3 +1847,32 @@ Computed via `scripts/ma_structural_ceiling.py`, which now includes the rung-1 s
 the environment still REFUSES that topology (the multi-hidden-node guard), but the ceiling
 needs only `topology.sample_dag`, so the identifiability question is answerable before the
 inference for it exists.
+
+**[MEASURED] The IV account of tb_both's advantage is NOT supported.** My hypothesis, and
+the data refuses it. `scripts/ma_iv_decomposition.py` replays both checkpoints over
+IDENTICAL seeded episodes (run_arm seeds as `seed*100_000 + episode`, so a given seed
+produces the same graphs for any policy) and splits their difference by whether an
+instrument-shaped configuration exists in that episode's true graph.
+
+    advantage, all episodes    +0.0300   CI [+0.0113, +0.0490]   SIGNIFICANT
+    advantage | IV present     +0.0315   CI [+0.0110, +0.0516]   SIGNIFICANT
+    advantage | IV absent      +0.0265   CI [-0.0061, +0.0600]   ns
+    DiD (IV - noIV)            +0.0050   CI [-0.0300, +0.0398]   ns
+
+Bootstrapped over SEEDS, not episodes -- episodes within a seed share a trained policy pair
+and are not independent, and resampling them would understate the interval.
+
+The advantage is REAL and reproduces (+0.030 here against +0.021 from the original training
+evaluation; the difference is stochastic-policy sampling on a fresh replay). It is simply
+the SAME whether an instrument exists or not. Not a power failure from a lopsided split
+either: IV structure is present in roughly two thirds of episodes, so both cells are well
+populated. Twenty seeds is the binding constraint on the DiD interval, not the split.
+
+So `vary` earns its ~2-3pp somewhere, and it is not instrument value. Candidates not
+distinguished by this test: a larger action space aiding exploration per se (consistent with
+the entropy finding above, where ma/ wants MORE exploration), or a soft intervention simply
+carrying different information from a hard clamp. Left open rather than guessed at.
+
+Consequence for the clamp-only default: unchanged. Clamp-only remains a TRADE with a known
+price of about 2-3pp, and the price is now measured twice by different routes. What has been
+removed is one candidate EXPLANATION for that price, not the price itself.
