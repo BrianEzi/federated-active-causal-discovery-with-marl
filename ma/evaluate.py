@@ -185,12 +185,34 @@ def union_graph(env: TwoAgentEnv, map_indices: Dict[int, int]) -> np.ndarray:
     return union
 
 
+def _constraint_union(env: TwoAgentEnv) -> np.ndarray:
+    """The constraint-side union: majority-vote directed edges, OR-stitched.
+
+    `union_graph` reads `space.dags[map_index]`, and the constraint backend has no MAP
+    index -- it reports -1, which numpy would silently read as THE LAST DAG in the
+    enumeration. This function exists so that -1 is never used as an index.
+    """
+    d = env.topology.d
+    union = np.zeros((d, d), dtype=np.int8)
+    for agent in env.topology.agents:
+        window = env.windows[agent]
+        majority = env.marginals[agent] >= 0.5
+        for i, u in enumerate(window.nodes):
+            for j, v in enumerate(window.nodes):
+                if majority[i, j]:
+                    union[u, v] = 1
+    return union
+
+
 def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     """Every criterion for one finished episode."""
     threshold = env.config.identify_threshold
     reports = {agent: agent_report(env, agent) for agent in env.topology.agents}
-    map_indices = {agent: reports[agent]["map_index"] for agent in env.topology.agents}
-    union = union_graph(env, map_indices)
+    if env.config.belief_backend == "constraint":
+        union = _constraint_union(env)
+    else:
+        map_indices = {agent: reports[agent]["map_index"] for agent in env.topology.agents}
+        union = union_graph(env, map_indices)
 
     acyclic = bool(is_acyclic(union))
     matches_truth = bool(np.array_equal(union, np.asarray(env.true_adjacency)))

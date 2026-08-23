@@ -3023,3 +3023,36 @@ credit is 0.5-0.6: boundary detections genuinely flip under resampling, so the r
 fraction plateaus near the per-detection power. This is a criterion-calibration question
 (0.7 was set for posterior MASS), flagged for the student -- NOT changed tonight. The
 training reward can still be earned (sparse) and the entropy shaping supplies gradient.
+
+## 2026-08-24 (overnight) -- Phase 3 done; training pipeline live end-to-end
+
+[DECIDED] `RolePerNodeActorCritic` (ma/policy.py): subclass of the frozen
+PerNodeActorCritic touching no parent module except node_encoder (replaced wider -- new
+architecture, new draws allowed; test_depth still passes untouched). Role features
+(is_shared, has_authority) break equivariance exactly where the task does: swapping two
+shared nodes swaps their logits, private-vs-shared are NOT interchangeable -- both pinned
+as tests, because FULL equivariance is the failure mode here. Budget and signals global,
+disclosed shared-targets per-node, authority selection is the action mask. Single-mode
+only, refused otherwise. gnn_layers=2 default (descendants are multi-hop; the 0.89 probe
+plateau at layers=1 is the standing evidence).
+
+[CORRECTED] Bug 8, caught by reading not by failing: `evaluate_episode` under the
+constraint backend would have passed map_index=-1 into `space.dags[...]`, silently
+scoring THE LAST DAG in the enumeration as the agent's answer. The constraint union is
+now majority-vote directed edges, OR-stitched; -1 is never used as an index.
+
+[MEASURED] End-to-end smokes. Rung 0 (2 agents, k=4, constraint+vary+gnn, budget 8,
+n_int=250, B=8): trains, solve 0.31 in the first update, eval learned 0.167 vs pass
+0.000. RUNG 1 -- three agents, one private each, widest_hidden=2, THE CONFIGURATION THE
+REMOVED GUARD FORBADE -- runs end-to-end: solve 0.25 first update, checkpoint saved,
+evaluated. First time this has ever been runnable. Wall-clock 1.05 s/episode at B=12
+n_int=250 budget 8 -> 4000 episodes ~ 1.2 h.
+
+[DECIDED] Overnight launch settings (all recorded in each results JSON): constraint
+backend, GNN, vary-only, round-robin (simultaneous interventions starve the engine's
+contrast rows -- a known third-variable clamp excludes the row), disclose_regime on (the
+foreign mask needs the bit; the no-bit arm is the later attribution study),
+potential_shaping 0.1 (policy-invariant, Ng et al.), budget 8 (rung 0) / 9 (rung 1),
+n_int 250, B=12, alpha 0.01, threshold 0.7 UNCHANGED. Sequence: rung0 s0 -> rung1 s0 ->
+rung0 s1 -> rung0 s2, strictly serial -- one CPU-bound job at a time, per the standing
+trap. Outputs results/cb_gnn/.

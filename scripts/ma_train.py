@@ -17,7 +17,7 @@ import time
 import numpy as np
 
 from ma.baselines import make_baselines
-from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS,
+from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
 from ma.policy import IndependentPPO, PPOConfig
@@ -53,6 +53,22 @@ def main(argv=None) -> dict:
     # A trade, not a demonstration that vary is useless.
     ap.add_argument("--clamp_only", action="store_true",
                     help="restrict the action space to clamps; the vary mode is removed")
+    # Vary-only, ADOPTED 2026-08-24 for constraint arms after the measured comparison
+    # (mean credit 0.60/0.51 vs clamp's 0.50/0.32 on 12 known-graph episodes): randomised
+    # values give the engine first-order power. See SA_EXPERIMENT_LOG 2026-08-24.
+    ap.add_argument("--vary_only", action="store_true",
+                    help="restrict the action space to vary; the clamp mode is removed")
+    # The two new axes (2026-08-24). Both recorded in the report config and in the
+    # checkpoint, and refused on mismatch at load -- performance belongs to the
+    # (policy, backend, arch) triple.
+    ap.add_argument("--backend", default="exact", choices=["exact", "constraint"])
+    ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn"])
+    ap.add_argument("--cb_n_boot", type=int, default=12,
+                    help="bootstrap replicates per refresh (constraint backend only)")
+    ap.add_argument("--gnn_layers", type=int, default=2)
+    ap.add_argument("--three_agents", action="store_true",
+                    help="rung 1: three agents, one private node each, three shared. "
+                         "Runs ONLY on the constraint backend (widest_hidden = 2).")
     # None (unset) means "let MAConfig resolve it" -- 2 ln(d)/d since 2026-08-22. Exposed
     # explicitly so a run can be PINNED to the old fixed value, which is what rung 0 of the
     # n-agent refactor needs: isolate the topology refactor from the prior change by holding
@@ -68,13 +84,27 @@ def main(argv=None) -> dict:
                     help="overwrite --out even if it holds a result from a different config")
     args = ap.parse_args(argv)
 
-    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
-    modes = (CLAMP,) if args.clamp_only else MODES
+    if args.three_agents:
+        topology = Topology(name="T_3agent_1each",
+                            private=((0,), (1,), (2,)), exposed=(3, 4, 5))
+    else:
+        topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,),
+                             exposed=(2, 3, 4))
+    if args.clamp_only and args.vary_only:
+        raise SystemExit("--clamp_only and --vary_only are mutually exclusive")
+    if args.clamp_only:
+        modes = (CLAMP,)
+    elif args.vary_only:
+        modes = (VARY,)
+    else:
+        modes = MODES
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
                        score_rule=args.rule, step_cost=args.step_cost,
                        turn_order=args.turn_order, action_modes=modes,
-                       prior_p=args.prior_p)
+                       prior_p=args.prior_p,
+                       belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
+                       policy_arch=args.policy_arch)
     env = TwoAgentEnv(config)
     started = time.time()
 
@@ -82,7 +112,7 @@ def main(argv=None) -> dict:
         total_episodes=args.train_episodes, seed=args.seed,
         potential_shaping=args.potential_shaping,
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
-        mask_pass_updates=args.mask_pass_updates))
+        mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
     history = ppo.train(verbose=True)
     train_seconds = time.time() - started
     # Persist the trained pair. Ten seeds were previously evaluated and discarded because
@@ -108,9 +138,12 @@ def main(argv=None) -> dict:
                    "identify_threshold": config.identify_threshold,
                    "intervene_scale": config.intervene_scale,
                    "reward_criterion": config.reward_criterion,
+                   "belief_backend": config.belief_backend,
+                   "policy_arch": config.policy_arch,
+                   "cb_n_boot": config.cb_n_boot,
+                   "cb_alpha": config.cb_alpha,
                    "topology": {"name": topology.name, "d": topology.d,
-                                "a_private": list(topology.private[0]),
-                                "b_private": list(topology.private[1]),
+                                "private": [list(p) for p in topology.private],
                                 "exposed": list(topology.exposed)},
                    "train_episodes": args.train_episodes,
                    "potential_shaping": args.potential_shaping,
@@ -127,11 +160,17 @@ def main(argv=None) -> dict:
 
     arms = {"learned": ppo.policies(deterministic=False)}
     reference = {agent: make_baselines(env, agent, seed=args.seed) for agent in env.topology.agents}
-    # `random_vary` has no legal actions in the clamp-only arm, so it is dropped rather
-    # than reported as an empty comparison. Its absence is visible in the report's arm list.
-    labels = ["random_clamp", "greedy", "pass"]
-    if not args.clamp_only:
-        labels.insert(1, "random_vary")
+    # A baseline appears only where it has legal moves and a working oracle: the random
+    # arms follow the action modes, and `greedy` reads the exact DP's score tables so it
+    # exists only on the exact backend (`enumerated_posterior` raises otherwise -- a
+    # constraint-side greedy is a separate design, see cb/backend.py).
+    labels = ["pass"]
+    if CLAMP in modes:
+        labels.insert(0, "random_clamp")
+    if VARY in modes:
+        labels.insert(0, "random_vary")
+    if args.backend == "exact":
+        labels.insert(-1, "greedy")
     for label in labels:
         arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
 
