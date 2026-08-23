@@ -8,10 +8,10 @@ misspecified model for the rest of the project.
 import numpy as np
 import pytest
 
-from ma.confounding import ambiguity_location, is_confounded, latent_projection_pairs, \
-    measure_topology
+from ma.projection import (ambiguity_location, common_source_pairs, is_confounded,
+                           measure_topology)
 from ma.topology import two_agent, T1, T2, T3, TOPOLOGIES, Topology, edge_class, masked_indices
-from sa.graphs import build_graph_space, is_acyclic
+from ma.graphs import build_graph_space, is_acyclic
 
 
 @pytest.fixture(scope="module")
@@ -106,7 +106,7 @@ def test_edge_class_labels_the_boundary_correctly():
 def test_a_hidden_node_with_two_observed_children_confounds():
     adjacency = np.zeros((6, 6), dtype=np.int8)
     adjacency[2, 4] = adjacency[2, 5] = 1
-    assert latent_projection_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == [(4, 5)]
+    assert common_source_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == [(4, 5)]
 
 
 def test_confounding_is_detected_through_a_hidden_intermediate():
@@ -114,13 +114,13 @@ def test_confounding_is_detected_through_a_hidden_intermediate():
     children-only test would miss this. It is still a confounder of 4 and 5."""
     adjacency = np.zeros((6, 6), dtype=np.int8)
     adjacency[2, 3] = adjacency[3, 4] = adjacency[2, 5] = 1
-    assert latent_projection_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == [(4, 5)]
+    assert common_source_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == [(4, 5)]
 
 
 def test_a_hidden_node_with_one_observed_descendant_does_not_confound():
     adjacency = np.zeros((6, 6), dtype=np.int8)
     adjacency[2, 4] = 1
-    assert latent_projection_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
+    assert common_source_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
     assert not is_confounded(adjacency, (0, 1, 4, 5), (2, 3))
 
 
@@ -129,7 +129,7 @@ def test_an_observed_common_cause_does_not_confound():
     agent can condition on, and counting it would inflate the measurement."""
     adjacency = np.zeros((6, 6), dtype=np.int8)
     adjacency[0, 4] = adjacency[0, 5] = 1
-    assert latent_projection_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
+    assert common_source_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
 
 
 def test_a_path_through_an_observed_node_does_not_confound():
@@ -137,7 +137,7 @@ def test_a_path_through_an_observed_node_does_not_confound():
     node 4, which blocks the latent path."""
     adjacency = np.zeros((6, 6), dtype=np.int8)
     adjacency[2, 4] = adjacency[4, 5] = 1
-    assert latent_projection_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
+    assert common_source_pairs(adjacency, (0, 1, 4, 5), (2, 3)) == []
 
 
 def test_t3_is_confounding_free_by_construction(space):

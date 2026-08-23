@@ -35,10 +35,10 @@ from typing import List
 
 import numpy as np
 
-from sa.dp import DPPosterior
-from sa.graphs import build_graph_space, is_singleton_mec, mec_signature
-from sa.score import get_score
-from sa.scm import sample_multi, sample_scm_params
+from crosscheck.dp import DPPosterior
+from ma.graphs import build_graph_space, is_singleton_mec, mec_signature
+from crosscheck.score import get_score
+from ma.scm import sample_multi, sample_scm_params
 
 THRESHOLDS = (0.5, 0.7, 0.9)
 

@@ -36,7 +36,7 @@ from ma.evaluate import credit_set, evaluate_episode, union_graph
 from ma.policy import IndependentPPO
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
-from sa.graphs import is_acyclic, mec_signature
+from ma.graphs import is_acyclic, mec_signature
 
 
 def joint_grid(env: TwoAgentEnv, agent: int) -> np.ndarray:

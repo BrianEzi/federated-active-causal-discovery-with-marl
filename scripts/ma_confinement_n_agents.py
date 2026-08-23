@@ -41,7 +41,7 @@ from typing import Dict, List, Sequence, Tuple
 import numpy as np
 
 from ma.projection import bidirected_pairs
-from sa.graphs import is_acyclic
+from ma.graphs import is_acyclic
 
 
 CROSS_PRIVATE = "cross_private"

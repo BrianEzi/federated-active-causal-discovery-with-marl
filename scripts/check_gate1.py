@@ -20,8 +20,8 @@ import numpy as np
 
 from sa.baselines import no_intervention_policy
 from sa.env import EnvConfig
-from sa.gates import bootstrap_ci, run_policy
-from sa.graphs import build_graph_space
+from ma.stats import bootstrap_ci, run_policy
+from ma.graphs import build_graph_space
 
 
 def main() -> None:

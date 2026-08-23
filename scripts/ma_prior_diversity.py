@@ -33,8 +33,8 @@ from collections import Counter
 import numpy as np
 
 from ma.topology import Topology, two_agent
-from sa.graphs import mec_signature
-from sa.priors import connectivity_prior_p
+from ma.graphs import mec_signature
+from ma.priors import connectivity_prior_p
 
 
 def shapes():

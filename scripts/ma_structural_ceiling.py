@@ -42,8 +42,8 @@ import numpy as np
 
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
-from sa.graphs import build_graph_space
-from sa.priors import connectivity_prior_p
+from ma.graphs import build_graph_space
+from ma.priors import connectivity_prior_p
 
 
 def ancestors(adjacency: np.ndarray, nodes) -> set:

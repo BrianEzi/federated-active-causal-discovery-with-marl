@@ -18,7 +18,7 @@ import numpy as np
 
 from ma.env import _is_connected
 from ma.topology import Topology, two_agent
-from sa.priors import connectivity_prior_p
+from ma.priors import connectivity_prior_p
 
 
 def shapes():

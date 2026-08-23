@@ -10,7 +10,7 @@ import sys
 # Ensure repository root is on sys.path for test discovery across all platforms
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import sa.graphs as _graphs  # noqa: E402  (must follow the sys.path insertion)
+import ma.graphs as _graphs  # noqa: E402  (must follow the sys.path insertion)
 
 
 # --------------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ import sa.graphs as _graphs  # noqa: E402  (must follow the sys.path insertion)
 # test session builds a few small ones and exits. The cost belongs where the benefit is.
 #
 # This must run at conftest IMPORT time, not in a fixture: test modules do
-# `from sa.graphs import build_graph_space`, which binds the function object at their own
+# `from ma.graphs import build_graph_space`, which binds the function object at their own
 # import time. conftest is imported first, so patching the module attribute here is picked up
 # by those later imports. A fixture would run too late to matter.
 

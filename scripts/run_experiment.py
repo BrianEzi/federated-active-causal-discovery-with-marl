@@ -26,7 +26,7 @@ from sa.evaluate import (
     summarise_seeds,
 )
 from sa.gates import collect_canaries
-from sa.graphs import build_graph_space
+from ma.graphs import build_graph_space
 from sa.backend import Backend
 from sa.oracle import InterventionOracle
 from sa.policy import PPOAgent, PPOConfig
@@ -362,7 +362,7 @@ def _check_gate1(env_config, space, n_episodes: int, backend=None):
     if n_episodes <= 0:
         return None
     from sa.baselines import no_intervention_policy
-    from sa.gates import bootstrap_ci, run_policy
+    from ma.stats import bootstrap_ci, run_policy
 
     outcome = run_policy(env_config, no_intervention_policy, n_episodes, seed=7,
                          space=space, backend=backend)

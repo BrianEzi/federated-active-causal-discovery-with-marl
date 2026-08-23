@@ -19,7 +19,7 @@ import pytest
 
 from ma.env import CLAMP, MAConfig, MODES, TwoAgentEnv, VARY
 from ma.topology import Topology, two_agent
-from sa.priors import connectivity_prior_p
+from ma.priors import connectivity_prior_p
 
 
 @pytest.fixture(scope="module")

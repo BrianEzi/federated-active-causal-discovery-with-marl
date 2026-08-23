@@ -30,10 +30,10 @@ import time
 
 import numpy as np
 
-from sa.dp import DPPosterior
-from sa.graphs import build_graph_space, is_singleton_mec
-from sa.score import get_score
-from sa.scm import sample_multi, sample_scm_params
+from crosscheck.dp import DPPosterior
+from ma.graphs import build_graph_space, is_singleton_mec
+from crosscheck.score import get_score
+from ma.scm import sample_multi, sample_scm_params
 
 
 def sample_singleton_dag(d: int, p: float, rng: np.random.Generator) -> np.ndarray:
@@ -51,7 +51,7 @@ def sample_singleton_dag(d: int, p: float, rng: np.random.Generator) -> np.ndarr
 
 def perturbations(adjacency: np.ndarray):
     """Every graph one edge away: add, delete, or reverse. Cyclic results are skipped."""
-    from sa.graphs import is_acyclic
+    from ma.graphs import is_acyclic
     d = adjacency.shape[0]
     for i in range(d):
         for j in range(d):
@@ -92,7 +92,7 @@ def run_d(d: int, episodes: int, n_obs: int, prior_p: float, seed: int,
     engine = prior_array = None
     if space is not None:
         from sa.posterior import PosteriorEngine
-        from sa.priors import erdos_renyi_prior
+        from ma.priors import erdos_renyi_prior
         engine = PosteriorEngine(space, score)
         # The SAME prior family the DP uses, so any disagreement between the two paths is
         # a real disagreement rather than a misspecification we introduced here.

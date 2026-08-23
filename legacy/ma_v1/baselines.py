@@ -16,8 +16,8 @@ from typing import Optional
 import numpy as np
 
 from legacy.ma_v1.env import CLAMP, PASS_ACTION, VARY, TwoAgentEnv
-from sa.graphs import build_graph_space
-from sa.oracle import _partition_entropy
+from ma.graphs import build_graph_space
+from ma.stats import _partition_entropy
 
 
 class RandomAgentPolicy:

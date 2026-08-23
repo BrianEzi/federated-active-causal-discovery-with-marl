@@ -47,7 +47,7 @@ from ma.env import MAConfig, TwoAgentEnv
 from ma.evaluate import bootstrap_ci
 from ma.projection import bidirected_pairs
 from ma.topology import Topology, two_agent
-from sa.graphs import mec_signature
+from ma.graphs import mec_signature
 
 
 def singleton_fraction(env: TwoAgentEnv, draws: int, seed: int) -> dict:

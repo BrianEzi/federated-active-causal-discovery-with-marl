@@ -44,10 +44,10 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ma.belief_dp import JOINT_CONF, WindowBeliefDP
+from crosscheck.belief_dp import JOINT_CONF, WindowBeliefDP
 from ma.topology import Topology
-from sa.priors import connectivity_prior_p
-from sa.scm import sample_multi, sample_scm_params
+from ma.priors import connectivity_prior_p
+from ma.scm import sample_multi, sample_scm_params
 
 PASS_ACTION = -1
 VARY = "vary"
@@ -128,7 +128,7 @@ class MAConfig:
     action_modes: Tuple[str, ...] = (CLAMP,)
     identify_threshold: float = 0.7
     # None means "scale with d" -- `2 ln(d)/d`, the FULL-CONNECTIVITY threshold with an
-    # empirical factor of two. See `sa.priors.connectivity_prior_p` for the measurement and
+    # empirical factor of two. See `ma.priors.connectivity_prior_p` for the measurement and
     # for why the percolation threshold `1/d` is the wrong target here. A float overrides.
     # NOTE this CHANGES the graph distribution: at d=5 it is 0.644, not 0.5.
     prior_p: Optional[float] = None
@@ -579,7 +579,7 @@ class TwoAgentEnv:
         number cannot drift apart -- which is exactly how they drifted apart before.
         """
         from ma.evaluate import credit_candidates
-        from sa.graphs import is_acyclic, mec_signature
+        from ma.graphs import is_acyclic, mec_signature
 
         mass, best_graph = {}, {}
         for agent in self.topology.agents:

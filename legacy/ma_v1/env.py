@@ -35,10 +35,10 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ma.topology import Topology
-from sa.graphs import build_graph_space
-from sa.scm import sample_multi, sample_scm_params
-from ma.score_regimes import JOINT_CONF, RegimeScorer
-from sa.score import BGeScore
+from ma.graphs import build_graph_space
+from ma.scm import sample_multi, sample_scm_params
+from crosscheck.score_regimes import JOINT_CONF, RegimeScorer
+from crosscheck.score import BGeScore
 
 PASS_ACTION = -1
 

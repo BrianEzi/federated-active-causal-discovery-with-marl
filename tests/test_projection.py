@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ma.confounding import latent_projection_pairs
+from ma.projection import common_source_pairs
 from ma.projection import (
     BIDIRECTED,
     DIRECTED,
@@ -20,7 +20,7 @@ from ma.projection import (
     latent_projection,
 )
 from ma.topology import T1, Topology, two_agent
-from sa.graphs import build_graph_space
+from ma.graphs import build_graph_space
 
 T112 = two_agent("t112", a_private=(0,), b_private=(1,), exposed=(2, 3))
 T113 = two_agent("t113", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
@@ -127,7 +127,7 @@ def test_confinement_also_holds_with_two_private_nodes_each():
 @pytest.mark.parametrize("topology", [T112, T113], ids=["(1,1,2)", "(1,1,3)"])
 @pytest.mark.slow
 def test_the_section_3_metric_overcounts_and_the_excess_is_ancestral(topology):
-    """`ma.confounding.latent_projection_pairs` flags any pair with a hidden common
+    """`ma.projection.latent_projection_pairs` flags any pair with a hidden common
     source. That is a superset of the true bidirected edges: if the two nodes are also
     ancestrally related, the MAG carries a *directed* edge there instead, and the agent's
     DAG model is not wrong about that pair at all.
@@ -142,7 +142,7 @@ def test_the_section_3_metric_overcounts_and_the_excess_is_ancestral(topology):
         anc = ancestor_matrix(adjacency)
         for agent in (0, 1):
             observed = topology.observed_by(agent)
-            proxy = {tuple(p) for p in latent_projection_pairs(
+            proxy = {tuple(p) for p in common_source_pairs(
                 adjacency, observed, topology.hidden_from(agent))}
             true = set(bidirected_pairs(adjacency, observed))
             assert true <= proxy, "the proxy must be a superset, not merely different"
@@ -153,3 +153,37 @@ def test_the_section_3_metric_overcounts_and_the_excess_is_ancestral(topology):
                 )
                 excess += 1
     assert excess > 0, "if there is no excess the two metrics agree and the note is moot"
+
+
+def test_the_two_confounding_criteria_diverge_and_the_difference_is_recorded():
+    """`common_source_pairs` and `bidirected_pairs` are NOT interchangeable.
+
+    Merged into one module on 2026-08-23; deliberately NOT unified into one function. This
+    test is the record of why, so a later reader does not "simplify" one into the other.
+
+    Graph: hidden node 0 causes both 1 and 2, AND there is a real edge 1 -> 2.
+
+        0 -> 1,  0 -> 2,  1 -> 2       observed = (1, 2),  hidden = (0,)
+
+    `common_source_pairs` returns (1, 2): node 0 is a hidden common source, which is true.
+
+    `bidirected_pairs` does NOT: in the MAG, a bidirected edge requires that NEITHER node
+    is an ancestor of the other, and here 1 IS an ancestor of 2 via the real edge. The MAG
+    carries 1 -> 2. That is the textbook definition (Richardson & Spirtes 2002) and it is
+    what env._confounded_positions scores against.
+
+    Neither is wrong. They answer different questions:
+      common_source_pairs   is my DAG model misspecified here?      -> yes
+      bidirected_pairs      does the MAG carry a bidirected edge?   -> no
+    """
+    adjacency = np.zeros((3, 3), dtype=int)
+    adjacency[0, 1] = adjacency[0, 2] = adjacency[1, 2] = 1
+
+    assert common_source_pairs(adjacency, (1, 2), (0,)) == [(1, 2)]
+    assert bidirected_pairs(adjacency, (1, 2)) == ()
+
+    # And where there is NO real edge between them, the two agree.
+    no_edge = np.zeros((3, 3), dtype=int)
+    no_edge[0, 1] = no_edge[0, 2] = 1
+    assert common_source_pairs(no_edge, (1, 2), (0,)) == [(1, 2)]
+    assert bidirected_pairs(no_edge, (1, 2)) == ((1, 2),)

@@ -26,10 +26,10 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
-from ma.belief_dp import JOINT_CONF, MODULAR_RULES
+from crosscheck.belief_dp import JOINT_CONF, MODULAR_RULES
 from ma.env import CLAMP, VARY, AgentWindow, TwoAgentEnv
-from sa.graphs import build_graph_space, descendants
-from sa.oracle import _partition_entropy
+from ma.graphs import build_graph_space, descendants
+from ma.stats import _partition_entropy
 
 MAX_ENUMERATED_K = 5
 
@@ -64,7 +64,7 @@ class _Window:
         # `mec_signature` for all 543 graphs on every call, and `singleton_fraction`
         # recomputed it once per DRAW. Stored as integer class ids so membership is an
         # array comparison rather than a set comparison.
-        from sa.graphs import mec_signature
+        from ma.graphs import mec_signature
         lookup: Dict[object, int] = {}
         self.mec_id = np.zeros(self.n_dags, dtype=np.int64)
         for i, dag in enumerate(self.dags):
@@ -78,7 +78,7 @@ class _Window:
 
     def id_of(self, adjacency: np.ndarray) -> int:
         """Class id of an arbitrary graph on this window, or -1 if it is not one."""
-        from sa.graphs import mec_signature
+        from ma.graphs import mec_signature
         return self._sig_to_id.get(mec_signature(adjacency), -1)
 
     @classmethod

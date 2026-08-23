@@ -28,9 +28,9 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
-from ma.belief_dp import JOINT_CONF
+from crosscheck.belief_dp import JOINT_CONF
 from ma.env import TwoAgentEnv
-from sa.graphs import is_acyclic, mec_signature
+from ma.graphs import is_acyclic, mec_signature
 
 
 def credit_set(window, truth: np.ndarray) -> np.ndarray:
@@ -73,7 +73,7 @@ def credit_candidates(window, truth: np.ndarray) -> np.ndarray:
     confounding enumeration already costs and the axis the federation boundary keeps small
     by design. The window may grow to the k the subset DP reaches without this term moving.
     """
-    from sa.graphs import build_graph_space
+    from ma.graphs import build_graph_space
 
     shared = [window.pos[node] for node in window.shared]
     truth = np.asarray(truth) > 0.5

@@ -34,10 +34,10 @@ from itertools import combinations
 import numpy as np
 from scipy import stats
 
-from sa.dp import DPPosterior
-from sa.priors import connectivity_prior_p
-from sa.scm import sample, sample_scm_params
-from sa.score import BGeScore
+from crosscheck.dp import DPPosterior
+from ma.priors import connectivity_prior_p
+from ma.scm import sample, sample_scm_params
+from crosscheck.score import BGeScore
 
 
 def random_dag(d: int, p: float, rng: np.random.Generator) -> np.ndarray:
