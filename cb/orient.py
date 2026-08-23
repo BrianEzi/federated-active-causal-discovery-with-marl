@@ -116,26 +116,28 @@ def _ancestors(directed: np.ndarray) -> np.ndarray:
 
 def orient(skeleton, ancestral: Optional[np.ndarray] = None,
            clamped: Optional[np.ndarray] = None,
-           require_power: bool = True) -> Orientation:
+           require_power: bool = True,
+           powered: Optional[np.ndarray] = None) -> Orientation:
     """Orient `skeleton`.
 
     `ancestral[x, y]` -- clamping x demonstrably changed y.
     `clamped[x]`      -- x was clamped often enough for its row to be informative. Without
                          it, an absent effect cannot be told from an absent experiment.
-    `require_power`   -- before calling a pair confounded, demand that each clamp moved
-                         SOMETHING, proving the experiment had power.
+    `require_power`   -- before calling a pair confounded, demand the experiment had the
+                         power to have detected causation on THAT PAIR, had it existed.
+    `powered[x, y]`   -- the per-pair power verdict, from `FisherZ.pair_power`: the clamp on
+                         x could have detected an effect on y of the size the pair's own
+                         observed dependence implies.
 
-    UNRESOLVED TENSION, 2026-08-23, and it is a real one rather than a loose end.
-    `require_power=True` is sound and removes the false confounders on a chain and a
-    collider. But it also removes TRUE ones whenever the confounded pair has no observed
-    descendants -- clamping either node then moves nothing observable, so power can never
-    be demonstrated, and the two-node validation case C goes from correct to silent.
-
-    Both settings are wrong in one direction: True under-reports confounding, False
-    over-reports it. Which matters more is an empirical question about our actual
-    topologies, where windows have 4+ nodes and a confounded shared pair usually DOES have
-    observed descendants -- so True is the better default, but it is a default, not a fix.
-    The real fix is a power calculation per pair rather than a global any() test.
+    TENSION RESOLVED 2026-08-24 by the per-pair check. The previous check was global --
+    "did the clamp on x move ANYTHING" -- which proved the experiment ran, not that it
+    could have seen an effect on the specific partner. That was wrong in both directions
+    at once: a clamp validated by a strong edge licensed a confounding verdict on a weak
+    one (false positive, the chain-and-branch xfail), and a true latent pair with no
+    observed descendant could never demonstrate power at all (false negative, the two-node
+    case). `powered` answers the question per pair, so both cases now come out right.
+    `require_power=True` with `powered=None` falls back to the old global test and exists
+    only for callers without a `FisherZ` at hand; `cb/bootstrap.py` always passes `powered`.
     """
     k = skeleton.k
     adjacency = skeleton.adjacency
@@ -230,11 +232,15 @@ def orient(skeleton, ancestral: Optional[np.ndarray] = None,
             # POWER CHECK, and it is what keeps this sound. Step 4 turns "no effect
             # detected" into a POSITIVE claim of confounding, so a MISSED detection becomes
             # a false confounder -- the exact inversion this file has already made twice.
-            # Require proof that each clamp was capable of showing an effect at all: it must
-            # have moved SOMETHING. A clamp that moved nothing anywhere is an experiment
-            # with no power, and reading confounding off it is reading noise.
-            if require_power and not (ancestral[u].any() and ancestral[v].any()):
-                continue
+            # Per PAIR: the clamp on u must have had the power to detect an effect on v of
+            # the size their own measured dependence implies, and vice versa. Only then is
+            # "nothing moved" evidence rather than noise.
+            if require_power:
+                if powered is not None:
+                    if not (powered[u, v] and powered[v, u]):
+                        continue
+                elif not (ancestral[u].any() and ancestral[v].any()):
+                    continue          # legacy global fallback; see docstring
             if not ancestral[u, v] and not ancestral[v, u]:
                 marks[u, v] = marks[v, u] = ARROW
 

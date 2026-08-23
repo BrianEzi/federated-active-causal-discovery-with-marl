@@ -142,19 +142,32 @@ class FisherZ:
 
         Still SOUND, not complete: an effect that moves neither mean nor variance is missed.
         Every ancestry reported is real; not every real one is reported.
+
+        BOTH GROUPS EXCLUDE ROWS WHERE ANY THIRD VARIABLE WAS CLAMPED, and this fixed the
+        FOURTH bug this test has had (found 2026-08-24, exposed by the per-pair power work).
+        The previous comparison group was simply "x free, y free" -- which, in an episode
+        with several clamp blocks, mixes in rows where some OTHER node z was clamped. If z
+        is an ancestor of y, y's distribution in those rows genuinely differs, and the test
+        attributes z's effect to x: on the hidden-confounder validation graph, clamping a
+        CHILDLESS SINK was reported as moving a node two edges away. That false entry then
+        satisfied the old global power check, so the latent-detection test passed BECAUSE
+        of this bug. Restricting both groups to rows where no third variable is intervened
+        makes the comparison a clean two-regime contrast; it costs rows, and costing rows
+        is sound -- fewer rows means less power, never a wrong attribution.
         """
         out = np.zeros((self.k, self.k), dtype=bool)
         for x in range(self.k):
             clamped = self.intervened[:, x]
-            n_in, n_out = int(clamped.sum()), int((~clamped).sum())
-            if n_in < min_rows or n_out < min_rows:
+            if int(clamped.sum()) < min_rows:
                 continue
             for y in range(self.k):
                 if y == x or self.intervened[:, y].all():
                     continue
-                # Compare only rows where y itself was free -- otherwise the "change" is
-                # someone else's intervention on y, not a causal effect of x.
+                # y itself free, and NO third variable clamped -- see the docstring.
                 free = ~self.intervened[:, y]
+                others = [c for c in range(self.k) if c not in (x, y)]
+                if others:
+                    free &= ~self.intervened[:, others].any(axis=1)
                 a, b = self.data[clamped & free, y], self.data[(~clamped) & free, y]
                 if len(a) < min_rows or len(b) < min_rows:
                     continue
@@ -168,6 +181,74 @@ class FisherZ:
                 fired = [q for q in (p_mean, p_var) if np.isfinite(q)]
                 if fired and min(fired) < self.alpha:
                     out[x, y] = True
+        return out
+
+    def pair_power(self, min_rows: int = MIN_ROWS, target_power: float = 0.8) -> np.ndarray:
+        """`[k, k]` bool: `out[x, y]` iff the clamp on `x` had adequate power to detect an
+        effect on `y`, had the observed x-y dependence been causal.
+
+        THE QUESTION THIS ANSWERS, PER PAIR: "if x -> y were real, would our experiment
+        have seen it?" Only when the answer is yes does 'we saw nothing' carry evidence --
+        which is what `orient` step 4 needs, and what its previous GLOBAL check
+        (`ancestral[x].any()`) could not supply: a clamp that visibly moved some third node
+        proves the experiment ran, not that it could have detected an effect on `y`.
+
+        THE EFFECT SIZE COMES FROM THE PAIR ITSELF. Step 4 only asks about pairs the
+        skeleton kept adjacent, so a dependence between x and y has already been measured.
+        Under linear-Gaussian with a hard clamp, if the marginal correlation r were entirely
+        causal (x -> y), clamping x would shrink y's variance by the factor 1 - r^2. That is
+        the effect the experiment should have shown, so the power question is concrete:
+        with the clamped/free row counts actually available, can a variance test at
+        `self.alpha` detect a variance ratio of 1 - r^2 with probability `target_power`?
+
+        MARGINAL r, not partial, and that is a choice: ancestry is a TOTAL-effect claim, so
+        the total dependence is the right scale. Where the dependence is mediated the
+        marginal overstates the DIRECT effect, but a real x -> y ancestry fires
+        `ancestral_evidence` through the mediator anyway, so no false confounder results.
+
+        Power is computed on the log-variance-ratio scale, where the sample statistic is
+        asymptotically normal with sd ~ sqrt(2/(n1-1) + 2/(n2-1)) for Gaussian data. This is
+        an approximation to the Levene test actually used for detection; it errs
+        conservative for heavy tails, and conservative here means 'undetermined', never
+        'confounded'.
+
+        A weak edge therefore lands in CIRCLE, not in a wrong mark: no power calculation
+        conjures detection out of a sample the effect is invisible in. Sound, not complete.
+        """
+        z_alpha = stats.norm.ppf(1.0 - self.alpha / 2.0)
+        z_power = stats.norm.ppf(target_power)
+        out = np.zeros((self.k, self.k), dtype=bool)
+        for x in range(self.k):
+            clamped = self.intervened[:, x]
+            for y in range(self.k):
+                if y == x:
+                    continue
+                # The same rows `ancestral_evidence` would compare: y free, no third
+                # variable clamped, split by clamp-x. Power must be computed on the sample
+                # the detection test actually gets, or it is power for a different test.
+                free = ~self.intervened[:, y]
+                others = [c for c in range(self.k) if c not in (x, y)]
+                if others:
+                    free &= ~self.intervened[:, others].any(axis=1)
+                n1 = int((clamped & free).sum())
+                n2 = int(((~clamped) & free).sum())
+                if n1 < min_rows or n2 < min_rows:
+                    continue                      # the detection test itself would not run
+                # Dependence measured where BOTH were free -- the same rows the skeleton's
+                # adjacency verdict for this pair rests on.
+                both_free = self._rows_for(x, y)
+                if int(both_free.sum()) < min_rows:
+                    continue
+                sub = self.data[both_free][:, [x, y]]
+                if not np.all(sub.std(axis=0) > 1e-12):
+                    continue
+                r = float(np.corrcoef(sub, rowvar=False)[0, 1])
+                if not np.isfinite(r):
+                    continue
+                r2 = min(r * r, 0.999999)
+                effect = abs(np.log(1.0 - r2))    # |log variance ratio| if r were causal
+                se = np.sqrt(2.0 / (n1 - 1) + 2.0 / (n2 - 1))
+                out[x, y] = bool(effect / se >= z_alpha + z_power)
         return out
 
     def clamped_enough(self, min_rows: int = MIN_ROWS) -> np.ndarray:

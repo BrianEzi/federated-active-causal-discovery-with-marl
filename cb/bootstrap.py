@@ -95,7 +95,9 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
         skel = estimate_skeleton(test, k, max_cond=max_cond)
         ancestral = test.ancestral_evidence() if use_interventions else None
         clamped = test.clamped_enough() if use_interventions else None
-        result = orient(skel, ancestral, clamped, require_power=require_power)
+        powered = test.pair_power() if use_interventions else None
+        result = orient(skel, ancestral, clamped, require_power=require_power,
+                        powered=powered)
 
         directed += (result.codes == CODE_DIRECTED)
         bidirected += (result.codes == CODE_BIDIRECTED)

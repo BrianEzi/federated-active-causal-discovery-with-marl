@@ -2859,3 +2859,41 @@ interventional and budget side.
    Cooperation buys honesty, not accuracy.
 2. **The interventional ceiling.** A modification of `scripts/ma_structural_ceiling.py` to
    interventional d-separation, not new machinery.
+
+## 2026-08-23 -- per-pair power: the fix, and the fifth bug it exposed
+
+[DECIDED] **Step 4's power check is now per pair, calibrated by the pair's own measured
+dependence.** A pair (u,v) only reaches the confounding question if the skeleton kept it
+adjacent, i.e. a correlation r was already measured. Under linear-Gaussian with a hard clamp,
+if that dependence were causal (u -> v), clamping u would shrink v's variance by the factor
+1 - r^2. So the check asks: with the clamped/free rows actually available, does a variance
+test at alpha have power >= 0.8 to detect a ratio of 1 - r^2? Power both ways + nothing moved
+=> confounded. No power either way => circles, never confounded. Marginal r, not partial:
+ancestry is a total-effect claim. Implemented as `FisherZ.pair_power`, consumed by `orient`
+step 4; the old global any() survives only as a fallback for callers without a FisherZ.
+
+[MEASURED] The 2026-08-23 xfail (chain-and-branch, (0,3) falsely confounded) flips to pass:
+r(0,3) is small, the implied variance drop is undetectable at n=1200, so the pair stays
+undetermined. The two-node latent case -- the old check's false NEGATIVE, silent because the
+pair had no observed descendant -- is now detected, since power no longer needs a third node.
+The detectability floor at n_clamp=1200, n_free=1200, alpha=0.01, power 0.8 is a variance
+ratio of ~0.85, i.e. |r| >~ 0.4.
+
+[CORRECTED] **Bug 5, found because the latent test failed AFTER the fix: `ancestral_evidence`
+compared across mixed regimes.** Its comparison group was "x free, y free" -- which in an
+episode with several clamp blocks includes rows where some OTHER node z was clamped. If z is
+an ancestor of y, y's distribution there genuinely differs, and the shift is attributed to x.
+Probe on the hidden-confounder graph (0->1, 0->2, 2->3, observe 1,2,3, clamp each): clamping
+node 1, a CHILDLESS SINK, was reported as moving node 3 (`ancestral[0,2]=1`). That false entry
+satisfied the old global power check -- so `test_a_true_latent_is_detected...` passed BECAUSE
+of this bug, at "P=1.00". Both comparison groups now exclude rows where any third variable is
+clamped: a clean two-regime contrast. Costs rows; costing rows is sound (less power, never
+wrong attribution). Same restriction mirrored into `pair_power`, since power must be computed
+on the sample the detection test actually gets.
+
+[CORRECTED] The latent ground-truth tests used seeded random weights, so what they proved
+depended on the draw: seed 0's confounder gives r = -0.28, genuinely undetectable at these
+sample sizes. Tests whose argument depends on effect size now hand-set weights (strong latent:
+r ~ 0.66; weak latent kept as the underpowered case asserting undetermined-not-confounded).
+Fifth consecutive engine bug that passed the whole suite; the count of bugs caught by direct
+ground-truth validation vs by any downstream metric is now 5 - 0.
