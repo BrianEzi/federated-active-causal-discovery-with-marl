@@ -2776,3 +2776,86 @@ sparse while actually delivering connected graphs. It reproduces roughly today's
 Cite Chevalley, Mehrjou & Schwab for the `Theta(1/d)` sparse regime and say we deliberately
 chose the connectivity threshold instead, with the reason. **The percolation framing is ours,
 not a citation.**
+
+---
+
+## 2026-08-23 — Disclosure aggregation: how one better-informed agent's claim reaches the others
+
+Design session, no code. Outcome is `docs/DISCLOSURE_SPEC.md`. Supervisor gave the green light
+on the disclosure category the same day, so this is no longer blocked.
+
+[DECIDED] **Disclosure is continuous and progressive, not threshold-gated.** A threshold
+discards information and adds a hyperparameter we cannot afford to tune before the freeze.
+"I do not know yet" needs no separate state — it is `q ~ base rate`, and the base rate is
+measured (8.8% at two agents, 16.9% at three).
+
+[DECIDED] **Disclosure is NOT an action; it happens every step.** It costs no budget, so as an
+action it is a decision with no trade-off — always-disclose dominates under full cooperation and
+the policy would spend sample complexity rediscovering that. Keeping it in the environment also
+makes the ablation a config flag rather than a learned behaviour. It would only become an action
+if communication had a cost, and we are not giving it one.
+
+[DECIDED] **Aggregation is noisy-OR, not pooling.** Each agent's claim is about ITS OWN private
+set, so the claims have different subjects and are logically independent: "my node confounds
+(u,v)" and "mine does not" are simultaneously true. There is no conflict to resolve, so
+COmbINE's maximum-weight-satisfiability apparatus collapses to
+`q_hat = 1 - PROD(1 - q_i)`. This also delivers the property the student identified
+independently — one confident voice dominates any number of quiet ones, because an absent claim
+is not evidence against.
+
+[CORRECTED] **The disclosed object is confounding attributable to the sender's OWN private set,
+not the sender's bidirected edges.** The sender's latent projection marginalises out everything
+it cannot see, INCLUDING the receiver's private nodes — so a naive "report my MAG's bidirected
+edges" would tell the receiver about a confounder the receiver already observes, injecting a
+phantom latent. Caught while tracing the pipeline, not by a test.
+
+[CORRECTED] **Ng & Zhang (2022) does not support the argument it was cited for.** Used on
+2026-08-23 as evidence that federated structure learning handles overlapping variable sets; it is
+HORIZONTALLY partitioned — same variables, different samples. Real paper, wrong argument.
+Recorded in `docs/BIBLIOGRAPHY.md` section 17 so it is not re-used.
+
+[MEASURED, from literature] **Genest (1984) is a uniqueness theorem, not a property list.** With
+unanimity and regularity, logarithmic pooling is the ONLY externally Bayesian pooling operator.
+This removes the "which pooling rule" question entirely for any future pooling we do. The linear
+pool (Stone 1961) is not externally Bayesian and is therefore disqualified for a belief updated
+every round.
+
+### Two traps identified before implementation, both silent
+
+[DECIDED] **The sender must compute `q` from its own likelihood only, never from its
+disclosure-informed posterior.** Otherwise A's claim feeds B's belief, feeds B's claim, feeds back
+to A — this is *data incest*, the distributed-fusion literature's own term. Computing `q` as a raw
+partition-function ratio avoids it structurally, since no prior enters the calculation.
+Regression test T3 in the spec.
+
+[DECIDED] **The prior must be added BEFORE the assignment-pruning threshold.**
+`joint_conf_marginals` drops assignments below `max(log_z) + log(1e-14)`. An assignment the
+likelihood alone would discard may be exactly the one disclosure rescues. Its existing comment
+claiming the threshold is exact ceases to be true once a prior exists. Regression test T4.
+
+### The claim that may have to change
+
+[PROPOSED, and it points against our own headline] **Two interventions identify confounding
+unaided.** For a shared pair (u,v): `do(u)` kills the dependence under both confounding and
+`v -> u`, so one intervention does not discriminate; but `do(v)` preserves it under `v -> u` and
+kills it under confounding. **Both interventions killing the dependence identifies confounding.**
+Agents hold authority over shared nodes, so this costs roughly six interventions against a budget
+of twenty at the current topology — expensive, not impossible.
+
+If that holds, the observational ceiling of 2.3% is the wrong ceiling, and disclosure's value
+reverts to SAVING BUDGET — which `docs/DISCLOSURE_DESIGN.md` section 3 explicitly disclaims. The
+finding would survive; the framing would not.
+
+Independent pressure in the same direction: Hahn et al. (2026) report federated observational
+discovery under latent confounding performing *"comparable to fully pooled analyses"*. If
+federation is statistically near-free observationally, our value has to come from the
+interventional and budget side.
+
+**Two cheap measurements now outrank building the arms, and neither needs training:**
+
+1. **Calibration of `q_i` against ground truth, by round.** The design rests on senders being
+   right, and noisy-OR is deliberately un-vetoable — one miscalibrated agent can inject a
+   confounder no number of correct agents can outvote, with exposure growing in agent count.
+   Cooperation buys honesty, not accuracy.
+2. **The interventional ceiling.** A modification of `scripts/ma_structural_ceiling.py` to
+   interventional d-separation, not new machinery.

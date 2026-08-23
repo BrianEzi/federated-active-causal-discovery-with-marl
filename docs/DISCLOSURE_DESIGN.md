@@ -144,3 +144,53 @@ Two questions for him, and they are one question really:
 If (1) is refused outright, then §3's measurement says cross-boundary causal discovery is not
 possible at all in this setting -- which is itself a defensible thesis finding, not a
 failure, and should be written up as one.
+
+---
+
+## 8. Update, 2026-08-23 — approved, specified, and one section under challenge
+
+**Supervisor gave the green light** on the disclosure category: an existential confounding claim
+about shared variables, with the clique-structure leak of section 4.3 accepted. Section 7's two
+questions are answered YES. This document is no longer blocked.
+
+**Implementation is now specified in `docs/DISCLOSURE_SPEC.md`** — the pipeline, the two
+insertion points, the two silent traps, the test plan, the ablation arms, and the cost. That is
+the document to read before writing code; this one remains the argument for *why* the design.
+
+**Sharpened, from tracing the pipeline:** the disclosed object is confounding attributable to the
+sender's **own private set**, not the bidirected edges of the sender's projection. The projection
+marginalises out everything the sender cannot see, which includes the *receiver's* private nodes
+— reporting those would inject a phantom latent the receiver already observes. Section 1's
+one-line summary is loose in exactly this way and should be read against SPEC section 3.
+
+**Aggregation across agents is noisy-OR**, and it needs no weighting scheme, because per-agent
+claims have different subjects and therefore cannot conflict. See SPEC section 7.
+
+### Section 3 is under challenge and may be wrong
+
+Section 3 states, emphatically, that *"the value of disclosure is not 'it saves budget'"*. Two
+independent lines of evidence now push against that.
+
+**First, two interventions identify confounding unaided.** For a shared pair `(u,v)`: `do(u)`
+kills the dependence under confounding AND under `v -> u`, so one intervention does not
+discriminate — but `do(v)` preserves it under `v -> u` and kills it under confounding. Both
+interventions killing the dependence identifies confounding. Agents hold authority over shared
+nodes, so this is available to them at roughly six interventions against a budget of twenty.
+
+**Second, Hahn et al. (2026)** perform federated observational causal discovery under latent
+confounding and report performance *"comparable to fully pooled analyses"*. If federation is
+statistically near-free observationally, our value cannot rest on statistical power.
+
+Section 3's **measurement** stands — 2.3%, CI [1.3, 4.0], is what it is. What is challenged is the
+**framing built on it**, because the 2.3% is an *observational* ceiling and our agents intervene.
+If the interventional ceiling is far higher, the honest claim becomes:
+
+> disclosure buys back intervention budget in a setting where budget is the binding constraint
+
+which is a genuinely weaker claim than "closes a gap no amount of data can close" — but still a
+real contribution, and one none of the observational federated work addresses at all.
+
+**Do not rewrite section 3 until the interventional ceiling is measured.** SPEC section 9.2
+describes the measurement; it is a modification of `scripts/ma_structural_ceiling.py` rather than
+new machinery. Rewriting on the argument alone would be replacing one unmeasured framing with
+another.

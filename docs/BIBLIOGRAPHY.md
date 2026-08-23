@@ -608,3 +608,194 @@ ALGORITHMS as baselines. We must not claim the BOUNDS.
 Beating sequential greedy makes the claim mean something; approaching joint greedy shows the
 federation costs little. Random stays in because it is the only arm that says what
 exploration alone buys.
+
+---
+
+## 16. Belief aggregation — opinion pooling, fusion, and constraint combination
+
+Added 2026-08-23. Every entry below was **checked against the source on that date** while
+scoping `docs/DISCLOSURE_SPEC.md`; these are VERIFIED in the strict sense of this file.
+
+```bibtex
+@article{stone1961opinion,
+  author  = {Stone, Mervyn},
+  title   = {The Opinion Pool},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {32}, number = {4}, pages = {1339--1342}, year = {1961}}                   % VERIFIED
+
+@article{genest1984characterization,
+  author  = {Genest, Christian},
+  title   = {A Characterization Theorem for Externally {B}ayesian Groups},
+  journal = {The Annals of Statistics},
+  volume  = {12}, number = {3}, pages = {1100--1105}, year = {1984}}                    % VERIFIED
+
+@article{genest1986combining,
+  author  = {Genest, Christian and Zidek, James V.},
+  title   = {Combining Probability Distributions: A Critique and an Annotated Bibliography},
+  journal = {Statistical Science},
+  volume  = {1}, number = {1}, pages = {114--135}, year = {1986}}                       % VERIFIED
+
+@article{degroot1974consensus,
+  author  = {DeGroot, Morris H.},
+  title   = {Reaching a Consensus},
+  journal = {Journal of the American Statistical Association},
+  volume  = {69}, number = {345}, pages = {118--121}, year = {1974}}                    % VERIFIED
+
+@inproceedings{julier1997covariance,
+  author    = {Julier, Simon J. and Uhlmann, Jeffrey K.},
+  title     = {A Non-divergent Estimation Algorithm in the Presence of Unknown Correlations},
+  booktitle = {Proceedings of the American Control Conference},
+  pages     = {2369--2373}, year = {1997}}                                             % VERIFIED
+
+@article{grime1994decentralized,
+  author  = {Grime, S. and Durrant-Whyte, H. F.},
+  title   = {Data Fusion in Decentralized Sensor Networks},
+  journal = {Control Engineering Practice},
+  volume  = {2}, number = {5}, pages = {849--863}, year = {1994}}                       % VERIFIED
+
+@book{pearl1988probabilistic,
+  author    = {Pearl, Judea},
+  title     = {Probabilistic Reasoning in Intelligent Systems: Networks of Plausible Inference},
+  publisher = {Morgan Kaufmann}, year = {1988}}                                        % VERIFIED (book)
+```
+
+**Why each matters.**
+
+**Stone (1961)** is the linear opinion pool — the weighted arithmetic mean, i.e. the obvious
+thing. Cite it to *reject* it: the linear pool is **not externally Bayesian**, so pooling then
+updating differs from updating then pooling. For a belief updated every round that is
+disqualifying.
+
+**Genest (1984)** is the reason we do not have to argue about which pooling rule to use. With
+unanimity and regularity, **logarithmic pooling is the UNIQUE externally Bayesian operator**.
+It is a uniqueness theorem, not a list of nice properties. If this project ever pools opinions,
+this citation settles how.
+
+**Genest & Zidek (1986)** is the canonical survey, and it also catalogues the impossibility
+results — no rule satisfies every desideratum, so some property must be given up deliberately.
+
+**DeGroot (1974)** is decentralised consensus by iterated weighted averaging. Relevant because
+it needs no coordinator, which is one of the few places our constraints are stricter than the
+field's. The log-domain version converges to the logarithmic pool.
+
+**Julier & Uhlmann (1997)** — covariance intersection — is the rigorous form of "take the least
+confident estimate". It fuses estimates whose evidence overlap is *unknown* with a guarantee of
+never becoming overconfident. It is a special case of the broader **Chernoff fusion rule**, and
+the fusion literature's stated position is that Chernoff-family rules are what you need
+specifically when network loops make double counting unavoidable. The price is that it
+deliberately discards real information.
+
+**Grime & Durrant-Whyte (1994)** is the exact alternative: track what each pair has already
+exchanged and subtract the common part, recovering the centralised answer. It needs a loop-free
+communication structure. **This maps onto our scaling ladder directly** — at two agents there is
+one link and no loop, so exact incest-free fusion is available *now*; at three or more with
+all-to-all broadcast, loops appear immediately and exactness becomes impossible. That is a
+concrete cost of rung 1 we had not priced.
+
+**Pearl (1988)** is noisy-OR — not an aggregation rule for opinions but a model of one variable
+with several **independent sufficient causes**. That is why it fits our confounding claims, where
+each agent reports on a different private set, and why it does not fit shared directed edges.
+The book is VERIFIED; the specific section attribution for noisy-OR is standard usage and was
+not confirmed at page level.
+
+**The term to use in the write-up is "data incest"** (also "rumour propagation") — confirmed as
+the distributed-fusion literature's own vocabulary for double counting. Its two remedies are
+exactly the two above: bookkeep and subtract, or use a rule that cannot become overconfident.
+
+**Ruled out: Dempster–Shafer combination.** It looks purpose-built for combining evidence from
+independent sources, but Zadeh's counterexample shows it behaves pathologically under strongly
+conflicting evidence — and conflict is our interesting case, not our edge case.
+
+## 17. Federated causal discovery — the current landscape
+
+Added 2026-08-23. This section exists because the field moved while we were building, and two
+of these are close enough that the thesis must position against them explicitly.
+
+```bibtex
+@inproceedings{tillman2011overlapping,
+  author    = {Tillman, Robert E. and Spirtes, Peter},
+  title     = {Learning Equivalence Classes of Acyclic Models with Latent and Selection
+               Variables from Multiple Datasets with Overlapping Variables},
+  booktitle = {Artificial Intelligence and Statistics (AISTATS)},
+  series    = {PMLR}, volume = {15}, year = {2011}}                                    % VERIFIED
+
+@article{triantafillou2015combine,
+  author  = {Triantafillou, Sofia and Tsamardinos, Ioannis},
+  title   = {Constraint-based Causal Discovery from Multiple Interventions over
+             Overlapping Variable Sets},
+  journal = {Journal of Machine Learning Research},
+  volume  = {16}, year = {2015}, note = {arXiv:1403.2150}}                              % VERIFIED
+
+@article{hahn2026fedci,
+  author  = {Hahn, Maximilian and Zajak, Alina and Heider, Dominik and Ribeiro, Adele H.},
+  title   = {Federated Causal Discovery Across Heterogeneous Datasets under Latent Confounding},
+  journal = {arXiv preprint arXiv:2603.05149}, year = {2026}}                           % VERIFIED
+
+@inproceedings{wang2025nonidentical,
+  author    = {Wang, Yunxia and Cao, Fuyuan and Yu, Kui and Liang, Jiye},
+  title     = {Federated Causal Structure Learning with Non-identical Variable Sets},
+  booktitle = {International Conference on Machine Learning (ICML)}, year = {2025}}     % VERIFIED
+
+@inproceedings{baldo2026regret,
+  author    = {Baldo, Federico and Assaad, Charles K.},
+  title     = {Regret-Based Federated Causal Discovery with Unknown Interventions},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2026}, note = {arXiv:2512.23626}}                                        % VERIFIED
+
+@inproceedings{ng2022federated,
+  author    = {Ng, Ignavier and Zhang, Kun},
+  title     = {Towards Federated {B}ayesian Network Structure Learning with
+               Continuous Optimization},
+  booktitle = {Artificial Intelligence and Statistics (AISTATS)},
+  series    = {PMLR}, volume = {151}, pages = {8095--8111}, year = {2022}}              % VERIFIED
+
+@article{fcdsurvey2026,
+  author  = {{Authors not yet checked}},
+  title   = {A Survey on Federated Causal Discovery and Inference},
+  journal = {arXiv preprint arXiv:2606.23741}, year = {2026}}                           % UNVERIFIED
+```
+
+**Tillman & Spirtes (2011)** and **Triantafillou & Tsamardinos (2015)** are the two that match
+our *partition* — overlapping variable sets, latent confounders. The second is closer: its
+**COmbINE** algorithm additionally handles **multiple interventions**, converts dependencies and
+independencies into path constraints, and solves the combination as a boolean satisfiability
+instance. That is our problem with a different solver, and it is the source of the
+constraint-combination argument in `DISCLOSURE_SPEC.md` section 7.
+
+**Hahn et al. (2026)** is the closest published work and the one to position against. It
+federates **IOD** (Integration of Overlapping Datasets — the Tillman & Spirtes line) and claims,
+verbatim, to enable *"for the first time, federated causal discovery under latent confounding
+across distributed and heterogeneous datasets"*. Two things follow. **We cannot claim that
+phrase.** And two differences are ours to hold: it is **purely observational** — no
+interventions, no experiment selection, no budget — and it shares **more than we do**, exchanging
+regression sufficient statistics through a federated iteratively-reweighted-least-squares
+procedure, against our one probability per shared pair. Its headline that federated performance
+is *"comparable to fully pooled analyses"* is a bar worth quoting: federation costs them almost
+nothing statistically.
+
+**Wang et al. (ICML 2025)** matters for a subtler reason than its title. Its stated problem is
+that *"non-overlapping variables may introduce spurious dependencies"* — which is our confounding
+problem stated from the other side. Note which side they take: their method **removes** the
+spurious dependency; ours **annotates** it as confounding. Both design choices now exist in the
+literature and can be contrasted directly. Their aggregation is a two-level priority-selection
+heuristic over local graphs rather than a principled rule, which is a weakness to cite rather
+than inherit.
+
+**Baldo & Assaad (ICML 2026)** looked like the nearest competitor and is not. Its interventions
+are **unknown and externally imposed** (different hospitals' protocols happen to induce them) and
+the method's job is to cope with interventions it cannot see or label. Ours are **chosen**, under
+a budget. It is also **horizontally partitioned** — same variables, different samples — targeting
+the CPDAG of the union of client graphs. Cite it to distinguish *chosen* from *observed*
+interventions.
+
+**Ng & Zhang (2022) — CORRECTION, recorded so it is not re-used wrongly.** This was cited on
+2026-08-23 as evidence that federated structure learning addresses overlapping variable sets.
+**It does not.** It is **horizontally partitioned**: every party holds the same variables over
+different samples. Ours is the vertical, overlapping case. Real paper, wrong argument.
+
+**The survey (arXiv:2606.23741)** is UNVERIFIED beyond existence — authors not checked. Its
+abstract gives three axes (methodological paradigm, federation topology, structural scope) and
+covers non-identical variable sets. It does **not** mention interventional or active discovery,
+multi-agent settings, or reinforcement learning. That is suggestive of our gap but an abstract
+omitting a category is not the survey omitting it. **Read the taxonomy section before using this
+as a positioning argument.**
