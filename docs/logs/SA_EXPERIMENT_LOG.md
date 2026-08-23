@@ -3056,3 +3056,14 @@ potential_shaping 0.1 (policy-invariant, Ng et al.), budget 8 (rung 0) / 9 (rung
 n_int 250, B=12, alpha 0.01, threshold 0.7 UNCHANGED. Sequence: rung0 s0 -> rung1 s0 ->
 rung0 s1 -> rung0 s2, strictly serial -- one CPU-bound job at a time, per the standing
 trap. Outputs results/cb_gnn/.
+
+[NOTED] Under vary-only arms the OBSERVATION regime bit is constant 0 (clean_fraction
+counts clamps), so the policy cannot read "partner intervened hidden" from that scalar --
+but the SIGNALS one-hot (disclose_signals, on by default) already carries
+private/shared/none per partner per round, so the information reaches the policy through
+the channel designed for it. The engine reads the row-level flag separately
+(hidden_intervened). No change made; recorded so the dead scalar does not read as a bug.
+
+[NOTED] git push hangs on this machine (osxkeychain holds no GitHub token; gh absent).
+All overnight commits are LOCAL ONLY until the student runs one interactive push. Flagged
+at the top of docs/MORNING_2026_08_24.md.
