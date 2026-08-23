@@ -2945,3 +2945,46 @@ identify; A reaches 0.92-1.00 often) and NOT FREE (round-0 identified on 0/15 se
 Failures track |w02*w03|: weak confounders are genuinely undetectable at this volume and
 read as unidentified, never as false confounding elsewhere. Pinned as
 tests/cb/test_backend.py::test_the_metric_is_earnable_and_not_free.
+
+## 2026-08-24 -- Phase-4 cross-check: verdicts diverge, and the reason is now measured
+
+[MEASURED] Both engines, 12 identical seeded episodes, k=4 topology (privates 0|1, shared
+2-4), graph 0->2, 0->3, 1->4, 2->4, round-robin budget 6, n_int=250, private-then-shared
+clamp plan. EXACT identifies 12/12 per agent (mass 0.78-0.98, uniformly). CONSTRAINT:
+2/12 before, 4/12 after the anchor fix below. All divergence is one-directional -- the
+constraint engine UNDER-claims; not one false identification, not one false confounder.
+
+[CORRECTED] **Bug 7, found by the cross-check exactly as the plan predicted: the power
+anchor r was computed on regime-pooled rows.** `pair_power` sized the detectable effect
+from `_rows_for` (both variables free), which still contains rows where an UPSTREAM node
+was clamped -- and a clamp upstream of a confounded pair severs the very dependence being
+measured. Seed 9: true obs-regime r = 0.70, pooled estimate 0.345, power declared absent,
+a detectable confounder reported undetermined. The de-confounding experiment was
+destroying the evidence anchor that sizes the effect the experiment must detect. Anchor
+now comes from PURE-REGIME rows only (no window clamp, no foreign clamp). Cross-check
+went 2/12 -> 4/12; B earns 0.75-0.92 where it earns at all.
+
+[MEASURED] The residual gap is INTRINSIC to clamp-to-0, not a bug. A clamp to 0 moves no
+mean (E[x] is already 0), so both ancestry detection and the confounding power check ride
+on the VARIANCE channel, whose detectable effect at alpha=0.01/power 0.8 is
+|log(1-r^2)| >= 3.42*sqrt(2/n1+2/n2): at 250-row clamp blocks that is |r| >= ~0.53, at
+1200 rows |r| >= ~0.4. The exact engine reads confounding from first-order likelihood
+structure and identifies |r| ~ 0.25 confounders easily. Scaling n_int 250 -> 4000 does
+not close the verdict gap (2/12 flat, pre-anchor-fix) because the binding constraint on
+weak-confounder seeds is r, not n.
+
+[PROPOSED] Remedies, all of which are design decisions above this pay grade:
+  1. NONZERO CLAMP VALUE (or a "set to c" mode): a child's mean shifts by (total
+     effect)*c -- first-order, ~1/sqrt(n) power, closes the gap outright. Changes the
+     intervention semantics every banked result used ("CLAMP always uses 0.0").
+  2. VARY-MODE INTERVENTIONS for the constraint arm: under do(x)~N(0,4), dependence of y
+     on x's DRAWN VALUES is a first-order interventional CI signal, and confounding shows
+     as its absence. Vary exists already (clamp-only was adopted because vary bought the
+     BAYESIAN engine nothing at +2pp cost -- the calculus inverts here), but `known` does
+     not record the MODE, and the engine would need an interventional-CI channel. Real
+     design work.
+  3. Accept the asymmetry: constraint arms identify only strong confounders; recalibrate
+     budget/threshold and reframe the cross-check as "no dangerous disagreement"
+     (constraint never claims what exact denies -- currently true on all 12 seeds).
+Decision deferred to the student. The one-directional character of the divergence is the
+important safety fact: the engine fails SILENT, never WRONG.

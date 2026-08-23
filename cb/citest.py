@@ -248,12 +248,19 @@ class FisherZ:
                 n2 = int(((~clamped) & free).sum())
                 if n1 < min_rows or n2 < min_rows:
                     continue                      # the detection test itself would not run
-                # Dependence measured where BOTH were free -- the same rows the skeleton's
-                # adjacency verdict for this pair rests on.
-                both_free = self._rows_for(x, y)
-                if int(both_free.sum()) < min_rows:
+                # THE EFFECT-SIZE ANCHOR COMES FROM PURE-REGIME ROWS ONLY -- no window
+                # clamp anywhere, no foreign clamp. Found on the first cross-check against
+                # the exact engine, not by inspection: pooling regimes DILUTES r, because
+                # a clamp upstream of the pair severs the very dependence being measured.
+                # On a strongly confounded pair (true r 0.70) the pooled estimate came
+                # back 0.345 -- the de-confounding experiment destroyed the anchor that
+                # sizes the effect the experiment must be able to detect, power failed,
+                # and a detectable confounder was reported undetermined. The dependence a
+                # causal reading must explain is the UNPERTURBED one.
+                pure = ~self.foreign & ~self.intervened.any(axis=1)
+                if int(pure.sum()) < min_rows:
                     continue
-                sub = self.data[both_free][:, [x, y]]
+                sub = self.data[pure][:, [x, y]]
                 if not np.all(sub.std(axis=0) > 1e-12):
                     continue
                 r = float(np.corrcoef(sub, rowvar=False)[0, 1])
