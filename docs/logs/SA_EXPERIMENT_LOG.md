@@ -3093,3 +3093,19 @@ cb_gnn_rung0_lowent. Everything else identical to rung0_s0, so the comparison is
 First learned > random gap of the constraint era (+0.03), CIs overlapping -- a HINT, not
 a demonstration. Direction matches the sa/ finding. Next step is length, not more knobs:
 episodes cost ~1 s and entropy is still 1.35 of 1.61 at 4000. Both runs NOT collapsed.
+
+## 2026-08-24 (morning) -- why learned ~ random: the headroom was measured, and it is thin
+
+[MEASURED] Near-oracle scripted plan vs random, 120 random-graph episodes, k=4, budget 8,
+constraint+vary (the exact overnight training config): scripted 0.208 [0.133, 0.283] vs
+random 0.142 [0.083, 0.200]. THE LEARNABLE HEADROOM IS ~7 POINTS -- most episodes are
+decided by the graph draw against the engine's power floor (|r| >~ 0.5 detectable by any
+coverage, below it by none), not by action choice. The lowent policy's +0.03 over random
+already captured about half the measured ceiling. "Failed to learn" is the wrong reading;
+"nearly nothing to learn at this scale" is the measured one.
+
+[PROPOSED] Make choice matter instead of training longer at k=4: (1) tighten the budget
+to 4-5 rounds -- coverage becomes impossible, ordering becomes the game; ~10 min to
+re-probe with the same script; (2) the scale ladder k=7-9, where random coverage
+collapses combinatorially -- the GNN's intended home, and it runs only on the constraint
+engine. Decision with the student.
