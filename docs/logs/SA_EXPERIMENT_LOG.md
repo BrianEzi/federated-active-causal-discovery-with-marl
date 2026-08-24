@@ -3291,3 +3291,23 @@ at budget 8 -- the scripted 2x margin comes from BALANCED coverage (each node ex
 block, private first). Handover doc updated: the overnight cluster runs ANSWER whether
 training separates from random; they do not confirm it. Learned ~ random at 16k would be
 a real finding to report, not to retune away.
+
+## 2026-08-25 -- WHY learned == random, and the one-number fix, falsified in five minutes
+
+[CORRECTED] The winning behaviour ("touch each authority node once, own private first")
+was UNLEARNABLE: the observation contained beliefs, budget, and the PARTNER's actions --
+but not the agent's own intervention history. You cannot avoid repeating what you cannot
+see. The single-agent env had per-node counts in its observation; the multi-agent
+observation dropped them, and the GNN's include_counts socket sat unused.
+
+[DECIDED] Per-node OWN-intervention counts added to the observation (budget-normalised,
+k entries at the end; own information only -- nothing crosses the privacy boundary) and
+routed into the GNN as a per-node feature. Old checkpoints are refused automatically by
+the existing obs_size check.
+
+[MEASURED] The falsification, as predicted BEFORE running: a two-comparison rule reading
+ONLY the observation ("lowest own-count authority node, private first") scores 18/60
+(0.30) vs random 4/60 (0.07) on paired confounded episodes -- matching the scripted
+ceiling (0.25). The winning rule is now a function of the observation. If training still
+fails to separate from random, the remaining suspect is per-step reward noise -- and
+only then. One shadowed-variable bug caught by shape mismatch during wiring; suite 285.

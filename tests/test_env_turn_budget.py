@@ -142,8 +142,10 @@ def test_the_partners_signal_reaches_the_observation():
     env.step({0: _action(env, 0, private=True), 1: _action(env, 1, private=True)})
     obs = env.observation(1)
     assert len(obs) == env.windows[1].obs_size
-    # The three signal slots are one-hot over the partner's reported region.
-    assert np.isclose(obs[-3:].sum(), 1.0)
+    # The three signal slots are one-hot over the partner's reported region. They sit
+    # before the per-node own-count block (k entries, appended 2026-08-25).
+    k = env.windows[1].k
+    assert np.isclose(obs[-3 - k:-k].sum(), 1.0)
 
 
 # -- 12.5 the done bit must not leak the credit set --------------------------------------

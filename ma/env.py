@@ -276,7 +276,12 @@ class AgentWindow:
                 + 1
                 + n_others * len(self.shared)
                 + 1
-                + n_others * len(SIGNALS))
+                + n_others * len(SIGNALS)
+                # Per-node OWN-intervention counts (2026-08-25). The winning behaviour is
+                # "touch each node once, private first" -- unlearnable by a policy that
+                # cannot see which nodes it already touched. Own history only: nothing
+                # crosses the privacy boundary.
+                + self.k)
 
 
 class TwoAgentEnv:
@@ -387,10 +392,12 @@ class TwoAgentEnv:
         self.disclosed: Dict[int, np.ndarray] = {}
         self.regime_bit: Dict[int, float] = {}
         n_others = self.topology.n_agents - 1
+        self.own_counts: Dict[int, np.ndarray] = {}
         for agent, window in self.windows.items():
             self.known[agent] = np.zeros((cfg.n_obs, window.k))
             self.clean[agent] = np.zeros(cfg.n_obs, dtype=float)
             self.hidden_intervened[agent] = np.zeros(cfg.n_obs, dtype=bool)
+            self.own_counts[agent] = np.zeros(window.k, dtype=float)
             self.n_interventions[agent] = 0
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
@@ -526,6 +533,7 @@ class TwoAgentEnv:
             own_node, _ = chosen[agent]
             if own_node != PASS_ACTION:
                 block[:, window.pos[own_node]] = 1.0
+                self.own_counts[agent][window.pos[own_node]] += 1.0
             # And others', but only on SHARED nodes -- those columns are visible to
             # all, so this discloses nothing private.
             for other in self.topology.agents:
@@ -820,7 +828,11 @@ class TwoAgentEnv:
         return np.concatenate([marginals[off_diagonal], budget_left,
                                self.disclosed[agent],
                                np.array([self.regime_bit[agent]]),
-                               self._signal_onehot(agent)])
+                               self._signal_onehot(agent),
+                               # Own per-node intervention counts, budget-normalised so
+                               # the feature stays on [0, 1] (raw counts once dominated
+                               # a first layer -- see the docstring above).
+                               self.own_counts[agent] / max(self.config.budget, 1)])
 
     def _result(self, reward: float, passed: bool = False) -> StepResult:
         threshold = self.config.identify_threshold

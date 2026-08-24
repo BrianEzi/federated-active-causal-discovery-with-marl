@@ -172,8 +172,10 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             role[window.pos[node], 1] = 1.0
         self.register_buffer("role", torch.as_tensor(role))
 
-        # role(2) + disclosed-count(1) + regime(1) + partner signals (global broadcast).
-        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS)
+        # role(2) + disclosed-count(1) + regime(1) + partner signals (global broadcast)
+        # + own-intervention count (1, per node -- the "what have I already done" input
+        # without which "touch each node once" is unlearnable; added 2026-08-25).
+        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS) + 1
         edge_hidden = max(hidden // 4, 8)
         self.node_encoder = nn.Sequential(
             nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
@@ -191,7 +193,9 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         regime = obs[:, i:i + 1]
         i += 1
         signals = obs[:, i:i + self.n_others * len(SIGNALS)]
-        return core, disclosed, regime, signals
+        i += self.n_others * len(SIGNALS)
+        counts = obs[:, i:i + k]
+        return core, disclosed, regime, signals, counts
 
     def forward(self, obs: torch.Tensor):
         single = obs.dim() == 1
@@ -199,20 +203,24 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             obs = obs.unsqueeze(0)
         batch, k = obs.shape[0], self.d
 
-        core, disclosed, regime, signals = self._split(obs)
+        core, disclosed, regime, signals, counts = self._split(obs)
         base = self._node_features(core)                    # parent path, verbatim modules
 
         per_node_disclosed = torch.zeros(batch, k, 1, dtype=obs.dtype, device=obs.device)
         if self.n_shared and self.n_others:
-            counts = disclosed.view(batch, self.n_others, self.n_shared).sum(dim=1)
+            # NOT named `counts`: that name is the OWN-intervention block from _split,
+            # and shadowing it here fed a [b, n_shared] tensor into the extras stack --
+            # caught immediately by the shape mismatch, worth a comment so it stays caught.
+            partner_hits = disclosed.view(batch, self.n_others, self.n_shared).sum(dim=1)
             for s_index, pos in enumerate(self.shared_positions):
-                per_node_disclosed[:, pos, 0] = counts[:, s_index]
+                per_node_disclosed[:, pos, 0] = partner_hits[:, s_index]
 
         extras = torch.cat([
             self.role.unsqueeze(0).expand(batch, k, 2),
             per_node_disclosed,
             regime.unsqueeze(1).expand(batch, k, 1),
             signals.unsqueeze(1).expand(batch, k, signals.shape[-1]),
+            counts.unsqueeze(-1),
         ], dim=-1)
 
         embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
