@@ -3170,3 +3170,33 @@ on DENSE windows (prior_p=0.644 makes most k=4 windows 5-6 edges of 6 pairs); ne
 diagnostic is the DIRECTION of adjacency errors (missed vs extra edges), which decides
 tunable-vs-floor. The criterion fix (+23pp, measured twice) remains the big lever and
 awaits sign-off.
+
+## 2026-08-24 -- the real answer: per-claim accuracy is 95%, the criterion is a conjunction
+
+[MEASURED] Error direction, 60 scripted episodes, 720 pairs: true windows are DENSE
+(68.6% of pairs are edges). Missed real edges 23 (4.7% of true edges); invented edges 8
+(3.5% of true non-edges). PER-EDGE ACCURACY ~95%.
+
+[MEASURED, and it explains everything] The conjunction cascade:
+    per-edge 0.95  ->  all 6 pairs in a window 0.95^6 = 0.75   (observed 0.775)
+    -> both agents 0.75^2 = 0.59  -> plus confounding + orientation conditions = 0.36
+A near-perfect-per-claim engine scores 36% because success demands ~12 judgments land
+together. The student's "a hand-written policy should score >90%" is CORRECT per claim;
+the criterion multiplies. The exact engine's 12/12 implies its per-claim accuracy is
+~99.5% -- a small per-claim gap, enormous after conjunction. THIS is the constraint
+engine's true deficit, not any single bug.
+
+[CORRECTED] My pooling refutation was confounded (3000 pooled rows vs 1000 obs). On EQUAL
+rows: pooled/interventional 36.7% vs observational 60.8% window-exact adjacency.
+Interventional rows are much weaker per row for ADJACENCY -- and the dominant reason is
+structural, not statistical: varying a node severs its incoming edges, so those edges are
+invisible in precisely those rows. Regime mixing may add to it; this test cannot separate
+them. Net effect is still positive (3000 mixed = 76.7% > 1000 obs = 60.8%), so no
+pipeline change is warranted -- but n_obs is now the identified cheap lever for adjacency,
+and interventional rows should not be expected to carry it.
+
+[PROPOSED] Three levers, in cost order: (1) the claim-level criterion (+23pp, measured
+twice) -- awaiting sign-off; (2) raise n_obs (adjacency is observational-data-hungry;
+400->1000 gave +3pp at window level, worth testing 4000); (3) accept that per-claim
+reporting, not all-or-nothing identification, is the honest headline metric for a
+constraint engine -- and report per-claim accuracy alongside it.
