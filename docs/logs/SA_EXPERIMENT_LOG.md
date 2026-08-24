@@ -3116,3 +3116,16 @@ power floor. Budgets 4/5/6 (n_int 250, 100 eps, scripted vs random): success fal
 interventional rows, so cutting rounds starves detection power before coverage. CONFOUND
 NOTED: slots and data shrink together; re-probing with n_int scaled to hold total
 interventional data at ~2000 rows (budget 4 x 500, 5 x 400 vs 8 x 250).
+
+[MEASURED] The budget lever is dead, decisively. Holding total interventional data at
+~2000 rows: budget 4 x n_int 500 gives 0.04/0.06 (scripted/random), 5 x 400 gives
+0.11/0.10, 8 x 250 gives 0.17/0.15 -- gaps -0.02/+0.01/+0.02, all noise. Fewer slots
+lower success for BOTH arms even at constant data, because at k=4 the credit criterion
+structurally requires intervening on ~every relevant node (each private edge needs its
+source intervened; a confounded shared pair needs both ends): the required intervention
+set is roughly the budget itself, leaving no slack for choice to exploit.
+
+[DECIDED, pending student go-ahead] The only remaining lever is the scale ladder
+(k=7-9): grow the window past the budget so most nodes are NOT worth intervening on and
+selection becomes the task. Next concrete step per the handover: measure one episode's
+wall-clock at k=7 and k=9 on the constraint backend and set B before any grid.
