@@ -3238,3 +3238,17 @@ claims 94% right; private directions 83% right, 0 wrong; CONFOUNDING claims 51% 
 confounding claim is the binding constraint on H1's ceiling: partly bar-vs-B granularity
 (freq steps of 1/12), partly the 19% structural misses. B is the smoothing lever; noted,
 not changed tonight (attribution).
+
+[MEASURED] Corrected probe (bug 9 fixed), 100 eps/arm/mix, claims criterion: confounded
+scripted 0.250 [0.17,0.33] / greedy_unc 0.140 / random 0.160; unconfounded 0.590 / 0.580
+/ 0.440. Success in a real range at last, scripted leads both mixes, and the learnable
+signature is visible: PAIR-COMPLETION (intervene on both ends of the suspected
+confounded pair) beats myopic uncertainty-greedy by ~10pp on confounded episodes -- the
+H1 behaviour in miniature. SANITY GATE: 0 settled-wrong confounding claims over 120
+unconfounded windows (30 wrong claims of other kinds ~ the known 5% per-claim error).
+
+[DECIDED] Gates pass; preliminary bug-hunt run launched (student's instruction before
+leaving): rung 0, claims + confounded mix, lowent (entropy 0.003, orthogonal), GNN,
+vary, B=12, n_obs 1000, n_int 250, budget 8, 1500 episodes, eval 100/arm.
+potential_shaping OFF -- the claims reward is already dense; stacking the entropy
+potential on top would blur attribution of tonight's first claims-trained curve.
