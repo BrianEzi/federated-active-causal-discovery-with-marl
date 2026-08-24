@@ -3086,3 +3086,10 @@ is earnable at 3 agents, choice-quality advantage needs longer training / lower 
 rerun with entropy_coef 0.003 + orthogonal_init (both sa/-measured levers for exactly
 this near-uniform-entropy signature, both exposed flags). Launched 05:51, arm
 cb_gnn_rung0_lowent. Everything else identical to rung0_s0, so the comparison is clean.
+
+[MEASURED] The entropy A/B, same seed, same everything else (4000 eps each):
+    rung0_s0        entropy_coef 0.01,  default init:  learned 0.180 [0.125,0.235] vs random 0.190 [0.135,0.245]
+    rung0_s0_lowent entropy_coef 0.003, orthogonal:    learned 0.240 [0.185,0.300] vs random 0.210 [0.155,0.265]
+First learned > random gap of the constraint era (+0.03), CIs overlapping -- a HINT, not
+a demonstration. Direction matches the sa/ finding. Next step is length, not more knobs:
+episodes cost ~1 s and entropy is still 1.35 of 1.61 at 4000. Both runs NOT collapsed.
