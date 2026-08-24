@@ -3,7 +3,7 @@
 **You are an agent with cluster access, starting cold. Read this file completely, then
 `docs/logs/SA_EXPERIMENT_LOG.md` entries dated 2026-08-24, before launching anything.**
 
-Everything is pushed through `8b8e64a` on `explore/constraint-based`.
+Everything is pushed on `explore/constraint-based` — clone HEAD; the own-counts observation fix (`fed869f`) and this doc are the last entries.
 
 **Deadlines: experiment freeze 31 August. Dissertation due 8 September.**
 
