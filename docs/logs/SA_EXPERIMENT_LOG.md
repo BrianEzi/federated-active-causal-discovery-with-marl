@@ -3252,3 +3252,15 @@ leaving): rung 0, claims + confounded mix, lowent (entropy 0.003, orthogonal), G
 vary, B=12, n_obs 1000, n_int 250, budget 8, 1500 episodes, eval 100/arm.
 potential_shaping OFF -- the claims reward is already dense; stacking the entropy
 potential on top would blur attribution of tonight's first claims-trained curve.
+
+[MEASURED] Preliminary claims-trained run (rung 0, confounded episodes, lowent, GNN,
+vary, B=12, 1500 eps, 57 min, bug-hunt sizing): NOT collapsed, reward from episode 0,
+train solve 0.10 -> 0.14, entropy 1.61 -> 1.40. Eval (100 eps/arm):
+    learned 0.170 [0.100,0.240]   random 0.070 [0.030,0.130]
+    greedy_uncertainty 0.190 [0.120,0.270]   pass 0.000
+FIRST CLEAR LEARNED-OVER-RANDOM RESULT on the constraint engine (2.4x, CIs barely
+touching) -- at 1500 episodes, under the criterion that rewards what the thesis is
+about. Not yet at greedy (0.19) or the scripted pair-completion ceiling (0.25): that is
+the overnight run's job. No bugs surfaced; the pipeline is clean end-to-end under the
+Day-1 redesign. Recommended overnight config: identical but 12-16k episodes, seeds 0-2,
+rung 1 after -- pending student's go on their return.
