@@ -3160,3 +3160,13 @@ DATA STARVATION RULED OUT as the skeleton's problem. Discriminator running: same
 episodes, skeleton from observational rows ONLY (1000 rows) vs the pooled 3000-row
 skeleton -- if obs-only wins with 3x less data, regime pooling is confirmed actively
 harmful and the JCI-style fix (intervention indicators as context variables) is the lever.
+
+[CORRECTED] The regime-pooling suspicion is REFUTED by its own discriminator: pooled
+skeleton (3000 rows) 76.7% majority adjacency vs observational-only (1000 rows) 60.8%,
+same 60 episodes. Interventional rows help adjacency on net -- a varied node breaks
+confounder-induced spurious dependence faster than regime mixing corrupts the tests. No
+JCI redesign warranted. The remaining ~20pp to a >90% oracle is per-claim skeleton error
+on DENSE windows (prior_p=0.644 makes most k=4 windows 5-6 edges of 6 pairs); next
+diagnostic is the DIRECTION of adjacency errors (missed vs extra edges), which decides
+tunable-vs-floor. The criterion fix (+23pp, measured twice) remains the big lever and
+awaits sign-off.
