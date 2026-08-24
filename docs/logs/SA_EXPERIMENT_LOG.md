@@ -3075,3 +3075,14 @@ NOT collapsed, first success episode 5, train solve 0.23 -> 0.31, entropy 1.61 -
 episodes. Headroom exists (scripted plan reaches 0.75-0.92 per-agent credit). Not a null
 on the thesis -- a statement about training length and entropy, both with known levers
 (sa/ measured entropy_coef 0.003; episodes cost 1 s).
+
+[MEASURED] rung1_s0 -- THREE AGENTS, widest_hidden=2, the first such run in the project's
+history (constraint+GNN+vary, budget 9, 4000 eps, 3h26m): NOT collapsed, first success
+episode 3, entropy 1.61 -> 1.38, eval learned 0.120 [0.080,0.165] ~ random_vary 0.130
+[0.085,0.180] >> pass 0.020. Same signature as rung 0: the pipeline works, identification
+is earnable at 3 agents, choice-quality advantage needs longer training / lower entropy.
+
+[DECIDED] Bonus seeds s1/s2 dropped in favour of the informative A/B: rung 0 seed 0
+rerun with entropy_coef 0.003 + orthogonal_init (both sa/-measured levers for exactly
+this near-uniform-entropy signature, both exposed flags). Launched 05:51, arm
+cb_gnn_rung0_lowent. Everything else identical to rung0_s0, so the comparison is clean.
