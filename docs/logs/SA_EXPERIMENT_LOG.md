@@ -3109,3 +3109,10 @@ to 4-5 rounds -- coverage becomes impossible, ordering becomes the game; ~10 min
 re-probe with the same script; (2) the scale ladder k=7-9, where random coverage
 collapses combinatorially -- the GNN's intended home, and it runs only on the constraint
 engine. Decision with the student.
+
+[MEASURED] Tighter budget does NOT widen the choice gap -- it collapses the task into the
+power floor. Budgets 4/5/6 (n_int 250, 100 eps, scripted vs random): success falls to
+0.05-0.12 for BOTH arms, gap -0.02/+0.03/+0.01 (noise). Cause: each round is also 250
+interventional rows, so cutting rounds starves detection power before coverage. CONFOUND
+NOTED: slots and data shrink together; re-probing with n_int scaled to hold total
+interventional data at ~2000 rows (budget 4 x 500, 5 x 400 vs 8 x 250).
