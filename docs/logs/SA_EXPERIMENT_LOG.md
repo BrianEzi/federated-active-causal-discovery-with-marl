@@ -3264,3 +3264,21 @@ about. Not yet at greedy (0.19) or the scripted pair-completion ceiling (0.25): 
 the overnight run's job. No bugs surfaced; the pipeline is clean end-to-end under the
 Day-1 redesign. Recommended overnight config: identical but 12-16k episodes, seeds 0-2,
 rung 1 after -- pending student's go on their return.
+
+## 2026-08-25 -- verification of the prelim result: weaker than first logged
+
+[CORRECTED] "First clear learned-over-random" was OVERSTATED. A second paired batch
+(50 eps, seeds 90000+) gave learned 7/50 vs random 6/50 -- the prelim's +10pp gap did
+not reproduce. Pooled across both paired batches: 0.16 vs 0.087 -- positive but
+batch-sensitive. Downgraded to SUGGESTIVE pending the 120-episode fingerprint and the
+overnight long runs. The student's surprise at the result prompted this check; the
+verify-directly practice earns its keep again.
+
+[CORRECTED] The first fingerprint probe was itself buggy: it computed confounded pairs
+with ALL nodes observed (no latent projection possible), so pair-completion read 0/50
+for every policy vacuously. Rerun uses per-window bidirected pairs in global ids.
+
+[MEASURED] Timing: a full episode costs ~1.0 s in isolation at n_obs=400 OR 1000 (the
+n_obs suspicion was wrong), vs 2.3 s/ep observed during the prelim train -- the 2x gap
+is unexplained, most plausibly CPU contention on the laptop. Cluster agent must measure
+on-cluster before sizing arrays (already in the handover doc).
