@@ -3200,3 +3200,27 @@ twice) -- awaiting sign-off; (2) raise n_obs (adjacency is observational-data-hu
 400->1000 gave +3pp at window level, worth testing 4000); (3) accept that per-claim
 reporting, not all-or-nothing identification, is the honest headline metric for a
 constraint engine -- and report per-claim accuracy alongside it.
+
+## 2026-08-24 (night 2) -- Day-1 redesign: claims, mix, stratified bootstrap, greedy
+
+[DECIDED, student sign-off "go" with defaults] Four pieces landed together:
+  1. cb/claims.py -- three-outcome scoring (settled-right / unsure / settled-wrong, bar
+     0.7, penalty 1). reward_criterion="claims": dense reward = per-step change in
+     (right - wrong)/claims, terminal +1 when all REQUIRED claims right and NOTHING
+     wrong anywhere. Shared-block directions may stay unsure (Markov equivalence);
+     confounding claims always required.
+  2. episode_mix on MAConfig: "confounded" | "unconfounded" | "any", rejection-sampled
+     against the MAG criterion, draw count reported. Unconfounded is the standing SANITY
+     arm at the student's instruction: zero settled-wrong confounding claims there is a
+     requirement, not a hope.
+  3. Block-stratified bootstrap resampling (blocks = experiment batches, sizes fixed);
+     property-tested by the one-row-per-block identity. Uniform resampling simulated
+     running different experiments, not seeing different data.
+  4. UncertaintyGreedyAgent: truth-free constraint-side greedy -- intervene on the
+     authority node touching the most unsure claims, pass when none. The thesis's
+     baseline finally exists on the new engine.
+
+[CORRECTED] The stratification legitimately moved the old per-replicate criterion's
+frequencies at the pinned seed (u14-replicate now 0/6 scripted seeds identify; claims:
+seed 3 identifies). The reachability test is re-pinned on claims -- the criterion
+training uses. 284+10 tests green.

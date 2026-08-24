@@ -82,7 +82,7 @@ class ConstraintBackend:
     # -- the WindowBeliefDP-shaped surface ------------------------------------------------
 
     def edge_marginals(self, data: np.ndarray, known: np.ndarray, clean=None,
-                       score_rule=None) -> np.ndarray:
+                       score_rule=None, blocks=None) -> np.ndarray:
         """`[k, k]` directed-edge frequencies. Signature-compatible with the exact engine.
 
         `known` is the per-row intervention mask the env already maintains -- exactly what
@@ -105,7 +105,7 @@ class ConstraintBackend:
         self.last = bootstrap_belief(
             np.asarray(data, dtype=float), np.asarray(known),
             n_boot=self.n_boot, alpha=self.alpha, max_cond=self.max_cond,
-            seed=self.base_seed + self._calls, foreign=foreign)
+            seed=self.base_seed + self._calls, foreign=foreign, blocks=blocks)
         return self.last.edge_marginals()
 
     @property

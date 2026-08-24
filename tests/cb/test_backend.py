@@ -149,10 +149,11 @@ ADJ[0, 2] = ADJ[0, 3] = ADJ[1, 4] = ADJ[2, 4] = 1
 PLAN = {0: [0, 2, 3], 1: [1, 3, 2]}
 
 
-def _drive(seed: int):
+def _drive(seed: int, criterion: str = "u14"):
     cfg = MAConfig(topology=TOPO, n_obs=400, n_int=250, budget=6,
                    turn_order=ROUND_ROBIN, belief_backend="constraint",
-                   cb_n_boot=12, identify_threshold=0.7, disclose_regime=True)
+                   cb_n_boot=12, identify_threshold=0.7, disclose_regime=True,
+                   reward_criterion=criterion)
     env = TwoAgentEnv(cfg, seed=seed)
     result = env.reset(seed=seed, adjacency=ADJ)
     at_reset = dict(result.identified)
@@ -172,12 +173,17 @@ def _drive(seed: int):
 
 
 def test_the_metric_is_earnable_and_not_free():
-    """THE reachability test. Seed 3 draws a strong confounder (w02*w03 = +2.34); with
-    each agent clamping private-then-shared the episode must identify -- and must NOT be
-    identified from observational data alone at round zero. If this fails after an engine
-    change, the reward has silently become unearnable (or free), and no training run can
-    be interpreted until that is understood."""
-    env, at_reset, result = _drive(seed=3)
+    """THE reachability test, re-pinned 2026-08-24 on the CLAIMS criterion -- the one
+    training now uses. Seed 3 draws a strong confounder (w02*w03 = +2.34); with each
+    agent clamping private-then-shared the episode must identify -- and must NOT be
+    identified from observational data alone at round zero. If this fails after an
+    engine change, the reward has silently become unearnable (or free), and no training
+    run can be interpreted until that is understood.
+
+    (The original pin was on the per-replicate u14 translation; block-stratified
+    resampling legitimately moved that criterion's frequencies at this seed, and the
+    criterion itself was superseded for its conjunction pathology -- see cb/claims.py.)"""
+    env, at_reset, result = _drive(seed=3, criterion="claims")
     assert not any(at_reset.values()), "identification must not be free at round 0"
     assert result.info["both_identified"], result.info["true_mass"]
     assert all(result.identified.values())

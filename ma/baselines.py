@@ -313,6 +313,65 @@ class ForcedClampAgent:
         return int(self.rng.choice(private))
 
 
+class UncertaintyGreedyAgent:
+    """Myopic uncertainty targeting for the CONSTRAINT backend -- the greedy analogue.
+
+    `GreedyAgent` below reads the exact DP's score tables and cannot exist on the
+    constraint path (see `enumerated_posterior`). This one is TRUTH-FREE and reads only
+    the agent's own bootstrap frequencies: a claim is UNSURE when no answer reaches the
+    confidence bar, each authority node is scored by how many unsure claims touch it, and
+    the agent intervenes on the argmax -- the node whose experiments would speak to the
+    most open questions. Passes when nothing is unsure. Seeded tie-breaks, so evaluation
+    stays reproducible.
+
+    Myopic by construction, exactly like the exact-path greedy: it values what is unsure
+    NOW, not what an intervention would render decidable later. That is the baseline the
+    thesis question names.
+    """
+
+    def __init__(self, agent: int, seed: int = 0, bar: float = 0.7):
+        self.agent = int(agent)
+        self.bar = float(bar)
+        self._seed = _agent_seed(seed, self.agent)
+        self.rng = np.random.default_rng(self._seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.agent))
+
+    def _unsure_touching(self, belief, k: int) -> np.ndarray:
+        counts = np.zeros(k)
+        adjacency = np.asarray(belief.adjacency)
+        directed = np.asarray(belief.directed)
+        bidirected = np.asarray(belief.bidirected)
+        for u in range(k):
+            for v in range(u + 1, k):
+                f_adj = float(adjacency[u, v])
+                if max(f_adj, 1.0 - f_adj) < self.bar:
+                    counts[u] += 1; counts[v] += 1       # adjacency itself unsettled
+                elif f_adj >= self.bar:
+                    settled = max(float(directed[u, v]), float(directed[v, u]),
+                                  float(bidirected[u, v]))
+                    if settled < self.bar:
+                        counts[u] += 1; counts[v] += 1   # edge known, type not
+        return counts
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        belief = window.belief.last
+        if belief is None:
+            return int(self.rng.integers(0, window.n_actions - 1))
+        counts = self._unsure_touching(belief, window.k)
+        authority_scores = {node: counts[window.pos[node]] for node in window.authority}
+        best = max(authority_scores.values())
+        if best <= 0:
+            return window.pass_index                     # nothing left worth a round
+        candidates = [n for n, s in authority_scores.items() if s == best]
+        node = int(self.rng.choice(candidates))
+        mode = VARY if VARY in window.modes else window.modes[0]
+        return window.actions.index((node, mode))
+
+
 class GreedyAgent:
     """Myopic expected information gain over the agent's own window.
 
@@ -395,4 +454,5 @@ def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, obj
         "random_clamp": RandomAgent(agent, seed, allow_clamp=True),
         "forced_clamp": ForcedClampAgent(agent, seed),
         "greedy": GreedyAgent(agent, env, seed),
+        "greedy_uncertainty": UncertaintyGreedyAgent(agent, seed),
     }

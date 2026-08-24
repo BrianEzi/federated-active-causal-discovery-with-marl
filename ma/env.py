@@ -175,7 +175,16 @@ class MAConfig:
     # SHARED subgraph only (25 DAGs at |X| = 3, not 543), which is exponential in |X| and
     # constant in the window size. That is the same axis the confounding enumeration
     # already costs, so no new scaling debt is acquired.
+    #   "claims"     (2026-08-24, constraint backend only) three-outcome claim scoring
+    #                (cb/claims.py): dense reward = per-step change in
+    #                (right - penalty*wrong)/total over the window's claims, terminal +1
+    #                when every agent has all REQUIRED claims settled right and NOTHING
+    #                settled wrong. Replaces the all-or-nothing conjunction that turned
+    #                95% per-claim accuracy into 36% success and a luck-dominated
+    #                training signal.
     reward_criterion: str = "u14"
+    claim_bar: float = 0.7             # per-claim confidence bar; 0.5 would be a coin flip
+    claim_penalty: float = 1.0         # settled-wrong weight in the dense reward
     # WHICH ENGINE HOLDS THE BELIEF. "exact" is the Bayesian subset DP
     # (`crosscheck/belief_dp.py`); "constraint" is the bootstrap PC/FCI engine (`cb/`).
     # The arms differ in exactly this one flag. Under "constraint", identification is the
@@ -193,6 +202,12 @@ class MAConfig:
     # attribution arm. On MAConfig rather than PPOConfig because a checkpoint must be able
     # to say what environment/architecture pair it belongs to.
     policy_arch: str = "mlp"
+    # WHICH EPISODES TO GENERATE (2026-08-24). "confounded": some agent's window carries
+    # a bidirected pair in its true MAG -- the episodes the thesis is about, and only 15%
+    # of unconstrained draws. "unconfounded": none does -- the SANITY arm, where zero
+    # settled-wrong confounding claims is a pinned requirement, not a hope. "any": the
+    # historical behaviour. Rejection sampling with a draw cap; acceptance rate recorded.
+    episode_mix: str = "any"
     # The exact backend is UNSOUND for `widest_hidden > 1` -- it scores the wrong
     # hypothesis (see the long note in `TwoAgentEnv.__init__`). The env refuses that
     # combination unless this is set, which exists for demonstrations of the defect
@@ -305,6 +320,12 @@ class TwoAgentEnv:
         # See docs/STRIP_SCOPE.md section 1, and docs/logs/MA_BUILD_LOG.md 2026-08-22.
         if config.belief_backend not in BACKENDS:
             raise ValueError(f"belief_backend must be one of {BACKENDS}")
+        if config.episode_mix not in ("any", "confounded", "unconfounded"):
+            raise ValueError("episode_mix must be 'any', 'confounded' or 'unconfounded'")
+        if config.reward_criterion == "claims" and config.belief_backend != CONSTRAINT:
+            raise ValueError(
+                "reward_criterion='claims' scores bootstrap claim frequencies; the exact "
+                "backend has no replicates. Use the constraint backend, or 'u14'.")
         widest_hidden = max((len(config.topology.hidden_from(a))
                              for a in config.topology.agents), default=0)
         if (config.belief_backend == EXACT and widest_hidden > 1
@@ -342,8 +363,12 @@ class TwoAgentEnv:
         if seed is not None:
             self._rng = np.random.default_rng(seed)
 
-        self.true_adjacency = (np.asarray(adjacency) if adjacency is not None
-                               else self.topology.sample_dag(self._rng, p=cfg.prior_p))
+        if adjacency is not None:
+            # An explicit graph bypasses the mix: the caller has chosen the episode.
+            self.true_adjacency = np.asarray(adjacency)
+            self.mix_draws = 1
+        else:
+            self.true_adjacency, self.mix_draws = self._sample_mixed_dag(cfg)
         self.params = sample_scm_params(self.true_adjacency, self._rng)
         self.samples, _ = sample_multi(self.params, cfg.n_obs, self._rng)
 
@@ -372,6 +397,9 @@ class TwoAgentEnv:
 
         self._credit_cache: Dict[int, np.ndarray] = {}
         self._mag_cache: Dict[int, np.ndarray] = {}
+        self._last_claim_fraction: Optional[float] = None
+        # Experiment-block label per row, for stratified bootstrap resampling.
+        self.blocks = np.zeros(cfg.n_obs, dtype=int)
         self.round = 0
         self.rounds_used = 0
         self.active: Optional[int] = None
@@ -390,6 +418,28 @@ class TwoAgentEnv:
             a: (PASS_ACTION, None) for a in self.topology.agents}
         self._refresh()
         return self._result(reward=0.0)
+
+    def _sample_mixed_dag(self, cfg) -> Tuple[np.ndarray, int]:
+        """Draw DAGs until the episode-mix condition holds. Returns (graph, draws).
+
+        "Confounded" is judged by the authoritative criterion: a bidirected pair in some
+        agent's true MAG (`projection.bidirected_pairs`), never `common_source_pairs` --
+        see the trap note in ma/projection.py. The cap exists so a topology where the
+        condition is near-impossible fails loudly instead of looping forever.
+        """
+        from ma.projection import bidirected_pairs
+        if cfg.episode_mix == "any":
+            return self.topology.sample_dag(self._rng, p=cfg.prior_p), 1
+        for draw in range(1, 201):
+            candidate = self.topology.sample_dag(self._rng, p=cfg.prior_p)
+            confounded = any(
+                bidirected_pairs(candidate, tuple(w.nodes))
+                for w in self.windows.values())
+            if confounded == (cfg.episode_mix == "confounded"):
+                return candidate, draw
+        raise RuntimeError(
+            f"episode_mix={cfg.episode_mix!r}: no qualifying graph in 200 draws on "
+            f"topology {self.topology.name!r} at prior_p={cfg.prior_p:.3f}")
 
     # -- turn taking --------------------------------------------------------------------
 
@@ -466,6 +516,8 @@ class TwoAgentEnv:
         new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng,
                                       intervene_nodes=targets)
         self.samples = np.vstack([self.samples, new_samples])
+        self.blocks = np.concatenate(
+            [self.blocks, np.full(cfg.n_int, self.blocks[-1] + 1, dtype=int)])
 
         for agent in self.topology.agents:
             window = self.windows[agent]
@@ -523,6 +575,8 @@ class TwoAgentEnv:
         cfg = self.config
         new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng)
         self.samples = np.vstack([self.samples, new_samples])
+        self.blocks = np.concatenate(
+            [self.blocks, np.full(cfg.n_int, self.blocks[-1] + 1, dtype=int)])
         n_others = self.topology.n_agents - 1
         for agent, window in self.windows.items():
             self.known[agent] = np.vstack(
@@ -617,11 +671,15 @@ class TwoAgentEnv:
             if cfg.belief_backend == CONSTRAINT:
                 told = (self.hidden_intervened[agent] if cfg.disclose_regime
                         else np.zeros(len(self.samples), dtype=bool))
+                self.marginals[agent] = window.belief.edge_marginals(
+                    self.samples[:, window.nodes], self.known[agent], told,
+                    cfg.score_rule, blocks=self.blocks)
             else:
                 told = (self.clean[agent] if cfg.disclose_regime
                         else np.zeros(len(self.samples), dtype=bool))
-            self.marginals[agent] = window.belief.edge_marginals(
-                self.samples[:, window.nodes], self.known[agent], told, cfg.score_rule)
+                self.marginals[agent] = window.belief.edge_marginals(
+                    self.samples[:, window.nodes], self.known[agent], told,
+                    cfg.score_rule)
         self._update_done_bits()
 
     def _true_mag(self, agent: int) -> np.ndarray:
@@ -766,7 +824,31 @@ class TwoAgentEnv:
 
     def _result(self, reward: float, passed: bool = False) -> StepResult:
         threshold = self.config.identify_threshold
-        if self.config.reward_criterion == "u14":
+        claim_info = None
+        if self.config.reward_criterion == "claims":
+            from cb.claims import score_window
+            cfg = self.config
+            scores = {}
+            for agent, window in self.windows.items():
+                scores[agent] = score_window(
+                    window.belief.last, self._true_mag(agent),
+                    [window.pos[n] for n in window.private], bar=cfg.claim_bar)
+            identified = {a: scores[a].identified for a in self.topology.agents}
+            all_identified = all(identified.values())
+            mass = {a: scores[a].fraction(cfg.claim_penalty)
+                    for a in self.topology.agents}
+            mean_fraction = float(np.mean(list(mass.values())))
+            # Dense component: what THIS round settled, net of what it unsettled. At
+            # reset there is no previous score, so the first delta is zero by definition.
+            if self._last_claim_fraction is not None:
+                reward += mean_fraction - self._last_claim_fraction
+            self._last_claim_fraction = mean_fraction
+            claim_info = {a: {"right": s.n_right, "wrong": s.n_wrong,
+                              "unsure": s.n_unsure,
+                              "required_right": s.required_right,
+                              "required_total": s.required_total}
+                          for a, s in scores.items()}
+        elif self.config.reward_criterion == "u14":
             mass, all_identified = self._u14_state()
             identified = {a: mass[a] >= threshold for a in self.topology.agents}
         else:
@@ -787,6 +869,7 @@ class TwoAgentEnv:
             reward=reward,
             n_interventions=dict(self.n_interventions),
             info={"true_mass": mass, "both_identified": all_identified, "passed": passed,
+                  "claims": claim_info,
                   # Per agent, never a max across agents: an idle agent hides inside an
                   # average, and free-riding is the thing we most need to see.
                   "interventions": dict(self.n_interventions),
@@ -796,6 +879,7 @@ class TwoAgentEnv:
                   "signals": dict(self.signals),
                   "done_bit": dict(self.done_bit),
                   "connected": bool(self.connected),
+                  "mix_draws": self.mix_draws,
                   "rounds_used": self.rounds_used,
                   # ROUNDS, not per-agent interventions. Under turn-taking an agent acts
                   # every other round, so `n_interventions` is roughly half the episode

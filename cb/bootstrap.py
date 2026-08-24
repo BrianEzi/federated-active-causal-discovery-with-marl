@@ -68,11 +68,19 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                      n_boot: int = 50, alpha: float = 0.01, max_cond: int = 3,
                      seed: int = 0, use_interventions: bool = True,
                      require_power: bool = True,
-                     foreign: Optional[np.ndarray] = None) -> BootstrapBelief:
+                     foreign: Optional[np.ndarray] = None,
+                     blocks: Optional[np.ndarray] = None) -> BootstrapBelief:
     """Resample rows `n_boot` times; run skeleton + orientation on each; count edges.
 
     Rows are resampled with replacement, NOT columns: the variables are fixed by the
     window, and only which observations were drawn is uncertain.
+
+    `blocks` (optional, `[n]` int labels) makes the resampling STRATIFIED: rows are
+    resampled within their experiment block, block sizes fixed. Without it, a resample
+    can draw 340 rows from one intervention block and 60 from another -- which simulates
+    running a DIFFERENT EXPERIMENT, not seeing different data, and the wobble it
+    manufactures is pure artefact (found 2026-08-24 during the criterion review). The
+    environment always passes blocks; the bare path remains for single-regime data.
 
     `n_boot = 0` is legal and runs the pipeline once on the real data, giving a hard 0/1
     belief. Useful for debugging the pipeline in isolation from the resampling.
@@ -94,13 +102,20 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
     runs = max(int(n_boot), 1)
     replicates = np.zeros((runs, k, k), dtype=np.int8)
 
+    block_rows = None
+    if blocks is not None:
+        labels = np.asarray(blocks)
+        block_rows = [np.flatnonzero(labels == lab) for lab in np.unique(labels)]
+
     for b in range(runs):
         if n_boot and b > 0:
-            rows = rng.integers(0, n, n)
-        elif n_boot:
-            rows = np.arange(n)         # first replicate is the real data, unresampled
+            if block_rows is not None:
+                rows = np.concatenate([members[rng.integers(0, len(members), len(members))]
+                                       for members in block_rows])
+            else:
+                rows = rng.integers(0, n, n)
         else:
-            rows = np.arange(n)
+            rows = np.arange(n)         # first replicate is the real data, unresampled
         sub, sub_int = data[rows], intervened[rows]
 
         test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])

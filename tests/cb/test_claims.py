@@ -1,0 +1,174 @@
+"""Three-outcome claim scoring, the claims reward, episode mix, stratified resampling,
+and the constraint-side greedy -- the Day-1 redesign, each piece checked directly."""
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from cb.bootstrap import BootstrapBelief, bootstrap_belief
+from cb.claims import score_window
+from ma.baselines import UncertaintyGreedyAgent
+from ma.env import VARY, MAConfig, TwoAgentEnv, ROUND_ROBIN
+from ma.projection import BIDIRECTED as MB, DIRECTED as MD, bidirected_pairs
+from ma.topology import two_agent
+
+TOPO = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+
+
+def _belief(adjacency, directed, bidirected):
+    k = np.asarray(adjacency).shape[0]
+    return BootstrapBelief(np.asarray(directed, float), np.asarray(bidirected, float),
+                           np.asarray(adjacency, float), n_boot=12, ci_tests=0,
+                           truncated_fraction=0.0)
+
+
+def _mag_chain_conf():
+    """0 -> 1 directed, (1, 2) confounded."""
+    mag = np.zeros((3, 3), dtype=np.int8)
+    mag[0, 1] = MD
+    mag[1, 2] = mag[2, 1] = MB
+    return mag
+
+
+def test_perfect_belief_scores_all_right_and_identifies():
+    adjacency = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], float)
+    directed = np.zeros((3, 3)); directed[0, 1] = 1.0
+    bidirected = np.zeros((3, 3)); bidirected[1, 2] = bidirected[2, 1] = 1.0
+    s = score_window(_belief(adjacency, directed, bidirected), _mag_chain_conf(),
+                     private_positions=[0])
+    # 3 adjacency claims + 2 type claims, all right; all 5 required (0 is private).
+    assert (s.n_right, s.n_wrong, s.n_unsure) == (5, 0, 0)
+    assert s.identified and s.fraction() == 1.0
+
+
+def test_unsure_is_neither_right_nor_wrong_and_blocks_identification():
+    adjacency = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], float)
+    directed = np.zeros((3, 3)); directed[0, 1] = 0.5          # below the 0.7 bar
+    bidirected = np.zeros((3, 3)); bidirected[1, 2] = bidirected[2, 1] = 1.0
+    s = score_window(_belief(adjacency, directed, bidirected), _mag_chain_conf(),
+                     private_positions=[0])
+    assert (s.n_right, s.n_wrong, s.n_unsure) == (4, 0, 1)
+    assert not s.identified                                    # required claim unsure
+    assert 0.0 < s.fraction() < 1.0
+
+
+def test_settled_wrong_is_punished_and_vetoes_identification():
+    """A confident wrong answer must cost MORE than an open question, and even a
+    non-required wrong claim vetoes identification -- confidently wrong anywhere is
+    not identified."""
+    adjacency = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], float)
+    directed = np.zeros((3, 3)); directed[0, 1] = 1.0
+    bidirected = np.zeros((3, 3))
+    directed[1, 2] = 1.0        # true confounding called DIRECTED: settled-wrong
+    s = score_window(_belief(adjacency, directed, bidirected), _mag_chain_conf())
+    assert s.n_wrong == 1
+    unsure_version = score_window(
+        _belief(adjacency, directed * [[0, 1, 0], [0, 0, 0.5], [0, 0, 0]], bidirected),
+        _mag_chain_conf())
+    assert s.fraction() < unsure_version.fraction()
+    assert not s.identified
+
+
+def test_shared_directed_edges_may_stay_unsure_without_blocking():
+    """Markov equivalence: a shared-block direction is not required, only confounding
+    and private-incident directions are."""
+    mag = np.zeros((3, 3), dtype=np.int8)
+    mag[1, 2] = MD                                     # edge between two non-private
+    adjacency = np.zeros((3, 3)); adjacency[1, 2] = adjacency[2, 1] = 1.0
+    directed = np.zeros((3, 3)); directed[1, 2] = 0.4  # unsure, but not required
+    s = score_window(_belief(adjacency, directed, np.zeros((3, 3))), mag,
+                     private_positions=[0])
+    assert s.n_unsure == 1
+    assert s.identified
+
+
+# -- episode mix --------------------------------------------------------------------
+
+
+def _env(**kw):
+    kw.setdefault("belief_backend", "constraint")
+    kw.setdefault("cb_n_boot", 4)
+    kw.setdefault("action_modes", (VARY,))
+    return TwoAgentEnv(MAConfig(topology=TOPO, n_obs=120, n_int=40, budget=3,
+                                turn_order=ROUND_ROBIN, **kw), seed=0)
+
+
+def _is_confounded(env):
+    return any(bidirected_pairs(env.true_adjacency, tuple(w.nodes))
+               for w in env.windows.values())
+
+
+def test_episode_mix_controls_confounding():
+    conf = _env(episode_mix="confounded")
+    clean = _env(episode_mix="unconfounded")
+    for seed in range(6):
+        conf.reset(seed=seed)
+        assert _is_confounded(conf)
+        clean.reset(seed=seed)
+        assert not _is_confounded(clean)
+
+
+def test_mix_draws_is_reported():
+    env = _env(episode_mix="confounded")
+    result = env.reset(seed=1)
+    assert result.info["mix_draws"] >= 1
+
+
+# -- the claims reward through the env -------------------------------------------------
+
+
+def test_claims_reward_runs_and_reports():
+    env = _env(reward_criterion="claims", episode_mix="confounded")
+    result = env.reset(seed=2)
+    assert result.info["claims"] is not None
+    total = {a: sum(result.info["claims"][a][key] for key in ("right", "wrong", "unsure"))
+             for a in (0, 1)}
+    assert all(t > 0 for t in total.values())
+    while not result.done:
+        acts = {a: 0 for a in (0, 1)}
+        result = env.step(acts)
+    assert np.isfinite(result.reward)
+
+
+def test_claims_reward_refused_on_exact_backend():
+    with pytest.raises(ValueError, match="claims"):
+        TwoAgentEnv(MAConfig(topology=TOPO, reward_criterion="claims"), seed=0)
+
+
+# -- stratified resampling ---------------------------------------------------------------
+
+
+def test_every_row_its_own_block_makes_resampling_the_identity():
+    """The sharpest property test available: one row per block means the stratified
+    resample must reproduce the dataset exactly, so every replicate equals the first."""
+    rng = np.random.default_rng(0)
+    data = rng.normal(size=(200, 3))
+    data[:, 2] = data[:, 0] + rng.normal(size=200) * 0.3
+    belief = bootstrap_belief(data, n_boot=8, blocks=np.arange(200))
+    for codes in belief.replicates[1:]:
+        assert np.array_equal(codes, belief.replicates[0])
+
+
+# -- the constraint-side greedy ---------------------------------------------------------
+
+
+def test_uncertainty_greedy_targets_the_open_question_and_passes_when_done():
+    env = _env()
+    env.reset(seed=3)
+    agent = UncertaintyGreedyAgent(0, seed=0)
+    window = env.windows[0]
+    k = window.k
+
+    settled_adj = np.zeros((k, k)); settled_dir = np.zeros((k, k))
+    settled_adj[0, 1] = settled_adj[1, 0] = 1.0
+    settled_dir[0, 1] = 1.0
+    unsure = BootstrapBelief(settled_dir, np.zeros((k, k)), settled_adj,
+                             n_boot=12, ci_tests=0, truncated_fraction=0.0)
+    unsure.adjacency[2, 3] = unsure.adjacency[3, 2] = 0.6      # open adjacency question
+    window.belief.last = unsure
+    action = agent(env, None)
+    node, _ = window.actions[action]
+    assert window.pos[node] in (2, 3), "greedy must target a node touching the unsure claim"
+
+    unsure.adjacency[2, 3] = unsure.adjacency[3, 2] = 0.0      # now everything settled
+    assert agent(env, None) == window.pass_index
