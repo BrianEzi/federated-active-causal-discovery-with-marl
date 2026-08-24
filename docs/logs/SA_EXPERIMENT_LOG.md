@@ -3129,3 +3129,27 @@ set is roughly the budget itself, leaving no slack for choice to exploit.
 (k=7-9): grow the window past the budget so most nodes are NOT worth intervening on and
 selection becomes the task. Next concrete step per the handover: measure one episode's
 wall-clock at k=7 and k=9 on the constraint backend and set B before any grid.
+
+## 2026-08-24 -- the 20% ceiling decomposed: criterion arithmetic + a starved skeleton
+
+[CORRECTED] "The headroom at k=4 is ~7pp, nothing to learn" was the WRONG framing. The
+student challenged it (a near-oracle should clear 90%) and the decomposition proves the
+challenge right. 80 scripted episodes, 1920 replicates: fully correct 55%, adjacency
+wrong 30%, confounding wrong 6%, private edge unoriented 7%, unsound 2%.
+
+[MEASURED] Cause 1, MY criterion translation: per-replicate conjunctive perfection turns
+55%-good replicates into 31% episode success. Claim-level majority vote over replicates
+(the honest analogue of u14's mass-on-a-set -- aggregate per claim, not per graph) gives
+the SAME episodes 54% episode success, agent-level 48.8% -> 68.8%. +23pp from arithmetic
+alone. Proposed: adopt claim-level criterion (frequency bar per claim), pending sign-off.
+
+[MEASURED] Cause 2, the skeleton: even majority-voted, adjacency is right in only 74% of
+windows. Suspects: (a) CI tests POOL intervention regimes -- a pair test keeps rows where
+a third variable was intervened, and those rows carry a genuinely different dependence;
+(b) probes ran at n_obs=400 (speed) vs the project default 1000, on dense graphs
+(prior_p=0.644) at alpha=0.01. n_obs=1000 decomposition running to split (a) from (b).
+If (a) dominates: JCI-style fix, intervention indicators as context variables in the CI
+tests -- design decision with the student.
+
+[MEASURED] Cause 3: only 24/160 windows contain any confounding, so most episodes are
+pure dense-structure recovery -- where the skeleton errors bite hardest.
