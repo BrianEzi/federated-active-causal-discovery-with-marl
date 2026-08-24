@@ -3153,3 +3153,10 @@ tests -- design decision with the student.
 
 [MEASURED] Cause 3: only 24/160 windows contain any confounding, so most episodes are
 pure dense-structure recovery -- where the skeleton errors bite hardest.
+
+[MEASURED] n_obs 400 -> 1000, same 80 episodes: majority adjacency 74.4% -> 77.5%,
+majority-criterion episode success 53.8% -> 55.0%. 2.5x the observational data buys 3pp:
+DATA STARVATION RULED OUT as the skeleton's problem. Discriminator running: same
+episodes, skeleton from observational rows ONLY (1000 rows) vs the pooled 3000-row
+skeleton -- if obs-only wins with 3x less data, regime pooling is confirmed actively
+harmful and the JCI-style fix (intervention indicators as context variables) is the lever.
