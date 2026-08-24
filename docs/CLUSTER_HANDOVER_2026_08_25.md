@@ -63,14 +63,23 @@ the thesis's central quantity.
 | scripted near-oracle (pair completion) | 0.250 | 0.590 |
 | greedy_uncertainty (myopic baseline) | 0.140 | 0.580 |
 | random | 0.160 | 0.440 |
-| **learned, 1500 episodes only** | **0.170** (random paired at 0.070) | — |
+| learned, 1500 episodes | 0.12 — **indistinguishable from random** (see below) | — |
 
-- The learnable signature: completing BOTH interventions of a suspected confounded pair
-  beats myopic greedy by ~10pp on confounded episodes. That behaviour is the target.
 - Sanity gate (must hold on every eval): **zero settled-wrong confounding claims on
   unconfounded episodes.** Measured 0/120 windows at handover.
-- VERIFICATION (behavioural fingerprint of the 1500-episode checkpoint + timing
-  decomposition): {{VERIFICATION_RESULTS}}
+- VERIFICATION (120 paired episodes, 2026-08-25): the prelim eval's learned 0.17 vs
+  random 0.07 was BATCH NOISE — on the verification batch both score exactly 14/120,
+  and the checkpoint's behaviour matches random (pair-completion 93 vs 99 of 120;
+  entropy still 1.40 of 1.61). **There is no evidence yet that training separates from
+  random; that is the open question the overnight runs answer, not a confirmation
+  run.** Also measured: pair-completion is NOT the differentiator (random completes
+  82% of pairs automatically at this budget) — the scripted policy's 2x margin over
+  random comes from BALANCED coverage: each authority node exactly one block, own
+  private node first. Greedy completes pairs only 50% yet edges the field (0.14).
+  The learnable behaviour is balance + ordering, not raw coverage.
+- Timing note: a full episode costs ~1.0 s in isolation (either n_obs); 2.3 s/ep was
+  observed during the prelim train, unexplained, plausibly laptop contention. Measure
+  on-cluster before sizing arrays.
 
 ## 5. The overnight job
 
@@ -103,9 +112,11 @@ same arm concurrently on one node.
 1. `collapsed: false` and `first_success_episode` small (reward is being sampled).
 2. Entropy falls (start 1.61; the 1500-ep run reached 1.40; expect <1.2 by 16k).
    Flat-at-max entropy = the policy never differentiated.
-3. `learned` vs paired baselines: the overnight TARGET is learned ≥ greedy_uncertainty
-   (0.19 at handover) approaching the scripted ceiling (0.25). Learned ≈ random after
-   16k episodes means something regressed — diagnose, don't rerun.
+3. `learned` vs paired baselines: at handover, learned (1500 eps) is INDISTINGUISHABLE
+   from random. The overnight question is whether 16k episodes separates it — first
+   from random, then toward greedy_uncertainty (~0.14) and the scripted ceiling (0.25).
+   Learned ≈ random after 16k is a REAL FINDING about this reward/architecture at this
+   scale — report it as such with the paired numbers; do not quietly retune and rerun.
 4. Sanity: any settled-wrong confounding on an unconfounded eval arm → STOP EVERYTHING.
    That failure mode (inventing confounders) is the one the thesis cannot survive.
 5. Same seed twice must reproduce bit-for-bit (determinism test exists in the suite).

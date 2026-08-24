@@ -3282,3 +3282,12 @@ for every policy vacuously. Rerun uses per-window bidirected pairs in global ids
 n_obs suspicion was wrong), vs 2.3 s/ep observed during the prelim train -- the 2x gap
 is unexplained, most plausibly CPU contention on the laptop. Cluster agent must measure
 on-cluster before sizing arrays (already in the handover doc).
+
+[MEASURED] Corrected fingerprint, 120 paired episodes: learned 14/120, random 14/120,
+greedy_uncertainty 17/120. The prelim's learned-over-random was batch noise: at 1500
+episodes the policy IS random (pair-completion 93 vs 99 of 120, entropy 1.40). Also:
+pair-completion is NOT the differentiator -- random completes 82% of pairs automatically
+at budget 8 -- the scripted 2x margin comes from BALANCED coverage (each node exactly one
+block, private first). Handover doc updated: the overnight cluster runs ANSWER whether
+training separates from random; they do not confirm it. Learned ~ random at 16k would be
+a real finding to report, not to retune away.
