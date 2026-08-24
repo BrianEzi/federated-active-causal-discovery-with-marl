@@ -3224,3 +3224,17 @@ constraint engine -- and report per-claim accuracy alongside it.
 frequencies at the pinned seed (u14-replicate now 0/6 scripted seeds identify; claims:
 seed 3 identifies). The reachability test is re-pinned on claims -- the criterion
 training uses. 284+10 tests green.
+
+[CORRECTED] **Bug 9: evaluation still scored the superseded criterion.** The first
+claims-era probe reported confounded-episode success 0.02-0.07 for every policy, which
+contradicted the direct decomposition (43% of agent-windows identified under claims).
+`evaluate_episode.success` was still thresholding `mass_credit` -- the per-replicate
+conjunction -- on the constraint path. The criterion the env PAYS is now the criterion
+evaluation REPORTS (claims verdict under reward_criterion="claims"). Probe re-running.
+
+[MEASURED] Claims decomposition on confounded episodes (60 eps, scripted): adjacency
+claims 94% right; private directions 83% right, 0 wrong; CONFOUNDING claims 51% right /
+46% unsure / 3% wrong -- median frequency 0.75, >=0.7 in 51%, ZERO in 19%. The
+confounding claim is the binding constraint on H1's ceiling: partly bar-vs-B granularity
+(freq steps of 1/12), partly the 19% structural misses. B is the smoothing lever; noted,
+not changed tonight (attribution).

@@ -69,6 +69,14 @@ def main(argv=None) -> dict:
     ap.add_argument("--three_agents", action="store_true",
                     help="rung 1: three agents, one private node each, three shared. "
                          "Runs ONLY on the constraint backend (widest_hidden = 2).")
+    # The Day-1 redesign axes (2026-08-24). "claims" is the training criterion for
+    # constraint arms; "confounded" episodes are what the thesis is about, with the
+    # unconfounded arm kept as the standing sanity check.
+    ap.add_argument("--reward_criterion", default=None,
+                    choices=["u14", "identified", "claims"],
+                    help="unset keeps MAConfig's default (u14)")
+    ap.add_argument("--episode_mix", default="any",
+                    choices=["any", "confounded", "unconfounded"])
     # None (unset) means "let MAConfig resolve it" -- 2 ln(d)/d since 2026-08-22. Exposed
     # explicitly so a run can be PINNED to the old fixed value, which is what rung 0 of the
     # n-agent refactor needs: isolate the topology refactor from the prior change by holding
@@ -104,7 +112,9 @@ def main(argv=None) -> dict:
                        turn_order=args.turn_order, action_modes=modes,
                        prior_p=args.prior_p,
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
-                       policy_arch=args.policy_arch)
+                       policy_arch=args.policy_arch, episode_mix=args.episode_mix,
+                       **({"reward_criterion": args.reward_criterion}
+                          if args.reward_criterion else {}))
     env = TwoAgentEnv(config)
     started = time.time()
 
@@ -142,6 +152,9 @@ def main(argv=None) -> dict:
                    "policy_arch": config.policy_arch,
                    "cb_n_boot": config.cb_n_boot,
                    "cb_alpha": config.cb_alpha,
+                   "episode_mix": config.episode_mix,
+                   "claim_bar": config.claim_bar,
+                   "claim_penalty": config.claim_penalty,
                    "topology": {"name": topology.name, "d": topology.d,
                                 "private": [list(p) for p in topology.private],
                                 "exposed": list(topology.exposed)},
@@ -171,6 +184,8 @@ def main(argv=None) -> dict:
         labels.insert(0, "random_vary")
     if args.backend == "exact":
         labels.insert(-1, "greedy")
+    else:
+        labels.insert(-1, "greedy_uncertainty")
     for label in labels:
         arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
 

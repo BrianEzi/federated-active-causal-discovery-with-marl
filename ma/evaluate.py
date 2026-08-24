@@ -229,10 +229,29 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
         "union_acyclic": acyclic,
         "union_matches_truth": matches_truth,
         "union_equivalent": globally_equivalent,
-        # All three parts of [U14], which is the number to report.
-        "success": bool(all(reports[a]["mass_credit"] >= threshold for a in env.topology.agents)
-                        and acyclic and globally_equivalent),
+        # All three parts of [U14], which is the number to report -- EXCEPT under the
+        # claims criterion, where success is the claims verdict itself. BUG 9, found
+        # 2026-08-24 when a probe's "success" (4%) contradicted the direct decomposition
+        # (43% of agent-windows identified): this expression was still scoring the
+        # superseded per-replicate conjunction through `mass_credit` on the constraint
+        # path, so every claims-era probe under-reported. The criterion the env pays is
+        # the criterion evaluation must report.
+        "success": (_claims_success(env) if env.config.reward_criterion == "claims"
+                    else bool(all(reports[a]["mass_credit"] >= threshold
+                                  for a in env.topology.agents)
+                              and acyclic and globally_equivalent)),
     }
+
+
+def _claims_success(env: TwoAgentEnv) -> bool:
+    from cb.claims import score_window
+    for agent, window in env.windows.items():
+        score = score_window(window.belief.last, env._true_mag(agent),
+                             [window.pos[n] for n in window.private],
+                             bar=env.config.claim_bar)
+        if not score.identified:
+            return False
+    return True
 
 
 def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
