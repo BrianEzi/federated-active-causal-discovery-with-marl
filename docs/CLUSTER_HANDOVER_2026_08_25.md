@@ -77,6 +77,14 @@ the thesis's central quantity.
   random comes from BALANCED coverage: each authority node exactly one block, own
   private node first. Greedy completes pairs only 50% yet edges the field (0.14).
   The learnable behaviour is balance + ordering, not raw coverage.
+- **LATE ADDITION (2026-08-25, after the verification): the unlearnability was
+  diagnosed and fixed.** The observation lacked the agent's own intervention history,
+  so "touch each node once" could not be learned. Per-node own-counts are now in the
+  observation (commit `fed869f`); an obs-only rule using them scores 0.30 vs random
+  0.07 -- at the scripted ceiling. Overnight runs pick this up automatically; old
+  checkpoints are refused by the obs_size check. The overnight expectation IMPROVES:
+  training should now separate from random early; if it does not, suspect per-step
+  reward noise and report, don't retune.
 - Timing note: a full episode costs ~1.0 s in isolation (either n_obs); 2.3 s/ep was
   observed during the prelim train, unexplained, plausibly laptop contention. Measure
   on-cluster before sizing arrays.
