@@ -3067,3 +3067,11 @@ the channel designed for it. The engine reads the row-level flag separately
 [NOTED] git push hangs on this machine (osxkeychain holds no GitHub token; gh absent).
 All overnight commits are LOCAL ONLY until the student runs one interactive push. Flagged
 at the top of docs/MORNING_2026_08_24.md.
+
+[MEASURED] rung0_s0 (constraint+GNN+vary, budget 8, n_int 250, B=12, 4000 eps, 1h51m):
+NOT collapsed, first success episode 5, train solve 0.23 -> 0.31, entropy 1.61 -> 1.42
+(near-uniform still). Eval: learned 0.180 [0.125,0.235] ~ random_vary 0.190 [0.135,0.245]
+>> pass 0.030. Training works end-to-end; no choice-quality advantage yet at 4000
+episodes. Headroom exists (scripted plan reaches 0.75-0.92 per-agent credit). Not a null
+on the thesis -- a statement about training length and entropy, both with known levers
+(sa/ measured entropy_coef 0.003; episodes cost 1 s).
