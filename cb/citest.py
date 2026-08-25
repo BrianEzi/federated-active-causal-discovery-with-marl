@@ -42,6 +42,47 @@ from scipy import stats
 MIN_ROWS = 20
 
 
+def _welch_p(a: np.ndarray, b: np.ndarray) -> float:
+    """Welch's two-sample t-test p-value -- scipy.stats.ttest_ind(equal_var=False),
+    without the per-call overhead. Same formulas: Welch statistic, Satterthwaite df."""
+    n1, n2 = len(a), len(b)
+    v1, v2 = a.var(ddof=1), b.var(ddof=1)
+    se2 = v1 / n1 + v2 / n2
+    if se2 <= 0:
+        return np.nan
+    t = (a.mean() - b.mean()) / np.sqrt(se2)
+    df = se2 * se2 / ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1))
+    return 2.0 * float(stats.t.sf(abs(t), df))
+
+
+def _brown_forsythe_p(a: np.ndarray, b: np.ndarray) -> float:
+    """scipy.stats.levene's default (center='median', i.e. Brown-Forsythe), two groups."""
+    za = np.abs(a - np.median(a))
+    zb = np.abs(b - np.median(b))
+    n1, n2 = len(za), len(zb)
+    ma, mb = za.mean(), zb.mean()
+    grand = (za.sum() + zb.sum()) / (n1 + n2)
+    denom = ((za - ma) ** 2).sum() + ((zb - mb) ** 2).sum()
+    if denom <= 0:
+        return np.nan
+    w = (n1 + n2 - 2) * (n1 * (ma - grand) ** 2 + n2 * (mb - grand) ** 2) / denom
+    return float(stats.f.sf(w, 1, n1 + n2 - 2))
+
+
+def _pearson_p(x: np.ndarray, y: np.ndarray) -> float:
+    """Pearson correlation p-value via the exact t transform -- what scipy.stats.pearsonr
+    computes through the beta distribution; identical two-sided p."""
+    n = len(x)
+    if n < 3 or x.std() <= 1e-12 or y.std() <= 1e-12:
+        return np.nan
+    r = float(np.corrcoef(x, y)[0, 1])
+    r = max(min(r, 1.0), -1.0)
+    if 1.0 - r * r <= 0:
+        return 0.0
+    t = r * np.sqrt((n - 2) / (1.0 - r * r))
+    return 2.0 * float(stats.t.sf(abs(t), n - 2))
+
+
 class FisherZ:
     """Partial-correlation independence test with per-row intervention masking.
 
@@ -94,24 +135,37 @@ class FisherZ:
     # -- the test -----------------------------------------------------------------------
 
     def independent(self, x: int, y: int, cond: Sequence[int] = ()) -> bool:
-        """Is `x` independent of `y` given `cond`, on the usable rows?"""
+        """Is `x` independent of `y` given `cond`, on the usable rows?
+
+        The correlation matrix over ALL columns is computed ONCE per pair and cached:
+        the usable rows depend only on (x, y), so every conditioning set the skeleton
+        tries for that pair reads submatrices of the same cached matrix (2026-08-25,
+        from the profile that found the engine spending its time in call overhead).
+        """
         self.calls += 1
         cond = [c for c in cond if c not in (x, y)]
-        rows = self._rows_for(x, y)
-        n_rows = int(rows.sum())
+        key = ("corr", x, y) if x <= y else ("corr", y, x)
+        hit = self._cache.get(key)
+        if hit is None:
+            rows = self._rows_for(x, y)
+            n_rows = int(rows.sum())
+            if n_rows >= MIN_ROWS:
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    full = np.corrcoef(self.data[rows], rowvar=False)
+            else:
+                full = None
+            hit = (n_rows, full)
+            self._cache[key] = hit
+        n_rows, full = hit
         dof = n_rows - len(cond) - 3
-        if n_rows < MIN_ROWS or dof <= 0:
+        if full is None or dof <= 0:
             return True
 
-        sub = self.data[rows][:, [x, y] + list(cond)]
-        # A clamped variable is constant within its rows, so its column can be degenerate
-        # even after masking. np.corrcoef would emit a divide warning and NaNs; catch it
-        # here and report independence rather than propagating NaN into the skeleton.
-        spread = sub.std(axis=0)
-        if not np.all(spread > 1e-12):
-            return True
-
-        corr = np.corrcoef(sub, rowvar=False)
+        index = [x, y] + list(cond)
+        corr = full[np.ix_(index, index)]
+        # A clamped variable is constant within its rows, so its column is degenerate
+        # even after masking: corrcoef leaves NaNs there, read as independence rather
+        # than propagated into the skeleton (same verdict as the old spread guard).
         if not np.all(np.isfinite(corr)):
             return True
         try:
@@ -195,16 +249,18 @@ class FisherZ:
                 # while a correlation against randomised values has 1/sqrt(n) power
                 # (|r| ~ 0.2 at n=250). On clamp-to-0 data x is constant in these rows and
                 # the channel is inert by the spread guard -- purely additive.
+                #
+                # DIRECT NUMPY FORMULAS, NOT scipy CALLS (2026-08-25). Profiling put 70%
+                # of all training compute in this method's ~5000 scipy calls per episode
+                # -- each ~1 ms of call overhead around microseconds of arithmetic. The
+                # formulas below ARE Welch's t, Brown-Forsythe Levene (scipy's default,
+                # center='median'), and Pearson's r with the t-distributed p -- verified
+                # verdict-identical against scipy across random datasets in
+                # tests/cb/test_fast_stats.py. Only the call overhead was removed.
                 a_x = self.data[clamped & free, x]
-                if a_x.std() > 1e-12 and a.std() > 1e-12:
-                    _, p_corr = stats.pearsonr(a_x, a)
-                else:
-                    p_corr = np.nan
-                _, p_mean = stats.ttest_ind(a, b, equal_var=False)
-                try:
-                    _, p_var = stats.levene(a, b)
-                except ValueError:
-                    p_var = np.nan
+                p_corr = _pearson_p(a_x, a)
+                p_mean = _welch_p(a, b)
+                p_var = _brown_forsythe_p(a, b)
                 fired = [q for q in (p_mean, p_var, p_corr) if np.isfinite(q)]
                 if fired and min(fired) < self.alpha:
                     out[x, y] = True
@@ -245,6 +301,15 @@ class FisherZ:
         z_alpha = stats.norm.ppf(1.0 - self.alpha / 2.0)
         z_power = stats.norm.ppf(target_power)
         out = np.zeros((self.k, self.k), dtype=bool)
+        # The pure-regime anchor rows are the same for EVERY pair; one correlation matrix
+        # replaces k^2 per-pair corrcoef calls (2026-08-25, from the same profile).
+        pure = ~self.foreign & ~self.intervened.any(axis=1)
+        if int(pure.sum()) < min_rows:
+            return out
+        pure_data = self.data[pure]
+        pure_sd = pure_data.std(axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            pure_corr = np.corrcoef(pure_data, rowvar=False)
         for x in range(self.k):
             clamped = self.intervened[:, x]
             for y in range(self.k):
@@ -271,13 +336,9 @@ class FisherZ:
                 # sizes the effect the experiment must be able to detect, power failed,
                 # and a detectable confounder was reported undetermined. The dependence a
                 # causal reading must explain is the UNPERTURBED one.
-                pure = ~self.foreign & ~self.intervened.any(axis=1)
-                if int(pure.sum()) < min_rows:
+                if pure_sd[x] <= 1e-12 or pure_sd[y] <= 1e-12:
                     continue
-                sub = self.data[pure][:, [x, y]]
-                if not np.all(sub.std(axis=0) > 1e-12):
-                    continue
-                r = float(np.corrcoef(sub, rowvar=False)[0, 1])
+                r = float(pure_corr[x, y])
                 if not np.isfinite(r):
                     continue
                 r2 = min(r * r, 0.999999)
@@ -300,7 +361,7 @@ class FisherZ:
                 # clamp-to-0 data (spread guard), like the detection channel it mirrors.
                 x_int = self.data[clamped & free, x]
                 sd_int = float(x_int.std())
-                sd_x = float(sub[:, 0].std())
+                sd_x = float(pure_sd[x])
                 if sd_int > 1e-12 and sd_x > 1e-12 and n1 > 3:
                     s = sd_int / sd_x
                     r_int = abs(r) * s / np.sqrt(1.0 + r2 * (s * s - 1.0))

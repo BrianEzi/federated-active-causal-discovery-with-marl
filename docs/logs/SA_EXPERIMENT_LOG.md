@@ -3326,3 +3326,20 @@ clean: the only change from the prelim (which was == random) is the counts obser
 [DECIDED] Stage B launched immediately: rung 1 (three agents, budget 9), same recipe,
 4500 episodes -- sized so both rungs land by morning; rung-0 extension deferred to the
 cluster's longer runs.
+
+## 2026-08-25 (morning) -- the engine profiled and made 2.3x faster, verdicts unchanged
+
+[MEASURED] Profile of one training episode: 70% of ALL compute was ancestral_evidence's
+~5000 scipy calls (ttest_ind + levene + pearsonr), each ~1 ms of call overhead around
+microseconds of arithmetic; skeleton CI tests 21%; everything else noise. The earlier
+"laptop contention" guess for slow episodes was partly this.
+
+[DECIDED] Two optimisations, both gated on VERDICT-IDENTICAL tests
+(tests/cb/test_fast_stats.py -- p-values within 1e-9 of scipy across 300 random inputs,
+full ancestral matrices equal over 40 random SCMs, CI-test verdicts equal over 60):
+  1. Welch t / Brown-Forsythe / Pearson-p as direct numpy formulas (same statistics,
+     no per-call overhead); pair_power's per-pair corrcoef replaced by one cached
+     pure-rows correlation matrix.
+  2. The CI test caches ONE full correlation matrix per pair (the usable rows depend
+     only on the pair), so every conditioning set reads submatrices of it.
+Like-for-like: 5.05 -> 2.21 s/episode under identical contention. Suite green.
