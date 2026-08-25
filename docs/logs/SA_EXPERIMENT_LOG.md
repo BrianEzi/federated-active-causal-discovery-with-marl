@@ -3513,3 +3513,59 @@ leaves the wrong-claim rate FLAT while identification falls. Consistent with (b)
 errors sit at 0.9-1.0 agreement, above every bar tested. Raising the bar is not a lever.
 Caveat: the greedy that produced those traces was targeting unsure claims at bar 0.7, so
 this isolates the scoring effect only.
+
+## 2026-08-26 -- the deterministic (infinite-data) environment: measured, and rejected
+
+Student proposal: start agents at the observational equivalence class, compute
+DETERMINISTICALLY what each intervention disambiguates, reward the fraction resolved. No
+data, no tests, no bootstrap. Formalised as a VERSION SPACE: belief = the set of MAGs still
+consistent with what is established; an intervention on X prunes it to those agreeing with
+the truth about X's ancestry (the infinite-data limit of the engine's own ancestral
+channel); a claim is RESOLVED when every survivor agrees. The truth never leaves the set,
+so resolved implies resolved CORRECTLY -- settled-wrong cannot occur by construction.
+
+[MEASURED] Scaling is possible because Markov-equivalent MAGs share adjacencies, so the
+class varies only in the MARKS ON THE TRUE SKELETON: 3^(edges) candidates, not 4^(pairs).
+Verified against exhaustive enumeration on k=4 (identical member sets) and 10x faster.
+Where the two disagreed (231 vs 219 on one dense graph) the exhaustive set was WRONG: the
+12 extras were non-maximal ancestral graphs, admitted because maximality was unchecked.
+
+[MEASURED] Single-agent headroom, 15 graphs, budget 3, EXACT (Bayes-optimal adaptive DP vs
+myopic greedy over the version space): optimal MINUS greedy = 0.000 on 15 of 15 graphs,
+max 0.000. Greedy reaches 10.46 of 10.87 available claims. With infinite data the
+objective is submodular and myopic selection is exactly optimal -- there is NOTHING to
+learn in single-window experiment selection.
+
+[MEASURED] Federated scaling, 1 intervention per agent, k=4 windows (1 private + 3 shared),
+20 worlds per row. What decentralised greedy LEAVES UNRESOLVED, which upper-bounds what
+ANY policy could win:
+
+    agents  2   d  5   decentralised  17.2   everything  21.4   unresolved 4.2
+    agents  3   d  6   decentralised  27.0   everything  30.1   unresolved 3.1
+    agents  6   d  9   decentralised  59.3   everything  62.2   unresolved 2.9
+    agents 10   d 13   decentralised  98.0   everything  98.8   unresolved 0.8
+    agents 14   d 17   decentralised 133.1   everything 133.6   unresolved 0.5
+    agents 20   d 23   decentralised 181.3   everything 181.9   unresolved 0.6
+
+Headroom SHRINKS with scale -- 0.3% at 20 agents -- because budget grows with agent count
+while window difficulty is fixed. Growing windows instead (6 agents, k=4->6) gives the
+same picture: 133.4 of 134.9 at k=6.
+
+[DECIDED] The deterministic environment is REJECTED as a training environment: greedy
+already solves it at every scale tested (2-20 agents, k=4-6, d up to 23). It is kept as an
+ANALYSIS tool -- exact, milliseconds per episode, and it provides computable optima.
+The learning problem in this project lives entirely in the statistical layer that the
+idealisation removes: the missed edges, the confounding misreads, the power limits
+measured on 2026-08-25.
+
+[CORRECTED] Three claims made from small samples during this investigation, all wrong:
+(a) "coordination is worth ~0.9 claims, 12/12 worlds" -- that estimator compared
+decentralised greedy against CENTRALISED GREEDY, two heuristics neither of which is
+optimal. At 8+ agents the "coordinated" one is reliably WORSE (-1.25 +/- 0.30, losing 19
+of 20 worlds) because summing gains over all windows over-values shared variables, which
+appear in every window. The comparison never measured headroom.
+(b) "+1.800 and +2.800 coordination gaps at k=4 and 5 agents" -- n=10, where this
+estimator's standard error is 0.5-1.0. At n=20 the same configurations give +0.50 +/- 0.42
+and -1.25 +/- 0.30. Noise.
+(c) "the gap grows with contention" -- not supported once error bars were computed; the
+sign flips with agent count and the trend is downward, not upward.
