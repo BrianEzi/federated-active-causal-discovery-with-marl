@@ -136,6 +136,40 @@ def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndar
     return proj
 
 
+def observational_skeleton(adjacency: np.ndarray, observed: Sequence[int]):
+    """(adjacency [k, k] bool, sepsets {(i, j): frozenset}) -- the infinite-data limit of
+    what OBSERVATION alone can know about the window: which pairs are connected, and for
+    each unconnected pair one witnessing separating set (window positions).
+
+    Added 2026-08-25 for the oracle warm start ("start the agents at the equivalence
+    class"): the same search `latent_projection` runs, but keeping the separating set,
+    which is what collider orientation consumes. Conditioning sets range over OBSERVED
+    nodes only, so nothing an observational method could not know leaks through --
+    in particular, a hidden confounder's pair stays ADJACENT here, and detecting the
+    confounding remains entirely the interventions' job.
+    """
+    observed = list(observed)
+    k = len(observed)
+    adj = np.zeros((k, k), dtype=bool)
+    sepsets = {}
+    for i, j in combinations(range(k), 2):
+        u, v = observed[i], observed[j]
+        rest = [w for w in observed if w not in (u, v)]
+        found = None
+        for size in range(len(rest) + 1):
+            for cond in combinations(rest, size):
+                if d_separated(adjacency, u, v, cond):
+                    found = frozenset(observed.index(w) for w in cond)
+                    break
+            if found is not None:
+                break
+        if found is None:
+            adj[i, j] = adj[j, i] = True
+        else:
+            sepsets[(i, j)] = found
+    return adj, sepsets
+
+
 def bidirected_pairs(adjacency: np.ndarray, observed: Sequence[int]) -> Tuple[Tuple[int, int], ...]:
     """Global-node-id pairs carrying a bidirected edge in the projection onto `observed`."""
     observed = list(observed)

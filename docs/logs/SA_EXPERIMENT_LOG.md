@@ -3372,3 +3372,17 @@ re-execute the main module, so any script using cb_n_jobs>1 needs a __main__ gua
 ends cleanly, no traceback, no results written; the machine was concurrently running a
 database restore and Jupyter kernels, so memory pressure is the lead suspect. Relaunched
 identically on the optimised engine; the rerun costs about what the lost tail would have.
+
+## 2026-08-25 -- oracle warm start built (student-approved): start at the equivalence class
+
+[DECIDED] `oracle_obs_structure=True` (MAConfig / --oracle_obs): each agent receives the
+TRUE infinite-observational-data structure of its window -- adjacency + separating sets
+from the new `ma.projection.observational_skeleton`, the same search latent_projection
+runs but keeping the witnessing sets for collider orientation. The engine skips skeleton
+estimation; replicates differ only through the interventional channels. NOTHING
+interventional leaks: a confounded pair starts adjacent-and-unexplained, exactly as
+infinite observation would leave it -- pinned by test. The correction over the raw "start
+at the MEC" idea: with hidden nodes the observational limit is the PAG-side object, not
+the MEC, and ~98% of confounding is observationally invisible (banked), so confounding
+detection remains entirely the agents' job. Constraint backend only; estimated-skeleton
+arms remain the end-to-end story, oracle is attribution + curriculum.

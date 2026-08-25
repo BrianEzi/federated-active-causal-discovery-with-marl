@@ -214,6 +214,15 @@ class MAConfig:
     # settled-wrong confounding claims is a pinned requirement, not a hope. "any": the
     # historical behaviour. Rejection sampling with a draw cap; acceptance rate recorded.
     episode_mix: str = "any"
+    # ORACLE WARM START (2026-08-25, student-approved): hand each agent the TRUE
+    # infinite-observational-data structure of its window -- adjacency and separating
+    # sets from `ma.projection.observational_skeleton` -- so the whole task is the part
+    # observation cannot do: orienting by experiment and detecting confounders. Nothing
+    # interventional leaks: a confounded pair starts adjacent and UNEXPLAINED, exactly as
+    # infinite observational data would leave it. Constraint backend only. Keep at least
+    # one estimated-skeleton arm in any reported comparison, or the claim silently
+    # becomes "given perfect observational preprocessing".
+    oracle_obs_structure: bool = False
     # The exact backend is UNSOUND for `widest_hidden > 1` -- it scores the wrong
     # hypothesis (see the long note in `TwoAgentEnv.__init__`). The env refuses that
     # combination unless this is set, which exists for demonstrations of the defect
@@ -337,6 +346,8 @@ class TwoAgentEnv:
             raise ValueError(
                 "reward_criterion='claims' scores bootstrap claim frequencies; the exact "
                 "backend has no replicates. Use the constraint backend, or 'u14'.")
+        if config.oracle_obs_structure and config.belief_backend != CONSTRAINT:
+            raise ValueError("oracle_obs_structure requires the constraint backend")
         widest_hidden = max((len(config.topology.hidden_from(a))
                              for a in config.topology.agents), default=0)
         if (config.belief_backend == EXACT and widest_hidden > 1
@@ -412,6 +423,11 @@ class TwoAgentEnv:
         self._credit_cache: Dict[int, np.ndarray] = {}
         self._mag_cache: Dict[int, np.ndarray] = {}
         self._last_claim_fraction: Optional[float] = None
+        if cfg.oracle_obs_structure:
+            from ma.projection import observational_skeleton
+            for agent, window in self.windows.items():
+                window.belief.oracle_skeleton = observational_skeleton(
+                    self.true_adjacency, tuple(window.nodes))
         # Experiment-block label per row, for stratified bootstrap resampling.
         self.blocks = np.zeros(cfg.n_obs, dtype=int)
         self.round = 0

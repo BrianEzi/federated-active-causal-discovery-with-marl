@@ -172,3 +172,40 @@ def test_uncertainty_greedy_targets_the_open_question_and_passes_when_done():
 
     unsure.adjacency[2, 3] = unsure.adjacency[3, 2] = 0.0      # now everything settled
     assert agent(env, None) == window.pass_index
+
+
+# -- the oracle warm start ---------------------------------------------------------------
+
+
+def test_oracle_skeleton_is_the_observational_limit_and_leaks_nothing():
+    """Hidden 0 -> {1, 2}: the pair (1, 2) must start ADJACENT (observation cannot
+    explain it away) but NOT confounded -- detecting that stays the interventions' job."""
+    import numpy as np
+    from ma.projection import observational_skeleton
+    adjacency = np.zeros((4, 4), dtype=int)
+    adjacency[0, 1] = adjacency[0, 2] = adjacency[2, 3] = 1
+    adj, sepsets = observational_skeleton(adjacency, (1, 2, 3))
+    # window positions: 0=node1, 1=node2, 2=node3
+    assert adj[0, 1], "confounded pair must remain adjacent"
+    assert adj[1, 2], "real edge 2->3 must be adjacent"
+    assert not adj[0, 2] and (0, 2) in sepsets, "1 and 3 separate (via node 2)"
+
+
+def test_oracle_warm_start_settles_adjacency_and_only_adjacency():
+    env = _env(oracle_obs_structure=True, reward_criterion="claims",
+               episode_mix="confounded")
+    result = env.reset(seed=4)
+    for agent, window in env.windows.items():
+        belief = window.belief.last
+        mag = env._true_mag(agent)
+        truth = (mag != 0) | (mag != 0).T
+        got = belief.adjacency >= 0.5
+        assert np.array_equal(got | got.T, truth), agent
+        assert np.all(np.isin(belief.adjacency, (0.0, 1.0)))
+        # No interventions yet, so no confounding may be claimed anywhere.
+        assert not (belief.bidirected >= env.config.claim_bar).any()
+
+
+def test_oracle_flag_refused_on_exact_backend():
+    with pytest.raises(ValueError, match="oracle"):
+        TwoAgentEnv(MAConfig(topology=TOPO, oracle_obs_structure=True), seed=0)

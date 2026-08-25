@@ -80,6 +80,10 @@ class ConstraintBackend:
         self.n_jobs = int(n_jobs)
         self._calls = 0
         self.last: Optional[BootstrapBelief] = None
+        # Set by the env at reset when oracle_obs_structure is on: (adjacency, sepsets)
+        # from ma.projection.observational_skeleton -- the true observational limit for
+        # THIS episode's graph. None means estimate the skeleton from data as usual.
+        self.oracle_skeleton = None
 
     # -- the WindowBeliefDP-shaped surface ------------------------------------------------
 
@@ -108,7 +112,7 @@ class ConstraintBackend:
             np.asarray(data, dtype=float), np.asarray(known),
             n_boot=self.n_boot, alpha=self.alpha, max_cond=self.max_cond,
             seed=self.base_seed + self._calls, foreign=foreign, blocks=blocks,
-            n_jobs=self.n_jobs)
+            n_jobs=self.n_jobs, oracle_skeleton=self.oracle_skeleton)
         return self.last.edge_marginals()
 
     @property

@@ -30,7 +30,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from cb.citest import FisherZ
 from cb.orient import CODE_BIDIRECTED, CODE_DIRECTED, orient
-from cb.skeleton import estimate_skeleton
+from cb.skeleton import Skeleton, estimate_skeleton
 
 # One persistent pool per process, created lazily. Replicates are embarrassingly
 # parallel and DETERMINISTIC BY CONSTRUCTION regardless of scheduling: every replicate's
@@ -54,10 +54,19 @@ def _pool(n_jobs: int) -> ProcessPoolExecutor:
 
 def _replicate(task):
     """One bootstrap replicate, a pure function of its inputs -- the unit of parallelism."""
-    data, intervened, foreign, rows, alpha, max_cond, use_interventions, require_power = task
+    (data, intervened, foreign, rows, alpha, max_cond, use_interventions,
+     require_power, oracle_skeleton) = task
     sub, sub_int = data[rows], intervened[rows]
     test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])
-    skel = estimate_skeleton(test, data.shape[1], max_cond=max_cond)
+    if oracle_skeleton is not None:
+        # The oracle warm start: adjacency and separating sets are the TRUE
+        # infinite-observational-data limit (ma.projection.observational_skeleton), so
+        # the replicates differ only through the interventional channels. ci_tests=0
+        # is honest -- no test ran.
+        adj, sepsets = oracle_skeleton
+        skel = Skeleton(np.asarray(adj, dtype=bool).copy(), dict(sepsets), 0, False)
+    else:
+        skel = estimate_skeleton(test, data.shape[1], max_cond=max_cond)
     ancestral = test.ancestral_evidence() if use_interventions else None
     clamped = test.clamped_enough() if use_interventions else None
     powered = test.pair_power() if use_interventions else None
@@ -105,7 +114,7 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                      require_power: bool = True,
                      foreign: Optional[np.ndarray] = None,
                      blocks: Optional[np.ndarray] = None,
-                     n_jobs: int = 1) -> BootstrapBelief:
+                     n_jobs: int = 1, oracle_skeleton=None) -> BootstrapBelief:
     """Resample rows `n_boot` times; run skeleton + orientation on each; count edges.
 
     Rows are resampled with replacement, NOT columns: the variables are fixed by the
@@ -158,7 +167,7 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
         row_sets.append(rows)
 
     tasks = [(data, intervened, foreign, rows, alpha, max_cond,
-              use_interventions, require_power) for rows in row_sets]
+              use_interventions, require_power, oracle_skeleton) for rows in row_sets]
     if n_jobs > 1 and runs > 1:
         # One chunk per worker: at small k a replicate is milliseconds of work, and
         # per-task IPC would swamp it (measured 2026-08-25: unchunked 4-way was 2.7x

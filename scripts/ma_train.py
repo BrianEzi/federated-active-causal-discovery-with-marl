@@ -77,6 +77,9 @@ def main(argv=None) -> dict:
                     help="unset keeps MAConfig's default (u14)")
     ap.add_argument("--episode_mix", default="any",
                     choices=["any", "confounded", "unconfounded"])
+    ap.add_argument("--oracle_obs", action="store_true",
+                    help="oracle warm start: agents receive the true observational-limit "
+                         "structure of their window; interventions are the whole task")
     # None (unset) means "let MAConfig resolve it" -- 2 ln(d)/d since 2026-08-22. Exposed
     # explicitly so a run can be PINNED to the old fixed value, which is what rung 0 of the
     # n-agent refactor needs: isolate the topology refactor from the prior change by holding
@@ -113,6 +116,7 @@ def main(argv=None) -> dict:
                        prior_p=args.prior_p,
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
                        policy_arch=args.policy_arch, episode_mix=args.episode_mix,
+                       oracle_obs_structure=args.oracle_obs,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
     env = TwoAgentEnv(config)
@@ -153,6 +157,7 @@ def main(argv=None) -> dict:
                    "cb_n_boot": config.cb_n_boot,
                    "cb_alpha": config.cb_alpha,
                    "episode_mix": config.episode_mix,
+                   "oracle_obs_structure": config.oracle_obs_structure,
                    "claim_bar": config.claim_bar,
                    "claim_penalty": config.claim_penalty,
                    "topology": {"name": topology.name, "d": topology.d,
