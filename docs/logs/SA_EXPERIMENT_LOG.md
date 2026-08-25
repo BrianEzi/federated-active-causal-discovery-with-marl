@@ -3386,3 +3386,35 @@ at the MEC" idea: with hidden nodes the observational limit is the PAG-side obje
 the MEC, and ~98% of confounding is observationally invisible (banked), so confounding
 detection remains entirely the agents' job. Constraint backend only; estimated-skeleton
 arms remain the end-to-end story, oracle is attribution + curriculum.
+
+## 2026-08-25 -- rung 1 stopped at update 120; the conjunction is the suspect
+
+[NOTED] Rung 1 take 2 was STOPPED by the student at update 120/281 (79 min in). Entropy
+was falling steadily (1.609 -> 1.192, so the policy was committing) while solve sat at
+~0.04. Committing without improving is the pattern that says "converging on something
+that cannot win", and it was not worth the remaining 160 updates to confirm.
+
+Caveat on the plateau alert that triggered the stop: solve is printed over batches of 16
+episodes, so one episode is 0.0625 and the window means compared (0.031 vs 0.041) are
+inside the sampling noise. The ENTROPY trend was the real signal; the solve comparison at
+that granularity could not have distinguished a plateau from a slow climb.
+
+[MEASURED] Confounded pairs per window, truth-only over 200 episodes of the same
+distribution the env samples (scratchpad/claim_load.py, no belief engine involved):
+
+    T1_1_1_3      2 agents   mean 0.68 per window   43% of windows carry ZERO
+    T_3agent_1each 3 agents  mean 0.94 per window   25% of windows carry ZERO
+
+Rung 1 is not merely "one more window". Each window is individually heavier, and under
+`episode_mix=confounded` far fewer windows come free.
+
+[NOTED] The structural fact this lands on: `ma/env.py::_result` scores success as
+`all_identified = all(identified.values())` over EVERY agent, and `ma/policy.py::collect`
+trains on exactly that. Each agent is graded on the other agents' windows, which it cannot
+act on. Two agents made it a double conjunction; three make it a triple. Taking the
+detection rate for a confounding claim at the previously measured ~51%, the implied joint
+ceiling is ~0.49 at rung 0 and ~0.20 at rung 1 -- both far ABOVE the ~0.05 observed, so
+the conjunction alone does not explain rung 1 and a second failure is present. The
+measurement that separates them (per-window vs joint identification, at training budget
+and 4x budget, with failures split into unsure vs settled-wrong) is running:
+scratchpad/diagnose_rung1.py.
