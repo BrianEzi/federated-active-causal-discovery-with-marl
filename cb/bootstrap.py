@@ -55,9 +55,10 @@ def _pool(n_jobs: int) -> ProcessPoolExecutor:
 def _replicate(task):
     """One bootstrap replicate, a pure function of its inputs -- the unit of parallelism."""
     (data, intervened, foreign, rows, alpha, max_cond, use_interventions,
-     require_power, oracle_skeleton) = task
+     require_power, oracle_skeleton, skeleton_alpha) = task
     sub, sub_int = data[rows], intervened[rows]
-    test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])
+    test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows],
+                   skeleton_alpha=skeleton_alpha)
     if oracle_skeleton is not None:
         # The oracle warm start: adjacency and separating sets are the TRUE
         # infinite-observational-data limit (ma.projection.observational_skeleton), so
@@ -114,7 +115,8 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                      require_power: bool = True,
                      foreign: Optional[np.ndarray] = None,
                      blocks: Optional[np.ndarray] = None,
-                     n_jobs: int = 1, oracle_skeleton=None) -> BootstrapBelief:
+                     n_jobs: int = 1, oracle_skeleton=None,
+                     skeleton_alpha: Optional[float] = None) -> BootstrapBelief:
     """Resample rows `n_boot` times; run skeleton + orientation on each; count edges.
 
     Rows are resampled with replacement, NOT columns: the variables are fixed by the
@@ -167,7 +169,8 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
         row_sets.append(rows)
 
     tasks = [(data, intervened, foreign, rows, alpha, max_cond,
-              use_interventions, require_power, oracle_skeleton) for rows in row_sets]
+              use_interventions, require_power, oracle_skeleton, skeleton_alpha)
+             for rows in row_sets]
     if n_jobs > 1 and runs > 1:
         # One chunk per worker: at small k a replicate is milliseconds of work, and
         # per-task IPC would swamp it (measured 2026-08-25: unchunked 4-way was 2.7x

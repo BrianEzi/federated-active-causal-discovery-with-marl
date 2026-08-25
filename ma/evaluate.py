@@ -105,7 +105,7 @@ def agent_report(env: TwoAgentEnv, agent: int) -> Dict[str, float]:
     `mass_equivalent`, private-pinned for `mass_credit`. `map_index` has no analogue --
     nothing enumerates the window -- and is -1.
     """
-    if env.config.belief_backend == "constraint":
+    if env.config.belief_backend in ("constraint", "version_space"):
         window = env.windows[agent]
         mag = env._true_mag(agent)
         private_positions = [window.pos[n] for n in window.private]
@@ -208,7 +208,7 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     """Every criterion for one finished episode."""
     threshold = env.config.identify_threshold
     reports = {agent: agent_report(env, agent) for agent in env.topology.agents}
-    if env.config.belief_backend == "constraint":
+    if env.config.belief_backend in ("constraint", "version_space"):
         union = _constraint_union(env)
     else:
         map_indices = {agent: reports[agent]["map_index"] for agent in env.topology.agents}

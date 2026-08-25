@@ -119,10 +119,18 @@ def main(argv=None) -> dict:
     ap.add_argument("--policy", default="greedy_uncertainty",
                     help="a baseline name, or the path to a saved policy pair (.pt)")
     ap.add_argument("--oracle_obs", action="store_true")
+    ap.add_argument("--backend", default="constraint",
+                    choices=["constraint", "version_space"])
+    ap.add_argument("--n_agents", type=int, default=None)
+    ap.add_argument("--per_agent_reward", action="store_true")
     ap.add_argument("--out", default="results/traces/trace.json")
     args = ap.parse_args(argv)
 
-    if args.three_agents:
+    if args.n_agents:
+        topology = Topology(name=f"T_{args.n_agents}agent_1each",
+                            private=tuple((i,) for i in range(args.n_agents)),
+                            exposed=tuple(range(args.n_agents, args.n_agents + 3)))
+    elif args.three_agents:
         topology = Topology(name="T_3agent_1each",
                             private=((0,), (1,), (2,)), exposed=(3, 4, 5))
     else:
@@ -131,10 +139,11 @@ def main(argv=None) -> dict:
 
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                       budget=args.budget, disclose_regime=True, turn_order=ROUND_ROBIN,
-                      action_modes=(VARY,), belief_backend="constraint",
+                      action_modes=(VARY,), belief_backend=args.backend,
                       cb_n_boot=args.cb_n_boot, policy_arch="gnn",
                       episode_mix=args.episode_mix, reward_criterion="claims",
                       claim_bar=args.claim_bar,
+                      per_agent_reward=args.per_agent_reward,
                       oracle_obs_structure=args.oracle_obs)
     env = TwoAgentEnv(config, seed=args.seed)
     agents = list(topology.agents)
@@ -161,6 +170,7 @@ def main(argv=None) -> dict:
                      "private": [list(p) for p in topology.private],
                      "exposed": list(topology.exposed)},
         "config": {"budget": args.budget, "n_obs": args.n_obs, "n_int": args.n_int,
+                   "belief_backend": args.backend,
                    "cb_n_boot": args.cb_n_boot, "claim_bar": args.claim_bar,
                    "episode_mix": args.episode_mix,
                    "oracle_obs_structure": args.oracle_obs,

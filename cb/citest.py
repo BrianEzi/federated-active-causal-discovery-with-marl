@@ -95,7 +95,8 @@ class FisherZ:
     """
 
     def __init__(self, data: np.ndarray, intervened: Optional[np.ndarray] = None,
-                 alpha: float = 0.01, foreign: Optional[np.ndarray] = None):
+                 alpha: float = 0.01, foreign: Optional[np.ndarray] = None,
+                 skeleton_alpha: Optional[float] = None):
         self.data = np.asarray(data, dtype=float)
         self.n, self.k = self.data.shape
         self.intervened = (np.zeros_like(self.data, dtype=bool) if intervened is None
@@ -113,6 +114,14 @@ class FisherZ:
         self.foreign = (np.zeros(self.n, dtype=bool) if foreign is None
                         else np.asarray(foreign) > 0)
         self.alpha = float(alpha)
+        # SEPARATE THRESHOLD FOR THE SKELETON, because the two uses have opposite error
+        # costs. A missed edge in the skeleton is a wrong adjacency claim outright -- the
+        # largest single error category measured (22 of 45 confident errors, 2026-08-25) --
+        # while a spurious ORIENTATION signal corrupts the type claims, and the alpha sweep
+        # showed type errors doubling from 16 to 32 as alpha went 0.01 -> 0.10. One shared
+        # threshold cannot serve both. Defaults to `alpha`, so behaviour is unchanged unless
+        # this is set deliberately.
+        self.skeleton_alpha = float(alpha if skeleton_alpha is None else skeleton_alpha)
         self.calls = 0
         self._cache: dict = {}
         # How many variables are intervened in each row -- lets any "no third variable
@@ -221,7 +230,9 @@ class FisherZ:
         r = float(np.clip(-precision[0, 1] / denom, -0.999999, 0.999999))
         z = 0.5 * np.log((1 + r) / (1 - r))
         p_value = 2.0 * stats.norm.sf(abs(np.sqrt(dof) * z))
-        return bool(p_value > self.alpha)
+        # `skeleton_alpha`, which defaults to `alpha`. The orientation channels below keep
+        # using `alpha` -- see the note in __init__ for why they must differ.
+        return bool(p_value > self.skeleton_alpha)
 
     # -- interventional orientation -----------------------------------------------------
 

@@ -57,7 +57,16 @@ PASS_ACTION = -1
 # what they can soundly handle (see the capability check in `TwoAgentEnv.__init__`).
 EXACT = "exact"
 CONSTRAINT = "constraint"
-BACKENDS = (EXACT, CONSTRAINT)
+# The deterministic idealisation (cb/versionspace.py): belief is the SET of structures still
+# consistent with what interventions have established, with no statistics anywhere. It
+# answers the infinite-data question -- can agents learn to divide experiments -- with
+# episodes in milliseconds and a computable optimum to measure against. It is NOT a claim
+# about finite data; the constraint backend remains the realistic path.
+VERSION_SPACE = "version_space"
+BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE)
+# Backends whose belief exposes bootstrap-shaped claim frequencies, so `cb.claims` and the
+# constraint-side greedy read them the same way.
+CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -183,7 +192,11 @@ class MAConfig:
     #                95% per-claim accuracy into 36% success and a luck-dominated
     #                training signal.
     reward_criterion: str = "u14"
-    claim_bar: float = 0.7             # per-claim confidence bar; 0.5 would be a coin flip
+    claim_bar: float = 0.7
+    # Pay each agent for its OWN window instead of the all-agents conjunction. Off by
+    # default so every number measured before 2026-08-26 stays reproducible; the shared
+    # reward remains what `both_identified` reports either way.
+    per_agent_reward: bool = False             # per-claim confidence bar; 0.5 would be a coin flip
     claim_penalty: float = 1.0         # settled-wrong weight in the dense reward
     # WHICH ENGINE HOLDS THE BELIEF. "exact" is the Bayesian subset DP
     # (`crosscheck/belief_dp.py`); "constraint" is the bootstrap PC/FCI engine (`cb/`).
@@ -193,7 +206,11 @@ class MAConfig:
     # documented divergence (no cross-agent union check).
     belief_backend: str = EXACT
     cb_n_boot: int = 50            # bootstrap replicates per refresh; B is the speed knob
-    cb_alpha: float = 0.01         # CI-test level. SWEPT 2026-08-24 (0.05 halves credit
+    cb_alpha: float = 0.01
+    # Separate significance threshold for SKELETON search only. None => same as cb_alpha.
+    # The alpha sweep (2026-08-25) showed one shared threshold cannot serve both uses:
+    # loosening recovers missed edges but doubles orientation errors.
+    cb_skeleton_alpha: Optional[float] = None         # CI-test level. SWEPT 2026-08-24 (0.05 halves credit
                                    # via noisier skeletons) and FIXED. Do not revisit
                                    # against results.
     # Bootstrap replicates CAN run on a process pool (bit-identical to serial by
@@ -254,6 +271,7 @@ class AgentWindow:
 
     def __init__(self, agent: int, topology: Topology,
                  modes: Sequence[str] = MODES, backend: str = EXACT,
+                 cb_skeleton_alpha: Optional[float] = None,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
@@ -275,7 +293,11 @@ class AgentWindow:
             # id so identical seeded episodes reproduce bit-for-bit.
             self.belief = ConstraintBackend(self.k, shared_positions, n_boot=cb_n_boot,
                                             alpha=cb_alpha, n_jobs=cb_n_jobs,
+                                            skeleton_alpha=cb_skeleton_alpha,
                                             base_seed=100003 * (self.agent + 1))
+        elif backend == VERSION_SPACE:
+            from cb.versionspace import VersionSpaceBackend
+            self.belief = VersionSpaceBackend(self.k, shared_positions)
         else:
             self.belief = WindowBeliefDP(self.k, shared_positions)
 
@@ -342,12 +364,23 @@ class TwoAgentEnv:
             raise ValueError(f"belief_backend must be one of {BACKENDS}")
         if config.episode_mix not in ("any", "confounded", "unconfounded"):
             raise ValueError("episode_mix must be 'any', 'confounded' or 'unconfounded'")
-        if config.reward_criterion == "claims" and config.belief_backend != CONSTRAINT:
+        if config.reward_criterion == "claims" and config.belief_backend not in CLAIM_BACKENDS:
             raise ValueError(
                 "reward_criterion='claims' scores bootstrap claim frequencies; the exact "
                 "backend has no replicates. Use the constraint backend, or 'u14'.")
         if config.oracle_obs_structure and config.belief_backend != CONSTRAINT:
             raise ValueError("oracle_obs_structure requires the constraint backend")
+        if config.belief_backend == VERSION_SPACE:
+            if config.reward_criterion != "claims":
+                raise ValueError("version_space belief only scores the claims criterion")
+            # Below 1.0 a MAJORITY of survivors could carry a wrong answer over the bar and
+            # settled-wrong would reappear -- the one thing this backend exists to make
+            # impossible. Unanimity is what makes "resolved" mean "resolved correctly".
+            if config.claim_bar < 1.0:
+                raise ValueError(
+                    "version_space requires claim_bar=1.0: the truth is always in the "
+                    "space, so a claim is settled correctly exactly when every survivor "
+                    "agrees. A lower bar re-admits settled-wrong.")
         widest_hidden = max((len(config.topology.hidden_from(a))
                              for a in config.topology.agents), default=0)
         if (config.belief_backend == EXACT and widest_hidden > 1
@@ -365,6 +398,7 @@ class TwoAgentEnv:
             agent: AgentWindow(agent, config.topology, config.action_modes,
                                backend=config.belief_backend,
                                cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha,
+                               cb_skeleton_alpha=config.cb_skeleton_alpha,
                                cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
@@ -423,6 +457,14 @@ class TwoAgentEnv:
         self._credit_cache: Dict[int, np.ndarray] = {}
         self._mag_cache: Dict[int, np.ndarray] = {}
         self._last_claim_fraction: Optional[float] = None
+        self._last_agent_fraction: Optional[Dict[int, float]] = None
+        self._agent_rewards: Optional[Dict[int, float]] = None
+        if cfg.belief_backend == VERSION_SPACE:
+            # The version space is defined relative to THIS episode's truth, so it has to
+            # be rebuilt every reset. Truth is used only to prune -- oracle-side, exactly
+            # as the reward is -- and never reaches the observation vector.
+            for agent, window in self.windows.items():
+                window.belief.reset(self._true_mag(agent))
         if cfg.oracle_obs_structure:
             from ma.projection import observational_skeleton
             for agent, window in self.windows.items():
@@ -699,7 +741,7 @@ class TwoAgentEnv:
             # needs the mode-agnostic regime flag (`hidden_intervened`), because a varied
             # hidden node is not clean but its rows are still foreign (bug 6's second
             # form, caught 2026-08-24 when vary-mode zeroed a confounded agent).
-            if cfg.belief_backend == CONSTRAINT:
+            if cfg.belief_backend in CLAIM_BACKENDS:
                 told = (self.hidden_intervened[agent] if cfg.disclose_regime
                         else np.zeros(len(self.samples), dtype=bool))
                 self.marginals[agent] = window.belief.edge_marginals(
@@ -731,7 +773,7 @@ class TwoAgentEnv:
     def true_mass(self, agent: int) -> float:
         window = self.windows[agent]
         cfg = self.config
-        if cfg.belief_backend == CONSTRAINT:
+        if cfg.belief_backend in CLAIM_BACKENDS:
             # The strict analogue of "mass on the exact true DAG": every directed MAG edge
             # recovered, confounding exactly right. See cb/backend.py.
             return window.belief.credit_fraction(self._true_mag(agent), strict=True)
@@ -766,7 +808,7 @@ class TwoAgentEnv:
         This is the same object `ma/evaluate2.py` reports, so the reward and the reported
         number cannot drift apart -- which is exactly how they drifted apart before.
         """
-        if self.config.belief_backend == CONSTRAINT:
+        if self.config.belief_backend in CLAIM_BACKENDS:
             # Replicate credit fraction with private-incident edges required, mirroring
             # [U14]'s criterion 1. The union acyclicity/MEC check does NOT port -- a
             # replicate PAG has no representative DAG -- so the constraint verdict is
@@ -878,6 +920,20 @@ class TwoAgentEnv:
             if self._last_claim_fraction is not None:
                 reward += mean_fraction - self._last_claim_fraction
             self._last_claim_fraction = mean_fraction
+            if cfg.per_agent_reward:
+                # Each agent paid for ITS OWN window: its own dense delta, and its own
+                # terminal +1. The shared alternative makes agent i's gradient depend on
+                # agent j's luck, which is credit-assignment noise the policy has to
+                # average out -- and it compresses the metric exponentially in the number
+                # of agents, so every further rung looks worse however well agents learn.
+                self._agent_rewards = {}
+                for a in self.topology.agents:
+                    own = mass[a]
+                    previous = (self._last_agent_fraction.get(a)
+                                if self._last_agent_fraction is not None else None)
+                    delta = 0.0 if previous is None else own - previous
+                    self._agent_rewards[a] = delta + (1.0 if identified[a] else 0.0)
+                self._last_agent_fraction = dict(mass)
             claim_info = {a: {"right": s.n_right, "wrong": s.n_wrong,
                               "unsure": s.n_unsure,
                               "required_right": s.required_right,
@@ -904,6 +960,8 @@ class TwoAgentEnv:
             reward=reward,
             n_interventions=dict(self.n_interventions),
             info={"true_mass": mass, "both_identified": all_identified, "passed": passed,
+                  "agent_rewards": self._agent_rewards,
+                  "identified_fraction": float(np.mean([float(v) for v in identified.values()])),
                   "claims": claim_info,
                   # Per agent, never a max across agents: an idle agent hides inside an
                   # average, and free-riding is the thing we most need to see.

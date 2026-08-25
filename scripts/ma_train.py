@@ -49,6 +49,7 @@ def _config_record(config, topology, args) -> dict:
             "oracle_obs_structure": config.oracle_obs_structure,
             "claim_bar": config.claim_bar,
             "claim_penalty": config.claim_penalty,
+            "per_agent_reward": config.per_agent_reward,
             "topology": {"name": topology.name, "d": topology.d,
                          "private": [list(p) for p in topology.private],
                          "exposed": list(topology.exposed)},
@@ -132,11 +133,20 @@ def main(argv=None) -> dict:
     # The two new axes (2026-08-24). Both recorded in the report config and in the
     # checkpoint, and refused on mismatch at load -- performance belongs to the
     # (policy, backend, arch) triple.
-    ap.add_argument("--backend", default="exact", choices=["exact", "constraint"])
+    ap.add_argument("--backend", default="exact",
+                    choices=["exact", "constraint", "version_space"])
+    ap.add_argument("--claim_bar", type=float, default=None,
+                    help="confidence bar per claim; version_space requires 1.0")
+    ap.add_argument("--per_agent_reward", action="store_true",
+                    help="pay each agent for its own window, not the all-agents conjunction")
     ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn"])
     ap.add_argument("--cb_n_boot", type=int, default=12,
                     help="bootstrap replicates per refresh (constraint backend only)")
     ap.add_argument("--gnn_layers", type=int, default=2)
+    ap.add_argument("--n_agents", type=int, default=None,
+                    help="N agents with one private node each and three shared; overrides "
+                         "--three_agents. The measured coordination headroom peaks near "
+                         "N=4 for three shared nodes (docs/FINDINGS_2026_08_26.md).")
     ap.add_argument("--three_agents", action="store_true",
                     help="rung 1: three agents, one private node each, three shared. "
                          "Runs ONLY on the constraint backend (widest_hidden = 2).")
@@ -174,7 +184,11 @@ def main(argv=None) -> dict:
     ap.add_argument("--no_wandb", action="store_true")
     args = ap.parse_args(argv)
 
-    if args.three_agents:
+    if args.n_agents:
+        topology = Topology(name=f"T_{args.n_agents}agent_1each",
+                            private=tuple((i,) for i in range(args.n_agents)),
+                            exposed=tuple(range(args.n_agents, args.n_agents + 3)))
+    elif args.three_agents:
         topology = Topology(name="T_3agent_1each",
                             private=((0,), (1,), (2,)), exposed=(3, 4, 5))
     else:
@@ -196,6 +210,8 @@ def main(argv=None) -> dict:
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
                        policy_arch=args.policy_arch, episode_mix=args.episode_mix,
                        oracle_obs_structure=args.oracle_obs,
+                       **({"claim_bar": args.claim_bar} if args.claim_bar else {}),
+                       per_agent_reward=args.per_agent_reward,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
     env = TwoAgentEnv(config)

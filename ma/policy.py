@@ -309,6 +309,10 @@ class IndependentPPO:
                    for agent in self.env.topology.agents}
         entropies: List[float] = []
         solved = 0
+        # Per-WINDOW identification alongside the joint rate. The joint number falls
+        # exponentially in the number of agents whatever the policy does, so it is a poor
+        # training signal to watch; this is the quantity the headroom was measured in.
+        windows_identified = 0.0
 
         for episode in range(episodes):
             result = self.env.reset(seed=int(self.rng.integers(1 << 30)))
@@ -318,8 +322,12 @@ class IndependentPPO:
                 picks = {a: self._act(a, obs[a], mask_pass) for a in self.env.topology.agents}
                 result = self.env.step({a: picks[a][0] for a in self.env.topology.agents})
                 new_potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
+                per_agent = result.info.get("agent_rewards")
                 for agent in self.env.topology.agents:
-                    shaped = result.reward
+                    # Per-agent pay when the environment provides it, otherwise the shared
+                    # scalar. Nothing else in the loop changes.
+                    shaped = (result.reward if per_agent is None
+                              else float(per_agent[agent]))
                     if cfg.potential_shaping:
                         shaped += cfg.potential_shaping * (
                             cfg.gamma * new_potential[agent] - potential[agent])
@@ -333,6 +341,7 @@ class IndependentPPO:
                     buf["done"].append(float(result.done))
                     entropies.append(entropy)
                 potential = new_potential
+            windows_identified += result.info.get("identified_fraction", 0.0)
             if result.info["both_identified"]:
                 solved += 1
                 if self.first_success_episode is None:
@@ -342,7 +351,8 @@ class IndependentPPO:
             for key in buffers[agent]:
                 buffers[agent][key] = np.asarray(buffers[agent][key], dtype=np.float32)
         return {"buffers": buffers, "entropy": float(np.mean(entropies)),
-                "solve_rate": solved / episodes}
+                "solve_rate": solved / episodes,
+                "window_rate": windows_identified / episodes}
 
     # -- learning -----------------------------------------------------------------------
 
@@ -404,13 +414,15 @@ class IndependentPPO:
                                  update * cfg.episodes_per_update, mask_pass)
             self.update(batch["buffers"])
             record = {"update": update, "entropy": batch["entropy"],
-                      "solve_rate": batch["solve_rate"], "mask_pass": mask_pass}
+                      "solve_rate": batch["solve_rate"],
+                      "window_rate": batch.get("window_rate"), "mask_pass": mask_pass}
             self.history.append(record)
             if on_update is not None:
                 on_update(record)
             if verbose and update % 10 == 0:
                 print(f"  update {update:4d}  entropy {record['entropy']:.3f}  "
-                      f"solve {record['solve_rate']:.3f}", flush=True)
+                      f"solve {record['solve_rate']:.3f}  "
+                      f"window {record['window_rate']:.3f}", flush=True)
         return self.history
 
     # -- use ----------------------------------------------------------------------------
