@@ -3367,3 +3367,8 @@ crossover (~k=6-7) from the feasibility measurements; we pay at toy scale for so
 at multi-hidden topologies and for scale itself. macOS spawn caveat: pool workers
 re-execute the main module, so any script using cb_n_jobs>1 needs a __main__ guard
 (ma_train.py has one).
+
+[NOTED] The first rung-1 run (old code) was KILLED externally at update ~220/281 -- log
+ends cleanly, no traceback, no results written; the machine was concurrently running a
+database restore and Jupyter kernels, so memory pressure is the lead suspect. Relaunched
+identically on the optimised engine; the rerun costs about what the lost tail would have.
