@@ -233,38 +233,43 @@ class TwoAgentEnv:
             raise ValueError(f"turn_order must be one of {TURN_ORDERS}")
         if not config.action_modes or any(m not in MODES for m in config.action_modes):
             raise ValueError(f"action_modes must be a non-empty subset of {MODES}")
-        # GUARD RESTORED 2026-08-22, on a wider condition than before.
+        # GUARD NARROWED 2026-08-25. It was blocking three- and five-agent topologies in
+        # the configuration where the scoring it protects is EXACT.
         #
-        # A 2026-08-22 attempt at per-block confounding subsets (S_r) tracks each round's
-        # cleanliness as an AGGREGATE FRACTION -- `n_clamped / len(hidden)` -- and mixes the
-        # clean/dirty local-score tables with weight `q = 1 - fraction`, the SAME weight for
-        # EVERY possible confounding edge under test. That is wrong whenever `len(hidden) >
-        # 1`: the mixture has no way to know WHICH hidden node was actually clamped, only
-        # HOW MANY, so a hypothesis about a specific node h is scored identically whether h
-        # itself was the one clamped or a completely different hidden node was. Confirmed
-        # directly: `_assignment_weights` receives only a scalar clean-fraction per row
-        # batch, with no per-node identity anywhere in its input. Fractions of exactly 0.0
-        # or 1.0 remain exact (every hidden node was clamped, or none were); anything in
-        # between is not.
+        # The hazard is real and unchanged. A 2026-08-22 attempt at per-block confounding
+        # subsets tracks each round's cleanliness as an AGGREGATE FRACTION --
+        # `n_clamped / len(hidden)` -- and mixes the clean/dirty local-score tables with
+        # weight `q = 1 - fraction`, the SAME weight for EVERY confounding edge under test.
+        # With more than one hidden node the mixture knows only HOW MANY were clamped, never
+        # WHICH, so a hypothesis about a specific hidden node is scored identically whether
+        # that node or a different one was clamped. `_assignment_weights` receives a scalar
+        # clean-fraction per row batch with no per-node identity anywhere in its input.
         #
-        # THE OLD GUARD ALSO MISSED THIS CASE. It checked `max(len(block) for block in
-        # private) > 1` -- a single agent's own private-node count -- which is right at two
-        # agents (hidden_from(agent) == the OTHER agent's private block) but wrong at three
-        # or more: with three agents and ONE private node each, hidden_from(agent) is the
-        # UNION of the other two agents' single nodes, i.e. two hidden nodes, even though no
-        # single private block exceeds size 1. The correct condition checks the actual
-        # hidden set PER AGENT, not the private-block size.
+        # WHAT IS NEW IS THE OBSERVATION THAT THE FRACTION IS ONLY EVER NON-TRIVIAL WHEN THE
+        # REGIME BIT IS DISCLOSED. `_refresh`, `true_mass` and `dag_set_mass` all pass
+        # `clean` as ALL ZEROS unless `config.disclose_regime` is set. A fraction of exactly
+        # 0.0 takes `_assignment_weights`'s `f == 0.0` branch, which reads the dirty table at
+        # the full parent set and mixes nothing -- exact, as the 2026-08-22 note itself
+        # records ("fractions of exactly 0.0 or 1.0 remain exact"). So on the default
+        # no-disclosure arm the unsound path is unreachable at ANY number of hidden nodes.
         #
-        # Fail loudly rather than score silently wrong data -- restated from the guard this
-        # replaces, because the reason has not changed, only the case it needed to also
-        # cover. See docs/logs/MA_BUILD_LOG.md, 2026-08-22, for the full finding.
+        # The old condition therefore refused three agents at one private node each -- where
+        # `hidden_from(agent)` is the union of the other two blocks, i.e. two nodes -- even
+        # though every score computed for that topology would have been exact. That is the
+        # entire scale ladder blocked by a guard on a branch it never enters.
+        #
+        # Still fail loudly for the combination that IS unsound, rather than scoring silently
+        # wrong data. See docs/logs/MA_BUILD_LOG.md, 2026-08-22, for the original finding.
         widest_hidden = max(len(config.topology.hidden_from(a)) for a in config.topology.agents)
-        if widest_hidden > 1:
+        if widest_hidden > 1 and config.disclose_regime:
             raise NotImplementedError(
                 f"topology {config.topology.name!r} can hide up to {widest_hidden} nodes "
                 "from a single agent (n_agents >= 3 and/or an agent with >1 private node "
-                "both count). The per-block confounding mixture cannot yet identify WHICH "
-                "hidden node was clamped, only how many, so it is not exact for this shape.")
+                "both count), and `disclose_regime` is on. The regime bit is a clean "
+                "FRACTION, so the confounding mixture cannot identify WHICH hidden node was "
+                "clamped -- only how many -- and the score is not exact for this shape. "
+                "Run this topology with `disclose_regime=False`, where `clean` is all zeros "
+                "and the mixture is exact.")
         self.config = config
         self.topology = config.topology
         self.windows: Dict[int, AgentWindow] = {

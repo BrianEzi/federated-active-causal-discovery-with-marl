@@ -64,6 +64,7 @@ and compared to the old rule by measurement rather than by identity.
 """
 from __future__ import annotations
 
+import heapq
 from itertools import combinations, product
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -108,10 +109,26 @@ class WindowBeliefDP:
     variables -- the only places a confounding edge may appear.
     """
 
-    def __init__(self, k: int, shared_positions: Sequence[int]):
+    # Above this many raw candidates the assignment set is NOT materialised and the
+    # screen (`_screened_assignments`) takes over. 4096 is 3^7, so every topology up to
+    # seven shared pairs -- |X| = 4, the largest size validated against full enumeration --
+    # keeps the exact path and reproduces earlier numbers bit for bit.
+    MAX_EAGER_ASSIGNMENTS = 4096
+    # How many assignments the screen keeps for exact evaluation. Measured on real SCM
+    # draws (`scripts/bayes_prune_survival.py`): at |X| = 4 the top 27 hold >= 99.9% of the
+    # posterior mass across five seeds, and the existing 1e-14 prune leaves 21-29 alive.
+    # 64 is that with headroom.
+    SCREEN_KEEP = 64
+
+    def __init__(self, k: int, shared_positions: Sequence[int],
+                 screen_keep: Optional[int] = None,
+                 max_eager: Optional[int] = None):
         self.k = k
         self.shared_positions = list(shared_positions)
         self.pairs: List[Tuple[int, int]] = list(combinations(self.shared_positions, 2))
+        self.screen_keep = int(screen_keep if screen_keep is not None else self.SCREEN_KEEP)
+        self._max_eager = int(max_eager if max_eager is not None
+                              else self.MAX_EAGER_ASSIGNMENTS)
         self.score = BGeScore(k)
         # Uniform over DAGs, matching `AgentView.log_prior = zeros`. Passing
         # "erdos_renyi" with p=0.5 would ALSO be uniform over edges but not over DAGs,
@@ -122,9 +139,23 @@ class WindowBeliefDP:
         # Ordered confounding assignments: each pair is absent, u->v, or v->u.
         # Each shared pair (u, v) independently takes one of three states: no confounding,
         # u -> v, or v -> u. 3^pairs assignments -- 27 at |X| = 3.
-        per_pair = [(None, (u, v), (v, u)) for u, v in self.pairs]
-        candidates = ([tuple(combo) for combo in product(*per_pair)]
-                      if per_pair else [()])
+        self.options: List[Tuple[Optional[Tuple[int, int]], ...]] = [
+            (None, (u, v), (v, u)) for u, v in self.pairs]
+        # LAZY ABOVE THE CAP. `product(*options)` is 3^pairs, and pairs is C(|X|,2): 59049
+        # at |X| = 5 and 3^45 at |X| = 10. Materialising it was itself a hard ceiling --
+        # the list could not be BUILT at the sizes this project is aiming for, let alone
+        # scored. Above the cap `self.assignments` stays None and every consumer goes
+        # through `prepared_assignments`, which screens.
+        self._eager = 3 ** len(self.pairs) <= self._max_eager
+        if not self._eager:
+            self.assignments = None
+            self._table_key = None
+            self._table_cache = None
+            self._assign_key = None
+            self._assign_cache = None
+            return
+        candidates = ([tuple(combo) for combo in product(*self.options)]
+                      if self.pairs else [()])
         # An assignment whose forced edges already contain a cycle admits NO acyclic
         # completion, so its hypothesis class is empty. Left in, the DP's alternating
         # inclusion-exclusion cancels to an exactly zero partition function and raises.
@@ -225,24 +256,135 @@ class WindowBeliefDP:
                     table[node, i] = self.score.local_score_from_stats(node, parents, stats)
         return table
 
-    def assignment_weights_and_z(self, samples: np.ndarray, known_intervened: np.ndarray,
-                                 clean: np.ndarray) -> List[Tuple[np.ndarray, float]]:
-        """`(log_w, log_z)` per surviving assignment, computed once per belief update."""
+    # -- the screen ---------------------------------------------------------------------
+
+    def _pair_deltas(self, reg_tables, log_prior: Optional[np.ndarray] = None) -> np.ndarray:
+        """`[n_pairs, 3]` -- what each pair-state is worth ON ITS OWN, in log partition.
+
+        `delta[p, s] = log Z(only pair p in state s) - log Z(no confounding)`, with state 0
+        (absent) zero by construction. Costs `1 + 2 * n_pairs` partition calls -- LINEAR in
+        the pair count, against the `3^pairs` the exact path pays.
+
+        This is the surrogate the screen ranks on, and it is a MEAN-FIELD approximation: it
+        assumes an assignment's weight is the sum of its pairs' individual contributions,
+        which ignores interaction between simultaneously-declared pairs. It is used only to
+        DECIDE WHICH assignments to evaluate. Everything that survives is then scored
+        exactly, so the surrogate never enters a reported number -- its only failure mode is
+        omitting an assignment that deserved evaluation, which `scripts/bayes_screen_error.py`
+        measures against full enumeration rather than assuming away.
+
+        `log_prior[p, s]` is added when given. Disclosure's prior is additive over pairs by
+        construction (DISCLOSURE_SPEC.md step 5), so it composes with this surrogate
+        EXACTLY, with no extra approximation -- and ranking on the posterior surrogate rather
+        than the likelihood one is what keeps TRAP 2 from reappearing at screen scale: an
+        assignment the likelihood alone would discard, but disclosure rescues, is ranked on
+        the rescued score.
+        """
+        empty = tuple(None for _ in self.pairs)
+        base = self.dp.log_partition(self._assignment_weights(reg_tables, empty))
+        deltas = np.zeros((len(self.pairs), 3), dtype=float)
+        for p in range(len(self.pairs)):
+            for state in (1, 2):
+                assignment = list(empty)
+                assignment[p] = self.options[p][state]
+                log_w = self._assignment_weights(reg_tables, tuple(assignment))
+                if not np.isfinite(log_w).any():
+                    deltas[p, state] = NEG_INF
+                    continue
+                z = float(self.dp.log_partition(log_w))
+                deltas[p, state] = (z - base) if np.isfinite(z) and np.isfinite(base) else NEG_INF
+        if log_prior is not None:
+            deltas = deltas + np.asarray(log_prior, dtype=float)
+        return deltas
+
+    def _screened_assignments(self, deltas: np.ndarray, keep: int) -> List[tuple]:
+        """The `keep` best-scoring ACYCLIC assignments under the additive surrogate.
+
+        Best-first over the product of per-pair choices, which enumerates in descending
+        total order without ever building the product. Each pair's states are visited in
+        rank order and a popped node pushes the `n_pairs` nodes that demote exactly one
+        pair by one rank, so every assignment is reachable and none is generated twice.
+
+        Cyclic assignments are skipped rather than counted: their hypothesis class is empty,
+        and the DP's alternating inclusion-exclusion cancels to an exactly zero partition
+        function on them. `max_pops` bounds the search so a topology whose best-ranked
+        region is mostly cyclic cannot spin.
+        """
+        n_pairs = len(self.pairs)
+        if n_pairs == 0:
+            return [()]
+        order = [list(np.argsort(-deltas[p])) for p in range(n_pairs)]
+        scores = [[float(deltas[p][state]) for state in order[p]] for p in range(n_pairs)]
+
+        start = tuple([0] * n_pairs)
+        total = sum(scores[p][0] for p in range(n_pairs))
+        heap = [(-total, start)]
+        seen = {start}
+        out: List[tuple] = []
+        pops = 0
+        max_pops = max(20 * keep, 200)
+
+        while heap and len(out) < keep and pops < max_pops:
+            neg_total, ranks = heapq.heappop(heap)
+            pops += 1
+            assignment = tuple(self.options[p][order[p][ranks[p]]] for p in range(n_pairs))
+            if np.isfinite(-neg_total) and not self._forces_a_cycle(assignment):
+                out.append(assignment)
+            for p in range(n_pairs):
+                if ranks[p] + 1 >= 3:
+                    continue
+                nxt = list(ranks)
+                nxt[p] += 1
+                nxt = tuple(nxt)
+                if nxt in seen:
+                    continue
+                seen.add(nxt)
+                delta = scores[p][nxt[p]] - scores[p][ranks[p]]
+                heapq.heappush(heap, (-(-neg_total + delta), nxt))
+        return out
+
+    def prepared_assignments(self, samples: np.ndarray, known_intervened: np.ndarray,
+                             clean: np.ndarray, log_prior: Optional[np.ndarray] = None
+                             ) -> List[Tuple[tuple, np.ndarray, float]]:
+        """`(assignment, log_w, log_z)` for every assignment worth evaluating.
+
+        Below `MAX_EAGER_ASSIGNMENTS` this is every acyclic assignment and the result is
+        exact. Above it, the screen picks `screen_keep` candidates by the additive surrogate
+        and each of those is then scored EXACTLY -- the approximation is in the shortlist,
+        never in the numbers.
+        """
         clean = np.asarray(clean, dtype=float)
         unique_f, counts = np.unique(clean, return_counts=True)
-        key = (samples.shape[0], tuple(float(f) for f in unique_f), tuple(int(c) for c in counts))
+        key = (samples.shape[0], tuple(float(f) for f in unique_f),
+               tuple(int(c) for c in counts),
+               None if log_prior is None else tuple(np.asarray(log_prior).ravel()))
         if self._assign_key == key and self._assign_cache is not None:
             return self._assign_cache
+
         reg_tables = self.regime_tables(samples, known_intervened, clean)
-        out: List[Tuple[np.ndarray, float]] = []
-        for assignment in self.assignments:
+        if self._eager:
+            assignments = self.assignments
+        else:
+            assignments = self._screened_assignments(
+                self._pair_deltas(reg_tables, log_prior), self.screen_keep)
+
+        out: List[Tuple[tuple, np.ndarray, float]] = []
+        for assignment in assignments:
             log_w = self._assignment_weights(reg_tables, assignment)
             if not np.isfinite(log_w).any():
-                out.append((log_w, NEG_INF))
+                out.append((assignment, log_w, NEG_INF))
                 continue
-            out.append((log_w, float(self.dp.log_partition(log_w))))
+            out.append((assignment, log_w, float(self.dp.log_partition(log_w))))
         self._assign_key, self._assign_cache = key, out
         return out
+
+    def assignment_weights_and_z(self, samples: np.ndarray, known_intervened: np.ndarray,
+                                 clean: np.ndarray) -> List[Tuple[np.ndarray, float]]:
+        """`(log_w, log_z)` per evaluated assignment. Thin wrapper on
+        `prepared_assignments`, kept because callers that do not need to know WHICH
+        assignment produced which weight read better without the triple."""
+        return [(log_w, log_z) for _, log_w, log_z in
+                self.prepared_assignments(samples, known_intervened, clean)]
 
     # -- modular rules ------------------------------------------------------------------
 
@@ -351,8 +493,8 @@ class WindowBeliefDP:
         # The threshold is far below float64 resolution against a weight of 1, so a
         # dropped assignment cannot move the result -- this is exact to the precision the
         # arithmetic already has, not an approximation with a knob.
-        prepared = [(z, w) for w, z in
-                    self.assignment_weights_and_z(samples, known_intervened, clean)
+        prepared = [(z, w) for _, w, z in
+                    self.prepared_assignments(samples, known_intervened, clean)
                     if np.isfinite(z)]
         if not prepared:
             return np.zeros((self.k, self.k))
@@ -412,8 +554,8 @@ class WindowBeliefDP:
 
         log_zs: List[float] = []
         log_ps: List[float] = []
-        prepared = self.assignment_weights_and_z(samples, known_intervened, clean)
-        for assignment, (log_w, log_z) in zip(self.assignments, prepared):
+        prepared = self.prepared_assignments(samples, known_intervened, clean)
+        for assignment, log_w, log_z in prepared:
             if not np.isfinite(log_z):
                 continue
             log_zs.append(log_z)
@@ -476,8 +618,8 @@ class WindowBeliefDP:
 
         log_zs: List[float] = []
         log_ps: List[float] = []
-        prepared = self.assignment_weights_and_z(samples, known_intervened, clean)
-        for assignment, (log_w, log_z) in zip(self.assignments, prepared):
+        prepared = self.prepared_assignments(samples, known_intervened, clean)
+        for assignment, log_w, log_z in prepared:
             if not np.isfinite(log_z):
                 continue
             log_zs.append(log_z)
@@ -524,4 +666,7 @@ class WindowBeliefDP:
 
     @property
     def n_assignments(self) -> int:
-        return len(self.assignments)
+        if self.assignments is not None:
+            return len(self.assignments)
+        # Not materialised: the screen decides, so the honest answer is what it will keep.
+        return self.screen_keep

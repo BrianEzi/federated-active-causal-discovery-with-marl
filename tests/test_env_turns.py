@@ -121,17 +121,49 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     assert not env.clean[1].any()
 
 
-def test_multi_private_topology_is_refused_rather_than_scored_wrong():
-    """RESTORED 2026-08-22. A 2026-08-22 attempt at per-block confounding subsets (S_r)
-    briefly lifted this guard, but its mixture tracks only an AGGREGATE clean fraction per
-    round -- how MANY hidden nodes were clamped, not WHICH -- so a confounding hypothesis
-    about a specific hidden node is scored identically whether that node was the one
-    clamped or a different one was. Confirmed directly against the belief_dp.py code: no
-    per-node identity reaches the scoring mixture, only a scalar fraction. Refuse until the
-    subset is tracked exactly, per docs/N_AGENT_REFACTOR_SPEC.md section 4."""
-    config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
+def test_multi_hidden_is_refused_ONLY_WHEN_THE_REGIME_BIT_IS_DISCLOSED():
+    """NARROWED 2026-08-25. The hazard is unchanged; the condition was too wide.
+
+    The unsound path is `_assignment_weights`'s `0 < f < 1` branch, which mixes the clean
+    and dirty tables with one weight for every confounding edge -- so with more than one
+    hidden node it knows how MANY were clamped, never WHICH. That branch is reachable only
+    when the regime bit is disclosed. With `disclose_regime=False`, `_refresh`, `true_mass`
+    and `dag_set_mass` all pass `clean` as zeros, `f` is exactly 0.0, and the `f == 0.0`
+    branch reads the dirty table at the full parent set -- exact, at any number of hidden
+    nodes. The old guard therefore refused the entire scale ladder over a branch it never
+    entered. The refusal below is the combination that IS unsound.
+    """
+    config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2,
+                      disclose_regime=True)
     with pytest.raises(NotImplementedError, match="hide up to"):
         TwoAgentEnv(config, seed=0)
+
+
+def test_multi_hidden_is_allowed_and_EXACT_without_the_regime_bit():
+    """The other half, and the one that unblocks three and five agents.
+
+    Asserts the mechanism, not just that construction succeeds: the vector actually handed
+    to the belief must be all zeros, because that is what makes the score exact. A test that
+    only checked `TwoAgentEnv(...)` did not raise would still pass if a future change routed
+    a real fraction through, which is the exact failure the guard existed to prevent.
+    """
+    topology = Topology(name="3a_1p_2x", private=((0,), (1,), (2,)), exposed=(3, 4))
+    assert max(len(topology.hidden_from(a)) for a in topology.agents) == 2
+    config = MAConfig(topology=topology, n_obs=100, n_int=20, budget=2,
+                      disclose_regime=False)
+    env = TwoAgentEnv(config, seed=0)
+
+    for agent in topology.agents:
+        clean = (env.clean[agent] if config.disclose_regime
+                 else np.zeros(len(env.samples), dtype=bool))
+        assert not np.asarray(clean).any(), (
+            f"agent {agent} would be scored through the inexact mixture")
+
+    env.step({a: _clamp_own_private(env, a) for a in topology.agents})
+    for agent in topology.agents:
+        clean = (env.clean[agent] if config.disclose_regime
+                 else np.zeros(len(env.samples), dtype=bool))
+        assert not np.asarray(clean).any(), "still zero after a private clamp"
 
 
 def test_turn_order_is_validated():

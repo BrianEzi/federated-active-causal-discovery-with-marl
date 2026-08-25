@@ -24,6 +24,20 @@ from ma.policy import IndependentPPO, PPOConfig
 from ma.topology import Topology, two_agent
 
 
+def build_topology(n_agents: int, n_private: int, n_shared: int) -> Topology:
+    """`n_agents` blocks of `n_private` nodes, then `n_shared` exposed. `d` is the sum.
+
+    Private blocks are laid out first so agent `i` owns a contiguous range and the shared
+    set is the tail. Nothing depends on the ordering, but fixing it keeps two runs at the
+    same shape directly comparable.
+    """
+    private = tuple(tuple(range(i * n_private, (i + 1) * n_private))
+                    for i in range(n_agents))
+    exposed = tuple(range(n_agents * n_private, n_agents * n_private + n_shared))
+    return Topology(name=f"T{n_agents}a_{n_private}p_{n_shared}x",
+                    private=private, exposed=exposed)
+
+
 def main(argv=None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seed", type=int, default=0)
@@ -63,12 +77,19 @@ def main(argv=None) -> dict:
     # measured justification. Off/default until a comparison confirms they help HERE too.
     ap.add_argument("--entropy_coef", type=float, default=0.01)
     ap.add_argument("--orthogonal_init", action="store_true")
+    # THE SCALE LADDER. Defaults reproduce T1_1_1_3 -- two agents, one private node each,
+    # three shared -- so an unflagged run stays comparable with every result banked before
+    # 2026-08-25. Climb one axis at a time: agents, then shared, then private.
+    ap.add_argument("--n_agents", type=int, default=2)
+    ap.add_argument("--n_private", type=int, default=1,
+                    help="private nodes PER AGENT; d = n_agents * n_private + n_shared")
+    ap.add_argument("--n_shared", type=int, default=3)
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
     args = ap.parse_args(argv)
 
-    topology = two_agent(name="T1_1_1_3", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))
+    topology = build_topology(args.n_agents, args.n_private, args.n_shared)
     modes = (CLAMP,) if args.clamp_only else MODES
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                        budget=args.budget, disclose_regime=args.disclose_regime,
@@ -108,9 +129,12 @@ def main(argv=None) -> dict:
                    "identify_threshold": config.identify_threshold,
                    "intervene_scale": config.intervene_scale,
                    "reward_criterion": config.reward_criterion,
+                   # PER-AGENT LIST, not a_private/b_private. Those two fields were a
+                   # two-agent assumption baked into the RESULTS FORMAT, so a three-agent
+                   # run would have silently dropped every block past the second.
                    "topology": {"name": topology.name, "d": topology.d,
-                                "a_private": list(topology.private[0]),
-                                "b_private": list(topology.private[1]),
+                                "n_agents": len(topology.private),
+                                "private": [list(b) for b in topology.private],
                                 "exposed": list(topology.exposed)},
                    "train_episodes": args.train_episodes,
                    "potential_shaping": args.potential_shaping,
