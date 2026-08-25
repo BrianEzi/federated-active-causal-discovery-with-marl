@@ -109,11 +109,19 @@ class WindowBeliefDP:
     variables -- the only places a confounding edge may appear.
     """
 
-    # Above this many raw candidates the assignment set is NOT materialised and the
-    # screen (`_screened_assignments`) takes over. 4096 is 3^7, so every topology up to
-    # seven shared pairs -- |X| = 4, the largest size validated against full enumeration --
-    # keeps the exact path and reproduces earlier numbers bit for bit.
-    MAX_EAGER_ASSIGNMENTS = 4096
+    # Above this many raw candidates the assignment set is NOT materialised and the screen
+    # takes over. 128 is chosen to sit BETWEEN |X| = 3 (3^3 = 27, stays exact) and |X| = 4
+    # (3^6 = 729, screens).
+    #
+    # It was 4096 first, to keep |X| = 4 exact as well, and that was measured to be a bad
+    # trade: at 5 agents the |X| = 4 rung cost 59.4 s/episode against 4.7 s at |X| = 3 --
+    # a 12.7x jump the screen removes for a max edge-marginal error of 3.3e-3. Exactness at
+    # |X| = 4 is worth having in the CROSS-CHECK (`scripts/bayes_screen_error.py` forces it
+    # with `max_eager`), not in every training episode.
+    #
+    # |X| = 3 stays exact deliberately: T1_1_1_3 is that shape, so every result banked
+    # before 2026-08-25 remains reproducible bit for bit rather than approximately.
+    MAX_EAGER_ASSIGNMENTS = 128
     # How many assignments the screen keeps for exact evaluation. Measured on real SCM
     # draws (`scripts/bayes_prune_survival.py`): at |X| = 4 the top 27 hold >= 99.9% of the
     # posterior mass across five seeds, and the existing 1e-14 prune leaves 21-29 alive.

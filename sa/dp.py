@@ -219,7 +219,7 @@ def _free_bits(masks: np.ndarray, d: int, n_free: int) -> np.ndarray:
 
 def log_partition_table_vec(log_alpha: np.ndarray, d: int
                             ) -> Tuple[List[float], List[float], float]:
-    """Vectorised `log_partition_table`. Same recurrence, same answer, ~15x faster at k=13.
+    r"""Vectorised `log_partition_table`. Same recurrence, same answer, ~15x faster at k=13.
 
     TWO CHANGES FROM THE SCALAR VERSION, and the second is the one that pays.
 
@@ -434,7 +434,7 @@ def _scatter_signed(log_out: np.ndarray, sign_out: np.ndarray, targets: np.ndarr
 
 def log_backward_vec(log_alpha: np.ndarray, log_f, sign_f, d: int,
                      max_block: int = 6_000_000) -> Tuple[np.ndarray, np.ndarray]:
-    """Vectorised `log_backward`. Same cotangents, same answer, ~20x faster at k=13.
+    r"""Vectorised `log_backward`. Same cotangents, same answer, ~20x faster at k=13.
 
     Batched BY POPCOUNT LEVEL OF `A`, descending, for the same reason the forward pass is
     batched ascending: every subset at one level has the same number of subsets below it
