@@ -3418,3 +3418,45 @@ the conjunction alone does not explain rung 1 and a second failure is present. T
 measurement that separates them (per-window vs joint identification, at training budget
 and 4x budget, with failures split into unsure vs settled-wrong) is running:
 scratchpad/diagnose_rung1.py.
+
+[MEASURED] Budget starvation, greedy_uncertainty, 30 episodes per row
+(scratchpad/diagnose_rung1.py). "settled-wrong" is the share of ALL windows where the
+belief put >= the 0.7 bar on a FALSE claim, which vetoes identification:
+
+    rung 0  budget  8   4/agent    per-window 0.250   joint 0.100   settled-wrong 35%
+    rung 0  budget 32  16/agent    per-window 0.650   joint 0.533   settled-wrong 22%
+    rung 1  budget  9   3/agent    per-window 0.200   joint 0.067   settled-wrong 41%
+    rung 1  budget 36  12/agent    per-window 0.467   joint 0.300   settled-wrong 18%
+
+Three readings. (a) PER-AGENT budget is the axis: rung 1 at 3-each sits below rung 0 at
+4-each on both measures. The rung-1 budget of 9 was chosen to hold TOTAL rounds roughly
+constant, which silently cut per-agent interventions by 25% while each window got harder
+(0.94 confounded pairs vs 0.68). Parity with rung 0 needs budget 12. (b) The settled-wrong
+rate is not systematic engine bias -- it halves as interventions rise, so it is the
+bootstrap committing across the bar on too little evidence. (c) BOTH rungs were trained on
+the steep part of the curve, so every arm bunched near the floor; that is why rung 0's
+learned-vs-greedy gap was 7pp with overlapping CIs.
+
+The conjunction is real but secondary: at rung 1 the observed joint (0.067) is eight times
+the independent prediction from per-window 0.200 (0.008), because the windows share one
+DAG. It costs a factor of ~3, not ~25.
+
+[MEASURED] Rung 1 (budget 9, 4500 episodes, 281 updates, 6.8 h) COMPLETED -- and it is a
+negative result. learned 0.055 [0.025, 0.090], random_vary 0.060 [0.030, 0.095],
+greedy_uncertainty 0.100 [0.060, 0.145]. Entropy 1.609 -> 0.678. The policy did not fail to
+learn; it converged confidently to BELOW RANDOM. At 3 interventions per agent the ceiling
+is low enough that the reward is mostly noise, and PPO committed to whatever early noise
+favoured. Budget 9 at three agents is a dead configuration -- do not rerun it.
+
+[CORRECTED] The overnight rung-1 take 1 was NOT killed at update ~220. It ran to
+completion; the file above is its result. Two ma_train processes were live this morning
+(take 1 still running, take 2 launched on the assumption it had died). The process stopped
+at 11:55 today was the DUPLICATE take 2. Stopping it was correct -- it was recomputing a
+result already in flight -- but the reason given at the time was wrong.
+
+[DECIDED] Episode-level diagnosis now has a tool: `scripts/trace_episode.py` dumps every
+step of an episode (which node each agent intervened on, and every claim's outcome AND the
+bootstrap frequencies behind it), `scripts/trace_view.py` renders traces as a
+step-through page. `cb/claims.py::score_window` is now a tally over the new
+`enumerate_claims`, so a trace and the reward cannot disagree about what a claim is --
+the 13 existing claims tests pass unchanged.

@@ -65,12 +65,80 @@ class ClaimScore:
                 and self.n_wrong == 0)
 
 
+@dataclass(frozen=True)
+class Claim:
+    """One scored question about one node pair -- the unit `score_window` counts.
+
+    Exists so a trace can show WHICH claim went wrong rather than only how many did.
+    `freq_correct` / `freq_wrong` are the bootstrap frequencies the outcome was read off,
+    so a claim that missed the bar by 0.02 is distinguishable from one that was never
+    close.
+    """
+    kind: str               # "adjacency" | "type"
+    u: int
+    v: int
+    required: bool
+    outcome: str            # "right" | "wrong" | "unsure"
+    truth: str              # what the true MAG says, human-readable
+    freq_correct: float
+    freq_wrong: float
+
+
 def _outcome(freq_correct: float, freq_wrong: float, bar: float):
     if freq_correct >= bar:
         return "right"
     if freq_wrong >= bar:
         return "wrong"
     return "unsure"
+
+
+def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
+                     bar: float = 0.7):
+    """Every claim in one window, with its outcome and the frequencies behind it.
+
+    `score_window` is a tally over exactly this list -- the two cannot disagree because
+    the second is defined in terms of the first.
+    """
+    mag = np.asarray(true_mag)
+    k = mag.shape[0]
+    private = set(int(p) for p in private_positions)
+    adjacency = np.asarray(belief.adjacency)
+    directed = np.asarray(belief.directed)
+    bidirected = np.asarray(belief.bidirected)
+
+    claims = []
+    for u, v in combinations(range(k), 2):
+        truly_adjacent = mag[u, v] != 0 or mag[v, u] != 0
+        f_adj = float(adjacency[u, v])
+        if truly_adjacent:
+            correct, wrong = f_adj, 1.0 - f_adj
+            truth = "adjacent"
+        else:
+            correct, wrong = 1.0 - f_adj, f_adj
+            truth = "not adjacent"
+        claims.append(Claim("adjacency", u, v, True,
+                            _outcome(correct, wrong, bar), truth, correct, wrong))
+        if not truly_adjacent:
+            continue                       # no type claim on a true non-edge
+
+        f_bi = float(bidirected[u, v])
+        if mag[u, v] == MAG_BIDIRECTED:
+            correct, wrong = f_bi, max(float(directed[u, v]), float(directed[v, u]))
+            required = True                # confounding is the thesis: always required
+            truth = "confounded"
+        elif mag[u, v] == MAG_DIRECTED:
+            correct = float(directed[u, v])
+            wrong = max(float(directed[v, u]), f_bi)
+            required = u in private or v in private
+            truth = "directed"
+        else:                              # mag[v, u] == MAG_DIRECTED
+            correct = float(directed[v, u])
+            wrong = max(float(directed[u, v]), f_bi)
+            required = u in private or v in private
+            truth = "reverse directed"
+        claims.append(Claim("type", u, v, required,
+                            _outcome(correct, wrong, bar), truth, correct, wrong))
+    return claims
 
 
 def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
@@ -86,53 +154,11 @@ def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] 
     edge. A shared-block directed edge may stay unsure without blocking identification --
     Markov equivalence leaves such edges unorientable for want of information.
     """
-    mag = np.asarray(true_mag)
-    k = mag.shape[0]
-    private = set(int(p) for p in private_positions)
-    adjacency = np.asarray(belief.adjacency)
-    directed = np.asarray(belief.directed)
-    bidirected = np.asarray(belief.bidirected)
-
-    n_right = n_wrong = n_unsure = 0
-    required_right = required_total = required_wrong = 0
-
-    def tally(outcome: str, required: bool):
-        nonlocal n_right, n_wrong, n_unsure
-        nonlocal required_right, required_total, required_wrong
-        if outcome == "right":
-            n_right += 1
-        elif outcome == "wrong":
-            n_wrong += 1
-        else:
-            n_unsure += 1
-        if required:
-            required_total += 1
-            required_right += outcome == "right"
-            required_wrong += outcome == "wrong"
-
-    for u, v in combinations(range(k), 2):
-        truly_adjacent = mag[u, v] != 0 or mag[v, u] != 0
-        f_adj = float(adjacency[u, v])
-        # -- adjacency claim, always required ------------------------------------------
-        if truly_adjacent:
-            tally(_outcome(f_adj, 1.0 - f_adj, bar), required=True)
-        else:
-            tally(_outcome(1.0 - f_adj, f_adj, bar), required=True)
-            continue                       # no type claim on a true non-edge
-        # -- type claim for the true edge ----------------------------------------------
-        f_bi = float(bidirected[u, v])
-        if mag[u, v] == MAG_BIDIRECTED:
-            correct, wrong = f_bi, max(float(directed[u, v]), float(directed[v, u]))
-            required = True                # confounding is the thesis: always required
-        elif mag[u, v] == MAG_DIRECTED:
-            correct = float(directed[u, v])
-            wrong = max(float(directed[v, u]), f_bi)
-            required = u in private or v in private
-        else:                              # mag[v, u] == MAG_DIRECTED
-            correct = float(directed[v, u])
-            wrong = max(float(directed[u, v]), f_bi)
-            required = u in private or v in private
-        tally(_outcome(correct, wrong, bar), required=required)
-
+    claims = enumerate_claims(belief, true_mag, private_positions, bar)
+    n_right = sum(c.outcome == "right" for c in claims)
+    n_wrong = sum(c.outcome == "wrong" for c in claims)
+    n_unsure = sum(c.outcome == "unsure" for c in claims)
+    required = [c for c in claims if c.required]
     return ClaimScore(n_right, n_wrong, n_unsure,
-                      required_right, required_total, required_wrong)
+                      sum(c.outcome == "right" for c in required), len(required),
+                      sum(c.outcome == "wrong" for c in required))
