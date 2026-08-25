@@ -17,7 +17,7 @@ import json
 import pathlib
 from typing import List
 
-ARMS = ("learned", "random_clamp", "random_vary", "greedy", "pass")
+ARMS = ("learned", "random_clamp", "random_vary", "greedy", "greedy_uncertainty", "pass")
 
 
 def load(patterns: List[str]) -> List[tuple]:

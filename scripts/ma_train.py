@@ -24,6 +24,77 @@ from ma.policy import IndependentPPO, PPOConfig
 from ma.topology import Topology, two_agent
 
 
+def _config_record(config, topology, args) -> dict:
+    """The RESOLVED settings, read off the config object rather than off `args`.
+
+    `prior_p` is derived from `d` when left unset and `identify_threshold` has no flag at
+    all, so recording the arguments would record neither -- which is what once made result
+    files unattributable. One function so the JSON report and the W&B run config cannot
+    drift apart.
+    """
+    return {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
+            "rule": config.score_rule,
+            "disclose_regime": config.disclose_regime,
+            "turn_order": config.turn_order,
+            "action_modes": list(config.action_modes),
+            "prior_p": config.prior_p,
+            "identify_threshold": config.identify_threshold,
+            "intervene_scale": config.intervene_scale,
+            "reward_criterion": config.reward_criterion,
+            "belief_backend": config.belief_backend,
+            "policy_arch": config.policy_arch,
+            "cb_n_boot": config.cb_n_boot,
+            "cb_alpha": config.cb_alpha,
+            "episode_mix": config.episode_mix,
+            "oracle_obs_structure": config.oracle_obs_structure,
+            "claim_bar": config.claim_bar,
+            "claim_penalty": config.claim_penalty,
+            "topology": {"name": topology.name, "d": topology.d,
+                         "private": [list(p) for p in topology.private],
+                         "exposed": list(topology.exposed)},
+            "train_episodes": args.train_episodes,
+            "potential_shaping": args.potential_shaping,
+            "step_cost": config.step_cost}
+
+
+def _wandb_run(args, config_record: dict):
+    """Open a W&B run, or return None. Telemetry must never be able to kill a training run,
+    so every failure here -- missing package, unwritable dir, no credentials -- degrades to
+    a printed warning and `None`."""
+    if args.no_wandb or args.wandb_mode == "disabled":
+        return None
+    import os
+    os.environ.setdefault("WANDB_MODE", args.wandb_mode)
+    os.environ.setdefault("WANDB_SILENT", "true")
+    try:
+        import wandb
+        run = wandb.init(project=args.wandb_project, name=f"{args.arm}_s{args.seed}",
+                         group=args.arm, job_type="train_eval", mode=args.wandb_mode,
+                         config={**config_record, "arm": args.arm, "seed": args.seed},
+                         reinit=True)
+        print(f"  wandb {args.wandb_mode}: {run.dir}", flush=True)
+        return run
+    except Exception as exc:                                    # noqa: BLE001
+        print(f"  [wandb] disabled -- {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+def _wandb_logger(run):
+    if run is None:
+        return None
+
+    def log(record: dict) -> None:
+        try:
+            run.log({"train/solve_rate": record["solve_rate"],
+                     "train/entropy": record["entropy"],
+                     "train/mask_pass": float(record["mask_pass"]),
+                     "train/update": record["update"]},
+                    step=int(record["update"]))
+        except Exception:                                       # noqa: BLE001
+            pass
+    return log
+
+
 def main(argv=None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seed", type=int, default=0)
@@ -93,6 +164,14 @@ def main(argv=None) -> dict:
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
+    # Live telemetry, ON by default since 2026-08-25 and OFFLINE by default: a compute node
+    # has no outbound internet, and an online init there blocks the run. `wandb sync` from
+    # a machine that does have it, later. `scripts/ma_wandb_sync.py` remains the
+    # reproducible post-hoc path -- this one is for watching a run while it is alive.
+    ap.add_argument("--wandb_project", default="ma-two-agent")
+    ap.add_argument("--wandb_mode", default="offline",
+                    choices=["offline", "online", "disabled"])
+    ap.add_argument("--no_wandb", action="store_true")
     args = ap.parse_args(argv)
 
     if args.three_agents:
@@ -120,6 +199,8 @@ def main(argv=None) -> dict:
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
     env = TwoAgentEnv(config)
+    config_record = _config_record(config, topology, args)
+    run = _wandb_run(args, config_record)
     started = time.time()
 
     ppo = IndependentPPO(env, PPOConfig(
@@ -127,7 +208,7 @@ def main(argv=None) -> dict:
         potential_shaping=args.potential_shaping,
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
-    history = ppo.train(verbose=True)
+    history = ppo.train(verbose=True, on_update=_wandb_logger(run))
     train_seconds = time.time() - started
     # Persist the trained pair. Ten seeds were previously evaluated and discarded because
     # nothing wrote them out, so any question about what an agent LEARNED needed a retrain.
@@ -143,29 +224,7 @@ def main(argv=None) -> dict:
         # arguments would have recorded neither -- and the 2026-08-22 prior change is
         # exactly the kind of thing that later makes a results file unattributable.
         # Same lesson as "log the raw quantity, never the verdict".
-        "config": {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
-                   "rule": config.score_rule,
-                   "disclose_regime": config.disclose_regime,
-                   "turn_order": config.turn_order,
-                   "action_modes": list(config.action_modes),
-                   "prior_p": config.prior_p,
-                   "identify_threshold": config.identify_threshold,
-                   "intervene_scale": config.intervene_scale,
-                   "reward_criterion": config.reward_criterion,
-                   "belief_backend": config.belief_backend,
-                   "policy_arch": config.policy_arch,
-                   "cb_n_boot": config.cb_n_boot,
-                   "cb_alpha": config.cb_alpha,
-                   "episode_mix": config.episode_mix,
-                   "oracle_obs_structure": config.oracle_obs_structure,
-                   "claim_bar": config.claim_bar,
-                   "claim_penalty": config.claim_penalty,
-                   "topology": {"name": topology.name, "d": topology.d,
-                                "private": [list(p) for p in topology.private],
-                                "exposed": list(topology.exposed)},
-                   "train_episodes": args.train_episodes,
-                   "potential_shaping": args.potential_shaping,
-                   "step_cost": config.step_cost},
+        "config": config_record,
         "train_seconds": train_seconds,
         # The collapse diagnostic. A seed that never sampled the terminal reward has a
         # different problem from one that sampled it and could not exploit it.
@@ -211,6 +270,30 @@ def main(argv=None) -> dict:
     if report["collapsed"]:
         print("  [CANARY] learned policy is under-acting -- mean_steps < 1.5, so this seed "
               "collapsed into passing rather than learning.", flush=True)
+
+    if run is not None:
+        try:
+            summary = {"train_seconds": train_seconds,
+                       "first_success_episode": ppo.first_success_episode,
+                       "final_entropy": report["final_entropy"],
+                       "collapsed": report["collapsed"]}
+            for label, row in report["arms"].items():
+                for field in ("success", "mean_steps", "clamp_fraction",
+                              "union_acyclic", "union_equivalent"):
+                    if row.get(field) is not None:
+                        summary[f"eval/{label}/{field}"] = row[field]
+                if row.get("success_ci"):
+                    summary[f"eval/{label}/success_lo"] = row["success_ci"][0]
+                    summary[f"eval/{label}/success_hi"] = row["success_ci"][1]
+            # The number every arm exists to answer: how far the learned policy is ahead
+            # of the greedy it has to beat.
+            greedy = report["arms"].get("greedy_uncertainty") or report["arms"].get("greedy")
+            if greedy is not None:
+                summary["eval/margin_over_greedy"] = learned["success"] - greedy["success"]
+            run.summary.update(summary)
+            run.finish()
+        except Exception as exc:                                # noqa: BLE001
+            print(f"  [wandb] summary skipped -- {type(exc).__name__}: {exc}", flush=True)
 
     if args.out:
         out = pathlib.Path(args.out)

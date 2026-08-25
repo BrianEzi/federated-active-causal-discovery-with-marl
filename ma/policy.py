@@ -392,7 +392,10 @@ class IndependentPPO:
                 nn.utils.clip_grad_norm_(self.nets[agent].parameters(), 0.5)
                 self.opts[agent].step()
 
-    def train(self, verbose: bool = False) -> List[dict]:
+    def train(self, verbose: bool = False, on_update=None) -> List[dict]:
+        """`on_update(record)` is called after every update, if given -- the hook the
+        live telemetry hangs off. It is deliberately a plain callback: nothing in `ma/`
+        imports a tracking library, so a broken or absent logger cannot take a run down."""
         cfg = self.config
         n_updates = max(1, cfg.total_episodes // cfg.episodes_per_update)
         for update in range(n_updates):
@@ -403,6 +406,8 @@ class IndependentPPO:
             record = {"update": update, "entropy": batch["entropy"],
                       "solve_rate": batch["solve_rate"], "mask_pass": mask_pass}
             self.history.append(record)
+            if on_update is not None:
+                on_update(record)
             if verbose and update % 10 == 0:
                 print(f"  update {update:4d}  entropy {record['entropy']:.3f}  "
                       f"solve {record['solve_rate']:.3f}", flush=True)
