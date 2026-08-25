@@ -80,6 +80,11 @@ def main(argv=None) -> dict:
     # THE SCALE LADDER. Defaults reproduce T1_1_1_3 -- two agents, one private node each,
     # three shared -- so an unflagged run stays comparable with every result banked before
     # 2026-08-25. Climb one axis at a time: agents, then shared, then private.
+    # TRAIN ONLY, leaving evaluation to scripts/ma_eval_arm.py as separate array tasks.
+    # At the top of the ladder the four inline arms cost more wall-clock than the training
+    # that produced them, and they are independent, so running them inside this job wastes
+    # the cluster and forces eval_episodes down until the intervals stop resolving anything.
+    ap.add_argument("--skip_eval", action="store_true")
     ap.add_argument("--n_agents", type=int, default=2)
     ap.add_argument("--n_private", type=int, default=1,
                     help="private nodes PER AGENT; d = n_agents * n_private + n_shared")
@@ -149,6 +154,12 @@ def main(argv=None) -> dict:
         "arms": {},
     }
 
+    if args.skip_eval:
+        _write_report(args, report)
+        print("  training only (--skip_eval); evaluate with scripts/ma_eval_arm.py",
+              flush=True)
+        return report
+
     arms = {"learned": ppo.policies(deterministic=False)}
     reference = {agent: make_baselines(env, agent, seed=args.seed) for agent in env.topology.agents}
     # `random_vary` has no legal actions in the clamp-only arm, so it is dropped rather
@@ -177,13 +188,18 @@ def main(argv=None) -> dict:
         print("  [CANARY] learned policy is under-acting -- mean_steps < 1.5, so this seed "
               "collapsed into passing rather than learning.", flush=True)
 
-    if args.out:
-        out = pathlib.Path(args.out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        _refuse_to_clobber_a_different_config(out, report["config"], args.force)
-        out.write_text(json.dumps(report, indent=1))
-        print(f"wrote {out}")
+    _write_report(args, report)
     return report
+
+
+def _write_report(args, report: dict) -> None:
+    if not args.out:
+        return
+    out = pathlib.Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    _refuse_to_clobber_a_different_config(out, report["config"], args.force)
+    out.write_text(json.dumps(report, indent=1))
+    print(f"wrote {out}")
 
 
 def _refuse_to_clobber_a_different_config(out: pathlib.Path, config: dict, force: bool):
