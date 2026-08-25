@@ -3569,3 +3569,45 @@ estimator's standard error is 0.5-1.0. At n=20 the same configurations give +0.5
 and -1.25 +/- 0.30. Noise.
 (c) "the gap grows with contention" -- not supported once error bars were computed; the
 sign flips with agent count and the trend is downward, not upward.
+
+[CORRECTED] The rejection above ("greedy already solves it at every scale") was measured on
+CLAIM COUNTS, and claim counts are the wrong metric. Identification is all-or-nothing --
+every required claim resolved or the window fails -- so a 2-5% gap in claims can be a large
+gap in the reported metric, and here it is. Measured against a clairvoyant that optimises
+FOR IDENTIFICATION (exact, same decomposition, 40 worlds per row, k=4, 1 intervention per
+agent, 3 shared nodes):
+
+    agents  2   decentralised 0.463   clairvoyant 0.500   gap +0.037 +/- 0.021   (+ 8%)
+    agents  3   decentralised 0.475   clairvoyant 0.692   gap +0.217 +/- 0.033   (+46%)
+    agents  4   decentralised 0.406   clairvoyant 0.713   gap +0.306 +/- 0.040   (+75%)
+    agents  6   decentralised 0.729   clairvoyant 0.929   gap +0.200 +/- 0.038   (+27%)
+    agents  8   decentralised 0.872   clairvoyant 0.984   gap +0.113 +/- 0.023   (+13%)
+    agents 10   decentralised 0.922   clairvoyant 0.995   gap +0.072 +/- 0.019   (+ 8%)
+
+Every row positive, most at 5+ standard errors. THE DETERMINISTIC ENVIRONMENT IS VIABLE
+after all -- for the coordination problem specifically, which is the thesis claim.
+
+Three structural facts fall out. (a) The headroom is ENTIRELY COORDINATION: single-agent
+play has exactly zero headroom (optimal = greedy on 15/15 graphs, exact DP), so everything
+above comes from agents dividing contested variables between them. (b) It lives in a BAND
+-- peaking where interventions are comparable to contested variables (4 agents, 3 shared)
+and closing on both sides: too few agents and there is nothing to divide, too many and the
+shared nodes get covered by accident (decentralised reaches 0.922 at ten agents).
+Experiments must be run inside that band or they will measure nothing. (c) Decentralised
+greedy gets WORSE as agents are added through the band (0.463 -> 0.475 -> 0.406) while the
+bound improves (0.500 -> 0.692 -> 0.713); the two diverge, which is the scaling behaviour
+the thesis wants.
+
+[MEASURED] The method's practical ceiling is WINDOW DENSITY, not variable count. Global
+graphs to d=23 are cheap because cost is 3^(edges in the window). At k=7 with 6 agents the
+density guard rejected 159 worlds to obtain 10 -- a 94% rejection rate, since every other
+agent's private node is a potential latent confounder -- so that row samples an
+unrepresentative sparse tail and is discarded, not reported. k<=6 is the usable range.
+
+[DECIDED] Two-layer design. The deterministic version-space environment becomes the
+COORDINATION layer: milliseconds per episode, no statistical confounds, and a computable
+optimum so results are reported as FRACTION OF ACHIEVABLE CLOSED rather than as a margin
+over a baseline. The statistical environment stays the ROBUSTNESS layer, where the
+2026-08-25 engine findings (missed edges, confounding misreads, power limits) live. Neither
+alone supports the thesis; together they separate "can agents learn to coordinate
+experiments" from "does it survive finite data".
