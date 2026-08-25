@@ -475,8 +475,17 @@ class IndependentPPO:
         }, path)
 
     @classmethod
-    def load(cls, path, env: TwoAgentEnv, config: Optional[PPOConfig] = None):
-        """Rebuild a trained set against `env`, refusing a mismatched environment."""
+    def load(cls, path, env: TwoAgentEnv, config: Optional[PPOConfig] = None,
+             allow_backend_transfer: bool = False):
+        """Rebuild a trained set against `env`, refusing a mismatched environment.
+
+        `allow_backend_transfer` permits loading a policy trained on ONE belief backend into
+        an environment using another. That is normally void -- performance belongs to the
+        (policy, backend) pair -- but it is exactly the transfer experiment: a policy
+        trained in the deterministic idealisation, evaluated on noisy data, testing whether
+        good experiment SELECTION is a structural skill that survives the noise. It must be
+        asked for explicitly, and what was trained on what is reported alongside the number.
+        """
         import torch as _torch
 
         blob = _torch.load(path, map_location=DEVICE, weights_only=False)
@@ -502,8 +511,9 @@ class IndependentPPO:
                              % (blob_arch, env_arch))
         blob_backend = blob.get("belief_backend", "exact")
         env_backend = getattr(env.config, "belief_backend", "exact")
-        if blob_backend != env_backend:
-            raise ValueError("checkpoint was trained on belief_backend %r, env uses %r"
+        if blob_backend != env_backend and not allow_backend_transfer:
+            raise ValueError("checkpoint was trained on belief_backend %r, env uses %r "
+                             "(pass allow_backend_transfer=True to run this deliberately)"
                              % (blob_backend, env_backend))
         learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
                                                   seed=blob["seed"]))

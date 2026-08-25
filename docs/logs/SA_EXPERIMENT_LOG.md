@@ -3611,3 +3611,61 @@ over a baseline. The statistical environment stays the ROBUSTNESS layer, where t
 2026-08-25 engine findings (missed edges, confounding misreads, power limits) live. Neither
 alone supports the thesis; together they separate "can agents learn to coordinate
 experiments" from "does it survive finite data".
+
+## 2026-08-26 (overnight) -- in-band gates, the deterministic backend, split thresholds
+
+[MEASURED] IN-BAND CONFIG GATE FAILED. The coordination band wants few interventions per
+agent; the statistics want many. Rows do NOT substitute for rounds, greedy per-window
+identification, 25 episodes:
+
+    budget  4  n_int 2000   0.147        budget 12  n_int  250   0.233 (reference)
+    budget  4  n_int 4000   0.227        budget 12  n_int 1000   0.350 (reference)
+    budget  6  n_int 2000   0.200
+
+An intervention resolves claims about ITS OWN node, so cutting rounds removes claims that
+no amount of extra data can reach. It takes 16x the rows to buy back what budget 12 gets.
+
+[MEASURED] THE ORACLE WARM START RESOLVES THE TENSION, and it was sitting unused since
+2026-08-25. Same gate, oracle_obs_structure=True:
+
+    budget 4  n_int 1000   0.267   wrong 0.267   0.3 s/ep
+    budget 6  n_int 1000   0.320   wrong 0.240   0.5 s/ep    <- PASSES, and 2 per agent
+    budget 9  n_int 1000   0.293   wrong 0.253   0.9 s/ep
+
+Handing over the skeleton is what makes scarce interventions productive: identification
+rises, confidently-wrong nearly halves (0.24 vs 0.35-0.43), and episodes run 5-14x FASTER
+because skeleton search is skipped. A 6000-episode run costs ~50 min instead of ~7 h.
+Adopted as the statistical training config.
+
+[MEASURED] SPLIT SIGNIFICANCE THRESHOLDS WORK, where the single knob failed. Skeleton
+threshold swept with orientation held at 0.01, 25 episodes, budget 12, n_int 250:
+
+    skeleton 0.01   identified 0.253   wrong 0.307   missed 15   invented 3   type 11
+    skeleton 0.05   identified 0.253   wrong 0.213   missed  9   invented 3   type 10
+    skeleton 0.15   identified 0.133   wrong 0.227   missed 13   invented 5   type  3
+
+At 0.05 missed edges HALVE with no increase in invented ones and no rise in type errors --
+precisely what the single-knob sweep destroyed (type errors 16 -> 32 there). Identification
+is flat because recovered edges land in `unsure` rather than `right`, but confidently-wrong
+windows fall 9.4pp, and trading false confidence for honest uncertainty is the right
+direction for a thesis about confounding. 0.15 overshoots. `cb_skeleton_alpha=0.05` is the
+recommendation; it is NOT yet the default, pending a paired run.
+
+[DECIDED] `cb/versionspace.py` -- the deterministic backend, built and wired as a third
+belief backend. Belief is the version space; the truth never leaves it, so a claim every
+survivor agrees on is agreed CORRECTLY and `claim_bar=1.0` is required and enforced.
+Episodes run in ~2 ms against 2.5-7 s. 9 tests pin the guarantees, including
+skeleton-only enumeration against exhaustive search.
+
+[MEASURED] The deterministic environment reproduces the scratchpad headroom inside the real
+env: 4 agents, budget 4, 60 episodes -- greedy 0.404 +/- 0.039 (scratchpad measured 0.406
+independently), random 0.221, ceiling 0.800. Headroom 0.396 per-window.
+
+[DECIDED] `per_agent_reward` added (off by default): each agent paid for its own window
+rather than the all-agents conjunction, which makes agent i's gradient depend on agent j's
+luck and compresses the reported metric exponentially in agent count. Both variants are
+training tonight so the comparison is measured rather than argued.
+
+[NOTED] Six concurrent training processes oversubscribed the machine -- a seventh job
+produced no output in four minutes and was stopped rather than left to crawl. Lane
+scheduling has to account for core count, not just wall clock.
