@@ -3311,3 +3311,18 @@ ONLY the observation ("lowest own-count authority node, private first") scores 1
 ceiling (0.25). The winning rule is now a function of the observation. If training still
 fails to separate from random, the remaining suspect is per-step reward noise -- and
 only then. One shadowed-variable bug caught by shape mismatch during wiring; suite 285.
+
+## 2026-08-25 (night 3) -- the counts fix trains: first policy to beat greedy
+
+[MEASURED] Stage A, rung 0 with own-counts observation (6000 eps, 4h0m, otherwise
+identical to the prelim): IT LEARNED. Entropy 1.61 -> 0.56 -- the first genuine
+differentiation of the project -- solve 0.09 -> 0.24 and still rising at cutoff. Paired
+eval (200 eps): learned 0.215 [0.160,0.275] > greedy_uncertainty 0.145 [0.100,0.195] >
+random 0.115 [0.075,0.160] > pass 0.000. Decisive over random (disjoint CIs); +7pp over
+greedy with overlapping CIs -- AHEAD, not yet decisive; the rising tail says
+undertrained, and the obs-balanced ceiling (0.30) is not yet reached. Attribution is
+clean: the only change from the prelim (which was == random) is the counts observation.
+
+[DECIDED] Stage B launched immediately: rung 1 (three agents, budget 9), same recipe,
+4500 episodes -- sized so both rungs land by morning; rung-0 extension deferred to the
+cluster's longer runs.
