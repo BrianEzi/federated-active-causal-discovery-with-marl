@@ -115,6 +115,60 @@ class FisherZ:
         self.alpha = float(alpha)
         self.calls = 0
         self._cache: dict = {}
+        # How many variables are intervened in each row -- lets any "no third variable
+        # clamped" mask be one vector comparison instead of a column gather (2026-08-25).
+        self._n_intervened = self.intervened.sum(axis=1)
+        self._groups = None            # lazy sufficient statistics; see _suffstats
+
+    # -- sufficient statistics -----------------------------------------------------------
+
+    def _suffstats(self):
+        """Per intervention-pattern group: row count, column sums, cross-products.
+
+        THE ALGORITHMIC HEART OF THE 2026-08-25 SPEEDUP. Rows fall into a handful of
+        groups by WHICH variables were intervened (observational block, one group per
+        intervened set). Any pair's usable-row correlation matrix is then assembled from
+        the kept groups' sums in O(k^2), instead of an O(rows x k^2) corrcoef per pair.
+        Products are taken on data CENTERED by the global column means -- covariance is
+        invariant to any fixed shift, and centering keeps the one-pass formula
+        numerically close to corrcoef's two-pass result.
+        """
+        if self._groups is None:
+            patterns, inverse = np.unique(self.intervened, axis=0, return_inverse=True)
+            center = self.data.mean(axis=0)
+            shifted = self.data - center
+            counts, sums, prods = [], [], []
+            for g in range(len(patterns)):
+                rows = shifted[inverse == g]
+                counts.append(len(rows))
+                sums.append(rows.sum(axis=0))
+                prods.append(rows.T @ rows)
+            self._groups = (patterns.astype(bool), np.asarray(counts),
+                            np.asarray(sums), np.asarray(prods))
+        return self._groups
+
+    def _pair_corr(self, x: int, y: int):
+        """(n_rows, [k, k] correlation matrix) over the rows usable for pair (x, y)."""
+        key = ("corr", x, y) if x <= y else ("corr", y, x)
+        hit = self._cache.get(key)
+        if hit is not None:
+            return hit
+        patterns, counts, sums, prods = self._suffstats()
+        keep = ~(patterns[:, x] | patterns[:, y])
+        n = int(counts[keep].sum())
+        if n < MIN_ROWS:
+            hit = (n, None)
+        else:
+            s = sums[keep].sum(axis=0)
+            p = prods[keep].sum(axis=0)
+            cov = (p - np.outer(s, s) / n) / (n - 1)
+            sd = np.sqrt(np.clip(np.diag(cov), 0.0, None))
+            with np.errstate(invalid="ignore", divide="ignore"):
+                corr = cov / np.outer(sd, sd)
+            corr[~np.isfinite(corr)] = np.nan
+            hit = (n, corr)
+        self._cache[key] = hit
+        return hit
 
     # -- row selection ------------------------------------------------------------------
 
@@ -144,19 +198,7 @@ class FisherZ:
         """
         self.calls += 1
         cond = [c for c in cond if c not in (x, y)]
-        key = ("corr", x, y) if x <= y else ("corr", y, x)
-        hit = self._cache.get(key)
-        if hit is None:
-            rows = self._rows_for(x, y)
-            n_rows = int(rows.sum())
-            if n_rows >= MIN_ROWS:
-                with np.errstate(invalid="ignore", divide="ignore"):
-                    full = np.corrcoef(self.data[rows], rowvar=False)
-            else:
-                full = None
-            hit = (n_rows, full)
-            self._cache[key] = hit
-        n_rows, full = hit
+        n_rows, full = self._pair_corr(x, y)
         dof = n_rows - len(cond) - 3
         if full is None or dof <= 0:
             return True
@@ -231,10 +273,9 @@ class FisherZ:
                     continue
                 # y itself free, NO third variable clamped, no FOREIGN clamp -- see the
                 # class docstring for the last one.
-                free = ~self.intervened[:, y] & ~self.foreign
-                others = [c for c in range(self.k) if c not in (x, y)]
-                if others:
-                    free &= ~self.intervened[:, others].any(axis=1)
+                free = (~self.intervened[:, y] & ~self.foreign
+                        & ((self._n_intervened - self.intervened[:, x]
+                            - self.intervened[:, y]) == 0))
                 a, b = self.data[clamped & free, y], self.data[(~clamped) & free, y]
                 if len(a) < min_rows or len(b) < min_rows:
                     continue
@@ -319,10 +360,9 @@ class FisherZ:
                 # variable clamped, no foreign clamp, split by clamp-x. Power must be
                 # computed on the sample the detection test actually gets, or it is power
                 # for a different test.
-                free = ~self.intervened[:, y] & ~self.foreign
-                others = [c for c in range(self.k) if c not in (x, y)]
-                if others:
-                    free &= ~self.intervened[:, others].any(axis=1)
+                free = (~self.intervened[:, y] & ~self.foreign
+                        & ((self._n_intervened - self.intervened[:, x]
+                            - self.intervened[:, y]) == 0))
                 n1 = int((clamped & free).sum())
                 n2 = int(((~clamped) & free).sum())
                 if n1 < min_rows or n2 < min_rows:

@@ -3343,3 +3343,27 @@ full ancestral matrices equal over 40 random SCMs, CI-test verdicts equal over 6
   2. The CI test caches ONE full correlation matrix per pair (the usable rows depend
      only on the pair), so every conditioning set reads submatrices of it.
 Like-for-like: 5.05 -> 2.21 s/episode under identical contention. Suite green.
+
+## 2026-08-25 -- full optimisation pass: 2.9x serial; parallelism measured and REJECTED at k=4
+
+[DECIDED] Sufficient statistics replace per-pair correlation scans: rows group by
+intervention pattern (a handful of groups); per group one count/sum/cross-product pass;
+any pair's usable-row correlation matrix assembles from kept groups in O(k^2). Third-var
+masks vectorised via a per-row intervention count. All gated by the verdict-identity
+suite (p-values within 1e-9 of scipy; CI and ancestral verdicts exactly equal to the
+reference implementations across random SCMs).
+
+[MEASURED] Like-for-like under identical load: 5.05 -> 1.76 s/episode (2.9x). Standalone
+runs should land near ~1 s.
+
+[MEASURED, null kept] Process-pool replicate parallelism is BIT-IDENTICAL to serial
+(pinned by test) but SLOWER at k=4: serial 1.76, 4 workers 3.96, 6 workers 6.26 s/ep --
+after the serial optimisations a replicate is ~4 ms and IPC swamps it. Default
+cb_n_jobs=1; the path stays for the scale ladder, where a replicate is ~25 ms and the
+pool pays. Chunked dispatch helps but does not flip the sign.
+
+[NOTED] The constraint engine remains slower than the exact engine AT k=4 -- the known
+crossover (~k=6-7) from the feasibility measurements; we pay at toy scale for soundness
+at multi-hidden topologies and for scale itself. macOS spawn caveat: pool workers
+re-execute the main module, so any script using cb_n_jobs>1 needs a __main__ guard
+(ma_train.py has one).

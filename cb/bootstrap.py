@@ -26,9 +26,44 @@ from typing import Optional
 
 import numpy as np
 
+from concurrent.futures import ProcessPoolExecutor
+
 from cb.citest import FisherZ
 from cb.orient import CODE_BIDIRECTED, CODE_DIRECTED, orient
 from cb.skeleton import estimate_skeleton
+
+# One persistent pool per process, created lazily. Replicates are embarrassingly
+# parallel and DETERMINISTIC BY CONSTRUCTION regardless of scheduling: every replicate's
+# row indices are drawn serially from the single rng BEFORE any work is dispatched, each
+# task is a pure function of its inputs, and accumulation happens in replicate order.
+# The parallel path must be bit-identical to the serial one -- pinned by
+# tests/cb/test_fast_stats.py.
+_POOL: Optional[ProcessPoolExecutor] = None
+_POOL_SIZE = 0
+
+
+def _pool(n_jobs: int) -> ProcessPoolExecutor:
+    global _POOL, _POOL_SIZE
+    if _POOL is None or _POOL_SIZE != n_jobs:
+        if _POOL is not None:
+            _POOL.shutdown(wait=False)
+        _POOL = ProcessPoolExecutor(max_workers=n_jobs)
+        _POOL_SIZE = n_jobs
+    return _POOL
+
+
+def _replicate(task):
+    """One bootstrap replicate, a pure function of its inputs -- the unit of parallelism."""
+    data, intervened, foreign, rows, alpha, max_cond, use_interventions, require_power = task
+    sub, sub_int = data[rows], intervened[rows]
+    test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])
+    skel = estimate_skeleton(test, data.shape[1], max_cond=max_cond)
+    ancestral = test.ancestral_evidence() if use_interventions else None
+    clamped = test.clamped_enough() if use_interventions else None
+    powered = test.pair_power() if use_interventions else None
+    result = orient(skel, ancestral, clamped, require_power=require_power,
+                    powered=powered)
+    return result.codes, skel.adjacency, skel.ci_tests, skel.truncated
 
 
 class BootstrapBelief:
@@ -69,7 +104,8 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                      seed: int = 0, use_interventions: bool = True,
                      require_power: bool = True,
                      foreign: Optional[np.ndarray] = None,
-                     blocks: Optional[np.ndarray] = None) -> BootstrapBelief:
+                     blocks: Optional[np.ndarray] = None,
+                     n_jobs: int = 1) -> BootstrapBelief:
     """Resample rows `n_boot` times; run skeleton + orientation on each; count edges.
 
     Rows are resampled with replacement, NOT columns: the variables are fixed by the
@@ -107,6 +143,9 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
         labels = np.asarray(blocks)
         block_rows = [np.flatnonzero(labels == lab) for lab in np.unique(labels)]
 
+    # All resample indices are drawn FIRST, serially, so the rng stream is identical
+    # whether the replicates then run serially or on the pool.
+    row_sets = []
     for b in range(runs):
         if n_boot and b > 0:
             if block_rows is not None:
@@ -116,22 +155,26 @@ def bootstrap_belief(data: np.ndarray, intervened: Optional[np.ndarray] = None,
                 rows = rng.integers(0, n, n)
         else:
             rows = np.arange(n)         # first replicate is the real data, unresampled
-        sub, sub_int = data[rows], intervened[rows]
+        row_sets.append(rows)
 
-        test = FisherZ(sub, sub_int, alpha=alpha, foreign=foreign[rows])
-        skel = estimate_skeleton(test, k, max_cond=max_cond)
-        ancestral = test.ancestral_evidence() if use_interventions else None
-        clamped = test.clamped_enough() if use_interventions else None
-        powered = test.pair_power() if use_interventions else None
-        result = orient(skel, ancestral, clamped, require_power=require_power,
-                        powered=powered)
+    tasks = [(data, intervened, foreign, rows, alpha, max_cond,
+              use_interventions, require_power) for rows in row_sets]
+    if n_jobs > 1 and runs > 1:
+        # One chunk per worker: at small k a replicate is milliseconds of work, and
+        # per-task IPC would swamp it (measured 2026-08-25: unchunked 4-way was 2.7x
+        # SLOWER than serial).
+        chunk = max(1, (len(tasks) + int(n_jobs) - 1) // int(n_jobs))
+        outputs = list(_pool(int(n_jobs)).map(_replicate, tasks, chunksize=chunk))
+    else:
+        outputs = [_replicate(task) for task in tasks]
 
-        directed += (result.codes == CODE_DIRECTED)
-        bidirected += (result.codes == CODE_BIDIRECTED)
-        adjacency += skel.adjacency
-        total_tests += skel.ci_tests
-        truncations += int(skel.truncated)
-        replicates[b] = result.codes
+    for b, (codes, skel_adjacency, ci_tests, truncated) in enumerate(outputs):
+        directed += (codes == CODE_DIRECTED)
+        bidirected += (codes == CODE_BIDIRECTED)
+        adjacency += skel_adjacency
+        total_tests += ci_tests
+        truncations += int(truncated)
+        replicates[b] = codes
 
     return BootstrapBelief(directed / runs, bidirected / runs, adjacency / runs,
                            runs, total_tests, truncations / runs, replicates)

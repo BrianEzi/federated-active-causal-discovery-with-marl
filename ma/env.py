@@ -196,6 +196,12 @@ class MAConfig:
     cb_alpha: float = 0.01         # CI-test level. SWEPT 2026-08-24 (0.05 halves credit
                                    # via noisier skeletons) and FIXED. Do not revisit
                                    # against results.
+    # Bootstrap replicates CAN run on a process pool (bit-identical to serial by
+    # construction and pinned by test) -- but at k=4 a replicate is ~4 ms of work and
+    # process dispatch LOSES (measured 2026-08-25: 4-way was 2x slower than serial).
+    # Default stays serial; raise this on the scale ladder (k=7-9), where a replicate
+    # is ~25 ms and the pool pays.
+    cb_n_jobs: int = 1
     # WHICH NETWORK THE POLICY USES. "mlp" is the flat ActorCritic behind every banked
     # number; "gnn" is the role-aware per-node wrapper (ma/policy.py) around
     # ma/nets.PerNodeActorCritic. The student wants results from the GNN; the MLP is the
@@ -239,7 +245,7 @@ class AgentWindow:
 
     def __init__(self, agent: int, topology: Topology,
                  modes: Sequence[str] = MODES, backend: str = EXACT,
-                 cb_n_boot: int = 50, cb_alpha: float = 0.01):
+                 cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
         self.modes: Tuple[str, ...] = tuple(modes)
@@ -259,7 +265,7 @@ class AgentWindow:
             # base_seed separates the agents' resample streams; deterministic in the agent
             # id so identical seeded episodes reproduce bit-for-bit.
             self.belief = ConstraintBackend(self.k, shared_positions, n_boot=cb_n_boot,
-                                            alpha=cb_alpha,
+                                            alpha=cb_alpha, n_jobs=cb_n_jobs,
                                             base_seed=100003 * (self.agent + 1))
         else:
             self.belief = WindowBeliefDP(self.k, shared_positions)
@@ -347,7 +353,8 @@ class TwoAgentEnv:
         self.windows: Dict[int, AgentWindow] = {
             agent: AgentWindow(agent, config.topology, config.action_modes,
                                backend=config.belief_backend,
-                               cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha)
+                               cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha,
+                               cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
         self.reset(seed)

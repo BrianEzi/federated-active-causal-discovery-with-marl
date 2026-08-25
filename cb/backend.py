@@ -69,13 +69,15 @@ class ConstraintBackend:
     can_handle_multi_hidden = True
 
     def __init__(self, k: int, shared_positions: Sequence[int], n_boot: int = 50,
-                 alpha: float = 0.01, max_cond: int = 3, base_seed: int = 0):
+                 alpha: float = 0.01, max_cond: int = 3, base_seed: int = 0,
+                 n_jobs: int = 1):
         self.k = int(k)
         self.shared_positions = tuple(int(p) for p in shared_positions)
         self.n_boot = int(n_boot)
         self.alpha = float(alpha)
         self.max_cond = int(max_cond)
         self.base_seed = int(base_seed)
+        self.n_jobs = int(n_jobs)
         self._calls = 0
         self.last: Optional[BootstrapBelief] = None
 
@@ -105,7 +107,8 @@ class ConstraintBackend:
         self.last = bootstrap_belief(
             np.asarray(data, dtype=float), np.asarray(known),
             n_boot=self.n_boot, alpha=self.alpha, max_cond=self.max_cond,
-            seed=self.base_seed + self._calls, foreign=foreign, blocks=blocks)
+            seed=self.base_seed + self._calls, foreign=foreign, blocks=blocks,
+            n_jobs=self.n_jobs)
         return self.last.edge_marginals()
 
     @property

@@ -134,3 +134,28 @@ def test_ancestral_evidence_verdicts_identical_to_scipy():
         test = FisherZ(data, intervened, foreign=foreign)
         fast = test.ancestral_evidence()
         assert np.array_equal(fast, _scipy_ancestral(test)), f"trial {trial}"
+
+
+def test_parallel_bootstrap_is_bit_identical_to_serial():
+    """Determinism is structural -- row draws precede dispatch, accumulation is ordered
+    -- and this test keeps it that way. Any drift here voids every seeded result."""
+    from cb.bootstrap import bootstrap_belief
+    rng = np.random.default_rng(3)
+    n, k = 900, 4
+    weights = np.triu(rng.uniform(-1.5, 1.5, (k, k)), 1) * (rng.random((k, k)) < 0.6)
+    data = np.zeros((n, k))
+    intervened = np.zeros((n, k), dtype=bool)
+    block = n // (k + 1)
+    for j in range(k):
+        data[:, j] = data @ weights[:, j] + rng.normal(size=n)
+        rows = slice(j * block, (j + 1) * block)
+        data[rows, j] = rng.normal(0, 2, block)
+        intervened[rows, j] = True
+    blocks = np.repeat(np.arange(k + 1), block)[:n]
+    serial = bootstrap_belief(data, intervened, n_boot=8, seed=5, blocks=blocks, n_jobs=1)
+    parallel = bootstrap_belief(data, intervened, n_boot=8, seed=5, blocks=blocks, n_jobs=4)
+    assert np.array_equal(serial.replicates, parallel.replicates)
+    assert np.array_equal(serial.directed, parallel.directed)
+    assert np.array_equal(serial.bidirected, parallel.bidirected)
+    assert np.array_equal(serial.adjacency, parallel.adjacency)
+    assert serial.ci_tests == parallel.ci_tests
