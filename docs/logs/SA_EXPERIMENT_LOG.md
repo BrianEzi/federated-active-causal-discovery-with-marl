@@ -3460,3 +3460,56 @@ bootstrap frequencies behind it), `scripts/trace_view.py` renders traces as a
 step-through page. `cb/claims.py::score_window` is now a tally over the new
 `enumerate_claims`, so a trace and the reward cannot disagree about what a claim is --
 the 13 existing claims tests pass unchanged.
+
+## 2026-08-25 -- what the belief engine is actually wrong about
+
+[MEASURED] Bootstrap count, at budget 12 / n_int 250 / rung 1, greedy, 20 episodes
+(scratchpad/engine_quality.py). Per-window identification, share of windows carrying a
+confidently-WRONG claim, share blocked only by unsure claims, and cost:
+
+    B= 5   identified 0.167   wrong 0.483   unsure 0.350   1.4 s/ep
+    B=12   identified 0.233   wrong 0.350   unsure 0.417   3.5 s/ep
+    B=25   identified 0.267   wrong 0.283   unsure 0.450   6.6 s/ep
+
+B=5 IS NOT ENOUGH and the reason is mechanical: at 5 resamples the 0.7 bar quantises to
+4-of-5, so claims two votes short of certainty get stamped as settled. It converts UNSURE
+into WRONG (unsure falls while wrong rises) -- manufacturing false confidence, the worst
+available trade for this thesis. Keep 12 as the floor.
+
+[MEASURED] Rows per experiment, same config, B=12: n_int 250 -> identified 0.233, wrong
+0.350, 3.6 s/ep; n_int 1000 -> identified 0.350, wrong 0.250, 6.7 s/ep.
+
+    FOR EQUAL COMPUTE, DATA BEATS RESAMPLES. B=25 and n_int=1000 both cost ~2x baseline;
+    the first buys +3.4pp identification, the second +11.7pp. Future runs should spend on
+    n_int, not on cb_n_boot.
+
+[MEASURED] Census of confident errors, 40 episodes / 120 windows / 1236 claims, budget 12,
+n_int 250, B 12 (scratchpad/wrong_census.py):
+
+    45 confident errors total (3.6% of claims)
+      missed a real edge     22   (49%)
+      confounding misread    17   (38%)
+      invented an edge        4   ( 9%)
+      direction wrong         2   ( 4%)
+    bootstrap agreement with the wrong answer:  0.8 -> 14,  0.9 -> 12,  1.0 -> 19
+
+Three readings. (a) The independence test is ASYMMETRIC 5.5:1 -- 22 missed edges against 4
+invented -- at alpha=0.01, a threshold tuned to avoid false edges in a regime where false
+edges are not the failure. alpha is the free lever and is being swept now. (b) 31 of 45
+errors have >=0.9 of the bootstrap agreeing, so they are NOT resampling noise and neither a
+higher bar nor a larger B can reach them; the remaining 14 (at 0.8) can. (c) Unanimity does
+NOT imply irreparable -- an under-powered test makes the SAME mistake in every replicate,
+which is exactly why n_int moves these numbers and B does not.
+
+[CORRECTED] Two overstatements made while these rows were arriving, both from reading a
+partial sweep. First: "most confidently-wrong is resampling noise" -- true only of the
+marginal population; at B=12 the residual is dominated by unanimous errors that B cannot
+touch. Second: from a 12-claim trace sample, "11 of 12 confident errors are adjacency, so
+the skeleton is the whole story" -- the 45-error census puts adjacency at 58%, with
+confounding misreads a substantial 38%. The trace sample was too small to carry that claim.
+
+[MEASURED] Rescoring finished traces at bars 0.6/0.7/0.8/0.9 (scratchpad/bar_sweep.py)
+leaves the wrong-claim rate FLAT while identification falls. Consistent with (b): the
+errors sit at 0.9-1.0 agreement, above every bar tested. Raising the bar is not a lever.
+Caveat: the greedy that produced those traces was targeting unsure claims at bar 0.7, so
+this isolates the scoring effect only.
