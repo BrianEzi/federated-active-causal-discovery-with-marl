@@ -175,7 +175,10 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         # role(2) + disclosed-count(1) + regime(1) + partner signals (global broadcast)
         # + own-intervention count (1, per node -- the "what have I already done" input
         # without which "touch each node once" is unlearnable; added 2026-08-25).
-        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS) + 1
+        # +2 for the per-node confounding/adjacency aggregates. Always present in the
+        # encoder's width: when the environment does not supply the channels they arrive as
+        # zeros, so one architecture reads both observation layouts.
+        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS) + 1 + 2
         edge_hidden = max(hidden // 4, 8)
         self.node_encoder = nn.Sequential(
             nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
@@ -195,7 +198,11 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         signals = obs[:, i:i + self.n_others * len(SIGNALS)]
         i += self.n_others * len(SIGNALS)
         counts = obs[:, i:i + k]
-        return core, disclosed, regime, signals, counts
+        i += k
+        # Bidirected + adjacency upper triangles, when the environment supplies them
+        # (`observe_belief_channels`). Empty otherwise, so the old layout still parses.
+        channels = obs[:, i:]
+        return core, disclosed, regime, signals, counts, channels
 
     def forward(self, obs: torch.Tensor):
         single = obs.dim() == 1
@@ -203,7 +210,7 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             obs = obs.unsqueeze(0)
         batch, k = obs.shape[0], self.d
 
-        core, disclosed, regime, signals, counts = self._split(obs)
+        core, disclosed, regime, signals, counts, channels = self._split(obs)
         base = self._node_features(core)                    # parent path, verbatim modules
 
         per_node_disclosed = torch.zeros(batch, k, 1, dtype=obs.dtype, device=obs.device)
@@ -215,12 +222,27 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             for s_index, pos in enumerate(self.shared_positions):
                 per_node_disclosed[:, pos, 0] = partner_hits[:, s_index]
 
+        # Pair-shaped beliefs become PER-NODE features: how much confounding, and how much
+        # adjacency, this node's pairs carry. Aggregating rather than flattening keeps the
+        # encoder permutation-equivariant within roles, which is the whole reason the GNN
+        # is here -- a flat 12-vector would tie parameters to node indices.
+        per_node_channels = torch.zeros(batch, k, 2, dtype=obs.dtype, device=obs.device)
+        if channels.shape[-1] == k * (k - 1):
+            half = k * (k - 1) // 2
+            rows, cols = torch.triu_indices(k, k, offset=1)
+            for offset, block in enumerate((channels[:, :half], channels[:, half:])):
+                dense = torch.zeros(batch, k, k, dtype=obs.dtype, device=obs.device)
+                dense[:, rows, cols] = block
+                dense[:, cols, rows] = block
+                per_node_channels[:, :, offset] = dense.sum(dim=2) / max(k - 1, 1)
+
         extras = torch.cat([
             self.role.unsqueeze(0).expand(batch, k, 2),
             per_node_disclosed,
             regime.unsqueeze(1).expand(batch, k, 1),
             signals.unsqueeze(1).expand(batch, k, signals.shape[-1]),
             counts.unsqueeze(-1),
+            per_node_channels,
         ], dim=-1)
 
         embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))

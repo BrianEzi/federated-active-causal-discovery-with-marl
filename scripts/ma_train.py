@@ -50,6 +50,7 @@ def _config_record(config, topology, args) -> dict:
             "claim_bar": config.claim_bar,
             "claim_penalty": config.claim_penalty,
             "per_agent_reward": config.per_agent_reward,
+            "observe_belief_channels": config.observe_belief_channels,
             "topology": {"name": topology.name, "d": topology.d,
                          "private": [list(p) for p in topology.private],
                          "exposed": list(topology.exposed)},
@@ -139,6 +140,10 @@ def main(argv=None) -> dict:
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
                     help="pay each agent for its own window, not the all-agents conjunction")
+    ap.add_argument("--observe_belief_channels", action="store_true",
+                    help="show the policy its confounding and adjacency beliefs, not just "
+                         "directed-edge frequencies (found 2026-08-26: without this the "
+                         "learner cannot see the channel its reward is scored on)")
     ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn"])
     ap.add_argument("--cb_n_boot", type=int, default=12,
                     help="bootstrap replicates per refresh (constraint backend only)")
@@ -212,6 +217,7 @@ def main(argv=None) -> dict:
                        oracle_obs_structure=args.oracle_obs,
                        **({"claim_bar": args.claim_bar} if args.claim_bar else {}),
                        per_agent_reward=args.per_agent_reward,
+                       observe_belief_channels=args.observe_belief_channels,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
     env = TwoAgentEnv(config)

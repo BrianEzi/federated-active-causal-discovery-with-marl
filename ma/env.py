@@ -196,7 +196,15 @@ class MAConfig:
     # Pay each agent for its OWN window instead of the all-agents conjunction. Off by
     # default so every number measured before 2026-08-26 stays reproducible; the shared
     # reward remains what `both_identified` reports either way.
-    per_agent_reward: bool = False             # per-claim confidence bar; 0.5 would be a coin flip
+    per_agent_reward: bool = False
+    # SHOW THE POLICY THE CHANNELS ITS REWARD IS SCORED ON. The observation carried only
+    # DIRECTED edge frequencies, so an agent could not see which pairs it believed
+    # CONFOUNDED -- the one claim the thesis is about, always required, and the largest
+    # remaining error category. The greedy baseline reads all three channels through
+    # cb.claims, so every learned-vs-greedy comparison to date handicapped the learner.
+    # Found 2026-08-26 while diagnosing learned < greedy in the deterministic environment.
+    # Off by default because it changes obs_size and voids old checkpoints.
+    observe_belief_channels: bool = False
     claim_penalty: float = 1.0         # settled-wrong weight in the dense reward
     # WHICH ENGINE HOLDS THE BELIEF. "exact" is the Bayesian subset DP
     # (`crosscheck/belief_dp.py`); "constraint" is the bootstrap PC/FCI engine (`cb/`).
@@ -272,6 +280,7 @@ class AgentWindow:
     def __init__(self, agent: int, topology: Topology,
                  modes: Sequence[str] = MODES, backend: str = EXACT,
                  cb_skeleton_alpha: Optional[float] = None,
+                 observe_belief_channels: bool = False,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
@@ -287,6 +296,7 @@ class AgentWindow:
             + [(PASS_ACTION, None)])
         self.n_actions = len(self.actions)
         self.pass_index = self.n_actions - 1
+        self._observe_channels = bool(observe_belief_channels)
         shared_positions = [self.pos[n] for n in self.shared]
         if backend == CONSTRAINT:
             # base_seed separates the agents' resample streams; deterministic in the agent
@@ -318,7 +328,9 @@ class AgentWindow:
                 # "touch each node once, private first" -- unlearnable by a policy that
                 # cannot see which nodes it already touched. Own history only: nothing
                 # crosses the privacy boundary.
-                + self.k)
+                + self.k
+                # Bidirected + adjacency upper triangles (2026-08-26), when enabled.
+                + (self.k * (self.k - 1) if self._observe_channels else 0))
 
 
 class TwoAgentEnv:
@@ -399,6 +411,7 @@ class TwoAgentEnv:
                                backend=config.belief_backend,
                                cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha,
                                cb_skeleton_alpha=config.cb_skeleton_alpha,
+                               observe_belief_channels=config.observe_belief_channels,
                                cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
@@ -897,7 +910,28 @@ class TwoAgentEnv:
                                # Own per-node intervention counts, budget-normalised so
                                # the feature stays on [0, 1] (raw counts once dominated
                                # a first layer -- see the docstring above).
-                               self.own_counts[agent] / max(self.config.budget, 1)])
+                               self.own_counts[agent] / max(self.config.budget, 1),
+                               # Confounding and adjacency beliefs, upper triangles. Both
+                               # already live on [0, 1]. See `observe_belief_channels`.
+                               self._belief_channels(agent)])
+
+    def _belief_channels(self, agent: int) -> np.ndarray:
+        """Bidirected and adjacency frequencies, upper triangle, or an empty array.
+
+        The claims criterion scores three channels; the observation carried one. An agent
+        that cannot see what it believes about confounding cannot act on it, while the
+        greedy baseline reads all three -- which made every learned-vs-greedy number a
+        comparison between a blindfolded learner and a sighted rule.
+        """
+        window = self.windows[agent]
+        if not self.config.observe_belief_channels:
+            return np.zeros(0)
+        belief = window.belief.last
+        if belief is None:
+            return np.zeros(window.k * (window.k - 1))
+        rows, cols = np.triu_indices(window.k, k=1)
+        return np.concatenate([np.asarray(belief.bidirected)[rows, cols],
+                               np.asarray(belief.adjacency)[rows, cols]])
 
     def _result(self, reward: float, passed: bool = False) -> StepResult:
         threshold = self.config.identify_threshold
