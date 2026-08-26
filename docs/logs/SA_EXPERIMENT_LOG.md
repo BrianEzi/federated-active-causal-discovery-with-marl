@@ -3911,3 +3911,65 @@ environment remains unachieved.
 Every re-scored arm reproduced its earlier value exactly (blindfolded 0.316/0.300, channels
 s0 0.431), confirming the fixed evaluation is deterministic across invocations -- the
 property the old seeding lacked.
+
+---
+
+## 2026-08-26, late — the target changes: ATTRIBUTION replaces the bidirected claim
+
+[DECIDED, student] Agents should not stop at the MAG. A bidirected edge says "something
+unobserved links these two" and stops; the object we want is a MODEL of that something.
+Concretely, replace each bidirected claim with an ATTRIBUTION: a partition of the confounded
+pairs into groups (one group = one latent variable) together with the OWNER of each group —
+the agent whose private block the latent lives in. The bidirected claim is not kept
+alongside it; attribution REPLACES it.
+
+Correctness is judged up to renaming the latent. An outsider can never learn WHICH of A's
+variables it is, and does not need to: the clique of pairs the latent explains IS its
+identity from outside. That is also the privacy statement, and it is empty at one private
+node per agent — naming the agent would name the variable — which is the second independent
+reason private sets must be >= 2.
+
+[STRUCTURAL] EVERY BIDIRECTED EDGE IN A WINDOW IS BETWEEN TWO SHARED NODES, and its latent
+lies in exactly one agent's private block. Proof from the edge rule: a bidirected edge needs
+a hidden node with directed paths to both endpoints running entirely through hidden nodes.
+Hidden nodes live in other agents' private blocks, and edges between DIFFERENT blocks are
+forbidden — so the whole path lies inside one block and leaves it by a single edge to a node
+that block's owner can see. The only nodes every agent sees are the exposed ones. Hence both
+endpoints are exposed.
+
+Consequences: attribution is a choice among a handful of NAMED agents, not a search over
+arbitrary latent structures; and valid groupings are partitions into CLIQUES, because one
+latent parenting {u,v,w} makes all three pairs bidirected. Caveat: two agents may
+independently confound the same pair, so an owner label must permit a SET, not a single name.
+
+[IDENTIFIABILITY] Observation cannot distinguish "one latent causing three visible nodes"
+from "three pairwise latents" — both give the same bidirected triangle. An INTERVENTION can:
+if all three associations move together when A acts privately, it is one latent; if only one
+moves, it is not. The only agent who can perform that intervention is the one who owns the
+variable. This is a federated result and it is what makes coordination about ATTRIBUTING
+hidden structure rather than only dividing work.
+
+[CORRECTED — a decision I made and then contradicted] On the morning of 2026-08-26 we
+settled, from Mooij, Magliacane & Claassen (JMLR 21(99), 2020), that the right treatment of
+a partner's intervention regime is to CONDITION on it as a context variable, not to exclude
+those rows and not to stratify. I then filed it under "further work, do not build this
+week" in `AGENDA_2026_08_26.md`, and spent the day on agenda item 1 — which asks whether to
+exclude foreign rows from the SKELETON tests as well. That is a question about excluding
+MORE, in a codebase whose agreed direction was to stop excluding. The null result it
+returned ("exclusion buys nothing") is weak evidence FOR conditioning and was filed as "no
+change needed". The exclusion is not a tuning detail; it is the specific thing standing
+between the engine and the attribution question.
+
+[DECIDED, student] Adapt the noisy engine NOW rather than later, for codebase consistency:
+replace `~self.foreign` exclusion with per-partner CONTEXT COLUMNS that the tests condition
+on. This does not deliver attribution by itself; it undoes the decision that blocks it, and
+it is the cheap half.
+
+[DECIDED, student] On the JCI exogeneity assumption — context variables must have no arrows
+into them, and our agents choose interventions adaptively from their own data, so the
+assumption is violated by construction. Three options were on the table: condition on the
+round block, restrict evidence to non-adaptive rounds, or ACCEPT the violation and MEASURE
+the damage against the deterministic environment where the right answer is known. Student
+chose the third: adjust only on observed degradation. Expectation on record, so it can be
+checked: the student expects the harm to be small. If it is not, the fallback is
+block-conditioning.
