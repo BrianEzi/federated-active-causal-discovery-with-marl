@@ -64,9 +64,19 @@ def _scipy_ancestral(test: FisherZ, min_rows: int = 20) -> np.ndarray:
 
 
 def _reference_independent(test: FisherZ, x, y, cond) -> bool:
-    """The pre-cache implementation of the CI test, verbatim."""
+    """The pre-cache implementation of the CI test, verbatim.
+
+    The row rule is written out here rather than borrowed from `FisherZ`. It used to call
+    `test._rows_for(x, y)` -- and that method turned out to be the ONLY thing keeping
+    `_rows_for` alive: nothing in production called it, so a reader looking for the row
+    filter found a plausible answer that had no effect on any number, and a diagnostic that
+    patched it produced bit-identical arms (2026-08-26). The method is gone; a reference
+    implementation should not have been sharing code with the thing it checks anyway.
+    """
     cond = [c for c in cond if c not in (x, y)]
-    rows = test._rows_for(x, y)
+    rows = ~(test.intervened[:, x] | test.intervened[:, y])
+    if test.exclude_foreign:
+        rows = rows & ~test.foreign
     n_rows = int(rows.sum())
     dof = n_rows - len(cond) - 3
     if n_rows < 20 or dof <= 0:
