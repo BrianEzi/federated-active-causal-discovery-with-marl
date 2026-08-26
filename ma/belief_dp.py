@@ -161,6 +161,7 @@ class WindowBeliefDP:
             self._table_cache = None
             self._assign_key = None
             self._assign_cache = None
+            self._parent_sizes = None
             return
         candidates = ([tuple(combo) for combo in product(*self.options)]
                       if self.pairs else [()])
@@ -178,6 +179,7 @@ class WindowBeliefDP:
         # and log_partition was being recomputed 25 times per caller.
         self._assign_key: Optional[Tuple[int, int]] = None
         self._assign_cache: Optional[List[Tuple[np.ndarray, float]]] = None
+        self._parent_sizes: Optional[List[np.ndarray]] = None
 
     def _forces_a_cycle(self, assignment) -> bool:
         """Kahn's algorithm over just the forced confounding edges."""
@@ -236,29 +238,60 @@ class WindowBeliefDP:
                     rows: np.ndarray) -> np.ndarray:
         """`[k, n_parent_sets]` local scores over one regime's rows.
 
-        Deliberately mirrors `RegimeScorer.log_posterior.local` line for line, including
-        the small-sample guard, because Phase 1's gate is exact agreement with it. The
-        batched `LocalScorer.table` is the intended fast replacement, but it must not be
-        swapped in until the equivalence test is green -- it does not implement the guard.
+        BATCHED since 2026-08-26. `LocalScorer.table` groups the marginals by subset size
+        and computes each group's determinants in one call, instead of one `slogdet` per
+        (node, parent set). A profile of a five-agent rung at k = 8 put 16.6s of 64s in
+        `_log_marginal_stats` -- 112640 scalar calls -- which was the single largest term
+        after the DP itself.
+
+        THE GUARD IS WHY THIS COULD NOT SIMPLY BE SWAPPED IN, and the previous docstring
+        said so. `LocalScorer.table` has no notion of a regime carrying too little evidence
+        to score a parent set, so it returns a number where the enumerated path returns the
+        neutral 0.0. Applied here afterwards, vectorised per node: a parent set is zeroed
+        exactly when `n_rows <= len(parents) + 2`, the same condition, and a node with no
+        usable rows at all is zeroed entirely.
+
+        Cooper & Yoo is unchanged and still lives in `LocalScorer.table`: a row where the
+        node was hard-intervened contributes no likelihood term FOR THAT NODE, but stays
+        valid evidence for its children.
+
+        Equivalence with the scalar path is a test, not a claim --
+        `tests/ma/test_belief_dp.py` and `tests/ma/test_screen.py` compare them directly.
         """
+        sub = samples[rows]
+        known_sub = known_intervened[rows]
+        if len(sub) == 0:
+            return np.zeros((self.k, self.scorer.n_parent_sets))
+
+        table = self.scorer.table(sub, known_sub)
+        if self._parent_sizes is None:
+            self._parent_sizes = [
+                np.array([len(p) for p in self.scorer.parent_sets[node]], dtype=int)
+                for node in range(self.k)]
+
+        for node in range(self.k):
+            n_rows = int((known_sub[:, node] < 0.5).sum())
+            if n_rows == 0:
+                table[node, :] = 0.0
+                continue
+            # A regime carrying no usable evidence contributes 0.0, the NEUTRAL element --
+            # not a penalty. Matches the enumerated path exactly.
+            table[node, self._parent_sizes[node] + 2 >= n_rows] = 0.0
+        return table
+
+    def local_table_scalar(self, samples: np.ndarray, known_intervened: np.ndarray,
+                           rows: np.ndarray) -> np.ndarray:
+        """The pre-batching implementation, kept as the reference the fast path is tested
+        against. Mirrors `RegimeScorer.log_posterior.local` line for line."""
         table = np.zeros((self.k, self.scorer.n_parent_sets))
         sub = samples[rows]
         known_sub = known_intervened[rows]
         for node in range(self.k):
-            # Cooper & Yoo: a row where this node was hard-intervened contributes no
-            # likelihood term for the node itself.
             keep = known_sub[:, node] < 0.5
             node_rows = sub[keep]
-            # ONE O(n k^2) pass per node, reused across all 2^(k-1) of its parent sets.
-            # `local_score` recomputes the sufficient statistics on every call, so the
-            # previous version made 16 full passes over the data per node -- 64 per table
-            # at k=4 -- where 4 suffice. The statistics depend only on the node's row
-            # subset, never on which parents are being scored.
             stats = self.score.sufficient_stats(node_rows) if len(node_rows) else None
             for i, parents in enumerate(self.scorer.parent_sets[node]):
                 if len(node_rows) <= len(parents) + 2 or stats is None:
-                    # A regime carrying no usable evidence contributes 0.0, the neutral
-                    # element -- NOT a penalty. Matches the enumerated path exactly.
                     table[node, i] = 0.0
                 else:
                     table[node, i] = self.score.local_score_from_stats(node, parents, stats)

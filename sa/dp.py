@@ -521,15 +521,29 @@ def log_backward_vec(log_alpha: np.ndarray, log_f, sign_f, d: int,
             _scatter_signed(log_fbar, sign_fbar, flat_rest,
                             (g_log + total)[keep], signed[keep], size)
 
-            # push 2 -- the cotangent of each alpha_j(rest), for j in S only
+            # push 2 -- the cotangent of each alpha_j(rest), for j in S only.
+            #
+            # ONE SCATTER FOR ALL d NODES, not d scatters. `_scatter_signed` allocates two
+            # full-length arrays and does a full-length merge per call, so its cost is set
+            # by the TARGET SPACE rather than by how few elements are being scattered.
+            # Per-node calls made that overhead d times over for the same work: a profile
+            # of a five-agent rung at k = 8 counted 138240 calls to it, 15.1s of 64s.
+            # Offsetting node j's targets by `j * size` puts every node in one flat space,
+            # `log_abar` being C-contiguous so the reshape is a view rather than a copy.
             base = g_log + log_f[rest]
             term_sign = signed * sign_f[rest]
+            targets, values, signs = [], [], []
             for j in range(d):
                 sel = keep & in_s[:, :, j]
                 if not sel.any():
                     continue
-                _scatter_signed(log_abar[j], sign_abar[j], rest[sel],
-                                (base + exclude_one[:, :, j])[sel], term_sign[sel], size)
+                targets.append(rest[sel] + j * size)
+                values.append((base + exclude_one[:, :, j])[sel])
+                signs.append(term_sign[sel])
+            if targets:
+                _scatter_signed(log_abar.reshape(-1), sign_abar.reshape(-1),
+                                np.concatenate(targets), np.concatenate(values),
+                                np.concatenate(signs), d * size)
 
     return log_abar, sign_abar
 
