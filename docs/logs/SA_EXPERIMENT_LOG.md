@@ -3889,3 +3889,25 @@ window and the window is fully determined. The exemption of shared-block directi
 the required set is therefore a GRADING CHOICE inherited from the observational argument,
 not a mathematical necessity; the real constraint is budget. It is arguably too lenient and
 should be revisited.
+
+[MEASURED] BELIEF CHANNELS REPLICATE ACROSS THREE SEEDS. Statistical environment, oracle
+warm start, budget 6, n_int 1000, 150 identical episodes per arm under the fixed
+per-episode seeding. Per-window identification:
+
+    + belief channels   0.431, 0.411, 0.402   ->  0.415 +/- 0.009  (3 seeds)
+    blindfolded         0.316, 0.300          ->  0.308 +/- 0.008  (2 seeds)
+    greedy                                        0.387 +/- 0.029
+    random                                        0.258 +/- 0.024
+
+THE CHANNELS ARE WORTH +0.107 +/- 0.012, about 9 standard errors across seeds. The
+single-seed figure reported earlier (+0.123) was slightly optimistic; the replicated
+effect is smaller and far better established.
+
+Against greedy the channels policies are +0.028 +/- 0.030 -- LEVEL, not a win. So the
+standing claim is: showing a policy the channel its reward is scored on takes it from
+clearly BELOW the truth-free rule to LEVEL WITH it. Beating greedy in the statistical
+environment remains unachieved.
+
+Every re-scored arm reproduced its earlier value exactly (blindfolded 0.316/0.300, channels
+s0 0.431), confirming the fixed evaluation is deterministic across invocations -- the
+property the old seeding lacked.
