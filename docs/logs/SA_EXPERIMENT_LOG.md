@@ -3695,3 +3695,39 @@ OFF by default because it changes obs_size and voids every existing checkpoint.
 Paired runs launched tonight: one statistical arm blindfolded, one with channels, same seed
 and config otherwise. Until those land, the honest statement is that the handicap is
 demonstrated to EXIST and its size is not yet measured.
+
+[MEASURED] THE STATISTICAL ENVIRONMENT IS NEARLY POLICY-INSENSITIVE, and this explains
+every disappointing result this project has produced. Per-window identification, 120
+episodes, 3 agents, oracle warm start, budget 6, n_int 1000:
+
+    random_vary          0.264 +/- 0.027
+    transferred          0.303 +/- 0.026     (trained in the deterministic env)
+    greedy_uncertainty   0.342 +/- 0.026
+
+The WHOLE SPREAD from random to greedy is 0.078 +/- 0.037 -- about two standard errors.
+There is almost nothing for any policy to win. Compare the deterministic environment on the
+same metric: random 0.212, greedy 0.359, learned 0.463, ceiling 0.774 -- a span of 0.56.
+
+That is the explanation for rung 0's 7pp margin with overlapping CIs, for rung 1's learned
+finishing BELOW random, and for tonight's transfer landing mid-pack. None of them were
+primarily learning failures: the environment was not measuring experiment choice, because
+the engine's ability to resolve claims dominates everything the policy does.
+
+[MEASURED] TRANSFER DOES NOT CARRY THE ADVANTAGE. The 3-agent deterministic policy scores
+0.820 joint identification in the environment it trained in (greedy 0.400, random 0.050 --
+double greedy, non-overlapping CIs). Evaluated on noisy data it scores 0.303 against
+greedy's 0.342: -0.039 +/- 0.037, indistinguishable from greedy.
+
+The student's hypothesis was that a good intervention is good regardless of measurement
+noise. The structural half holds -- the policy does not collapse to random -- but the
+advantage does not survive, because in the noisy environment there is barely an advantage
+available to anyone (see above). The transfer test could not have succeeded on this
+configuration whatever the policy had learned, which is a property of the TEST BED, not a
+refutation of the idea. Re-running it needs a statistical configuration with measurable
+policy sensitivity first: greedy minus random must be large before a transferred policy can
+be shown to beat greedy.
+
+[DECIDED] The next question is therefore not "how do we train better" but "what makes the
+statistical environment policy-sensitive". The levers already measured point one way:
+n_int (data per experiment) moved identification more than any other knob, and
+cb_skeleton_alpha=0.05 cut confidently-wrong by 9.4pp. Neither is a policy change.
