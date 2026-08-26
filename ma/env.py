@@ -147,22 +147,27 @@ class MAConfig:
     # Overrides `action_modes` entirely -- each node gets exactly ONE action, so the action
     # space stays the size of the vary-only or clamp-only arms rather than doubling.
     #
-    # WHY THIS PAIRING AND NOT THE OTHER. Identifiability depends on intervention TARGETS,
-    # not on the values assigned (Hauser & Buhlmann, JMLR 13, 2012 -- BIBLIOGRAPHY.md §19),
-    # so in the infinite-data limit clamp and vary are equally powerful and this flag is a
-    # FINITE-SAMPLE, ROLE-DEPENDENT choice, not an identifiability one. The two roles want
-    # opposite things:
-    #   - on a node you are trying to ORIENT FOR YOURSELF, you need variance left in it to
-    #     read the correlation channel, so VARY is the informative move -- a clamp gives
-    #     that node zero variance and its outgoing associations vanish along with the
-    #     confounding you were trying to detect.
-    #   - on a node HIDDEN FROM YOUR PARTNER (your private nodes), a clamp is the altruistic
-    #     move: it removes that variable's variance, so the confounded association it
-    #     induces in your partner's window DISAPPEARS. Varying it leaves the confounding in
-    #     place -- measured 2026-08-16: vary restores 0% of a confounded agent's
-    #     identification.
-    # Shared nodes are visible to everyone and are nobody's hidden confounder, so vary is
-    # right there; private nodes are exactly the hidden ones, so clamp is right there.
+    # THE REASONING, WHICH THE MEASUREMENT REFUTED. Identifiability depends on intervention
+    # TARGETS, not on the values assigned (Hauser & Buhlmann, JMLR 13, 2012 --
+    # BIBLIOGRAPHY.md §19), so in the infinite-data limit clamp and vary are equally
+    # powerful and this flag can only be a FINITE-SAMPLE, role-dependent choice. The
+    # argument was that the two roles want opposite things: keep variance in a node you are
+    # orienting for yourself, and remove it from a node that confounds your PARTNER, since
+    # clamping a hidden common cause makes the confounded association vanish for them.
+    #
+    # MEASURED (statistical backend, 3 agents, budget 6, 40 episodes, greedy):
+    #     vary only                    identified 0.308   confounding claims right 0.373
+    #     clamp only                   identified 0.333   confounding claims right 0.355
+    #     clamp private / vary shared  identified 0.250   confounding claims right 0.309
+    # The mixed rule is WORST, and worst on the confounding claims it was meant to help
+    # most. The likely reason is a cost the argument left out: clamping your own private
+    # node destroys YOUR orientation power on the edges incident to it, and those are
+    # required claims for you. The altruistic move is not free, and per-window scoring
+    # charges you for it.
+    #
+    # KEPT, not adopted. The flag stays because the finding is worth reporting and because
+    # a reward that actually paid for partner outcomes might reverse it -- but it is off by
+    # default, and anyone turning it on should expect it to cost identification.
     mode_by_role: bool = False
     identify_threshold: float = 0.7
     # None means "scale with d" -- `2 ln(d)/d`, the FULL-CONNECTIVITY threshold with an

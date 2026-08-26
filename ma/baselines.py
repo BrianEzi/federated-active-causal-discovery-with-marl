@@ -289,6 +289,16 @@ class RandomAgent:
         candidates = [i for i, (node, mode) in enumerate(window.actions)
                       if node != -1 and (self.allow_clamp or window.mode_by_role
                                          or mode == VARY)]
+        if not candidates:
+            # `allow_clamp=False` in a clamp-only environment. `scripts/ma_train.py` guards
+            # this at the call site by only offering `random_vary` when VARY is available,
+            # but the class did not, so the failure surfaced as an opaque numpy error from
+            # `rng.choice` several frames down. Say what is wrong instead.
+            raise ValueError(
+                f"random_vary has no legal move for agent {self.agent}: the environment's "
+                f"action modes are {window.modes} and this arm excludes clamps. Use "
+                f"random_clamp, which is uniform over every action, when the environment "
+                f"offers no vary.")
         return int(self.rng.choice(candidates))
 
 

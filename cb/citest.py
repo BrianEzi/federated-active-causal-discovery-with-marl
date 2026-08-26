@@ -130,9 +130,14 @@ class FisherZ:
         # vary drives children and can create one. Pooling regimes is what JCI says not to
         # do naively (BIBLIOGRAPHY.md §19).
         #
-        # Off by default, because the argument cuts both ways and the measurement decides:
-        # exclusion costs rows, and the engine's measured failure mode is MISSED edges from
-        # under-powered tests, not invented ones. See `docs/FINDINGS_2026_08_26.md`.
+        # MEASURED 2026-08-26, and the answer is NO. Paired, 30 episodes, greedy:
+        #     pooled (default)    missed 12  invented 2  type wrong 14  identified 0.211
+        #     foreign excluded    missed 12  invented 3  type wrong 17  identified 0.156
+        # Exclusion recovers no edges at all and costs identification, because it costs
+        # ROWS -- and the engine's failure mode here is under-powered tests, not regime
+        # contamination. The JCI argument is sound and simply does not bite at this row
+        # count. Off by default; kept so the question stays answerable rather than
+        # re-litigated. See `docs/FINDINGS_2026_08_26.md` §13.
         self.exclude_foreign = bool(exclude_foreign)
         self.calls = 0
         self._cache: dict = {}
