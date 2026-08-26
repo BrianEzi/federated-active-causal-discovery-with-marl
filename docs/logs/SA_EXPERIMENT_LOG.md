@@ -2968,3 +2968,43 @@ Gate 2 still passes at the current criterion, though by less: random_clamp 0.080
 pass 0.010 means choices matter, and `greedy` sits BELOW random at 0.060, which was also
 true in the banked numbers (0.240 against 0.387) and is a property of this task rather than
 a new fault.
+
+### [CORRECTED AGAIN] 2026-08-26 — it was the REGIME BIT, not the metric and not the budget
+
+My previous two attributions were both wrong. Measured at rung 0, 250 episodes, budget 10:
+
+    disclose_regime  prior_p   random  greedy   pass
+               True      0.5    0.356   0.212  0.008
+              False      0.5    0.080     --   0.010
+              False   0.6437    0.030   0.030  0.020
+    banked, ma_fixed/     0.5    0.387   0.240  0.007
+
+With the regime bit ON, the banked numbers reproduce. The identification criterion is NOT
+the cause — nothing was retracted that matters here — and the budget effect is small. **The
+regime bit is worth roughly 4.5x on the success rate.**
+
+I got this wrong twice by changing several things at once and attributing the difference to
+whichever one I had touched most recently. The banked config differed from mine in THREE
+ways (budget, prior, regime bit) and I tested them one at a time in the wrong order.
+
+### [FINDING] The bit is exactly what does not generalise past two agents
+
+`ma/env.py` refuses `disclose_regime` whenever an agent has more than one hidden node,
+because the bit is a clean FRACTION — `n_clamped / len(hidden)` — which says how many hidden
+nodes were clamped but never WHICH. At two agents with one private node each, `len(hidden)`
+is 1 and the fraction is exactly an identity. At three agents it is not.
+
+So the validated two-agent result rests on a disclosure mechanism that is structurally
+unavailable at the scale this project is aiming for. That is not a compute problem and no
+amount of engine speed touches it. It is also, stated the other way round, a direct
+motivation for `docs/DISCLOSURE_SPEC.md`: the projection disclosure exists to carry exactly
+this information in a form that scales.
+
+**Proposed fix, NOT implemented — needs sign-off per the spec-before-coding rule.** Under
+turn-taking only ONE agent acts per round, and the turn order is already public. So when the
+acting agent has a single private node, the identity of the clamped hidden node is
+DERIVABLE by every other agent without any new disclosure — the bit can be a one-hot over
+hidden nodes rather than a scalar fraction, and the `0 < f < 1` mixture is never entered.
+That would make the bit sound for every rung with `n_private == 1`, which is rungs 1-4.
+For `n_private > 1` the ambiguity is only within the acting agent's own block, which is a
+strictly smaller mixture than today's.

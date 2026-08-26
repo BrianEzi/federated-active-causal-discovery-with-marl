@@ -88,12 +88,11 @@ def main() -> None:
                   for seed in seeds.values() for r in seed.values()
                   if "config_fingerprint" in r}
         if len(prints) > 1:
+            listed = ("\n  ").join(sorted(prints))
             raise SystemExit(
-                f"{rung}: results span {len(prints)} different configurations, so they "
-                f"cannot be pooled. Delete the stale ones.
-  "
-                + "
-  ".join(sorted(prints)))
+                f"{rung}: results span {len(prints)} different configurations, so "
+                f"they cannot be pooled. Delete the stale ones.\n  {listed}")
+
         n = len(paired)
         mean = float(np.mean(paired))
         low, high = bootstrap_ci(paired, seed=0)
