@@ -305,6 +305,174 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         return logits, value
 
 
+class PortableRoleActorCritic(RolePerNodeActorCritic):
+    """The same network, freed of the window it was built for.
+
+    WHAT ACTUALLY TIED A CHECKPOINT TO ONE WINDOW. Nothing in the parent's learned
+    parameters depends on `k`: the edge encoder maps a single (i->j, j->i) pair, the node
+    encoder maps one node's feature vector, and the score, value and pass heads read one
+    node embedding or one pooled summary. Every width is per-NODE or per-PAIR, so the
+    parameter count is already independent of the window size. Two things tied it down
+    anyway, and both are fixed here:
+
+      1. `role`, a [k, 2] BUFFER, which lands in the state dict and so pins its shape.
+         Registered non-persistently here and rebuilt from whatever window the net is
+         currently bound to.
+      2. The partner blocks -- disclosed targets, signals, and cumulative counts -- were
+         CONCATENATED in agent order, so the encoder width grew with the number of agents
+         and the layout encoded partner identity by position. Pooled here (mean and max
+         together, Deep Sets) so the width is fixed and the treatment is permutation-
+         INVARIANT over partners. That is the right symmetry: a priori partners are
+         interchangeable, and a policy that behaves differently towards "partner 0" and
+         "partner 1" because of their index is fitting the labelling, not the task.
+
+    The cost of (2) is real and worth stating: pooling discards WHICH partner did what, so
+    per-partner attribution -- the clique-attribution question -- is not expressible by
+    this variant. It keeps HOW MANY and HOW MUCH. `RolePerNodeActorCritic` remains the
+    fixed-topology architecture, and remains the one to use when partner identity matters.
+
+    `rebind(window, n_others)` points a trained net at a different window. Only the
+    non-learned bookkeeping changes.
+    """
+
+    def __init__(self, window, n_others: int, hidden: int = 128, layers: int = 2):
+        super().__init__(window, n_others, hidden=hidden, layers=layers)
+        # Pooled partner features: 2 (mean, max) x [disclosed, signal one-hot, shared
+        # counts, distinct-partner share, private counts]. Per-node where the feature is
+        # about a node, global where it is not -- see `forward`.
+        self._extra = (2 + 2 + 1 + 2 * len(SIGNALS) + 1
+                       + (2 if self._channels else 0)
+                       + (4 if self._partner_counts else 0))
+        edge_hidden = max(hidden // 4, 8)
+        self.node_encoder = nn.Sequential(
+            nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
+            nn.Linear(hidden, hidden), nn.Tanh(),
+        )
+        self._rebind(window, n_others)
+
+    def _rebind(self, window, n_others: int) -> None:
+        self.d = window.k
+        self.n_others = int(n_others)
+        self.n_shared = len(window.shared)
+        self.shared_positions = [window.pos[n] for n in window.shared]
+        self.authority_positions = [window.pos[n] for n in window.authority]
+        role = np.zeros((window.k, 2), dtype=np.float32)
+        for node in window.shared:
+            role[window.pos[node], 0] = 1.0
+        for node in window.authority:
+            role[window.pos[node], 1] = 1.0
+        # NON-PERSISTENT: the state dict must not carry a [k, 2] tensor, or loading into a
+        # different window size fails on a shape mismatch -- the very thing this class is
+        # for. It is derived from the window, so there is nothing to save.
+        self.register_buffer("role", torch.as_tensor(role), persistent=False)
+
+    def rebind(self, window, n_others: int) -> "PortableRoleActorCritic":
+        if bool(getattr(window, "_observe_channels", False)) != self._channels:
+            raise ValueError("cannot rebind across the belief-channel flag: the observation "
+                             "layout differs, so the encoder would slice the wrong columns")
+        if bool(getattr(window, "_observe_partner_counts", False)) != self._partner_counts:
+            raise ValueError("cannot rebind across the partner-count flag: the observation "
+                             "layout differs, so the encoder would slice the wrong columns")
+        self._rebind(window, n_others)
+        return self
+
+    @staticmethod
+    def _pool(blocks: torch.Tensor) -> torch.Tensor:
+        """[b, n_others, width] -> [b, 2 * width], mean and max together.
+
+        Both, not one: mean carries the typical partner and max carries the most extreme,
+        and a single statistic loses distinctions the score needs (Zaheer et al. 2017 --
+        the same argument the parent's neighbour pooling rests on).
+        """
+        if blocks.shape[1] == 0:
+            return torch.zeros(blocks.shape[0], 2 * blocks.shape[2],
+                               dtype=blocks.dtype, device=blocks.device)
+        return torch.cat([blocks.mean(dim=1), blocks.max(dim=1).values], dim=-1)
+
+    def forward(self, obs: torch.Tensor):
+        single = obs.dim() == 1
+        if single:
+            obs = obs.unsqueeze(0)
+        batch, k = obs.shape[0], self.d
+
+        core, disclosed, regime, signals, counts, channels, partner = self._split(obs)
+        base = self._node_features(core)
+
+        # Disclosed shared targets: pooled over partners, then routed to the shared node
+        # each column is about. Two per node (mean, max across partners).
+        per_node_disclosed = torch.zeros(batch, k, 2, dtype=obs.dtype, device=obs.device)
+        if self.n_shared and self.n_others:
+            table = disclosed.view(batch, self.n_others, self.n_shared)
+            mean_block = table.mean(dim=1)                 # [b, n_shared]
+            max_block = table.max(dim=1).values
+            for s_index, pos in enumerate(self.shared_positions):
+                per_node_disclosed[:, pos, 0] = mean_block[:, s_index]
+                per_node_disclosed[:, pos, 1] = max_block[:, s_index]
+
+        pooled_signals = self._pool(signals.view(batch, self.n_others, len(SIGNALS))
+                                    if self.n_others else
+                                    signals.view(batch, 0, len(SIGNALS)))
+
+        per_node_channels = torch.zeros(batch, k, 2 if self._channels else 0,
+                                        dtype=obs.dtype, device=obs.device)
+        if self._channels and channels.shape[-1] == k * (k - 1):
+            half = k * (k - 1) // 2
+            rows, cols = torch.triu_indices(k, k, offset=1)
+            for offset, block in enumerate((channels[:, :half], channels[:, half:])):
+                dense = torch.zeros(batch, k, k, dtype=obs.dtype, device=obs.device)
+                dense[:, rows, cols] = block
+                dense[:, cols, rows] = block
+                per_node_channels[:, :, offset] = dense.sum(dim=2) / max(k - 1, 1)
+
+        per_node_partner = torch.zeros(batch, k, 2 if self._partner_counts else 0,
+                                       dtype=obs.dtype, device=obs.device)
+        partner_global = torch.zeros(batch, 2 if self._partner_counts else 0,
+                                     dtype=obs.dtype, device=obs.device)
+        if self._partner_counts and self.n_others and partner.shape[-1]:
+            table = partner.view(batch, self.n_others, self.n_shared + 1)
+            shared_table = table[:, :, :self.n_shared]
+            for s_index, pos in enumerate(self.shared_positions):
+                column = shared_table[:, :, s_index]
+                per_node_partner[:, pos, 0] = column.sum(dim=1)
+                per_node_partner[:, pos, 1] = (column > 0).to(obs.dtype).mean(dim=1)
+            private = table[:, :, -1]
+            partner_global[:, 0] = private.mean(dim=1)
+            partner_global[:, 1] = private.max(dim=1).values
+
+        globals_ = torch.cat([regime, pooled_signals, partner_global], dim=-1)
+        extras = torch.cat([
+            self.role.unsqueeze(0).expand(batch, k, 2),
+            per_node_disclosed,
+            globals_.unsqueeze(1).expand(batch, k, globals_.shape[-1]),
+            counts.unsqueeze(-1),
+            per_node_channels,
+            per_node_partner,
+        ], dim=-1)
+
+        embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
+
+        if self.rounds:
+            pairs = self._neighbour_pairs(core)
+            index = self._neighbour_index(obs.device)
+            for block in self.rounds:
+                neighbours = embeddings[:, index]
+                messages = block["message"](torch.cat([neighbours, pairs], dim=-1))
+                pooled_messages = torch.cat(
+                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                embeddings = block["combine"](
+                    torch.cat([embeddings, pooled_messages], dim=-1))
+
+        node_logits = self.node_score(embeddings).squeeze(-1)
+        pooled = embeddings.mean(dim=1)
+        logits = torch.cat([node_logits[:, self.authority_positions],
+                            self.pass_head(pooled)], dim=-1)
+        value = self.value_head(pooled).squeeze(-1)
+
+        if single:
+            return logits.squeeze(0), value.squeeze(0)
+        return logits, value
+
+
 def belief_entropy(marginals: np.ndarray) -> float:
     """H of the edge-marginal field, in nats -- the shaping potential's magnitude.
 
@@ -327,22 +495,61 @@ class IndependentPPO:
         torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
         arch = getattr(env.config, "policy_arch", "mlp")
-        if arch == "gnn":
-            n_others = env.topology.n_agents - 1
+        n_others = env.topology.n_agents - 1
+        if arch == "gnn_portable":
+            # ONE network, shared by every agent, because with the number of agents varying
+            # across the training mixture there is no stable agent identity to give a net
+            # to. This is PARAMETER SHARING with decentralised execution: each agent still
+            # acts on its own observation only, and nothing centralises the critic or pools
+            # observations, so the CTDE constraint is untouched. It is nonetheless a
+            # departure from "one learner per agent" and must be reported as one -- the
+            # arm is named separately for exactly that reason.
+            shared = PortableRoleActorCritic(env.windows[env.topology.agents[0]], n_others,
+                                             hidden=config.hidden, layers=config.gnn_layers)
+            self.nets = {agent: shared for agent in env.topology.agents}
+            self.shared_net: Optional[nn.Module] = shared
+            optimiser = torch.optim.Adam(shared.parameters(), lr=config.lr)
+            self.opts = {agent: optimiser for agent in env.topology.agents}
+        elif arch == "gnn":
             self.nets = {
                 agent: RolePerNodeActorCritic(env.windows[agent], n_others,
                                               hidden=config.hidden,
                                               layers=config.gnn_layers)
                 for agent in env.topology.agents}
+            self.shared_net = None
+            self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
+                         for agent, net in self.nets.items()}
         else:
             self.nets = {
                 agent: ActorCritic(env.obs_size(agent), env.n_actions(agent), config.hidden,
                                    orthogonal_init=config.orthogonal_init)
                 for agent in env.topology.agents}
-        self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
-                     for agent, net in self.nets.items()}
+            self.shared_net = None
+            self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
+                         for agent, net in self.nets.items()}
         self.history: List[dict] = []
         self.first_success_episode: Optional[int] = None
+
+    # -- portability --------------------------------------------------------------------
+
+    def bind(self, env: TwoAgentEnv) -> "IndependentPPO":
+        """Point a SHARED portable policy at a different environment, in place.
+
+        Only legal for `gnn_portable`, and that is the point of the restriction: any other
+        architecture has per-agent parameters whose shapes are tied to one window, so
+        "binding" them to another environment would be a silent reinterpretation of learned
+        weights rather than a rebind.
+        """
+        if self.shared_net is None:
+            raise ValueError("bind requires policy_arch='gnn_portable' -- other "
+                             "architectures have window-shaped parameters")
+        n_others = env.topology.n_agents - 1
+        self.shared_net.rebind(env.windows[env.topology.agents[0]], n_others)
+        self.env = env
+        self.nets = {agent: self.shared_net for agent in env.topology.agents}
+        optimiser = next(iter(self.opts.values()))
+        self.opts = {agent: optimiser for agent in env.topology.agents}
+        return self
 
     # -- rollout ------------------------------------------------------------------------
 
@@ -429,7 +636,17 @@ class IndependentPPO:
 
     def update(self, buffers: Dict[int, dict]) -> None:
         cfg = self.config
-        for agent in self.env.topology.agents:
+        if self.shared_net is not None:
+            # One network, so ONE update over every agent's experience pooled. Stepping the
+            # shared optimiser once per agent instead would make the effective learning rate
+            # scale with the number of agents, and would make the update order matter --
+            # both of which would show up as the mixture arm behaving differently at 4 and
+            # at 8 agents for reasons that have nothing to do with the task.
+            merged = {key: np.concatenate([buffers[a][key]
+                                           for a in self.env.topology.agents])
+                      for key in buffers[self.env.topology.agents[0]]}
+            buffers = {self.env.topology.agents[0]: merged}
+        for agent in buffers:
             buf = buffers[agent]
             advantages, returns = self._advantages(buf)
             # Normalise over the whole batch, AFTER computing returns. Normalising before
@@ -538,6 +755,9 @@ class IndependentPPO:
             "observe_partner_counts": getattr(
                 self.env.config, "observe_partner_counts", False),
             "mode_by_role": getattr(self.env.config, "mode_by_role", False),
+            # A portable checkpoint carries no window-shaped tensor, so `load` may skip the
+            # obs_size check that pins an ordinary one to its environment.
+            "portable": self.shared_net is not None,
             "claims_require_all_types": getattr(
                 self.env.config, "claims_require_all_types", True),
         }, path)
@@ -558,11 +778,19 @@ class IndependentPPO:
 
         blob = _torch.load(path, map_location=DEVICE, weights_only=False)
         blob = _upgrade_checkpoint_keys(blob)
-        for agent in env.topology.agents:
-            if blob["obs_size"][agent] != env.obs_size(agent):
-                raise ValueError(
-                    "checkpoint is for a different environment: agent %s has obs_size %d, "
-                    "this env has %d" % (agent, blob["obs_size"][agent], env.obs_size(agent)))
+        # A PORTABLE checkpoint is deliberately exempt from the obs_size check. Every
+        # learned width in it is per-node or per-pair and the partner blocks are pooled, so
+        # it has no tensor whose shape encodes the window size or the agent count -- which
+        # is the whole reason it exists. The observation LAYOUT flags still have to match,
+        # because the encoder slices the observation positionally, and `rebind` enforces
+        # that; a mismatched layout raises there rather than silently mis-slicing.
+        if not blob.get("portable", False):
+            for agent in env.topology.agents:
+                if blob["obs_size"][agent] != env.obs_size(agent):
+                    raise ValueError(
+                        "checkpoint is for a different environment: agent %s has obs_size "
+                        "%d, this env has %d"
+                        % (agent, blob["obs_size"][agent], env.obs_size(agent)))
         if blob.get("score_rule") != env.config.score_rule:
             # Cross-rule numbers are void -- a joint_conf-trained policy scored under
             # `subset` collapses below random. Performance belongs to the (policy, rule)
@@ -585,6 +813,15 @@ class IndependentPPO:
                              % (blob_backend, env_backend))
         learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
                                                   seed=blob["seed"]))
+        if learner.shared_net is not None:
+            # Every agent key holds the same weights; load one and every agent has it.
+            first = next(iter(blob["nets"].values()))
+            # `strict=False` tolerates a `role` buffer left over from a checkpoint written
+            # before it became non-persistent. Nothing learned can be missing silently:
+            # every learned module is constructed here, so an absent weight would surface
+            # as an untrained head rather than a shape error.
+            learner.shared_net.load_state_dict(first, strict=False)
+            return learner
         for agent in env.topology.agents:
             learner.nets[agent].load_state_dict(blob["nets"][agent])
         return learner

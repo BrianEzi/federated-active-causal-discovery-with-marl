@@ -96,7 +96,8 @@ class FisherZ:
 
     def __init__(self, data: np.ndarray, intervened: Optional[np.ndarray] = None,
                  alpha: float = 0.01, foreign: Optional[np.ndarray] = None,
-                 skeleton_alpha: Optional[float] = None):
+                 skeleton_alpha: Optional[float] = None,
+                 exclude_foreign: bool = False):
         self.data = np.asarray(data, dtype=float)
         self.n, self.k = self.data.shape
         self.intervened = (np.zeros_like(self.data, dtype=bool) if intervened is None
@@ -122,6 +123,17 @@ class FisherZ:
         # threshold cannot serve both. Defaults to `alpha`, so behaviour is unchanged unless
         # this is set deliberately.
         self.skeleton_alpha = float(alpha if skeleton_alpha is None else skeleton_alpha)
+        # DROP FOREIGN ROWS FROM THE SKELETON'S INDEPENDENCE TESTS as well as from the
+        # orientation channels, which already gate on `foreign`. A foreign intervention
+        # puts those rows in a different REGIME: a foreign clamp removes a hidden common
+        # cause and can destroy a dependence the observational rows carry, while a foreign
+        # vary drives children and can create one. Pooling regimes is what JCI says not to
+        # do naively (BIBLIOGRAPHY.md §19).
+        #
+        # Off by default, because the argument cuts both ways and the measurement decides:
+        # exclusion costs rows, and the engine's measured failure mode is MISSED edges from
+        # under-powered tests, not invented ones. See `docs/FINDINGS_2026_08_26.md`.
+        self.exclude_foreign = bool(exclude_foreign)
         self.calls = 0
         self._cache: dict = {}
         # How many variables are intervened in each row -- lets any "no third variable
@@ -132,7 +144,7 @@ class FisherZ:
     # -- sufficient statistics -----------------------------------------------------------
 
     def _suffstats(self):
-        """Per intervention-pattern group: row count, column sums, cross-products.
+        """Per group: row count, column sums, cross-products, and the group's foreign flag.
 
         THE ALGORITHMIC HEART OF THE 2026-08-25 SPEEDUP. Rows fall into a handful of
         groups by WHICH variables were intervened (observational block, one group per
@@ -141,9 +153,15 @@ class FisherZ:
         Products are taken on data CENTERED by the global column means -- covariance is
         invariant to any fixed shift, and centering keeps the one-pass formula
         numerically close to corrcoef's two-pass result.
+
+        The FOREIGN flag joins the grouping key (2026-08-26) so that whole groups can be
+        dropped when `exclude_foreign` is set. It is part of the key rather than a separate
+        mask because the statistics are per group: a group mixing foreign and native rows
+        could not be split afterwards without going back to the rows.
         """
         if self._groups is None:
-            patterns, inverse = np.unique(self.intervened, axis=0, return_inverse=True)
+            key = np.column_stack([self.intervened, self.foreign.astype(self.intervened.dtype)])
+            patterns, inverse = np.unique(key, axis=0, return_inverse=True)
             center = self.data.mean(axis=0)
             shifted = self.data - center
             counts, sums, prods = [], [], []
@@ -152,18 +170,33 @@ class FisherZ:
                 counts.append(len(rows))
                 sums.append(rows.sum(axis=0))
                 prods.append(rows.T @ rows)
-            self._groups = (patterns.astype(bool), np.asarray(counts),
-                            np.asarray(sums), np.asarray(prods))
+            self._groups = (patterns[:, :-1].astype(bool), np.asarray(counts),
+                            np.asarray(sums), np.asarray(prods),
+                            patterns[:, -1].astype(bool))
         return self._groups
 
     def _pair_corr(self, x: int, y: int):
-        """(n_rows, [k, k] correlation matrix) over the rows usable for pair (x, y)."""
-        key = ("corr", x, y) if x <= y else ("corr", y, x)
+        """(n_rows, [k, k] correlation matrix) over the rows usable for pair (x, y).
+
+        A GROUP is dropped when either variable was intervened in it: a test is only
+        meaningful when both sides were free to vary as the mechanism dictates, and
+        independence is symmetric so the rule must be too.
+
+        THIS IS THE ONLY ROW FILTER. A `_rows_for` method sat below this one until
+        2026-08-26 stating the same rule per row, and was called by nothing -- so a reader
+        looking for "where are rows selected" found a plausible answer that had no effect on
+        any number. Deleted rather than wired up. `exclude_foreign` is the live question it
+        was standing in for.
+        """
+        key = ("corr", self.exclude_foreign, x, y) if x <= y else \
+              ("corr", self.exclude_foreign, y, x)
         hit = self._cache.get(key)
         if hit is not None:
             return hit
-        patterns, counts, sums, prods = self._suffstats()
+        patterns, counts, sums, prods, foreign = self._suffstats()
         keep = ~(patterns[:, x] | patterns[:, y])
+        if self.exclude_foreign:
+            keep = keep & ~foreign
         n = int(counts[keep].sum())
         if n < MIN_ROWS:
             hit = (n, None)
@@ -177,22 +210,6 @@ class FisherZ:
             corr[~np.isfinite(corr)] = np.nan
             hit = (n, corr)
         self._cache[key] = hit
-        return hit
-
-    # -- row selection ------------------------------------------------------------------
-
-    def _rows_for(self, x: int, y: int) -> np.ndarray:
-        """Rows usable for a test between `x` and `y`.
-
-        A row is dropped when EITHER variable was clamped in it. Symmetric because
-        independence is symmetric: a test is only meaningful when both sides were free to
-        vary as the mechanism dictates.
-        """
-        key = (x, y) if x <= y else (y, x)
-        hit = self._cache.get(key)
-        if hit is None:
-            hit = ~(self.intervened[:, x] | self.intervened[:, y])
-            self._cache[key] = hit
         return hit
 
     # -- the test -----------------------------------------------------------------------
