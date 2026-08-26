@@ -3789,3 +3789,51 @@ environment and false of the one that matters for the claim: in the deterministi
 environment the skeleton is fixed and directed frequencies proxy for the rest, so there is
 little for the channel to add. I should have waited for the statistical arm before
 characterising the fix at all.
+
+[MEASURED] TRANSFER, RE-SCORED UNDER THE FIXED SEEDING, 150 episodes, identical episodes
+for all three arms:
+
+    greedy         0.336 +/- 0.027
+    transferred    0.276 +/- 0.022
+    random         0.231 +/- 0.024
+
+The transferred policy sits between random and greedy, nearer random: +0.045 +/- 0.033 over
+random (not significant) and -0.060 +/- 0.035 against greedy. The same policy scores 0.820
+joint identification in the deterministic environment where greedy scores 0.400.
+
+NO RELIABLE TRANSFER. The likely mechanism is distributional rather than conceptual: the
+policy was trained on version-space frequencies that are almost all 0 or 1, and is fed
+bootstrap fractions spread across the whole interval -- it is out of distribution whatever
+it understood about coordination. That suggests the fix is domain randomisation over belief
+sharpness, or a short fine-tune, rather than abandoning the idea.
+
+The earlier confounded numbers for this test (transferred 0.303 vs greedy 0.342) are void.
+
+## Night summary, 2026-08-26
+
+WHAT HOLDS
+  * Deterministic environment, 4 agents, 3 seeds, 200 episodes each: learned
+    0.463 +/- 0.012 against greedy 0.359 +/- 0.022, ceiling 0.774. About 4 standard errors,
+    25% of a COMPUTABLE optimum closed. The first clean separation this project has made.
+  * The observation never carried the confounding channel. Supplying it is worth
+    +0.123 +/- 0.042 per-window in the statistical environment, lifting the learned policy
+    from below greedy to level with it (0.431 vs 0.387, about 1 SE -- not a win).
+  * Split significance thresholds: skeleton at 0.05 halves missed edges (15 -> 9) with no
+    extra invented edges and no rise in type errors; confidently-wrong windows fall 9.4pp.
+  * The oracle warm start makes scarce interventions productive and runs 5-14x faster.
+  * The bootstrap resample stream carried process history; fixed, and verified by a
+    cross-layout check that now reproduces baselines exactly.
+
+WHAT FAILED
+  * Per-agent reward: 0.446 vs 0.479 shared, inside noise.
+  * Transfer: no reliable benefit on noisy data (above).
+  * My own readings, three times: "nearly policy-insensitive" (0.078, actually 0.129),
+    "the channels fix does not help" (true only of the environment where it cannot), and
+    "one architecture reads both observation layouts" (it did not, and that cost the first
+    evaluation pass).
+
+NEXT
+  1. Domain-randomise belief sharpness in the deterministic environment, then re-test
+     transfer. The idea is untested, not refuted.
+  2. Make cb_skeleton_alpha=0.05 the default after a paired run.
+  3. More seeds on the channels arm -- one seed is carrying the +0.123 claim.

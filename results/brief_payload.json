@@ -17,14 +17,14 @@
   },
   {
    "label": "Noisy env: greedy &minus; random",
-   "value": "+0.078",
-   "note": "all the room any policy has there",
+   "value": "+0.104",
+   "note": "the room a policy has there, against 0.146 in the clean env",
    "tone": "bad"
   },
   {
-   "label": "Transfer vs greedy (noisy)",
-   "value": "-0.039",
-   "note": "indistinguishable from greedy",
+   "label": "Transfer: over random",
+   "value": "+0.044",
+   "note": "and -0.060 against greedy &mdash; no reliable benefit",
    "tone": "bad"
   }
  ],
@@ -504,11 +504,11 @@
    ]
   },
   {
-   "title": "Why the noisy environment never showed any of this",
+   "title": "Why the noisy environment shows so much less",
    "blocks": [
     {
      "type": "text",
-     "body": "The most important measurement of the night. In the statistical environment the gap between the best truth-free rule and <i>random</i> is almost nothing &mdash; so there is almost nothing for any policy to win, and every arm lands in a heap."
+     "body": "In the statistical environment the gap between the best truth-free rule and <i>random</i> is small: that gap is the entire room a policy has to demonstrate anything, and it is several times narrower than in the deterministic environment, where the same comparison spans half the scale."
     },
     {
      "type": "table",
@@ -523,9 +523,9 @@
       {
        "cells": [
         "statistical (noisy)",
-        "0.264",
-        "0.342",
-        "0.078",
+        "0.258",
+        "0.387",
+        "0.129",
         "unknown"
        ]
       },
@@ -544,6 +544,11 @@
     {
      "type": "text",
      "body": "This retroactively explains the history: rung 0's seven-point margin with overlapping intervals, rung 1's learned policy finishing <i>below random</i>, and tonight's transfer landing mid-pack. Those were not primarily learning failures. The environment was not measuring experiment choice, because whether the engine can resolve a claim at all dominates which experiment produced the data."
+    },
+    {
+     "type": "note",
+     "tone": "warn",
+     "body": "<b>Correction to an earlier reading tonight:</b> I first measured this span as 0.078 and called the environment &ldquo;nearly policy-insensitive&rdquo;. That figure came from the confounded evaluation described below; the clean number is larger. The qualitative point survives &mdash; far less room than the deterministic environment's 0.212&ndash;0.774 &mdash; but the environment has more room than I claimed."
     },
     {
      "type": "note",
@@ -580,9 +585,9 @@
       {
        "cells": [
         "statistical (noisy)",
-        "0.303 &plusmn; 0.026",
-        "0.342 &plusmn; 0.026",
-        "0.264 &plusmn; 0.027"
+        "0.276 &plusmn; 0.022",
+        "0.336 &plusmn; 0.027",
+        "0.231 &plusmn; 0.024"
        ]
       }
      ]
@@ -590,7 +595,7 @@
     {
      "type": "note",
      "tone": "warn",
-     "body": "Double greedy in clean conditions; <b>-0.039</b> against greedy on noisy data &mdash; indistinguishable. But note the row above: there, greedy itself beats random by only 0.078, so <b>the test could not have succeeded whatever the policy had learned</b>. That is a property of the test bed, not a refutation of the idea. Worth re-running once the statistical environment has measurable policy sensitivity."
+     "body": "Double greedy in clean conditions; <b>-0.060</b> against greedy on noisy data &mdash; indistinguishable. But note the row above: there, greedy itself beats random by only 0.129, so <b>the test could not have succeeded whatever the policy had learned</b>. That is a property of the test bed, not a refutation of the idea. Worth re-running once the statistical environment has measurable policy sensitivity."
     }
    ]
   },
@@ -621,6 +626,69 @@
      "episode": 0,
      "title": "Statistical environment",
      "blurb": "The same task with real estimation. Here a claim can settle WRONG &mdash; impossible in the deterministic environment, and the reason the robustness layer exists."
+    }
+   ]
+  },
+  {
+   "title": "Statistical environment, re-scored under sound methodology",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "Three agents, oracle warm start, budget 6, 1000 rows per experiment, 150 episodes. Every policy scored on the SAME episodes with the SAME resample streams &mdash; see the methodology note below, which invalidated the first pass."
+    },
+    {
+     "type": "table",
+     "columns": [
+      "arm",
+      "windows identified",
+      "joint"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "learned, + belief channels",
+        "0.431 &plusmn; 0.031",
+        "0.227 &plusmn; 0.034"
+       ],
+       "highlight": true
+      },
+      {
+       "cells": [
+        "greedy (truth-free rule)",
+        "0.387 &plusmn; 0.029",
+        "0.180 &plusmn; 0.031"
+       ],
+       "highlight": false
+      },
+      {
+       "cells": [
+        "learned, blindfolded (seed 0)",
+        "0.316 &plusmn; 0.029",
+        "0.120 &plusmn; 0.027"
+       ],
+       "highlight": false
+      },
+      {
+       "cells": [
+        "learned, blindfolded (seed 1)",
+        "0.300 &plusmn; 0.028",
+        "0.120 &plusmn; 0.027"
+       ],
+       "highlight": false
+      },
+      {
+       "cells": [
+        "random",
+        "0.258 &plusmn; 0.024",
+        "0.067 &plusmn; 0.020"
+       ],
+       "highlight": false
+      }
+     ]
+    },
+    {
+     "type": "note",
+     "body": "Supplying the confounding channel is worth <b>+0.123 &plusmn; 0.037</b> to the learned policy &mdash; it lifts it from clearly BELOW greedy to LEVEL WITH greedy (0.431 against 0.387, a difference of +0.044 which is about one standard error). A real improvement to the policy; not yet a win over greedy."
     }
    ]
   },
@@ -682,7 +750,7 @@
    ]
   },
   {
-   "title": "A real defect that did not turn into a gain",
+   "title": "The blindfold: no gain where I first looked, a large one where it mattered",
    "blocks": [
     {
      "type": "text",
@@ -691,7 +759,7 @@
     {
      "type": "note",
      "tone": "warn",
-     "body": "Against its matched control, supplying the channels changed the result by <b>+0.020 &plusmn; 0.038</b> &mdash; inside noise. The defect is real; removing it did not measurably help. Finding a genuine bug does not entail that fixing it improves anything."
+     "body": "Against its matched control, supplying the channels changed the result by <b>+0.020 &plusmn; 0.038</b> in the DETERMINISTIC environment &mdash; inside noise, because there the skeleton is fixed and directed frequencies proxy for the rest. In the STATISTICAL environment, where confounding carries information nothing else supplies, the same change is worth about +0.12 per-window (see above). I reported the first result as &ldquo;did not help&rdquo; before the second had run."
     }
    ]
   },
