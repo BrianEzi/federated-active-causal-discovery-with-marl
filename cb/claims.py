@@ -93,7 +93,8 @@ def _outcome(freq_correct: float, freq_wrong: float, bar: float):
 
 
 def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
-                     bar: float = 0.7, require_all_types: bool = True):
+                     bar: float = 0.7, require_all_types: bool = True,
+                     confounding_claims: bool = True):
     """Every claim in one window, with its outcome and the frequencies behind it.
 
     `score_window` is a tally over exactly this list -- the two cannot disagree because
@@ -125,6 +126,12 @@ def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[i
             continue                       # no type claim on a true non-edge
 
         f_bi = float(bidirected[u, v])
+        if mag[u, v] == MAG_BIDIRECTED and not confounding_claims:
+            # The ATTRIBUTION claim replaces this one outright (2026-08-26). Scoring both
+            # would double-count the same fact and, worse, let an agent bank the easy half
+            # -- "something confounds these" -- while failing the half that carries the
+            # thesis, which is whose it is. See cb/attribution.py.
+            continue
         if mag[u, v] == MAG_BIDIRECTED:
             correct, wrong = f_bi, max(float(directed[u, v]), float(directed[v, u]))
             required = True                # confounding is the thesis: always required
@@ -145,7 +152,8 @@ def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[i
 
 
 def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
-                 bar: float = 0.7, require_all_types: bool = True) -> ClaimScore:
+                 bar: float = 0.7, require_all_types: bool = True,
+                 confounding_claims: bool = True) -> ClaimScore:
     """Score one window's belief against its true MAG.
 
     `belief` is a `BootstrapBelief` (needs `.adjacency`, `.directed`, `.bidirected`
@@ -170,7 +178,8 @@ def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] 
     numbers only. Any comparison must hold it fixed across arms.
     """
     claims = enumerate_claims(belief, true_mag, private_positions, bar,
-                              require_all_types=require_all_types)
+                              require_all_types=require_all_types,
+                              confounding_claims=confounding_claims)
     n_right = sum(c.outcome == "right" for c in claims)
     n_wrong = sum(c.outcome == "wrong" for c in claims)
     n_unsure = sum(c.outcome == "unsure" for c in claims)

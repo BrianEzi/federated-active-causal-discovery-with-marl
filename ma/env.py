@@ -63,10 +63,14 @@ CONSTRAINT = "constraint"
 # episodes in milliseconds and a computable optimum to measure against. It is NOT a claim
 # about finite data; the constraint backend remains the realistic path.
 VERSION_SPACE = "version_space"
-BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE)
+# Version space over (structure, ATTRIBUTION): who owns each hidden cause.
+# See cb/attribution.py. Deterministic, like VERSION_SPACE, and it adds the
+# only channel through which one agent can help another in that environment.
+ATTRIBUTED = "attributed"
+BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED)
 # Backends whose belief exposes bootstrap-shaped claim frequencies, so `cb.claims` and the
 # constraint-side greedy read them the same way.
-CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE)
+CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -378,6 +382,10 @@ class AgentWindow:
         elif backend == VERSION_SPACE:
             from cb.versionspace import VersionSpaceBackend
             self.belief = VersionSpaceBackend(self.k, shared_positions)
+        elif backend == ATTRIBUTED:
+            from cb.attribution import AttributedVersionSpaceBackend
+            self.belief = AttributedVersionSpaceBackend(
+                self.k, shared_positions, n_agents=topology.n_agents, agent=self.agent)
         else:
             self.belief = WindowBeliefDP(self.k, shared_positions)
 
@@ -577,7 +585,15 @@ class TwoAgentEnv:
             # Per-episode resample stream: see ConstraintBackend.set_episode.
             if hasattr(window.belief, "set_episode"):
                 window.belief.set_episode(seed if seed is not None else 0)
-        if cfg.belief_backend == VERSION_SPACE:
+        if cfg.belief_backend == ATTRIBUTED:
+            # Needs the GLOBAL graph, not only the window's MAG: the true latent groups and
+            # the response of each to a partner's action are properties of the whole system.
+            # Truth is used only to prune and to score -- oracle-side, exactly as the reward
+            # is -- and never reaches the observation vector.
+            for agent, window in self.windows.items():
+                window.belief.reset(self._true_mag(agent), adjacency=self.true_adjacency,
+                                    topology=self.topology)
+        elif cfg.belief_backend == VERSION_SPACE:
             # The version space is defined relative to THIS episode's truth, so it has to
             # be rebuilt every reset. Truth is used only to prune -- oracle-side, exactly
             # as the reward is -- and never reaches the observation vector.
@@ -783,10 +799,45 @@ class TwoAgentEnv:
                                      else np.zeros(0))
             self.regime_bit[agent] = float(clean_fraction) if cfg.disclose_regime else 0.0
 
+        self._disclose_partner_responses(chosen)
         self._refresh()
         cost = cfg.step_cost * sum(
             1 for a in self.topology.agents if chosen[a][0] != PASS_ACTION)
         return self._result(reward=-cost)
+
+    def _disclose_partner_responses(self, chosen) -> None:
+        """Tell each agent WHICH of its confounded pairs moved when a named partner acted.
+
+        THE ONLY CHANNEL through which one agent can help another in the deterministic
+        environment. Everything else there prunes on the acting agent's OWN window columns,
+        so a partner's private experiment was previously invisible -- which means every
+        "coordination" result measured before 2026-08-26 in that environment was division of
+        labour over shared nodes and contained no altruism at all.
+
+        WHAT IS AND IS NOT DISCLOSED. The agent learns which partner acted (already
+        broadcast by `disclose_signals`) and which of its OWN pairs responded, which it
+        could compute for itself from its own columns given infinite data. It never learns
+        which node the partner touched. That asymmetry is the whole privacy claim, and it is
+        what makes the recovered object an attribution to an AGENT rather than to a variable.
+        """
+        from cb.attribution import response_signature
+        if self.config.belief_backend != ATTRIBUTED or not self.config.disclose_signals:
+            return
+        for actor in self.topology.agents:
+            node, _mode = chosen[actor]
+            if node == PASS_ACTION or node in self.topology.exposed:
+                continue                       # only PRIVATE actions carry this signal
+            for agent, window in self.windows.items():
+                if agent == actor:
+                    continue
+                groups = window.belief.true_groups
+                if not groups:
+                    continue
+                responded = response_signature(self.true_adjacency, self.topology,
+                                               agent, groups, node)
+                moved = frozenset(pair for group, hit in zip(groups, responded) if hit
+                                  for pair in group.pairs())
+                window.belief.observe_partner(actor, moved)
 
     def _append_observational_batch(self) -> None:
         """One batch with nothing intervened on -- what a forfeited round produces."""
@@ -1087,15 +1138,37 @@ class TwoAgentEnv:
             from cb.claims import score_window
             cfg = self.config
             scores = {}
+            attributed = cfg.belief_backend == ATTRIBUTED
+            attribution = {}
             for agent, window in self.windows.items():
                 scores[agent] = score_window(
                     window.belief.last, self._true_mag(agent),
                     [window.pos[n] for n in window.private], bar=cfg.claim_bar,
-                    require_all_types=cfg.claims_require_all_types)
-            identified = {a: scores[a].identified for a in self.topology.agents}
+                    require_all_types=cfg.claims_require_all_types,
+                    # Under the attributed backend the confounding type claim is REPLACED
+                    # by the attribution claim, never scored alongside it -- scoring both
+                    # would let an agent bank "something confounds these" while failing the
+                    # half that carries the thesis, which is whose it is.
+                    confounding_claims=not attributed)
+                if attributed:
+                    from cb.attribution import score_groups
+                    attribution[agent] = score_groups(
+                        window.belief.last, window.belief.true_groups, bar=cfg.claim_bar)
+            identified = {a: scores[a].identified
+                          and (not attributed or attribution[a]["identified"])
+                          for a in self.topology.agents}
             all_identified = all(identified.values())
-            mass = {a: scores[a].fraction(cfg.claim_penalty)
-                    for a in self.topology.agents}
+            mass = {}
+            for a in self.topology.agents:
+                base, n = scores[a].n_right - cfg.claim_penalty * scores[a].n_wrong, scores[a].n_claims
+                if attributed:
+                    # Attribution claims join the SAME pool as the structure claims, so the
+                    # dense reward pays for progress on either and the two cannot be traded
+                    # against each other by weighting.
+                    row = attribution[a]
+                    base += row["right"] - cfg.claim_penalty * row["wrong"]
+                    n += row["total"]
+                mass[a] = (base / n) if n else 0.0
             mean_fraction = float(np.mean(list(mass.values())))
             # Dense component: what THIS round settled, net of what it unsettled. At
             # reset there is no previous score, so the first delta is zero by definition.
@@ -1119,7 +1192,11 @@ class TwoAgentEnv:
             claim_info = {a: {"right": s.n_right, "wrong": s.n_wrong,
                               "unsure": s.n_unsure,
                               "required_right": s.required_right,
-                              "required_total": s.required_total}
+                              "required_total": s.required_total,
+                              **({"attr_right": attribution[a]["right"],
+                                  "attr_total": attribution[a]["total"],
+                                  "attr_unsure": attribution[a]["unsure"]}
+                                 if attributed else {})}
                           for a, s in scores.items()}
         elif self.config.reward_criterion == "u14":
             mass, all_identified = self._u14_state()
