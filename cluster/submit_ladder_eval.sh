@@ -35,10 +35,12 @@ rung_config $((TASK / 20))
 SEED=$(((TASK % 20) / 4))
 EVAL_ARM=${ARMS[$((TASK % 4))]}
 
-# 150 everywhere. One episode is worth 0.7 percentage points at 150, against 2.0 at 50 --
-# and the differences this ladder exists to detect live below 2 points. Holding it constant
-# also keeps rungs comparable to each other, which a per-rung episode count would not.
-EPISODES=150
+# EVAL comes from the rung table, and it FALLS up the ladder. Holding it constant would be
+# better -- one episode is worth 0.7 percentage points at 150 against 2.5 at 40 -- but at
+# rung 8 an episode costs ~1000s and 150 of them do not fit in any queue. The top two rungs
+# are therefore reported with intervals wide enough that only a large effect is visible,
+# which is stated rather than worked around.
+EPISODES=$EVAL
 
 RUN="results/ladder/${ARM}_s${SEED}.json"
 OUT="results/ladder_eval/${ARM}_s${SEED}_${EVAL_ARM}.json"

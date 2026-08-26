@@ -26,7 +26,9 @@ import numpy as np
 from ma.evaluate import bootstrap_ci
 
 LEARNED = "learned"
-RUNG_RE = re.compile(r"^(rung(\d+)_[0-9a-z_]+_d(\d+))_s(\d+)_([a-z_]+)\.json$")
+# The rung INDEX is optional: cluster runs carry it (`rung3_5a_1p_4x_d9`), local ones
+# do not (`rung_5a_1p_4x_d9`). Ordering falls back to d when the index is absent.
+RUNG_RE = re.compile(r"^(rung(\d*)_[0-9a-z_]+_d(\d+))_s(\d+)_([a-z_]+)\.json$")
 
 
 def collect(directory: pathlib.Path) -> dict:
@@ -39,7 +41,7 @@ def collect(directory: pathlib.Path) -> dict:
             continue
         rung, index, d, seed, arm = match.groups()
         out[rung][int(seed)][arm] = json.loads(path.read_text())
-        meta[rung] = (int(index), int(d))
+        meta[rung] = (int(index) if index else int(d), int(d))
     return out, meta
 
 
