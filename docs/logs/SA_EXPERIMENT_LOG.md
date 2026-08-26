@@ -3837,3 +3837,14 @@ NEXT
      transfer. The idea is untested, not refuted.
   2. Make cb_skeleton_alpha=0.05 the default after a paired run.
   3. More seeds on the channels arm -- one seed is carrying the +0.123 claim.
+
+[NOTED] A leftover row from the SUPERSEDED scale ladder completed after 21631s: 4 agents,
+k=7 windows, "coordination gap" +7.800, 9/10 worlds. NOT reported as headroom. That
+estimator compares decentralised greedy against CENTRALISED GREEDY -- two heuristics,
+neither optimal -- and it was shown to go reliably NEGATIVE at 8+ agents, so its magnitude
+means little. What the row weakly suggests is that the two heuristics diverge more as
+windows grow. The valid headroom measure is distance to the clairvoyant bound
+(scripts/vs_evaluate.py), which is what every reported number uses.
+
+The six-hour runtime is itself the density finding again: k=7 windows with several hidden
+confounders fill in with bidirected edges, and this run predated the density guard.
