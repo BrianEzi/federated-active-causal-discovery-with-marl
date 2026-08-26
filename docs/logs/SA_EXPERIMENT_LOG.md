@@ -3048,3 +3048,26 @@ way. The richer hypothesis space is close to free on top of what already exists.
 
 Still NOT implemented. It changes what a hypothesis IS, which is a design decision, not a
 bug fix, and the spec-before-coding rule applies.
+
+### [MEASURED] Rung 0 with the regime bit — agents BEAT the baselines, 5/5 seeds
+
+Myriad array 212985. 2 agents, 1 private each, 3 shared (d=5), budget 10, prior 0.5,
+3000 training episodes, 250 eval episodes, 5 seeds.
+
+    learned        0.554   (0.580, 0.488, 0.572, 0.584, 0.544)
+    random_clamp   0.377   (0.352, 0.376, 0.388, 0.388, 0.380)
+    greedy         0.187   (0.212, 0.148, 0.200, 0.204, 0.172)
+
+    paired learned - best baseline: +0.177  CI [+0.143, +0.209]  5/5 seeds positive
+
+Scored against the BEST baseline per seed, which is `random_clamp` throughout — greedy is
+consistently worse, as it was in the banked numbers (0.240 against 0.387). Beating random
+while losing to greedy would not have counted.
+
+This reproduces `results/ma_fixed/tb_clamp_s0.json` (learned 0.620) on the corrected
+criterion and confirms the two-agent case end to end on the rebuilt engine: vectorised DP,
+batched BGe table, screened assignments, skeleton-restricted credit set. Nothing in that
+chain moved the result, which is what the equivalence gates were for.
+
+**It is also the ceiling of what the current mechanism reaches.** The same configuration is
+impossible from three agents onward — see `docs/SCALING_DECISION_2026_08_26.md`.
