@@ -71,8 +71,24 @@ nothing goes into the thesis unchecked.
   booktitle = {Uncertainty in Artificial Intelligence (UAI)}, year = {1995}}            % STANDARD
 ```
 
+```bibtex
+@article{ali2009markovmag,
+  author  = {Ali, R. Ayesha and Richardson, Thomas S. and Spirtes, Peter},
+  title   = {{M}arkov Equivalence for Ancestral Graphs},
+  journal = {The Annals of Statistics}, volume = {37}, number = {5B}, year = {2009}}    % STANDARD
+```
+
 **Used for:** the definition of Markov equivalence as `(skeleton, v-structures)`, which is
 implemented directly as `mec_signature` in `sa/graphs.py`.
+
+**Used for (2026-08-26):** `ali2009markovmag` is the MAG-side characterisation -- same
+adjacencies, same colliders with order, plus a discriminating-path condition. The
+"same adjacencies" clause is what licenses `cb/versionspace.py::equivalence_class` to
+enumerate orientations of the TRUE SKELETON (3^edges) instead of all mark assignments
+(4^pairs). Verified against exhaustive search at k=4 in
+`tests/cb/test_versionspace.py`. CONFIRM the discriminating-path clause against the paper
+before citing it in the thesis -- the implementation does not rely on it, since candidates
+are filtered by full m-separation signature rather than by the graphical criterion.
 
 ## 3. Scoring a graph
 
@@ -378,6 +394,99 @@ The percolation link is **our framing, not a citation**: in `G(d, p)` the giant 
 appears at `p_c = 1/d`, so `p_e = Θ(1/d)` *is* percolation-critical scaling. A fixed 0.5 sits
 15× above threshold at `d = 30` — deep in the dense phase, one connected blob, where recovery
 is neither realistic nor informative. State it as a framing device; do not attribute it.
+
+## 18. Version spaces and query learning — the deterministic backend's frame
+
+```bibtex
+@article{mitchell1982generalization,
+  author  = {Mitchell, Tom M.},
+  title   = {Generalization as Search},
+  journal = {Artificial Intelligence}, volume = {18}, number = {2}, year = {1982}}      % STANDARD
+
+@article{angluin1988queries,
+  author  = {Angluin, Dana},
+  title   = {Queries and Concept Learning},
+  journal = {Machine Learning}, volume = {2}, number = {4}, year = {1988}}              % STANDARD
+
+@inproceedings{seung1992qbc,
+  author    = {Seung, H. S. and Opper, M. and Sompolinsky, H.},
+  title     = {Query by Committee},
+  booktitle = {Computational Learning Theory (COLT)}, year = {1992}}                    % STANDARD
+```
+
+**Used for:** the framing of `cb/versionspace.py`. A version space is the set of hypotheses
+consistent with the evidence so far; learning is ELIMINATION, the space only shrinks, and a
+proposition is known when every survivor agrees (Mitchell's classification rule -- which is
+exactly why `claim_bar` must be 1.0 on that backend, and why settled-wrong is impossible
+there). The observational version space over MAGs IS the Markov equivalence class, i.e. the
+PAG. Interventions are QUERIES that partition the space, which is the halving-algorithm /
+query-by-committee setting: choose the query the survivors most disagree about.
+
+Also the source of the known WEAKNESS: version spaces are brittle under noise, because a
+single incorrect elimination removes the truth permanently and the space cannot recover.
+That is the argument for keeping the bootstrap belief in the statistical environment rather
+than porting elimination to it.
+
+## 19. Joint Causal Inference — the regime indicator, and why exclusion is a choice
+
+```bibtex
+@article{mooij2020jci,
+  author  = {Mooij, Joris M. and Magliacane, Sara and Claassen, Tom},
+  title   = {Joint Causal Inference from Multiple Contexts},
+  journal = {Journal of Machine Learning Research}, volume = {21}, number = {99},
+  pages   = {1--108}, year = {2020},
+  note    = {arXiv:1611.10351; code at https://github.com/caus-am/jci}}                 % VERIFIED
+
+@article{hauser2012interventional,
+  author  = {Hauser, Alain and B\"uhlmann, Peter},
+  title   = {Characterization and Greedy Learning of Interventional {M}arkov Equivalence
+             Classes of Directed Acyclic Graphs},
+  journal = {Journal of Machine Learning Research}, volume = {13}, pages = {2409--2464},
+  year    = {2012}}                                                                     % VERIFIED
+
+@article{hauser2014twostrategies,
+  author  = {Hauser, Alain and B\"uhlmann, Peter},
+  title   = {Two Optimal Strategies for Active Learning of Causal Models from
+             Interventional Data},
+  journal = {International Journal of Approximate Reasoning}, volume = {55}, number = {4},
+  year    = {2014}}                                                                     % VERIFIED
+
+@misc{hardinterventions2025,
+  title = {Characterization and Learning of Causal Graphs from Hard Interventions},
+  note  = {arXiv:2505.01037}, year = {2025}}                                            % UNVERIFIED
+```
+
+**Used for (2026-08-26):**
+
+`mooij2020jci` is the formal basis for treating the disclosed regime bit as a VARIABLE
+rather than a filter. JCI adds context variables as NODES alongside system variables, pools
+all contexts into one dataset, and runs standard discovery on the joint set; it does not
+require knowing intervention targets or types. Assumptions as reported: JCI 0 (the
+meta-system is a simple SCM), JCI 1 exogeneity (no system variable causes a context
+variable), JCI 2 randomization (no context/system pair is confounded), JCI 3 genericity
+(no arrows among context variables).
+
+CAVEAT recorded with the reference: our interventions are chosen ADAPTIVELY from beliefs
+that are functions of past data, so the context variable is caused by past system variables
+and JCI 1 fails if rows are pooled naively across rounds. Treat each round as its own
+context, or condition on history. NOTE also that the assumption wording above is PARAPHRASE
+from the abstract and secondary summaries -- the PDF would not parse for verbatim quotes,
+so check sections 2-3 before quoting in the thesis.
+
+`hauser2012interventional` gives the characterisation used to settle clamp-vs-vary: two
+DAGs are I-Markov equivalent iff, for every intervention target set S, the graphs with
+incoming edges of S removed are Markov equivalent. The class depends on the TARGETS, not on
+the intervened VALUES -- so a clamp and a randomised "vary" are equally informative in the
+identifiability limit. The measured preference for vary (2026-08-24) is a FINITE-SAMPLE
+estimator property: clamping leaves the target with zero variance, so the correlation
+channel is uninformative and only mean/variance shifts remain. Conversely, clamping a
+HIDDEN common cause cuts the path and makes the association vanish, which is why clamp is
+the right mode for private nodes and vary for one's own target.
+
+`hardinterventions2025` is a LEAD ONLY, recorded for the statement that hard interventions
+may fix a value "deterministically ... or by stochastically assigning values drawn from an
+independent distribution" -- i.e. our `vary` is a hard intervention, not a soft one. Read it
+before citing.
 
 ## 13. Amortised causal discovery
 
