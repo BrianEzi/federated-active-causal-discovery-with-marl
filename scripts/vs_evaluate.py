@@ -30,7 +30,8 @@ from ma.topology import federated_topology
 def build_env(n_agents: int, budget: int, n_shared: int = 3, seed: int = 0,
               channels: bool = False, private_size: int = 1,
               partner_counts: bool = False, mode_by_role: bool = False,
-              require_all_types: bool = True) -> TwoAgentEnv:
+              require_all_types: bool = True, graph_model: str = "er",
+              sf_m: int = 2) -> TwoAgentEnv:
     topology = federated_topology(n_agents, private_size, n_shared)
     config = MAConfig(topology=topology, n_obs=60, n_int=20, budget=budget,
                       disclose_regime=True, turn_order=ROUND_ROBIN, action_modes=(VARY,),
@@ -40,7 +41,8 @@ def build_env(n_agents: int, budget: int, n_shared: int = 3, seed: int = 0,
                       observe_belief_channels=channels,
                       observe_partner_counts=partner_counts,
                       mode_by_role=mode_by_role,
-                      claims_require_all_types=require_all_types)
+                      claims_require_all_types=require_all_types,
+                      graph_model=graph_model, sf_m=sf_m)
     return TwoAgentEnv(config, seed=seed)
 
 
