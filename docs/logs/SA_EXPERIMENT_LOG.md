@@ -3848,3 +3848,44 @@ windows grow. The valid headroom measure is distance to the clairvoyant bound
 
 The six-hour runtime is itself the density finding again: k=7 windows with several hidden
 confounders fill in with bidirected edges, and this run predated the density guard.
+
+## 2026-08-26 -- two gaps found by reading the foreign-row masking, neither measured
+
+[NOTED] FOREIGN ROWS ARE EXCLUDED INCONSISTENTLY. `foreign` gates the two-sample contrasts
+(`ancestral_evidence`, `pair_power`) but NOT `_rows_for`, which selects rows for the
+skeleton's CI tests -- that only drops rows where x or y itself was intervened. So rows in
+which an unseen node was manipulated ARE pooled into the independence tests that build the
+skeleton. Pooling across regimes is unsound in general, and it sits directly upstream of
+the missed-edge errors that dominate the census (22 of 45 confident errors). Whether it
+bites is UNMEASURED; the check is cheap -- compare skeleton accuracy with foreign rows
+included against excluded, at fixed everything else.
+
+[NOTED] THE EXCLUSION DISCARDS THE FEDERATION'S DISTINCTIVE SIGNAL. Rows where a partner
+intervened on its own private node are the only channel through which information about
+another agent's private variables reaches an agent. Currently they are deleted to avoid
+misattribution (correctly -- that was bug 5). But they carry confounding information:
+
+  * If a partner CLAMPS a hidden common cause h of u and v, the path u <- h -> v is cut and
+    the u-v association disappears IN THOSE ROWS. "The association vanished while someone
+    was intervening privately" identifies u <-> v as confounded by a partner's private
+    variable, without revealing which one.
+  * If a partner VARIES h (the current default), h still causes u and v, so the path stays
+    open and only its strength changes -- a weaker signal, present but not a disappearance.
+
+The disclosure this needs is already implemented (`disclose_regime` / `hidden_intervened`):
+a bit saying a private intervention is happening, with no node identity. The change is to
+CONDITION ON the regime rather than delete it -- the standard Joint Causal Inference move.
+
+Two consequences if it holds: it argues for CLAMP on private nodes specifically (cuts the
+path) even though vary-only was adopted for orientation power, so a mixed policy may
+dominate; and the required claim set could then be tightened.
+
+[CORRECTED] I have twice written that Markov equivalence leaves shared-block directions
+"unorientable no matter what you do". That is WRONG. Markov equivalence constrains
+OBSERVATION. The reveal channel is pairwise ancestry, and for an adjacent pair, u -> v iff u
+is an ancestor of v, v -> u iff the reverse, u <-> v iff neither -- so intervening on BOTH
+endpoints fixes the edge type with no residual ambiguity. Intervene on every node in a
+window and the window is fully determined. The exemption of shared-block directions from
+the required set is therefore a GRADING CHOICE inherited from the observational argument,
+not a mathematical necessity; the real constraint is budget. It is arguably too lenient and
+should be revisited.
