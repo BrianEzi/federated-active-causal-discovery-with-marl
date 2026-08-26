@@ -3669,3 +3669,29 @@ training tonight so the comparison is measured rather than argued.
 [NOTED] Six concurrent training processes oversubscribed the machine -- a seventh job
 produced no output in four minutes and was stopped rather than left to crawl. Lane
 scheduling has to account for core count, not just wall clock.
+
+[CORRECTED -- and this one invalidates comparisons, not just a number] THE POLICY COULD NOT
+SEE CONFOUNDING. `TwoAgentEnv.observation` carried `marginals`, which is the DIRECTED edge
+frequency matrix, and nothing else about the belief. The bidirected channel -- always a
+required claim, the thesis's subject, and 38% of the confident errors -- was absent, as was
+adjacency. Meanwhile `UncertaintyGreedyAgent` scores claims through `cb.claims`, which reads
+ALL THREE channels. Every learned-vs-greedy comparison in this project has therefore pitted
+a blindfolded learner against a sighted rule.
+
+Verified directly at a k=4 window: bidirected[2,3] = 0.36 with the pair invisible to the
+observation vector, while directed[2,3] = 0.32 was visible.
+
+Found while diagnosing learned < greedy in the DETERMINISTIC environment, where the effect
+is total: observation fixes the skeleton there, so confounding is the ONLY thing
+interventions resolve, and a policy that cannot see it is choosing blind. In the statistical
+environment the handicap is severe rather than total, since directed frequencies correlate
+with the rest of the belief.
+
+`observe_belief_channels` (MAConfig / --observe_belief_channels) appends the bidirected and
+adjacency upper triangles. The GNN aggregates them into PER-NODE features rather than
+flattening, so equivariance within roles -- the reason the GNN is there at all -- survives.
+OFF by default because it changes obs_size and voids every existing checkpoint.
+
+Paired runs launched tonight: one statistical arm blindfolded, one with channels, same seed
+and config otherwise. Until those land, the honest statement is that the handicap is
+demonstrated to EXIST and its size is not yet measured.

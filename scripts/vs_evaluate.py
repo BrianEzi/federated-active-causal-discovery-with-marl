@@ -27,7 +27,8 @@ from ma.policy import IndependentPPO
 from ma.topology import Topology
 
 
-def build_env(n_agents: int, budget: int, n_shared: int = 3, seed: int = 0) -> TwoAgentEnv:
+def build_env(n_agents: int, budget: int, n_shared: int = 3, seed: int = 0,
+              channels: bool = False) -> TwoAgentEnv:
     topology = Topology(name=f"T_{n_agents}agent_1each",
                         private=tuple((i,) for i in range(n_agents)),
                         exposed=tuple(range(n_agents, n_agents + n_shared)))
@@ -35,7 +36,8 @@ def build_env(n_agents: int, budget: int, n_shared: int = 3, seed: int = 0) -> T
                       disclose_regime=True, turn_order=ROUND_ROBIN, action_modes=(VARY,),
                       belief_backend="version_space", policy_arch="gnn",
                       episode_mix="confounded", reward_criterion="claims",
-                      claim_bar=1.0, per_agent_reward=True)
+                      claim_bar=1.0, per_agent_reward=True,
+                      observe_belief_channels=channels)
     return TwoAgentEnv(config, seed=seed)
 
 
@@ -109,12 +111,13 @@ def main() -> None:
     ap.add_argument("--n_agents", type=int, default=4)
     ap.add_argument("--budget", type=int, default=None, help="default: one per agent")
     ap.add_argument("--episodes", type=int, default=200)
+    ap.add_argument("--observe_belief_channels", action="store_true")
     ap.add_argument("--policy", default=None, help="a trained .pt to include as 'learned'")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     budget = args.budget if args.budget else args.n_agents
-    env = build_env(args.n_agents, budget)
+    env = build_env(args.n_agents, budget, channels=args.observe_belief_channels)
     agents = list(env.topology.agents)
 
     reference = {a: make_baselines(env, a, seed=0) for a in agents}

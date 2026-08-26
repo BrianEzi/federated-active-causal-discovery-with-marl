@@ -1,0 +1,125 @@
+{
+ "date": "26 August 2026",
+ "title": "Overnight Brief",
+ "lede": "A deterministic environment built and measured against a computable optimum, a blindfold found in the observation vector, and two significance thresholds where there was one. Numbers below come straight from the result files.",
+ "headline": [],
+ "sections": [
+  {
+   "title": "The finding that reframes the earlier runs",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "The observation vector carried only <b>directed-edge frequencies</b>. An agent could not see which pairs it believed <b>confounded</b> &mdash; the claim the thesis is about, always required for identification, and the largest remaining error category. The greedy baseline reads all three belief channels. So every learned-versus-greedy number produced so far compared a blindfolded learner against a sighted rule."
+    },
+    {
+     "type": "text",
+     "body": "It surfaced in the deterministic environment, where observation fixes the skeleton and confounding is the <i>only</i> thing interventions resolve &mdash; so the handicap is total there, and merely severe elsewhere. <code>--observe_belief_channels</code> supplies the missing channels."
+    }
+   ]
+  },
+  {
+   "title": "Deterministic environment: coordination, measured against an optimum",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "Four agents, three shared variables, one intervention each &mdash; the configuration where measured coordination headroom peaks. Reported per <b>window</b>, because the all-agents conjunction falls exponentially in agent count whatever the policy does."
+    },
+    {
+     "type": "table",
+     "columns": [
+      "arm",
+      "windows identified",
+      "headroom closed"
+     ],
+     "rows": []
+    }
+   ]
+  },
+  {
+   "title": "What an episode actually looks like",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "One row per agent, one column per round. Node ringed in blue is the one that agent intervened on; edge colour is what the agent believes about that pair. The counter under each window is required claims resolved."
+    },
+    {
+     "type": "film",
+     "trace": "greedy",
+     "episode": 0,
+     "title": "Greedy baseline, same seed",
+     "blurb": "Each agent picks what is locally best for its own window, with no way to know another agent is about to cover the same variable."
+    }
+   ]
+  },
+  {
+   "title": "Engine: two thresholds beat one",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "The single significance threshold gates both skeleton search and interventional orientation, and their error costs are opposite. Splitting them, with orientation held at 0.01:"
+    },
+    {
+     "type": "table",
+     "columns": [
+      "skeleton threshold",
+      "identified",
+      "confidently wrong",
+      "missed edges",
+      "invented"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "0.01 (current default)",
+        "0.253",
+        "0.307",
+        "15",
+        "3"
+       ]
+      },
+      {
+       "cells": [
+        "0.05",
+        "0.253",
+        "0.213",
+        "9",
+        "3"
+       ],
+       "highlight": true
+      },
+      {
+       "cells": [
+        "0.15",
+        "0.133",
+        "0.227",
+        "13",
+        "5"
+       ]
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "body": "At 0.05 missed edges halve with no increase in invented ones and no rise in type errors &mdash; exactly what the single-knob sweep destroyed. Identification is flat because recovered edges land in <i>unsure</i> rather than <i>right</i>, but confidently-wrong windows fall 9.4 points. Recommended, not yet the default."
+    }
+   ]
+  },
+  {
+   "title": "Caveats, and what I would not claim yet",
+   "blocks": [
+    {
+     "type": "list",
+     "items": [
+      "Single seed on the deterministic arms. The differences between reward variants are within seed noise until replicated &mdash; the ceiling comparison is the solid part.",
+      "The deterministic environment answers the infinite-data question only. It cannot speak to sample efficiency or robustness; that is what the statistical layer is for.",
+      "The belief-channels fix changes obs_size, so it voids old checkpoints and every pre-fix number is a blindfolded-learner number.",
+      "Version-space enumeration is bounded by window DENSITY, not variable count: k&nbsp;&le;&nbsp;6 is the usable range, and a dense k=7 window rejected 94% of worlds."
+     ]
+    }
+   ]
+  }
+ ],
+ "trace_files": {
+  "greedy": "results/traces/vs4_greedy.json"
+ }
+}

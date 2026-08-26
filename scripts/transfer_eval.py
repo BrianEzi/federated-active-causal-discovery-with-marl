@@ -28,7 +28,7 @@ from ma.policy import IndependentPPO
 from ma.topology import Topology
 
 
-def build_env(n_agents, budget, n_obs, n_int, n_boot, oracle, seed=0):
+def build_env(n_agents, budget, n_obs, n_int, n_boot, oracle, seed=0, channels=False):
     topology = Topology(name=f"T_{n_agents}agent_1each",
                         private=tuple((i,) for i in range(n_agents)),
                         exposed=tuple(range(n_agents, n_agents + 3)))
@@ -36,7 +36,8 @@ def build_env(n_agents, budget, n_obs, n_int, n_boot, oracle, seed=0):
                       disclose_regime=True, turn_order=ROUND_ROBIN, action_modes=(VARY,),
                       belief_backend="constraint", cb_n_boot=n_boot, policy_arch="gnn",
                       episode_mix="confounded", reward_criterion="claims",
-                      oracle_obs_structure=oracle)
+                      oracle_obs_structure=oracle,
+                      observe_belief_channels=channels)
     return TwoAgentEnv(config, seed=seed)
 
 
@@ -66,12 +67,14 @@ def main() -> None:
     ap.add_argument("--n_int", type=int, default=1000)
     ap.add_argument("--cb_n_boot", type=int, default=12)
     ap.add_argument("--oracle_obs", action="store_true")
+    ap.add_argument("--observe_belief_channels", action="store_true")
     ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     env = build_env(args.n_agents, args.budget, args.n_obs, args.n_int,
-                    args.cb_n_boot, args.oracle_obs)
+                    args.cb_n_boot, args.oracle_obs,
+                    channels=args.observe_belief_channels)
     agents = list(env.topology.agents)
     reference = {a: make_baselines(env, a, seed=0) for a in agents}
 
