@@ -472,6 +472,10 @@ class TwoAgentEnv:
         self._last_claim_fraction: Optional[float] = None
         self._last_agent_fraction: Optional[Dict[int, float]] = None
         self._agent_rewards: Optional[Dict[int, float]] = None
+        for window in self.windows.values():
+            # Per-episode resample stream: see ConstraintBackend.set_episode.
+            if hasattr(window.belief, "set_episode"):
+                window.belief.set_episode(seed if seed is not None else 0)
         if cfg.belief_backend == VERSION_SPACE:
             # The version space is defined relative to THIS episode's truth, so it has to
             # be rebuilt every reset. Truth is used only to prune -- oracle-side, exactly

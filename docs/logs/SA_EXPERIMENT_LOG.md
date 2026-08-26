@@ -3731,3 +3731,28 @@ be shown to beat greedy.
 statistical environment policy-sensitive". The levers already measured point one way:
 n_int (data per experiment) moved identification more than any other knob, and
 cb_skeleton_alpha=0.05 cut confidently-wrong by 9.4pp. Neither is a policy change.
+
+[CORRECTED -- an evaluation confound, not a result] THE BOOTSTRAP RESAMPLE STREAM CARRIED
+PROCESS HISTORY. `ConstraintBackend.edge_marginals` seeded each refresh as
+`base_seed + self._calls`, and `_calls` counted every refresh since the backend was
+CONSTRUCTED -- never reset per episode. Two consequences, both real:
+
+  * A BASELINE varied across runs of an identical config. Measured tonight: greedy scored
+    0.145 on one statistical run and 0.100 on another with the same seed and settings,
+    because training length in refreshes differed and left the stream at a different point.
+  * Within a run, arms are scored in sequence, so each arm saw a DIFFERENT resample
+    sequence. "Paired" learned-vs-greedy comparisons were not paired.
+
+Demonstrated directly (scratchpad/check_reproducible.py): with the old seeding and policy
+RNGs reset exactly as `run_arm` resets them, greedy scores 0.3056 with no history and
+0.4167 after five warm-up episodes. With `set_episode` the same measurement is 0.4167 both
+times.
+
+FIXED: `ConstraintBackend.set_episode(episode_seed)` restarts the stream per episode, and
+`TwoAgentEnv.reset` calls it. A given (base_seed, episode) now reproduces regardless of
+what ran before. 44 cb tests pass unchanged.
+
+WHAT THIS INVALIDATES: the statistical arms' internal comparisons from tonight, and any
+cross-run baseline comparison in this project's history. It does NOT touch the
+deterministic environment (no bootstrap, no resampling) -- the coordination result stands.
+All three statistical policies are being re-scored on identical episodes under the fix.

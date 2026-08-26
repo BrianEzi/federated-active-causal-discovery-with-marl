@@ -82,6 +82,8 @@ class ConstraintBackend:
         self.base_seed = int(base_seed)
         self.n_jobs = int(n_jobs)
         self._calls = 0
+        # Base for the CURRENT episode's resample stream; `set_episode` moves it.
+        self._episode_base = int(self.base_seed)
         self.last: Optional[BootstrapBelief] = None
         # Set by the env at reset when oracle_obs_structure is on: (adjacency, sepsets)
         # from ma.projection.observational_skeleton -- the true observational limit for
@@ -89,6 +91,15 @@ class ConstraintBackend:
         self.oracle_skeleton = None
 
     # -- the WindowBeliefDP-shaped surface ------------------------------------------------
+
+    def set_episode(self, episode_seed: int) -> None:
+        """Start a fresh resample stream for one episode.
+
+        Called by the environment at every reset. Without it the stream carried process
+        history, which made baselines vary across runs of identical configs.
+        """
+        self._calls = 0
+        self._episode_base = int(self.base_seed) + 9973 * (int(episode_seed) % 100_003)
 
     def edge_marginals(self, data: np.ndarray, known: np.ndarray, clean=None,
                        score_rule=None, blocks=None) -> np.ndarray:
@@ -106,15 +117,21 @@ class ConstraintBackend:
         test (see `FisherZ.__init__`). The disclosure discipline is unchanged: the no-bit
         arm passes zeros and differs in exactly what the agent is told.
 
-        Seeding is deterministic per call so identical seeded episodes reproduce exactly:
-        the resample stream depends on (base_seed, refresh count), never on wall clock.
+        SEEDING IS PER EPISODE, not per process. It used to be `base_seed + calls`, with
+        `calls` counting every refresh since the backend was CONSTRUCTED -- so the resample
+        stream depended on how much had happened earlier in the process. Two consequences,
+        both measured on 2026-08-26: a baseline scored 0.145 in one run and 0.100 in
+        another on an identical config and seed, because training length in refreshes
+        differed; and arms evaluated in sequence each saw a different stream, so "paired"
+        comparisons were not paired. `set_episode` resets the stream, so a given
+        (base_seed, episode) reproduces regardless of what ran before it.
         """
         self._calls += 1
         foreign = None if clean is None else np.asarray(clean, dtype=float) > 0
         self.last = bootstrap_belief(
             np.asarray(data, dtype=float), np.asarray(known),
             n_boot=self.n_boot, alpha=self.alpha, max_cond=self.max_cond,
-            seed=self.base_seed + self._calls, foreign=foreign, blocks=blocks,
+            seed=self._episode_base + self._calls, foreign=foreign, blocks=blocks,
             n_jobs=self.n_jobs, oracle_skeleton=self.oracle_skeleton,
             skeleton_alpha=self.skeleton_alpha)
         return self.last.edge_marginals()

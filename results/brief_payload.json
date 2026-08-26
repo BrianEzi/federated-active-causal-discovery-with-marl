@@ -1,52 +1,40 @@
 {
- "date": "26 August 2026",
+ "date": "Overnight, 25&ndash;26 August 2026",
  "title": "Overnight Brief",
- "lede": "A deterministic environment built and measured against a computable optimum, a blindfold found in the observation vector, and two significance thresholds where there was one. Numbers below come straight from the result files.",
+ "lede": "Agents learned to coordinate experiments and beat greedy by four standard errors &mdash; in a new deterministic environment built tonight. The same night showed why the noisy environment has never been able to show anything of the kind. Every number below comes straight from its result file.",
  "headline": [
   {
-   "label": "Deterministic env, 3 seeds",
+   "label": "Coordination learned (3 seeds)",
    "value": "0.463",
-   "note": "+/- 0.012 across seeds, greedy 0.359",
+   "note": "greedy 0.359, ceiling 0.774",
    "tone": "good"
   },
   {
    "label": "Headroom closed",
    "value": "25%",
-   "note": "pooled over seeds, of the 0.415 available",
+   "note": "of the 0.415 available, pooled",
    "tone": "good"
   },
   {
-   "label": "Beats greedy by",
-   "value": "+0.105",
-   "note": "greedy 0.359, ceiling 0.774",
-   "tone": "good"
+   "label": "Noisy env: greedy &minus; random",
+   "value": "+0.078",
+   "note": "all the room any policy has there",
+   "tone": "bad"
+  },
+  {
+   "label": "Transfer vs greedy (noisy)",
+   "value": "-0.039",
+   "note": "indistinguishable from greedy",
+   "tone": "bad"
   }
  ],
  "sections": [
   {
-   "title": "A real defect that did not turn into a gain",
+   "title": "Coordination is learnable, measured against an optimum",
    "blocks": [
     {
      "type": "text",
-     "body": "The observation vector carried only <b>directed-edge frequencies</b>. An agent could not see which pairs it believed <b>confounded</b> &mdash; a claim that is always required for identification, and the subject of the thesis. The greedy baseline reads all three belief channels through <code>cb.claims</code>. So every learned-versus-greedy comparison in this project has run a blindfolded learner against a sighted rule."
-    },
-    {
-     "type": "text",
-     "body": "It surfaced in the deterministic environment, where observation fixes the skeleton and confounding is the <i>only</i> thing interventions resolve, so the handicap is total there and merely severe elsewhere. Verified directly: a pair with bidirected belief 0.36 was absent from the observation while its directed belief 0.32 was present."
-    },
-    {
-     "type": "note",
-     "tone": "warn",
-     "body": "Against its matched control, supplying the channels changed the result by <b>+0.020 &plusmn; 0.038</b> &mdash; inside noise. The defect is real and demonstrable; fixing it did not measurably help here. Finding a genuine bug does not entail that removing it improves anything, and this one has not yet earned a place in the results."
-    }
-   ]
-  },
-  {
-   "title": "Deterministic environment: coordination, measured against an optimum",
-   "blocks": [
-    {
-     "type": "text",
-     "body": "Four agents, three shared variables, one intervention each &mdash; the configuration where measured coordination headroom peaks. Reported per <b>window</b>, because the all-agents conjunction falls exponentially in agent count whatever the policy does."
+     "body": "In the deterministic environment built tonight &mdash; belief is the set of structures still consistent with what interventions established, no statistics anywhere &mdash; agents learn to divide experiments between them. Four agents, three shared variables, one intervention each. Reported per window, against an optimum that can be computed exactly rather than against a baseline."
     },
     {
      "type": "table",
@@ -58,52 +46,21 @@
      "rows": [
       {
        "cells": [
-        "greedy (baseline)",
-        "0.359 &plusmn; 0.022",
-        "&mdash;"
-       ]
-      },
-      {
-       "cells": [
-        "random",
-        "0.212 &plusmn; 0.018",
-        "&mdash;"
-       ]
-      },
-      {
-       "cells": [
-        "learned, shared reward",
+        "learned, seed 0",
         "0.479 &plusmn; 0.025",
         "+29%"
-       ],
-       "highlight": true
+       ]
       },
       {
        "cells": [
-        "learned, per-agent reward",
-        "0.446 &plusmn; 0.027",
-        "+21%"
-       ],
-       "highlight": false
-      },
-      {
-       "cells": [
-        "learned, + belief channels",
-        "0.466 &plusmn; 0.027",
-        "+26%"
-       ],
-       "highlight": false
-      },
-      {
-       "cells": [
-        "learned, shared reward (seed 1)",
+        "learned, seed 1",
         "0.440 &plusmn; 0.023",
         "+20%"
        ]
       },
       {
        "cells": [
-        "learned, shared reward (seed 2)",
+        "learned, seed 2",
         "0.471 &plusmn; 0.024",
         "+27%"
        ]
@@ -118,12 +75,30 @@
       },
       {
        "cells": [
+        "greedy (truth-free rule)",
+        "0.359 &plusmn; 0.022",
+        "&mdash;"
+       ]
+      },
+      {
+       "cells": [
+        "random",
+        "0.212 &plusmn; 0.018",
+        "&mdash;"
+       ]
+      },
+      {
+       "cells": [
         "<b>ceiling (computable optimum)</b>",
         "<b>0.774</b>",
         "100%"
        ]
       }
      ]
+    },
+    {
+     "type": "note",
+     "body": "<b>+0.105 over greedy, about 4.2 standard errors across independent seeds.</b> The first clean separation this project has produced. Pooled, not the best seed."
     },
     {
      "type": "curve",
@@ -257,7 +232,7 @@
         0.3906,
         0.4031
        ],
-       "color": "var(--ink-3)"
+       "color": "var(--accent)"
       },
       {
        "name": "per-agent reward",
@@ -388,7 +363,7 @@
         0.3969,
         0.3781
        ],
-       "color": "var(--accent)"
+       "color": "var(--ink-3)"
       },
       {
        "name": "+ belief channels",
@@ -524,7 +499,98 @@
      ],
      "ceiling": 0.77375,
      "greedy": 0.35875,
-     "height": 250
+     "height": 240
+    }
+   ]
+  },
+  {
+   "title": "Why the noisy environment never showed any of this",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "The most important measurement of the night. In the statistical environment the gap between the best truth-free rule and <i>random</i> is almost nothing &mdash; so there is almost nothing for any policy to win, and every arm lands in a heap."
+    },
+    {
+     "type": "table",
+     "columns": [
+      "environment",
+      "random",
+      "greedy",
+      "span",
+      "ceiling"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "statistical (noisy)",
+        "0.264",
+        "0.342",
+        "0.078",
+        "unknown"
+       ]
+      },
+      {
+       "cells": [
+        "deterministic",
+        "0.212",
+        "0.359",
+        "0.146",
+        "0.774"
+       ],
+       "highlight": true
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "body": "This retroactively explains the history: rung 0's seven-point margin with overlapping intervals, rung 1's learned policy finishing <i>below random</i>, and tonight's transfer landing mid-pack. Those were not primarily learning failures. The environment was not measuring experiment choice, because whether the engine can resolve a claim at all dominates which experiment produced the data."
+    },
+    {
+     "type": "note",
+     "tone": "warn",
+     "body": "Consequence for the plan: the next question is not &ldquo;how do we train better&rdquo; but &ldquo;what makes the statistical environment policy-sensitive&rdquo;. Both levers measured so far are engine-side, not policy-side &mdash; rows per experiment, and the split significance threshold."
+    }
+   ]
+  },
+  {
+   "title": "Transfer: trained on perfect data, tested on noisy data",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "The hypothesis: which node to intervene on is a structural question, so noise should change how much an experiment reveals, not which experiment is worth running. The same policy, in both environments:"
+    },
+    {
+     "type": "table",
+     "columns": [
+      "environment",
+      "learned / transferred",
+      "greedy",
+      "random"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "deterministic (where it trained)",
+        "0.820",
+        "0.400",
+        "0.050"
+       ],
+       "highlight": true
+      },
+      {
+       "cells": [
+        "statistical (noisy)",
+        "0.303 &plusmn; 0.026",
+        "0.342 &plusmn; 0.026",
+        "0.264 &plusmn; 0.027"
+       ]
+      }
+     ]
+    },
+    {
+     "type": "note",
+     "tone": "warn",
+     "body": "Double greedy in clean conditions; <b>-0.039</b> against greedy on noisy data &mdash; indistinguishable. But note the row above: there, greedy itself beats random by only 0.078, so <b>the test could not have succeeded whatever the policy had learned</b>. That is a property of the test bed, not a refutation of the idea. Worth re-running once the statistical environment has measurable policy sensitivity."
     }
    ]
   },
@@ -533,30 +599,37 @@
    "blocks": [
     {
      "type": "text",
-     "body": "One row per agent, one column per round. Node ringed in blue is the one that agent intervened on; edge colour is what the agent believes about that pair. The counter under each window is required claims resolved."
+     "body": "One row per agent, one column per round. The blue-ringed node is the one that agent intervened on; edge colour is what that agent believes about the pair; the counter is required claims resolved. Step-through detail, including the bootstrap frequency behind every claim, is in the Episode Inspector."
     },
     {
      "type": "film",
      "trace": "learned",
      "episode": 0,
      "title": "Learned policy",
-     "blurb": "Watch which nodes get taken in the first rounds: the learned policy spreads across distinct shared variables rather than several agents converging on the same one."
+     "blurb": "Watch the early rounds: agents spread across distinct shared variables."
     },
     {
      "type": "film",
      "trace": "greedy",
      "episode": 0,
-     "title": "Greedy baseline, same seed",
-     "blurb": "Each agent picks what is locally best for its own window, with no way to know another agent is about to cover the same variable."
+     "title": "Greedy, same seeds",
+     "blurb": "Each agent takes what is locally best for its own window, with no way to know another agent is about to cover the same variable."
+    },
+    {
+     "type": "film",
+     "trace": "stat",
+     "episode": 0,
+     "title": "Statistical environment",
+     "blurb": "The same task with real estimation. Here a claim can settle WRONG &mdash; impossible in the deterministic environment, and the reason the robustness layer exists."
     }
    ]
   },
   {
-   "title": "Engine: two thresholds beat one",
+   "title": "Engine: two significance thresholds beat one",
    "blocks": [
     {
      "type": "text",
-     "body": "The single significance threshold gates both skeleton search and interventional orientation, and their error costs are opposite. Splitting them, with orientation held at 0.01:"
+     "body": "One threshold gates both skeleton search and interventional orientation, and their error costs are opposite. Splitting them, orientation held at 0.01:"
     },
     {
      "type": "table",
@@ -600,20 +673,39 @@
     },
     {
      "type": "text",
-     "body": "At 0.05 missed edges halve with no increase in invented ones and no rise in type errors &mdash; exactly what the single-knob sweep destroyed. Identification is flat because recovered edges land in <i>unsure</i> rather than <i>right</i>, but confidently-wrong windows fall 9.4 points. Recommended, not yet the default."
+     "body": "Missed edges halve with no increase in invented ones and no rise in type errors &mdash; what the single-knob sweep destroyed. Identification is flat because recovered edges land in <i>unsure</i> rather than <i>right</i>, but confidently-wrong windows fall 9.4 points. Recommended; not yet the default, pending a paired run."
+    },
+    {
+     "type": "text",
+     "body": "Also measured: the coordination band and statistical power pull in opposite directions. Budget 4 scores 0.147 against budget 12's 0.233, and it takes sixteen times the rows to buy that back &mdash; rounds are not substitutable for data. The oracle warm start resolves it: 0.320 per window, confidently-wrong nearly halved, and 5&ndash;14&times; faster because skeleton search is skipped."
     }
    ]
   },
   {
-   "title": "Caveats, and what I would not claim yet",
+   "title": "A real defect that did not turn into a gain",
+   "blocks": [
+    {
+     "type": "text",
+     "body": "The observation vector carried only <b>directed-edge frequencies</b>. An agent could not see which pairs it believed <b>confounded</b> &mdash; always required for identification, and the subject of the thesis &mdash; while the greedy baseline reads all three belief channels. Every learned-versus-greedy comparison in this project ran a blindfolded learner against a sighted rule. Verified directly: a pair with bidirected belief 0.36 was absent from the observation while its directed belief 0.32 was present."
+    },
+    {
+     "type": "note",
+     "tone": "warn",
+     "body": "Against its matched control, supplying the channels changed the result by <b>+0.020 &plusmn; 0.038</b> &mdash; inside noise. The defect is real; removing it did not measurably help. Finding a genuine bug does not entail that fixing it improves anything."
+    }
+   ]
+  },
+  {
+   "title": "What I would not claim yet",
    "blocks": [
     {
      "type": "list",
      "items": [
-      "Single seed on the deterministic arms. The differences between reward variants are within seed noise until replicated &mdash; the ceiling comparison is the solid part.",
-      "The deterministic environment answers the infinite-data question only. It cannot speak to sample efficiency or robustness; that is what the statistical layer is for.",
-      "The belief-channels fix changes obs_size, so it voids old checkpoints and every pre-fix number is a blindfolded-learner number.",
-      "Version-space enumeration is bounded by window DENSITY, not variable count: k&nbsp;&le;&nbsp;6 is the usable range, and a dense k=7 window rejected 94% of worlds."
+      "The deterministic result is the solid one: three seeds, 200 evaluation episodes each, against a computable optimum. Everything else tonight is one or two seeds.",
+      "The deterministic environment answers the infinite-data question only. It says nothing about sample efficiency or robustness.",
+      "Two of my own hypotheses failed: per-agent reward did not help (0.446 vs 0.479, inside noise), and neither did supplying the missing confounding channel. Both were argued from principle before being measured.",
+      "The transfer result is not evidence against the transfer idea, because the test bed had no room in it. It is evidence that the test bed needs fixing first.",
+      "Version-space enumeration is bounded by window DENSITY, not variable count: k&nbsp;&le;&nbsp;6 is usable, and a dense k=7 window rejected 94% of sampled worlds."
      ]
     }
    ]
@@ -621,6 +713,7 @@
  ],
  "trace_files": {
   "learned": "results/traces/vs4_learned.json",
-  "greedy": "results/traces/vs4_greedy.json"
+  "greedy": "results/traces/vs4_greedy.json",
+  "stat": "results/traces/oracle_stat.json"
  }
 }
