@@ -2937,3 +2937,34 @@ them. Rung 8 (5 agents, 30 nodes) gets 500 training episodes and is the thinnest
 ladder — read it with that in mind. No result yet; `scripts/ma_ladder_report.py` reads them
 as paired per-seed differences against the BEST baseline, since beating random while losing
 to greedy is not a result.
+
+### [CORRECTED] 2026-08-26 — the budget commit's reasoning was half wrong
+
+`cfca559` changed BUDGET from `3 * n_agents` to `n_agents * max(5, k+1)` and justified it by
+citing `results/ma_fixed/tb_clamp_s0.json` (random_clamp 0.387, greedy 0.240) as the target
+the new rung 0 failed to reproduce. **That attribution was wrong.** Measured directly:
+
+    branch                       budget  prior_p   random  greedy   pass
+    feat/disclosure (tonight)         6      0.5    0.060   0.060  0.010
+    feat/disclosure (tonight)        10      0.5    0.080   0.060  0.010
+    main c58543e (PRE-tonight)       10      0.5    0.080     --     --
+    banked, results/ma_fixed/        10      0.5    0.387   0.240  0.007
+
+Pre-tonight `main` reproduces 0.080, not 0.387, at the identical configuration. So the gap
+is NOT the budget and NOT anything in tonight's optimisations -- it is the identification
+criterion, which was tightened on 2026-08-20 when the looser version was retracted. The
+banked `ma_fixed/` and `rung0/` numbers were measured under the old criterion.
+
+Two consequences:
+
+1. **Every absolute success rate banked before 2026-08-20 is on a different metric and is
+   not comparable to anything measured now.** Anything in the write-up citing 0.62 / 0.387 /
+   0.240 needs re-baselining, not just re-labelling.
+2. The budget change is still the right rule -- five turns per agent, scaling with the
+   window rather than with d -- but its measured effect at rung 0 is small (0.060 -> 0.080),
+   not the 5x the commit message implied.
+
+Gate 2 still passes at the current criterion, though by less: random_clamp 0.080 against
+pass 0.010 means choices matter, and `greedy` sits BELOW random at 0.060, which was also
+true in the banked numbers (0.240 against 0.387) and is a property of this task rather than
+a new fault.
