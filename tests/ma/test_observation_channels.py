@@ -101,3 +101,25 @@ def test_identified_fraction_is_reported_for_the_window_metric():
     assert 0.0 <= fraction <= 1.0
     assert fraction == pytest.approx(
         np.mean([float(v) for v in result.identified.values()]))
+
+
+def test_checkpoints_round_trip_under_both_observation_layouts():
+    """The bug this pins: the encoder width was widened for the belief channels
+    unconditionally, so every policy trained before them failed to load -- and it failed at
+    EVALUATION time, after the training compute had been spent."""
+    import pathlib
+    import tempfile
+
+    from ma.policy import IndependentPPO, PPOConfig
+
+    for channels in (False, True):
+        env = _env(observe_belief_channels=channels, policy_arch="gnn")
+        learner = IndependentPPO(env, PPOConfig(total_episodes=1, episodes_per_update=1))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "policy.pt"
+            learner.save(path)
+            restored = IndependentPPO.load(path, env)
+            for agent in TOPO.agents:
+                observation = env.observation(agent)
+                assert restored.policy(agent)(env, None) is not None
+                assert observation.shape[0] == env.obs_size(agent)
