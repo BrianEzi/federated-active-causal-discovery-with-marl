@@ -3071,3 +3071,28 @@ chain moved the result, which is what the equivalence gates were for.
 
 **It is also the ceiling of what the current mechanism reaches.** The same configuration is
 impossible from three agents onward — see `docs/SCALING_DECISION_2026_08_26.md`.
+
+### [MEASURED] The no-bit control, 2 / 3 / 5 agents — floor everywhere
+
+Local run, same code path and rung table as the cluster, `disclose_regime` OFF,
+1500 train / 150 eval episodes:
+
+    rung                 d   n   learned  greedy  random   pass   paired vs best
+    rung0_2a_1p_3x       5   2    0.013   0.010   0.010   0.007   +0.003  ties
+    rung1_3a_1p_3x       6   2    0.003   0.007   0.007   0.000   -0.003  ties
+    rung2_5a_1p_3x       8   1    0.010   0.010   0.010   0.000   +0.000  ties
+
+**This is a stronger statement than "the method fails to scale".** Without the regime bit
+the task sits on the floor at TWO agents as well — the same shape that reaches 0.554 with
+the bit on. So the bit is not a scaling aid, it is the mechanism that makes the task solvable
+at all, and it happens to be exact only at two agents.
+
+    2 agents, bit ON     learned 0.554   best baseline 0.377   +0.177 [+0.143,+0.209]
+    2 agents, bit OFF    learned 0.013   best baseline 0.010   ties
+    3 agents (no bit)    learned 0.003   best baseline 0.007   ties
+    5 agents (no bit)    learned 0.010   best baseline 0.010   ties
+
+That is the argument for the disclosure work stated as a measurement rather than an
+expectation: some channel carrying de-confounding information is NECESSARY for the task to
+be learnable, the only channel currently implemented is exact at n = 2, and therefore a
+channel that scales is the contribution rather than an enhancement.
