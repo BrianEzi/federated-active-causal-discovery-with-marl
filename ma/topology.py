@@ -47,6 +47,12 @@ from typing import FrozenSet, Optional, Sequence, Tuple
 
 import numpy as np
 
+# How the generating DAG is drawn. See `Topology.sample_dag` for why this is a choice at
+# all: the Erdos-Renyi assumption came from a Bayesian prior that no engine in use reads.
+ER = "er"
+SF = "sf"
+GRAPH_MODELS = (ER, SF)
+
 
 @dataclass(frozen=True)
 class Topology:
@@ -154,17 +160,64 @@ class Topology:
                     allowed[u, v] = False
         return allowed
 
-    def sample_dag(self, rng: np.random.Generator, p: float = 0.5) -> np.ndarray:
-        """Draw one DAG: random topological order, allowed forward pairs with prob `p`."""
+    def sample_dag(self, rng: np.random.Generator, p: float = 0.5,
+                   model: str = ER, m: int = 2) -> np.ndarray:
+        """Draw one DAG under `model`, respecting the jointly-visible mask.
+
+        `er` -- random topological order, each allowed forward pair included with
+        probability `p`. Every node is exchangeable, so degrees concentrate and there are
+        no hubs.
+
+        `sf` -- scale-free by preferential attachment along the same random topological
+        order: each node takes up to `m` parents from the nodes before it, chosen with
+        probability proportional to their out-degree so far (plus one, so a node with no
+        children yet can still be chosen). Acyclicity is free for the same reason it is
+        free under `er` -- edges only ever run forward along the order.
+
+        WHY THIS MATTERS HERE AND NOT ONLY AS REALISM. Erdos-Renyi was inherited from the
+        Bayesian DP this project started with, whose prior had to match the generator.
+        Neither engine now in use reads `prior_p` -- it is consumed by this method and
+        nowhere else -- so the constraint was a hangover, not a requirement.
+
+        What changes is the FEDERATED structure, not just the degree distribution. Under
+        `er` every private node is a weak, interchangeable confounder of its agent's
+        partners. Under `sf` a private node can be a HUB, parenting many shared variables
+        at once -- which is precisely the single-hidden-cause-of-many-children pattern that
+        projects to a bidirected CLIQUE in every other agent's window. Hubs therefore make
+        the structure this project measures more common rather than incidental, and they
+        make it matter more who clamps what: clamping a hub cleans a great deal for a
+        partner, clamping a leaf cleans almost nothing. Under `er` those two moves are
+        nearly the same move.
+        """
+        if model not in GRAPH_MODELS:
+            raise ValueError(f"model must be one of {GRAPH_MODELS}, got {model!r}")
         d = self.d
         allowed = self.allowed_edges()
         order = rng.permutation(d)
         adjacency = np.zeros((d, d), dtype=np.int8)
-        for i in range(d):
-            for j in range(i + 1, d):
-                u, v = int(order[i]), int(order[j])
-                if allowed[u, v] and rng.random() < p:
-                    adjacency[u, v] = 1
+        if model == ER:
+            for i in range(d):
+                for j in range(i + 1, d):
+                    u, v = int(order[i]), int(order[j])
+                    if allowed[u, v] and rng.random() < p:
+                        adjacency[u, v] = 1
+            return adjacency
+
+        out_degree = np.zeros(d, dtype=float)
+        for j in range(1, d):
+            v = int(order[j])
+            candidates = [int(order[i]) for i in range(j) if allowed[int(order[i]), v]]
+            if not candidates:
+                continue
+            # +1 so a childless node is reachable; without it the first edge could never
+            # form and the whole construction would stall at zero.
+            weights = out_degree[candidates] + 1.0
+            take = min(m, len(candidates))
+            chosen = rng.choice(candidates, size=take, replace=False,
+                                p=weights / weights.sum())
+            for u in np.atleast_1d(chosen):
+                adjacency[int(u), v] = 1
+                out_degree[int(u)] += 1.0
         return adjacency
 
 

@@ -38,6 +38,8 @@ def _config_record(config, topology, args) -> dict:
             "turn_order": config.turn_order,
             "action_modes": list(config.action_modes),
             "prior_p": config.prior_p,
+            "graph_model": config.graph_model,
+            "sf_m": config.sf_m,
             "identify_threshold": config.identify_threshold,
             "intervene_scale": config.intervene_scale,
             "reward_criterion": config.reward_criterion,
@@ -157,7 +159,12 @@ def main(argv=None) -> dict:
     ap.add_argument("--legacy_claim_exemption", action="store_true",
                     help="restore the pre-2026-08-26 grading in which shared-block "
                          "directions were not required. For reproduction only")
-    ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn"])
+    ap.add_argument("--graph_model", default="er", choices=["er", "sf"],
+                    help="er: each allowed pair with prob prior_p. sf: scale-free by "
+                         "preferential attachment, density set by --sf_m")
+    ap.add_argument("--sf_m", type=int, default=2,
+                    help="parents per node under --graph_model sf; prior_p is ignored")
+    ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn", "gnn_portable"])
     ap.add_argument("--cb_n_boot", type=int, default=12,
                     help="bootstrap replicates per refresh (constraint backend only)")
     ap.add_argument("--gnn_layers", type=int, default=2)
@@ -232,7 +239,8 @@ def main(argv=None) -> dict:
                        budget=args.budget, disclose_regime=args.disclose_regime,
                        score_rule=args.rule, step_cost=args.step_cost,
                        turn_order=args.turn_order, action_modes=modes,
-                       prior_p=args.prior_p,
+                       prior_p=args.prior_p, graph_model=args.graph_model,
+                       sf_m=args.sf_m,
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
                        policy_arch=args.policy_arch, episode_mix=args.episode_mix,
                        oracle_obs_structure=args.oracle_obs,

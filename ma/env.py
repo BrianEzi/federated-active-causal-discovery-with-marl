@@ -46,7 +46,7 @@ import numpy as np
 
 from cb.backend import ConstraintBackend
 from crosscheck.belief_dp import JOINT_CONF, WindowBeliefDP
-from ma.topology import Topology
+from ma.topology import ER, Topology
 from ma.priors import connectivity_prior_p
 from ma.scm import sample_multi, sample_scm_params
 
@@ -170,6 +170,13 @@ class MAConfig:
     # for why the percolation threshold `1/d` is the wrong target here. A float overrides.
     # NOTE this CHANGES the graph distribution: at d=5 it is 0.644, not 0.5.
     prior_p: Optional[float] = None
+    # HOW THE GENERATING GRAPH IS DRAWN. "er" is the historical default; "sf" is scale-free
+    # by preferential attachment, where `sf_m` sets the parents each node takes and thus the
+    # density (`prior_p` is ignored under "sf"). See `Topology.sample_dag`: the ER
+    # assumption was inherited from a Bayesian prior that had to match the generator, and
+    # no engine now in use reads `prior_p`, so this is free to vary.
+    graph_model: str = ER
+    sf_m: int = 2
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
     score_rule: str = JOINT_CONF
     # One bit per round: "I clamped something you cannot see". OFF by default -- the no-bit
@@ -609,6 +616,11 @@ class TwoAgentEnv:
         self._refresh()
         return self._result(reward=0.0)
 
+    def _draw(self, cfg) -> np.ndarray:
+        """One graph from the configured generator. One call site for both models."""
+        return self.topology.sample_dag(self._rng, p=cfg.prior_p,
+                                        model=cfg.graph_model, m=cfg.sf_m)
+
     def _sample_mixed_dag(self, cfg) -> Tuple[np.ndarray, int]:
         """Draw DAGs until the episode-mix condition holds. Returns (graph, draws).
 
@@ -619,9 +631,9 @@ class TwoAgentEnv:
         """
         from ma.projection import bidirected_pairs
         if cfg.episode_mix == "any":
-            return self.topology.sample_dag(self._rng, p=cfg.prior_p), 1
+            return self._draw(cfg), 1
         for draw in range(1, 201):
-            candidate = self.topology.sample_dag(self._rng, p=cfg.prior_p)
+            candidate = self._draw(cfg)
             confounded = any(
                 bidirected_pairs(candidate, tuple(w.nodes))
                 for w in self.windows.values())
