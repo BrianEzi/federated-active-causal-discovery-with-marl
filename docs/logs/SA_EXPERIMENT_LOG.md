@@ -3756,3 +3756,36 @@ WHAT THIS INVALIDATES: the statistical arms' internal comparisons from tonight, 
 cross-run baseline comparison in this project's history. It does NOT touch the
 deterministic environment (no bootstrap, no resampling) -- the coordination result stands.
 All three statistical policies are being re-scored on identical episodes under the fix.
+
+[MEASURED] STATISTICAL POLICIES RE-SCORED UNDER THE FIXED SEEDING, 150 episodes, identical
+episodes and streams for every arm (scratchpad/final_stat_eval.py). Per-window
+identification, with joint in brackets:
+
+    learned, + belief channels   0.431 +/- 0.031    (joint 0.227 +/- 0.034)
+    greedy (truth-free)          0.387 +/- 0.029    (joint 0.180 +/- 0.031)
+    learned, blindfolded s0      0.316 +/- 0.029    (joint 0.120 +/- 0.027)
+    learned, blindfolded s1      0.300 +/- 0.028    (joint 0.120 +/- 0.027)
+    random                       0.258 +/- 0.024    (joint 0.067 +/- 0.020)
+
+METHODOLOGY CHECK PASSED: greedy and random were scored in BOTH observation layouts and
+reproduced exactly (0.387 and 0.258 in each) -- which is what a correct seeding must give,
+since neither reads the observation, and precisely what the old code could not (0.145 vs
+0.100 on identical configs).
+
+THE CONFOUNDING CHANNEL IS WORTH +0.123 +/- 0.042 to the learned policy. That lifts it from
+clearly BELOW greedy (-0.08, about 2 SE) to LEVEL WITH greedy (+0.044 +/- 0.042, about 1
+SE -- not a win). A real improvement to the policy; not yet a win over the baseline.
+
+[CORRECTED] Earlier tonight I measured the statistical environment's greedy-minus-random
+span as 0.078 and called the environment "nearly policy-insensitive". That figure came from
+the confounded evaluation. The clean span is 0.129 +/- 0.038 (about 3.4 SE). The
+qualitative claim survives -- the deterministic environment spans 0.212 to 0.774 on the
+same metric, several times wider -- but the specific number was wrong and the environment
+has more room in it than I said.
+
+[CORRECTED] I also reported that supplying the belief channels "did not measurably help",
+on the strength of the deterministic arm alone (+0.020 +/- 0.038). That was true of that
+environment and false of the one that matters for the claim: in the deterministic
+environment the skeleton is fixed and directed frequencies proxy for the rest, so there is
+little for the channel to add. I should have waited for the statistical arm before
+characterising the fix at all.
