@@ -91,6 +91,15 @@ def main(argv=None) -> dict:
     row["seed"] = seed
     row["run"] = str(run_path)
     row["eval_episodes"] = args.episodes
+    # The settings that change what the number MEANS, carried with it. A stale result file
+    # from an earlier rung table is otherwise indistinguishable from a current one, and a
+    # report that averages the two is silently wrong -- which happened on 2026-08-26 when a
+    # killed local run left behind a `budget=6` arm beside `budget=10` ones.
+    row["config_fingerprint"] = {
+        k: report["config"][k] for k in
+        ("budget", "n_obs", "n_int", "rule", "turn_order", "action_modes", "prior_p",
+         "identify_threshold", "disclose_regime")}
+    row["topology"] = report["config"]["topology"]
 
     print(f"{report['arm']} / {args.arm:13s} success {row['success']:.3f} "
           f"CI {row['success_ci'][0]:.3f}-{row['success_ci'][1]:.3f}  "

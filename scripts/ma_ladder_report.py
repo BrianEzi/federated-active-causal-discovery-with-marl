@@ -79,6 +79,21 @@ def main() -> None:
 
         if not paired:
             continue
+
+        # REFUSE TO AVERAGE ACROSS CONFIGURATIONS. A stale file from an earlier rung table
+        # sits in the same directory and matches the same glob; averaging it in moves the
+        # number without moving anything visible. Older results predate the fingerprint, so
+        # a missing one is tolerated -- only a genuine DISAGREEMENT is fatal.
+        prints = {json.dumps(r["config_fingerprint"], sort_keys=True)
+                  for seed in seeds.values() for r in seed.values()
+                  if "config_fingerprint" in r}
+        if len(prints) > 1:
+            raise SystemExit(
+                f"{rung}: results span {len(prints)} different configurations, so they "
+                f"cannot be pooled. Delete the stale ones.
+  "
+                + "
+  ".join(sorted(prints)))
         n = len(paired)
         mean = float(np.mean(paired))
         low, high = bootstrap_ci(paired, seed=0)
