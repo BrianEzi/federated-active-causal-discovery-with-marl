@@ -282,8 +282,13 @@ class RandomAgent:
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
         window = env.windows[self.agent]
+        # Under `mode_by_role` the mode is not a choice -- it is fixed by the node's role --
+        # so `allow_clamp` has nothing to select on and the arm is "uniform over targets",
+        # which is the floor it was always meant to be. Filtering on mode there would
+        # return an empty candidate list.
         candidates = [i for i, (node, mode) in enumerate(window.actions)
-                      if node != -1 and (self.allow_clamp or mode == VARY)]
+                      if node != -1 and (self.allow_clamp or window.mode_by_role
+                                         or mode == VARY)]
         return int(self.rng.choice(candidates))
 
 
@@ -368,8 +373,7 @@ class UncertaintyGreedyAgent:
             return window.pass_index                     # nothing left worth a round
         candidates = [n for n, s in authority_scores.items() if s == best]
         node = int(self.rng.choice(candidates))
-        mode = VARY if VARY in window.modes else window.modes[0]
-        return window.actions.index((node, mode))
+        return window.action_index(node, prefer=VARY)
 
 
 class GreedyAgent:

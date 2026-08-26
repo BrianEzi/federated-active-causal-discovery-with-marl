@@ -21,7 +21,7 @@ from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
 from ma.policy import IndependentPPO, PPOConfig
-from ma.topology import Topology, two_agent
+from ma.topology import Topology, federated_topology, two_agent
 
 
 def _config_record(config, topology, args) -> dict:
@@ -51,6 +51,9 @@ def _config_record(config, topology, args) -> dict:
             "claim_penalty": config.claim_penalty,
             "per_agent_reward": config.per_agent_reward,
             "observe_belief_channels": config.observe_belief_channels,
+            "observe_partner_counts": config.observe_partner_counts,
+            "mode_by_role": config.mode_by_role,
+            "claims_require_all_types": config.claims_require_all_types,
             "topology": {"name": topology.name, "d": topology.d,
                          "private": [list(p) for p in topology.private],
                          "exposed": list(topology.exposed)},
@@ -144,6 +147,16 @@ def main(argv=None) -> dict:
                     help="show the policy its confounding and adjacency beliefs, not just "
                          "directed-edge frequencies (found 2026-08-26: without this the "
                          "learner cannot see the channel its reward is scored on)")
+    ap.add_argument("--observe_partner_counts", action="store_true",
+                    help="cumulative per-partner intervention counts (shared nodes by "
+                         "node, private ones as an unnamed total). Converts per-round "
+                         "disclosure the feedforward policy cannot retain into memory")
+    ap.add_argument("--mode_by_role", action="store_true",
+                    help="clamp on own private nodes, vary on shared ones; one action per "
+                         "node. Overrides --clamp_only/--vary_only")
+    ap.add_argument("--legacy_claim_exemption", action="store_true",
+                    help="restore the pre-2026-08-26 grading in which shared-block "
+                         "directions were not required. For reproduction only")
     ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn"])
     ap.add_argument("--cb_n_boot", type=int, default=12,
                     help="bootstrap replicates per refresh (constraint backend only)")
@@ -152,6 +165,16 @@ def main(argv=None) -> dict:
                     help="N agents with one private node each and three shared; overrides "
                          "--three_agents. The measured coordination headroom peaks near "
                          "N=4 for three shared nodes (docs/FINDINGS_2026_08_26.md).")
+    # PRIVATE SETS >= 2 (2026-08-26). Needed for two independent reasons: at ONE private
+    # node per agent the disclosure-privacy claim is empty (agent identity is node
+    # identity, so "I intervened privately" names the node), and the diversity story needs
+    # windows that are not all k=4. Cost ceiling: the version space enumerates
+    # 3^(edges in window), so k <= 6 is the usable range -- private_size 2 with 3 shared
+    # nodes is k=5, private_size 3 with 3 shared is k=6 and dense windows there are slow.
+    ap.add_argument("--private_size", type=int, default=1,
+                    help="private nodes per agent (with --n_agents)")
+    ap.add_argument("--n_shared", type=int, default=3,
+                    help="shared/exposed nodes (with --n_agents)")
     ap.add_argument("--three_agents", action="store_true",
                     help="rung 1: three agents, one private node each, three shared. "
                          "Runs ONLY on the constraint backend (widest_hidden = 2).")
@@ -190,9 +213,7 @@ def main(argv=None) -> dict:
     args = ap.parse_args(argv)
 
     if args.n_agents:
-        topology = Topology(name=f"T_{args.n_agents}agent_1each",
-                            private=tuple((i,) for i in range(args.n_agents)),
-                            exposed=tuple(range(args.n_agents, args.n_agents + 3)))
+        topology = federated_topology(args.n_agents, args.private_size, args.n_shared)
     elif args.three_agents:
         topology = Topology(name="T_3agent_1each",
                             private=((0,), (1,), (2,)), exposed=(3, 4, 5))
@@ -218,6 +239,9 @@ def main(argv=None) -> dict:
                        **({"claim_bar": args.claim_bar} if args.claim_bar else {}),
                        per_agent_reward=args.per_agent_reward,
                        observe_belief_channels=args.observe_belief_channels,
+                       observe_partner_counts=args.observe_partner_counts,
+                       mode_by_role=args.mode_by_role,
+                       claims_require_all_types=not args.legacy_claim_exemption,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
     env = TwoAgentEnv(config)

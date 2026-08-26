@@ -143,6 +143,27 @@ class MAConfig:
     # (81-91% of clamps on its own private node).
     # Pass `action_modes=MODES` to restore both. `tb_both` remains a live arm.
     action_modes: Tuple[str, ...] = (CLAMP,)
+    # MODE BY ROLE (2026-08-26): clamp on your own private nodes, vary on shared ones.
+    # Overrides `action_modes` entirely -- each node gets exactly ONE action, so the action
+    # space stays the size of the vary-only or clamp-only arms rather than doubling.
+    #
+    # WHY THIS PAIRING AND NOT THE OTHER. Identifiability depends on intervention TARGETS,
+    # not on the values assigned (Hauser & Buhlmann, JMLR 13, 2012 -- BIBLIOGRAPHY.md §19),
+    # so in the infinite-data limit clamp and vary are equally powerful and this flag is a
+    # FINITE-SAMPLE, ROLE-DEPENDENT choice, not an identifiability one. The two roles want
+    # opposite things:
+    #   - on a node you are trying to ORIENT FOR YOURSELF, you need variance left in it to
+    #     read the correlation channel, so VARY is the informative move -- a clamp gives
+    #     that node zero variance and its outgoing associations vanish along with the
+    #     confounding you were trying to detect.
+    #   - on a node HIDDEN FROM YOUR PARTNER (your private nodes), a clamp is the altruistic
+    #     move: it removes that variable's variance, so the confounded association it
+    #     induces in your partner's window DISAPPEARS. Varying it leaves the confounding in
+    #     place -- measured 2026-08-16: vary restores 0% of a confounded agent's
+    #     identification.
+    # Shared nodes are visible to everyone and are nobody's hidden confounder, so vary is
+    # right there; private nodes are exactly the hidden ones, so clamp is right there.
+    mode_by_role: bool = False
     identify_threshold: float = 0.7
     # None means "scale with d" -- `2 ln(d)/d`, the FULL-CONNECTIVITY threshold with an
     # empirical factor of two. See `ma.priors.connectivity_prior_p` for the measurement and
@@ -205,6 +226,27 @@ class MAConfig:
     # Found 2026-08-26 while diagnosing learned < greedy in the deterministic environment.
     # Off by default because it changes obs_size and voids old checkpoints.
     observe_belief_channels: bool = False
+    # CUMULATIVE PARTNER-INTERVENTION COUNTS (2026-08-26). Per (other agent x shared node),
+    # budget-normalised, plus one column per partner counting its PRIVATE interventions
+    # without saying which node.
+    #
+    # This discloses nothing new. Every shared target is already disclosed in the round it
+    # happens (`disclose_shared_targets`) and every private intervention already raises the
+    # PRIVATE_SIGNAL bit in the round it happens (`disclose_signals`). The policy is
+    # FEEDFORWARD, so a per-round disclosure it cannot retain is information the
+    # environment hands over and the agent structurally loses. This converts disclosure
+    # into MEMORY -- the same class of fix as the own-intervention counts, which was the
+    # last thing to unlock a result.
+    #
+    # The private column is also the handle for the clique case study: an agent that can
+    # count HOW MANY private interventions each partner has made can, in principle, tell
+    # which partner's hidden variables its own window responds to. Weakly identifiable at
+    # best, and named as further work rather than claimed.
+    # Off by default because it changes obs_size and voids old checkpoints.
+    observe_partner_counts: bool = False
+    # Grade every type claim, not only the private-incident ones. True since 2026-08-26 --
+    # the old exemption rested on a false claim about Markov equivalence. See cb/claims.py.
+    claims_require_all_types: bool = True
     claim_penalty: float = 1.0         # settled-wrong weight in the dense reward
     # WHICH ENGINE HOLDS THE BELIEF. "exact" is the Bayesian subset DP
     # (`crosscheck/belief_dp.py`); "constraint" is the bootstrap PC/FCI engine (`cb/`).
@@ -281,6 +323,8 @@ class AgentWindow:
                  modes: Sequence[str] = MODES, backend: str = EXACT,
                  cb_skeleton_alpha: Optional[float] = None,
                  observe_belief_channels: bool = False,
+                 observe_partner_counts: bool = False,
+                 mode_by_role: bool = False,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
@@ -291,12 +335,26 @@ class AgentWindow:
         self.private: List[int] = [n for n in self.nodes if n not in self.shared]
         self.k = len(self.nodes)
         self.pos = {node: i for i, node in enumerate(self.nodes)}
-        self.actions: List[Tuple[int, Optional[str]]] = (
-            [(node, mode) for node in self.authority for mode in self.modes]
-            + [(PASS_ACTION, None)])
+        self.mode_by_role = bool(mode_by_role)
+        if self.mode_by_role:
+            # One action per node, its mode fixed by the node's role. See
+            # MAConfig.mode_by_role for why this pairing and not the other.
+            self.actions: List[Tuple[int, Optional[str]]] = (
+                [(node, VARY if node in self.shared else CLAMP)
+                 for node in self.authority]
+                + [(PASS_ACTION, None)])
+            # The GNN wrapper refuses a multi-mode window because it has no mode head.
+            # Under this rule there is no mode CHOICE -- the mode is a function of the
+            # node -- so the window reports a single effective mode and the wrapper is
+            # satisfied without any silent averaging.
+            self.modes = ("by_role",)
+        else:
+            self.actions = ([(node, mode) for node in self.authority for mode in self.modes]
+                            + [(PASS_ACTION, None)])
         self.n_actions = len(self.actions)
         self.pass_index = self.n_actions - 1
         self._observe_channels = bool(observe_belief_channels)
+        self._observe_partner_counts = bool(observe_partner_counts)
         shared_positions = [self.pos[n] for n in self.shared]
         if backend == CONSTRAINT:
             # base_seed separates the agents' resample streams; deterministic in the agent
@@ -310,6 +368,24 @@ class AgentWindow:
             self.belief = VersionSpaceBackend(self.k, shared_positions)
         else:
             self.belief = WindowBeliefDP(self.k, shared_positions)
+
+    def action_index(self, node: int, prefer: Optional[str] = None) -> int:
+        """Index of the action targeting `node`, preferring mode `prefer` where it is free.
+
+        Exists because `mode_by_role` makes the mode a FUNCTION of the node, so a caller
+        that builds the key `(node, VARY)` and looks it up raises -- which is exactly what
+        two baselines did. Asking the window instead keeps every caller correct under any
+        mode rule, including ones added later.
+        """
+        for index, (candidate, mode) in enumerate(self.actions):
+            if candidate == node and (prefer is None or self.mode_by_role
+                                      or mode == prefer):
+                return index
+        # `prefer` was not available for this node: fall back to whatever is.
+        for index, (candidate, _mode) in enumerate(self.actions):
+            if candidate == node:
+                return index
+        raise ValueError(f"node {node} is not in agent {self.agent}'s action space")
 
     def induced(self, global_adjacency: np.ndarray) -> np.ndarray:
         """The global graph restricted to this window. Well defined precisely because
@@ -330,7 +406,12 @@ class AgentWindow:
                 # crosses the privacy boundary.
                 + self.k
                 # Bidirected + adjacency upper triangles (2026-08-26), when enabled.
-                + (self.k * (self.k - 1) if self._observe_channels else 0))
+                + (self.k * (self.k - 1) if self._observe_channels else 0)
+                # Cumulative partner counts (2026-08-26): per other agent, one column per
+                # SHARED node plus one for "private, node unspecified". See
+                # MAConfig.observe_partner_counts.
+                + (n_others * (len(self.shared) + 1)
+                   if self._observe_partner_counts else 0))
 
 
 class TwoAgentEnv:
@@ -412,6 +493,8 @@ class TwoAgentEnv:
                                cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha,
                                cb_skeleton_alpha=config.cb_skeleton_alpha,
                                observe_belief_channels=config.observe_belief_channels,
+                               observe_partner_counts=config.observe_partner_counts,
+                               mode_by_role=config.mode_by_role,
                                cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)
@@ -458,11 +541,17 @@ class TwoAgentEnv:
         self.regime_bit: Dict[int, float] = {}
         n_others = self.topology.n_agents - 1
         self.own_counts: Dict[int, np.ndarray] = {}
+        # [n_others, n_shared + 1] per agent: how many times each PARTNER has intervened on
+        # each shared node, and (last column) on a private node of its own. Cumulative over
+        # the episode -- the memory the feedforward policy cannot keep for itself.
+        self.partner_counts: Dict[int, np.ndarray] = {}
         for agent, window in self.windows.items():
             self.known[agent] = np.zeros((cfg.n_obs, window.k))
             self.clean[agent] = np.zeros(cfg.n_obs, dtype=float)
             self.hidden_intervened[agent] = np.zeros(cfg.n_obs, dtype=bool)
             self.own_counts[agent] = np.zeros(window.k, dtype=float)
+            self.partner_counts[agent] = np.zeros((n_others, len(window.shared) + 1),
+                                                  dtype=float)
             self.n_interventions[agent] = 0
             self.disclosed[agent] = np.zeros(n_others * len(window.shared))
             self.regime_bit[agent] = 0.0
@@ -500,6 +589,18 @@ class TwoAgentEnv:
         # fraction cannot tell those apart, so it cannot measure altruism.
         self.clamps_private: Dict[int, int] = {a: 0 for a in self.topology.agents}
         self.clamps_shared: Dict[int, int] = {a: 0 for a in self.topology.agents}
+        # BEHAVIOURAL COORDINATION METRIC (2026-08-26). How many interventions landed on
+        # each shared node, by anyone. Duplicate coverage -- two agents spending rounds on
+        # the same shared node -- is the failure a coordinating policy avoids, and it is
+        # measurable WITHOUT the belief engine, so it transfers across environments where
+        # the identification rate does not. That is the point: it separates "the policy
+        # stopped coordinating" from "coordination stopped paying".
+        self.shared_touches: Dict[int, int] = {n: 0 for n in self.topology.exposed}
+        # ROUNDS TO IDENTIFICATION, per agent. `None` until the window is identified; then
+        # the round it first happened. Censored at the budget when it never does. A
+        # continuous metric with a true zero, against the binary rate's 1-bit-per-episode.
+        self.identified_round: Dict[int, Optional[int]] = {
+            a: None for a in self.topology.agents}
         self.signals: Dict[int, str] = {a: NO_INTERVENTION for a in self.topology.agents}
         self.done_bit: Dict[int, float] = {a: 0.0 for a in self.topology.agents}
         self.connected = _is_connected(self.true_adjacency)
@@ -642,14 +743,24 @@ class TwoAgentEnv:
 
             # Concatenate disclosed shared target vectors for all other partners in canonical order.
             disclosed_blocks = []
-            for other in self.topology.agents:
-                if other == agent:
-                    continue
+            for slot, other in enumerate(o for o in self.topology.agents if o != agent):
                 other_block = np.zeros(len(window.shared))
                 other_node, _ = chosen[other]
                 if cfg.disclose_shared_targets and other_node in window.shared:
                     other_block[window.shared.index(other_node)] = 1.0
                 disclosed_blocks.append(other_block)
+                # The cumulative version of the same two disclosures, and of nothing else:
+                # a shared target under `disclose_shared_targets`, a private intervention
+                # under `disclose_signals` (which already broadcasts PRIVATE_SIGNAL), with
+                # the node deliberately unnamed.
+                if other_node == PASS_ACTION:
+                    continue
+                if other_node in window.shared:
+                    if cfg.disclose_shared_targets:
+                        self.partner_counts[agent][slot,
+                                                   window.shared.index(other_node)] += 1.0
+                elif cfg.disclose_signals:
+                    self.partner_counts[agent][slot, -1] += 1.0
             self.disclosed[agent] = (np.concatenate(disclosed_blocks)
                                      if disclosed_blocks
                                      else np.zeros(0))
@@ -694,6 +805,8 @@ class TwoAgentEnv:
                 self.forfeits[agent] += 1
                 continue
             self.n_interventions[agent] += 1
+            if node in self.shared_touches:
+                self.shared_touches[node] += 1
             if mode == CLAMP:
                 if node in self.windows[agent].shared:
                     self.clamps_shared[agent] += 1
@@ -917,7 +1030,20 @@ class TwoAgentEnv:
                                self.own_counts[agent] / max(self.config.budget, 1),
                                # Confounding and adjacency beliefs, upper triangles. Both
                                # already live on [0, 1]. See `observe_belief_channels`.
-                               self._belief_channels(agent)])
+                               self._belief_channels(agent),
+                               # Cumulative partner counts, same normalisation as own
+                               # counts. See `observe_partner_counts`.
+                               self._partner_counts(agent)])
+
+    def _partner_counts(self, agent: int) -> np.ndarray:
+        """Cumulative per-partner counts, flattened, or an empty array.
+
+        Budget-normalised for the same reason the own-counts are: a raw count next to
+        probabilities in [0, 1] once dominated the first layer.
+        """
+        if not self.config.observe_partner_counts:
+            return np.zeros(0)
+        return (self.partner_counts[agent] / max(self.config.budget, 1)).reshape(-1)
 
     def _belief_channels(self, agent: int) -> np.ndarray:
         """Bidirected and adjacency frequencies, upper triangle, or an empty array.
@@ -947,7 +1073,8 @@ class TwoAgentEnv:
             for agent, window in self.windows.items():
                 scores[agent] = score_window(
                     window.belief.last, self._true_mag(agent),
-                    [window.pos[n] for n in window.private], bar=cfg.claim_bar)
+                    [window.pos[n] for n in window.private], bar=cfg.claim_bar,
+                    require_all_types=cfg.claims_require_all_types)
             identified = {a: scores[a].identified for a in self.topology.agents}
             all_identified = all(identified.values())
             mass = {a: scores[a].fraction(cfg.claim_penalty)
@@ -984,6 +1111,13 @@ class TwoAgentEnv:
             mass = {a: self.true_mass(a) for a in self.topology.agents}
             identified = {a: mass[a] >= threshold for a in self.topology.agents}
             all_identified = all(identified.values())
+        # First round at which each window became identified. Latched: a window that comes
+        # undone later keeps the round it was first settled, because the metric being
+        # reported is "how many experiments did it take", not "was it still true at the end"
+        # -- the identification rate already answers the second.
+        for a in self.topology.agents:
+            if self.identified_round[a] is None and identified[a]:
+                self.identified_round[a] = self.rounds_used
         # The SHARED pool is what ends an episode, together with joint success. Declining
         # never ends it -- see docs/TURN_BUDGET_SPEC.md section 4.
         out_of_budget = self.rounds_used >= self.config.budget
@@ -1009,6 +1143,10 @@ class TwoAgentEnv:
                   "clamps_shared": dict(self.clamps_shared),
                   "signals": dict(self.signals),
                   "done_bit": dict(self.done_bit),
+                  # See the notes on these two in `reset`.
+                  "shared_touches": dict(self.shared_touches),
+                  "duplicate_coverage": self.duplicate_coverage(),
+                  "identified_round": dict(self.identified_round),
                   "connected": bool(self.connected),
                   "mix_draws": self.mix_draws,
                   "rounds_used": self.rounds_used,
@@ -1019,6 +1157,43 @@ class TwoAgentEnv:
                   "budget_left": {a: self.config.budget - self.n_interventions[a]
                                   for a in self.topology.agents}},
         )
+
+    # -- behavioural metrics --------------------------------------------------------------
+
+    def duplicate_coverage(self) -> float:
+        """Fraction of shared-node interventions that landed on an already-covered node.
+
+        `(spent - distinct) / spent` over the episode so far, on shared nodes only: with
+        `spent` interventions covering `distinct` nodes, every intervention past the first
+        on a node is a round that bought nothing a partner had not already bought. Zero when
+        agents divide the shared surface perfectly; 1 - 1/spent when they all pile onto one
+        node. Undefined (0.0) before any shared intervention.
+
+        DELIBERATELY BELIEF-FREE. It reads only what agents DID, so the same number means
+        the same thing in the deterministic and the statistical environments -- which is
+        what makes it usable as a transfer diagnostic when the identification rate is not
+        comparable across them. It is a NECESSARY condition for coordination, not a
+        sufficient one: a policy can divide the shared nodes perfectly and still choose the
+        wrong ones.
+        """
+        spent = sum(self.shared_touches.values())
+        if spent == 0:
+            return 0.0
+        distinct = sum(1 for count in self.shared_touches.values() if count > 0)
+        return float((spent - distinct) / spent)
+
+    def rounds_to_identification(self, censor: Optional[int] = None) -> Dict[int, int]:
+        """Per agent, the round its window was first identified; `censor` if it never was.
+
+        Right-censored rather than dropped: excluding the failures would report the mean
+        over the episodes a policy happened to solve, which rewards a policy that solves
+        few and easy ones. `censor` defaults to `budget + 1` -- one worse than using the
+        entire budget, which is the honest ordering ("did not finish" is worse than
+        "finished on the last round") without pretending to know how much worse.
+        """
+        limit = self.config.budget + 1 if censor is None else int(censor)
+        return {a: (limit if self.identified_round[a] is None else self.identified_round[a])
+                for a in self.topology.agents}
 
     # -- convenience --------------------------------------------------------------------
 

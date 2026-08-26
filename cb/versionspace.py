@@ -102,17 +102,36 @@ def valid_mag(marks, k):
     return directed, bidirected, anc
 
 
+def _structure(marks, k):
+    """(directed, bidirected, ancestors, adjacency) for a valid MAG, or None.
+
+    Split out of `m_separated` because the equivalence-class search asks ~80 separation
+    questions of the SAME candidate, and recomputing the transitive closure (O(k^3)) once
+    per question was most of the cost of building a k=5 or k=6 version space.
+    """
+    parts = valid_mag(marks, k)
+    if parts is None:
+        return None
+    directed, bidirected, anc = parts
+    adjacency = [[False] * k for _ in range(k)]
+    for (u, v), m in zip(pairs(k), marks):
+        if m != NONE:
+            adjacency[u][v] = adjacency[v][u] = True
+    return directed, bidirected, anc, adjacency
+
+
 def m_separated(marks, k, x, y, cond) -> bool:
     """m-separation: every path between x and y is blocked given `cond`.
 
     A path is m-connecting iff every intermediate node is either a COLLIDER that is in
     `cond` or has a descendant there, or a NON-COLLIDER outside `cond`.
     """
-    directed, bidirected, anc = valid_mag(marks, k)
-    adjacency = [[False] * k for _ in range(k)]
-    for (u, v), m in zip(pairs(k), marks):
-        if m != NONE:
-            adjacency[u][v] = adjacency[v][u] = True
+    return _m_separated(_structure(marks, k), k, x, y, cond)
+
+
+def _m_separated(structure, k, x, y, cond) -> bool:
+    """`m_separated` against a prebuilt `_structure`."""
+    directed, bidirected, anc, adjacency = structure
 
     def arrow_into(a, b):
         return (a, b) in directed or (a, b) in bidirected or (b, a) in bidirected
@@ -158,7 +177,8 @@ def equivalence_class(true_marks, k):
     equivalent MAGs share adjacencies, and which is what makes larger windows tractable.
     """
     queries = separation_queries(k)
-    target = tuple(m_separated(true_marks, k, x, y, cond) for x, y, cond in queries)
+    truth_structure = _structure(true_marks, k)
+    target = tuple(_m_separated(truth_structure, k, x, y, cond) for x, y, cond in queries)
     slots = [i for i, m in enumerate(true_marks) if m != NONE]
     members = []
     for assignment in product((FWD, BACK, BI), repeat=len(slots)):
@@ -166,9 +186,12 @@ def equivalence_class(true_marks, k):
         for slot, mark in zip(slots, assignment):
             marks[slot] = mark
         marks = tuple(marks)
-        if valid_mag(marks, k) is None:
+        structure = _structure(marks, k)
+        if structure is None:
             continue
-        if all(m_separated(marks, k, x, y, cond) == value
+        # Queries are ordered smallest conditioning set first, so a candidate that differs
+        # from the truth usually dies on one of the cheap ones.
+        if all(_m_separated(structure, k, x, y, cond) == value
                for value, (x, y, cond) in zip(target, queries)):
             members.append(marks)
     return tuple(members)
@@ -247,10 +270,24 @@ class VersionSpaceBackend:
         self.truth: Optional[tuple] = None
         self.last: Optional[VersionSpaceBelief] = None
         self._space: tuple = ()
+        # Reveal signature of every candidate, [candidate][node], computed once per episode.
+        # `reveal` runs the transitive closure, and it was being run once per candidate per
+        # intervened node on EVERY belief refresh -- the dominant cost of a long episode.
+        self._signatures: tuple = ()
+        self._truth_signature: tuple = ()
+        self._current: tuple = ()
+        self._current_signatures: tuple = ()
+        self._applied: frozenset = frozenset()
 
     def reset(self, true_mag: np.ndarray) -> None:
         self.truth = marks_from_mag(true_mag)
         self._space = equivalence_class(self.truth, self.k)
+        self._signatures = tuple(tuple(reveal(m, self.k, x) for x in range(self.k))
+                                 for m in self._space)
+        self._truth_signature = tuple(reveal(self.truth, self.k, x) for x in range(self.k))
+        self._current = self._space
+        self._current_signatures = self._signatures
+        self._applied = frozenset()
         self.last = VersionSpaceBelief(self._space, self.k)
 
     def edge_marginals(self, data, known_intervened, told=None, score_rule=None,
@@ -259,16 +296,31 @@ class VersionSpaceBackend:
 
         `data` is ignored -- that is the whole point. Only the intervention MASK matters,
         because with infinite data the values add nothing the mask does not already imply.
+
+        INCREMENTAL, and exact because it can be: pruning by a node is monotone (survivors
+        only leave), idempotent (a second intervention on the same node removes nobody) and
+        commutative (each candidate is tested against the truth independently, so order
+        cannot matter). So carrying the pruned space forward and applying only the NEWLY
+        intervened nodes gives the same set as re-pruning from the start. A mask that
+        shrinks -- which only happens if a caller reuses the backend across episodes without
+        `reset` -- falls back to a rebuild rather than silently returning a stale subset.
         """
         if self.truth is None:
             raise RuntimeError("VersionSpaceBackend.reset(true_mag) must be called first")
         mask = np.asarray(known_intervened) > 0.5
-        intervened = [x for x in range(self.k) if mask[:, x].any()]
-        space = self._space
-        for x in intervened:
-            truth_reveal = reveal(self.truth, self.k, x)
-            space = tuple(m for m in space if reveal(m, self.k, x) == truth_reveal)
-        self.last = VersionSpaceBelief(space, self.k)
+        intervened = frozenset(x for x in range(self.k) if mask[:, x].any())
+        if not intervened >= self._applied:
+            self._current, self._current_signatures = self._space, self._signatures
+            self._applied = frozenset()
+        fresh = intervened - self._applied
+        if fresh or self.last is None:
+            if fresh:
+                keep = [i for i, signature in enumerate(self._current_signatures)
+                        if all(signature[x] == self._truth_signature[x] for x in fresh)]
+                self._current = tuple(self._current[i] for i in keep)
+                self._current_signatures = tuple(self._current_signatures[i] for i in keep)
+                self._applied = intervened
+            self.last = VersionSpaceBelief(self._current, self.k)
         return self.last.directed
 
     def credit_fraction(self, true_mag: np.ndarray, required_positions: Sequence[int] = (),

@@ -180,8 +180,17 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         # unconditional silently broke every checkpoint trained before the channels
         # existed (caught 2026-08-26 when the baselines would not load back).
         self._channels = bool(getattr(window, "_observe_channels", False))
+        # +3 for the cumulative partner counts, when the environment supplies them: two
+        # PER-NODE (how many partner interventions this shared node has absorbed, and how
+        # many DISTINCT partners have touched it -- "twice by one agent" and "once by each
+        # of two" are different coordination states and a single sum cannot tell them
+        # apart) and one GLOBAL (how much private work partners have done in total, which
+        # is not attached to any node this agent can see). Same conditional-width rule as
+        # the belief channels: making it unconditional voids every earlier checkpoint.
+        self._partner_counts = bool(getattr(window, "_observe_partner_counts", False))
         self._extra = (2 + 1 + 1 + self.n_others * len(SIGNALS) + 1
-                       + (2 if self._channels else 0))
+                       + (2 if self._channels else 0)
+                       + (3 if self._partner_counts else 0))
         edge_hidden = max(hidden // 4, 8)
         self.node_encoder = nn.Sequential(
             nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
@@ -204,8 +213,12 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         i += k
         # Bidirected + adjacency upper triangles, when the environment supplies them
         # (`observe_belief_channels`). Empty otherwise, so the old layout still parses.
-        channels = obs[:, i:]
-        return core, disclosed, regime, signals, counts, channels
+        width = k * (k - 1) if self._channels else 0
+        channels = obs[:, i:i + width]
+        i += width
+        # Cumulative partner counts, [n_others, n_shared + 1] flattened. Empty otherwise.
+        partner = obs[:, i:]
+        return core, disclosed, regime, signals, counts, channels, partner
 
     def forward(self, obs: torch.Tensor):
         single = obs.dim() == 1
@@ -213,7 +226,7 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             obs = obs.unsqueeze(0)
         batch, k = obs.shape[0], self.d
 
-        core, disclosed, regime, signals, counts, channels = self._split(obs)
+        core, disclosed, regime, signals, counts, channels, partner = self._split(obs)
         base = self._node_features(core)                    # parent path, verbatim modules
 
         per_node_disclosed = torch.zeros(batch, k, 1, dtype=obs.dtype, device=obs.device)
@@ -240,6 +253,23 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
                 dense[:, cols, rows] = block
                 per_node_channels[:, :, offset] = dense.sum(dim=2) / max(k - 1, 1)
 
+        # Cumulative partner history. The per-node pair goes to the shared nodes it is
+        # about; the private total is global, because the agent is told THAT partners
+        # worked privately and never WHERE, so there is no node to attach it to.
+        per_node_partner = torch.zeros(batch, k, 2 if self._partner_counts else 0,
+                                       dtype=obs.dtype, device=obs.device)
+        partner_private = torch.zeros(batch, 1 if self._partner_counts else 0,
+                                      dtype=obs.dtype, device=obs.device)
+        if self._partner_counts and self.n_others and partner.shape[-1]:
+            table = partner.view(batch, self.n_others, self.n_shared + 1)
+            shared_table = table[:, :, :self.n_shared]
+            total = shared_table.sum(dim=1)                       # [b, n_shared]
+            distinct = (shared_table > 0).to(obs.dtype).sum(dim=1)
+            for s_index, pos in enumerate(self.shared_positions):
+                per_node_partner[:, pos, 0] = total[:, s_index]
+                per_node_partner[:, pos, 1] = distinct[:, s_index] / max(self.n_others, 1)
+            partner_private[:, 0] = table[:, :, -1].sum(dim=1)
+
         extras = torch.cat([
             self.role.unsqueeze(0).expand(batch, k, 2),
             per_node_disclosed,
@@ -247,6 +277,8 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
             signals.unsqueeze(1).expand(batch, k, signals.shape[-1]),
             counts.unsqueeze(-1),
             per_node_channels,
+            per_node_partner,
+            partner_private.unsqueeze(1).expand(batch, k, partner_private.shape[-1]),
         ], dim=-1)
 
         embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
@@ -498,6 +530,16 @@ class IndependentPPO:
             "disclose_regime": self.env.config.disclose_regime,
             "policy_arch": getattr(self.env.config, "policy_arch", "mlp"),
             "belief_backend": getattr(self.env.config, "belief_backend", "exact"),
+            # Provenance only -- `obs_size` already refuses a mismatched environment. These
+            # are here so a checkpoint can SAY what it was trained with rather than leaving
+            # it to be inferred from a width.
+            "observe_belief_channels": getattr(
+                self.env.config, "observe_belief_channels", False),
+            "observe_partner_counts": getattr(
+                self.env.config, "observe_partner_counts", False),
+            "mode_by_role": getattr(self.env.config, "mode_by_role", False),
+            "claims_require_all_types": getattr(
+                self.env.config, "claims_require_all_types", True),
         }, path)
 
     @classmethod

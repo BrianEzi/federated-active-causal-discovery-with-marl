@@ -93,11 +93,14 @@ def _outcome(freq_correct: float, freq_wrong: float, bar: float):
 
 
 def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
-                     bar: float = 0.7):
+                     bar: float = 0.7, require_all_types: bool = True):
     """Every claim in one window, with its outcome and the frequencies behind it.
 
     `score_window` is a tally over exactly this list -- the two cannot disagree because
     the second is defined in terms of the first.
+
+    `require_all_types` (default since 2026-08-26) makes EVERY type claim required, not
+    only the private-incident ones. See the note in `score_window`.
     """
     mag = np.asarray(true_mag)
     k = mag.shape[0]
@@ -129,12 +132,12 @@ def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[i
         elif mag[u, v] == MAG_DIRECTED:
             correct = float(directed[u, v])
             wrong = max(float(directed[v, u]), f_bi)
-            required = u in private or v in private
+            required = require_all_types or u in private or v in private
             truth = "directed"
         else:                              # mag[v, u] == MAG_DIRECTED
             correct = float(directed[v, u])
             wrong = max(float(directed[u, v]), f_bi)
-            required = u in private or v in private
+            required = require_all_types or u in private or v in private
             truth = "reverse directed"
         claims.append(Claim("type", u, v, required,
                             _outcome(correct, wrong, bar), truth, correct, wrong))
@@ -142,19 +145,32 @@ def enumerate_claims(belief, true_mag: np.ndarray, private_positions: Sequence[i
 
 
 def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
-                 bar: float = 0.7) -> ClaimScore:
+                 bar: float = 0.7, require_all_types: bool = True) -> ClaimScore:
     """Score one window's belief against its true MAG.
 
     `belief` is a `BootstrapBelief` (needs `.adjacency`, `.directed`, `.bidirected`
     frequency matrices). `bar` is the confidence bar per claim -- 0.7, matching the
     identify threshold's meaning of "confident", NOT a bare majority.
 
-    REQUIRED claims (the identification set, mirroring [U14]): every adjacency claim,
-    every confounding type claim, and the type claim of every private-incident directed
-    edge. A shared-block directed edge may stay unsure without blocking identification --
-    Markov equivalence leaves such edges unorientable for want of information.
+    REQUIRED claims (the identification set, mirroring [U14]): every adjacency claim and
+    every type claim. Identification therefore means "recovered the window".
+
+    THE EXEMPTION THAT USED TO LIVE HERE, and why it is gone (2026-08-26). Shared-block
+    directed edges were exempt, on the stated ground that "Markov equivalence leaves such
+    edges unorientable". THAT WAS WRONG, and it was wrong in a way that made the task
+    easier than it should be. Markov equivalence constrains what OBSERVATION can settle;
+    the interventional reveal channel is pairwise ancestry, so for an adjacent pair,
+    u -> v iff u is an ancestor of v, v -> u iff the reverse, and u <-> v iff neither.
+    Intervening on BOTH endpoints therefore fixes the mark outright, with no residual
+    ambiguity, and intervening on every node determines the window completely. The
+    exemption was a GRADING CHOICE dressed as a necessity, and it shrank precisely the
+    part of the problem coordination can win -- shared nodes are the contended surface.
+
+    `require_all_types=False` restores the old grading, for reproducing pre-2026-08-26
+    numbers only. Any comparison must hold it fixed across arms.
     """
-    claims = enumerate_claims(belief, true_mag, private_positions, bar)
+    claims = enumerate_claims(belief, true_mag, private_positions, bar,
+                              require_all_types=require_all_types)
     n_right = sum(c.outcome == "right" for c in claims)
     n_wrong = sum(c.outcome == "wrong" for c in claims)
     n_unsure = sum(c.outcome == "unsure" for c in claims)

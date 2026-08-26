@@ -112,8 +112,12 @@ def test_checkpoints_round_trip_under_both_observation_layouts():
 
     from ma.policy import IndependentPPO, PPOConfig
 
-    for channels in (False, True):
-        env = _env(observe_belief_channels=channels, policy_arch="gnn")
+    # Every combination of the two width-changing flags, because the encoder slices the
+    # observation positionally: a checkpoint with channels ON and counts OFF must not be
+    # readable by a net that expects the other layout, and each layout must round-trip.
+    for channels, counts in ((False, False), (True, False), (False, True), (True, True)):
+        env = _env(observe_belief_channels=channels, observe_partner_counts=counts,
+                   policy_arch="gnn")
         learner = IndependentPPO(env, PPOConfig(total_episodes=1, episodes_per_update=1))
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "policy.pt"

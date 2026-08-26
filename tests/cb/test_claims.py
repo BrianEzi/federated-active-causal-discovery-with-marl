@@ -69,17 +69,31 @@ def test_settled_wrong_is_punished_and_vetoes_identification():
     assert not s.identified
 
 
-def test_shared_directed_edges_may_stay_unsure_without_blocking():
-    """Markov equivalence: a shared-block direction is not required, only confounding
-    and private-incident directions are."""
+def test_every_type_claim_is_required_by_default():
+    """A shared-block direction left unsure BLOCKS identification (2026-08-26).
+
+    This test previously asserted the opposite, on the ground that "Markov equivalence
+    leaves such edges unorientable". That was wrong: Markov equivalence constrains
+    OBSERVATION, and the interventional reveal channel is pairwise ancestry, so
+    intervening on both endpoints of an adjacent pair fixes its mark outright. The
+    exemption was a grading choice, and it exempted precisely the contended surface that
+    coordination exists to divide. `require_all_types=False` keeps the old grading
+    available for reproducing pre-2026-08-26 numbers.
+    """
     mag = np.zeros((3, 3), dtype=np.int8)
     mag[1, 2] = MD                                     # edge between two non-private
     adjacency = np.zeros((3, 3)); adjacency[1, 2] = adjacency[2, 1] = 1.0
-    directed = np.zeros((3, 3)); directed[1, 2] = 0.4  # unsure, but not required
-    s = score_window(_belief(adjacency, directed, np.zeros((3, 3))), mag,
-                     private_positions=[0])
-    assert s.n_unsure == 1
-    assert s.identified
+    directed = np.zeros((3, 3)); directed[1, 2] = 0.4  # unsure
+    belief = _belief(adjacency, directed, np.zeros((3, 3)))
+
+    strict = score_window(belief, mag, private_positions=[0])
+    assert strict.n_unsure == 1
+    assert strict.required_total == 4                  # 3 adjacency + 1 type
+    assert not strict.identified
+
+    legacy = score_window(belief, mag, private_positions=[0], require_all_types=False)
+    assert legacy.required_total == 3                  # the type claim is exempt
+    assert legacy.identified
 
 
 # -- episode mix --------------------------------------------------------------------

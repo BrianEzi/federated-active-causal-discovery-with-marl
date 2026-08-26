@@ -184,6 +184,29 @@ def two_agent(name: str, a_private: Sequence[int], b_private: Sequence[int],
                     exposed_have_no_private_parents=exposed_have_no_private_parents)
 
 
+def federated_topology(n_agents: int, private_size: int = 1, n_shared: int = 3) -> Topology:
+    """`n_agents` with `private_size` private nodes each, over `n_shared` shared ones.
+
+    THE ONE PLACE this family is built. It was written out inline in four scripts, each
+    hard-coding one private node per agent and three shared -- so "scale the private set"
+    meant editing four call sites in step, and a topology named `T_4agent_1each` while
+    carrying two private nodes each is exactly the kind of quiet mislabelling that makes a
+    results file unreadable a week later. The name is derived, so it cannot drift.
+
+    Window size is `private_size + n_shared`, and that is what the version space costs
+    3^(edges) in -- not `d`. See `cb/versionspace.py`: k <= 6 is the usable range.
+    """
+    if n_agents < 1 or private_size < 1 or n_shared < 1:
+        raise ValueError(f"federated_topology({n_agents}, {private_size}, {n_shared}): "
+                         f"all three must be at least 1")
+    private = tuple(tuple(range(i * private_size, (i + 1) * private_size))
+                    for i in range(n_agents))
+    base = n_agents * private_size
+    return Topology(name=f"T_{n_agents}agent_{private_size}each_{n_shared}shared",
+                    private=private,
+                    exposed=tuple(range(base, base + n_shared)))
+
+
 # The three candidates compared in block 5. T1 is the agreed default; T2 widens the
 # boundary; T3 exists to test whether removing latent confounding by construction is worth
 # what it costs.
