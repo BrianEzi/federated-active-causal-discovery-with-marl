@@ -175,10 +175,13 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         # role(2) + disclosed-count(1) + regime(1) + partner signals (global broadcast)
         # + own-intervention count (1, per node -- the "what have I already done" input
         # without which "touch each node once" is unlearnable; added 2026-08-25).
-        # +2 for the per-node confounding/adjacency aggregates. Always present in the
-        # encoder's width: when the environment does not supply the channels they arrive as
-        # zeros, so one architecture reads both observation layouts.
-        self._extra = 2 + 1 + 1 + self.n_others * len(SIGNALS) + 1 + 2
+        # +2 for the per-node confounding/adjacency aggregates, ONLY when the window's
+        # environment supplies them. The width has to follow the observation: making it
+        # unconditional silently broke every checkpoint trained before the channels
+        # existed (caught 2026-08-26 when the baselines would not load back).
+        self._channels = bool(getattr(window, "_observe_channels", False))
+        self._extra = (2 + 1 + 1 + self.n_others * len(SIGNALS) + 1
+                       + (2 if self._channels else 0))
         edge_hidden = max(hidden // 4, 8)
         self.node_encoder = nn.Sequential(
             nn.Linear(2 * edge_hidden + 1 + self._extra, hidden), nn.Tanh(),
@@ -226,8 +229,9 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         # adjacency, this node's pairs carry. Aggregating rather than flattening keeps the
         # encoder permutation-equivariant within roles, which is the whole reason the GNN
         # is here -- a flat 12-vector would tie parameters to node indices.
-        per_node_channels = torch.zeros(batch, k, 2, dtype=obs.dtype, device=obs.device)
-        if channels.shape[-1] == k * (k - 1):
+        per_node_channels = torch.zeros(batch, k, 2 if self._channels else 0,
+                                        dtype=obs.dtype, device=obs.device)
+        if self._channels and channels.shape[-1] == k * (k - 1):
             half = k * (k - 1) // 2
             rows, cols = torch.triu_indices(k, k, offset=1)
             for offset, block in enumerate((channels[:, :half], channels[:, half:])):
