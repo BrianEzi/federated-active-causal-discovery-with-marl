@@ -2859,3 +2859,81 @@ interventional and budget side.
    Cooperation buys honesty, not accuracy.
 2. **The interventional ceiling.** A modification of `scripts/ma_structural_ceiling.py` to
    interventional d-separation, not new machinery.
+
+---
+
+## 2026-08-25/26 — scaling the exact Bayesian engine to 5 agents / 30 nodes
+
+Branch `feat/disclosure`. Goal set by the student: get the Bayesian engine working and
+scaling, and get agents beating baselines at 2, 3 and 5 agents with more variables each.
+
+### [MEASURED] Where the cost actually was
+
+Cost of one belief update is `n_assignments(|X|) x DP_cost(k)` — two exponentials that
+multiply. Measured before touching anything:
+
+- `sa/dp.py`'s `log_partition_table` and `log_backward` were **O(3^k) scalar Python**.
+  Clean factor of 27 per +3 nodes: 0.102s / 2.955s / 105.9s at k = 9 / 12 / 15.
+- Assignments = number of DAGs over the shared set: 3, 25, 543, **29281** at |X| = 5.
+
+### [MEASURED] The existing prune works, and had never been checked
+
+`NEGLIGIBLE_WEIGHT`'s own comment said its |X| = 4 saving "is an expectation and has NOT
+been measured". On real SCM draws, five seeds: 543 assignments -> 21-29 survive, and the
+top 27 hold >= 99.9% of the mass. Run on `rng.normal` it would have reported the opposite —
+structureless data gives a flat posterior and nothing prunes. `scripts/ma_disclosure_scaling.py`
+uses `rng.normal`, so its timings are an upper bound rather than an estimate.
+
+### [CORRECTED] I aimed the first fix at the wrong pass
+
+The prune already removes ~95% of the *marginals* work. What it cannot avoid is computing
+`log_partition` for every assignment in order to know what to prune. That z-pass was 3.49s
+of an 8.9s update at k=8/|X|=4. My earlier "7.2 hours per belief update at k=10/|X|=5" was
+wrong for the same reason — it priced the marginals pass at full cost. Corrected: ~1 hour.
+
+### [DECIDED] The guard was blocking the ladder over a branch it never enters
+
+`ma/env.py` refused any topology hiding >1 node from an agent. The unsound path is the
+`0 < f < 1` mixture, reachable only when `disclose_regime` is on; otherwise `clean` is all
+zeros, `f` is exactly 0.0, and the score is exact at any number of hidden nodes. Narrowed
+to `widest_hidden > 1 AND disclose_regime`. Three- and five-agent topologies ran the same
+day.
+
+### [MEASURED] Three optimisations, all gated on exact equivalence
+
+1. **Level-batched DP.** The obvious inversion (one numpy call per subset) measured 1.5x
+   and was SLOWER than the scalar loop below k=11 — `2^d` calls on arrays averaging `1.5^d`
+   entries is almost pure overhead. Batching by popcount level makes each level one
+   rectangular block, `O(d^2)` calls instead of `2^d`. 20-30x on partition, ~10x on
+   marginals. Signs exactly equal, magnitudes to 1e-11.
+2. **The assignment screen.** Rank pair-states by an additive surrogate costing
+   `1 + 2*n_pairs` partition calls, keep the best 64, score those exactly. At k=8/|X|=4:
+   99.88% of mass kept (min 99.66%), max marginal error 3.3e-3. Rank recall stays ~1.0 even
+   where mass is low, so the surrogate is not misranking — `keep` is the dial. Swept:
+   16 -> 97.5%, 32 -> 99.2%, 64 -> 99.9%.
+3. **Batched BGe table + batched backward scatter.** Both found by cProfile, neither in the
+   recurrence this branch had been optimising. Bit-identical (max difference exactly 0.0).
+
+### [MEASURED] The metric cost more than the belief
+
+cProfile of one five-agent episode at |X| = 5: **46% of runtime in `credit_candidates`**,
+which enumerated all 29281 DAGs on the shared set. Markov equivalent graphs share a
+skeleton and the private-incident edges are already pinned, so only ORIENTATIONS of the
+truth's shared-shared skeleton can qualify — `2^m`, at most 1024. Exact, not a heuristic;
+verified byte-identical over 6 seeds x {2,3,5} agents.
+
+### [MEASURED] Ladder wall-clock, seconds/episode at budget 8
+
+    d       5     6     8      9     10     15     20      25      30
+    start  --    --    --     --     --     --     --      --      --     (guard refused 3+ agents)
+    mid   1.76  3.12  4.74  22.77  37.18  55.76  90.86  129.83  234.89
+    now   0.85  1.36  2.10   9.91  14.19  21.72  36.13   65.53  146.50
+
+### [PENDING] Training
+
+45 train + 180 eval tasks on Myriad (arrays 212906, 212907). Eval is split per arm because
+at the top rungs four inline arms cost more wall-clock than the training that produced
+them. Rung 8 (5 agents, 30 nodes) gets 500 training episodes and is the thinnest on the
+ladder — read it with that in mind. No result yet; `scripts/ma_ladder_report.py` reads them
+as paired per-seed differences against the BEST baseline, since beating random while losing
+to greedy is not a result.
