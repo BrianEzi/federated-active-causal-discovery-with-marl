@@ -3008,3 +3008,43 @@ hidden nodes rather than a scalar fraction, and the `0 < f < 1` mixture is never
 That would make the bit sound for every rung with `n_private == 1`, which is rungs 1-4.
 For `n_private > 1` the ambiguity is only within the acting agent's own block, which is a
 strictly smaller mixture than today's.
+
+### [MEASURED] The full 2x2, and it makes the prior a red herring too
+
+Rung 0, 250 episodes, budget 10:
+
+    regime_bit   prior   random   greedy    pass
+          True     0.5    0.356    0.212   0.008
+          True  0.6437    0.328    0.244   0.012
+         False     0.5    0.052    0.040   0.008
+         False  0.6437    0.020    0.016   0.012
+
+With the bit ON the prior barely matters (0.356 against 0.328). With it OFF the task sits on
+the floor at either prior. So the connectivity-scaling prior is fine and needs no change,
+and the budget rule change was argued from a false premise — its measured effect is small.
+**One factor explains essentially all of it, and it is the regime bit: worth 7-16x.**
+
+### [RETRACTED] The "derivable one-hot" fix does not work as I stated it
+
+The entry above proposed making the bit sound at n > 2 by deriving WHICH hidden node was
+clamped from the public turn order. That is true and costs no new disclosure — with
+round-robin and `disclose_signals` on, an agent already knows the actor and its action
+CATEGORY, so at one private node per agent the identity follows.
+
+**It is necessary and not sufficient, so on its own it fixes nothing.** For a declared
+confounding edge `u -> v`, `_assignment_weights` needs to know whether THAT edge's latent
+was severed in a given row. Knowing node `h_j` was clamped does not answer it, because an
+assignment says only that `(u,v)` is confounded — it never names the latent responsible. One
+of `m` hidden nodes clamped still gives `f = 1/m`, squarely in the unsound middle.
+
+**Corrected proposal.** The hypothesis has to attribute each confounded pair to a latent:
+a pair's state becomes `absent` or `(orientation, owning hidden node)`, i.e. `1 + 2m` states
+instead of 3. Then per-row cleanliness is exact and the mixture is never entered.
+
+The reason this is now affordable is tonight's screen. Enumerating `(1+2m)^pairs` is
+hopeless — 9^10 at five agents — but the screen never enumerates: it costs
+`1 + 2m*pairs` partition calls (81 rather than 21 at m=4) and keeps 64 assignments either
+way. The richer hypothesis space is close to free on top of what already exists.
+
+Still NOT implemented. It changes what a hypothesis IS, which is a design decision, not a
+bug fix, and the spec-before-coding rule applies.
