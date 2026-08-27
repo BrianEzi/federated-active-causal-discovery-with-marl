@@ -132,11 +132,36 @@ observation sizes 158 → 1,852 unchanged.
 | 6 | 16 | 0.169 ± 0.029 | 0.067 | **0.598** |
 | 8 | 20 | 0.080 ± 0.031 | 0.038 | **0.520** |
 
-Metric is joint success (every agent correct). **Three readings:**
-1. **Bigger windows are fine** — ~1.6x over greedy at k=8 and k=12.
-2. **More agents breaks it, abruptly, between 3 and 6.** Greedy holds ~0.55 while learning
-   falls to 0.08. THE BIGGEST OPEN PROBLEM.
-3. **Sharing beats solo about 2:1 everywhere** — a measured cost of full decentralisation.
+Metric is joint success (every agent correct).
+
+**THE AGENT LADDER AT 6 AND 8 IS NOT A RESULT — THOSE POLICIES NEVER TRAINED.** Measured
+after the fact, mutual information between observation and action, I(S;A)/H, exact from the
+policy rather than estimated:
+
+| run | I(S;A)/H | final entropy | max entropy |
+|---|---|---|---|
+| w08 (learning wins) | **0.616** | 0.910 | 2.20 |
+| w12 (learning wins) | **0.513** | 1.094 | 2.56 |
+| a08 (learning "fails") | **0.034** | 1.800 | 1.946 |
+
+At 8 agents the policy barely reads its observation and sits a hair below uniform entropy —
+a fixed mixture wearing a network, the same signature the second agent found in the
+attribution learners (0.035). So "learning collapses between 3 and 6 agents" was written up
+here as a property of the task, with three seeds and error bars, and it is a TRAINING
+FAILURE. Nothing about coordination was measured at 6 or 8 agents.
+
+**What stands:**
+1. **Bigger windows are fine** — ~1.6x over greedy at k=8 and k=12, and those policies
+   demonstrably learned (I(S;A)/H 0.51–0.62).
+2. **Agent scaling is UNDETERMINED above 3.** Consistent with credit-assignment noise: at 8
+   agents each acts in 3 of 24 rounds while its reward depends on a window 7 partners
+   disturb, so the gradient never moves it off initialisation. `a08long` (16,000 episodes)
+   is the decisive test.
+3. **Sharing beats solo about 2:1** — but check I(S;A)/H per arm before trusting any cell,
+   since an untrained policy's number says nothing about sharing.
+
+**RUN THE MUTUAL-INFORMATION CHECK BEFORE REPORTING ANY LEARNED RESULT.**
+`mi_check.py` in the session scratchpad; it is exact and takes two minutes.
 
 ### Attribution — the novel contribution, 3 agents only
 
