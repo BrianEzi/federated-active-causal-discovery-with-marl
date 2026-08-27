@@ -18,6 +18,7 @@ import numpy as np
 
 from ma.baselines import (GreedyAgent, PassAgent, ProbeThenWorkAgent, RandomAgent,
                           UncertaintyGreedyAgent)
+from ma.density_guard import DensityGuardedEnv
 from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
@@ -207,6 +208,15 @@ def main(argv=None) -> dict:
     # measured justification. Off/default until a comparison confirms they help HERE too.
     ap.add_argument("--entropy_coef", type=float, default=0.01)
     ap.add_argument("--orthogonal_init", action="store_true")
+    # Density guard. Measured 2026-08-27: at four agents the attributed episode cost is
+    # heavy-TAILED -- median under a second, one draw in five at 48 s, one that did not
+    # finish in twenty minutes -- and the cost is exponential in the window's EDGE count.
+    # Rejecting dense draws changes the episode distribution, so the rejection rate is
+    # reported and no guarded result above three agents may be quoted without the
+    # three-agent guarded/unguarded control beside it.
+    ap.add_argument("--max_edges", type=int, default=None,
+                    help="reject draws whose densest window MAG has more than this many "
+                         "edges; unset disables the guard")
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
@@ -253,7 +263,10 @@ def main(argv=None) -> dict:
                        claims_require_all_types=not args.legacy_claim_exemption,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
-    env = TwoAgentEnv(config)
+    # `--max_edges` routes through the density guard; without it this is the ordinary
+    # environment, and DensityGuardedEnv(max_edges=None) is its parent's behaviour exactly,
+    # so both halves of the three-agent guarded/unguarded control share one code path.
+    env = DensityGuardedEnv(config, max_edges=args.max_edges)
     config_record = _config_record(config, topology, args)
     run = _wandb_run(args, config_record)
     started = time.time()

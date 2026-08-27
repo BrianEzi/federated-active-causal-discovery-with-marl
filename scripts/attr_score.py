@@ -34,6 +34,7 @@ import numpy as np
 from cb.attribution import score_groups
 from cb.claims import score_window
 from ma.baselines import ProbeThenWorkAgent, RandomAgent, UncertaintyGreedyAgent
+from ma.density_guard import DensityGuardedEnv
 from ma.env import ATTRIBUTED, PASS_ACTION, ROUND_ROBIN, VARY, MAConfig, TwoAgentEnv
 from ma.policy import IndependentPPO
 from ma.topology import federated_topology
@@ -47,6 +48,10 @@ def build_env(args) -> TwoAgentEnv:
     reward criterion would make the baselines answer a different question from the learner.
     """
     topology = federated_topology(args.n_agents, args.private_size, args.n_shared)
+    # The guard has to match the TRAINING arm. A policy trained on draws capped at 7 edges
+    # and scored on uncapped ones would be measured out of distribution, and the baselines
+    # beside it would be playing a different task -- which is the same error as comparing
+    # across belief rules.
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                       budget=args.budget, disclose_regime=True,
                       turn_order=ROUND_ROBIN, action_modes=(VARY,),
@@ -55,7 +60,7 @@ def build_env(args) -> TwoAgentEnv:
                       claim_bar=1.0, per_agent_reward=args.per_agent_reward,
                       observe_belief_channels=True, observe_partner_counts=True,
                       graph_model=args.graph_model, sf_m=args.sf_m)
-    return TwoAgentEnv(config, seed=args.seed)
+    return DensityGuardedEnv(config, max_edges=args.max_edges, seed=args.seed)
 
 
 def _episode_row(env: TwoAgentEnv, private_moves: int, moves: int) -> Dict[str, float]:
@@ -175,6 +180,8 @@ def main(argv=None) -> dict:
     ap.add_argument("--per_agent_reward", action="store_true", default=True)
     ap.add_argument("--shared_reward", dest="per_agent_reward", action="store_false",
                     help="job 2's control arm: the all-agents conjunction pays everyone")
+    ap.add_argument("--max_edges", type=int, default=None,
+                    help="density guard; must match the training arm")
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py")
     ap.add_argument("--episodes", type=int, default=150)
     ap.add_argument("--seed", type=int, default=0)

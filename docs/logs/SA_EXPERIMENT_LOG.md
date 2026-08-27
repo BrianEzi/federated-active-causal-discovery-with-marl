@@ -4035,3 +4035,56 @@ quoted.
 and 15-16 of `cluster/submit_attr_scale.sh`. Job 1 (4 and 6 agents) and the 4-agent half of
 job 3 are held. Job 4 needs no de-scoping -- ER at private_size 2 costs 67 s where the
 handover warned it might be unusable, so the fallback to private_size 1 is not needed.
+
+[MEASURED] THE DENSITY GUARD RESCUES FOUR AGENTS AND CANNOT RESCUE SIX. `ma/density_guard.py`
+rejects draws whose densest window MAG exceeds `max_edges`, before any enumeration -- the
+existing `max_candidates` cap cannot help, because it truncates AFTER
+`cb.versionspace.equivalence_class`, and the enumeration is the cost.
+
+Reset cost at `max_edges 7`, 12 episodes per row:
+
+    3 agents   median 0.29 s   max 0.48 s   candidates <= 1025    rejections  8/43
+    4 agents   median 0.73 s   max 3.22 s   candidates <= 35170   rejections  3/25
+    6 agents   ONE reset did not complete in 30 minutes
+
+Against unguarded 4 agents -- median under a second, one draw at 48 s with 181878
+candidates, one that did not finish in 20 minutes -- the guard converts an unbounded tail
+into a bounded one at four agents. Four agents is now feasible: ~1 s/episode, so a
+4000-episode run is about an hour.
+
+[MEASURED] THE COST DRIVER IS THE PARTNER COUNT, NOT WINDOW DENSITY, and this was nearly
+misdiagnosed. The distribution of the densest window's edge count on confounded draws is
+almost IDENTICAL at 3, 4 and 6 agents (600 draws each):
+
+    max_edges     3 agents   4 agents   6 agents
+        <= 6         0.127      0.173      0.207
+           7         0.605      0.563      0.585
+        >= 8         0.268      0.263      0.208
+
+So density cannot explain why 3 agents costs 34 s per 32-episode probe and 4 agents exceeds
+3000 s. The attribution space is a clique partition TIMES a choice of owner, and the owner
+is one of the partners: 2 partners at 3 agents, 3 at 4, 5 at 6. That multiplier is what no
+edge cap can reach, which is why the guard works at four agents and fails at six. Reaching
+six needs a cap at 6 edges, which rejects 79% of draws -- the 2026-08-26 k=7 guard rejected
+94%, sampled an unrepresentative sparse tail, and its row was discarded rather than
+reported. SIX AGENTS IS THEREFORE NOT ATTEMPTED, and that is a reported result with a
+mechanism, not a gap.
+
+[NOTED, and it is the condition on every guarded number] The guard rejects ~26% of
+confounded draws, which is a change to the task and not a tuning detail. Three agents runs
+cheaply BOTH ways, so `attr3a_guarded` (guarded) and `attr3a_peragent` (unguarded) are the
+same configuration either side of the guard and MEASURE the distortion. No guarded
+four-agent result may be reported without that pair beside it. Note also that the guard
+removes almost exactly the same slice at every agent count (the table above), so whatever
+it costs, it costs the 3-agent and 4-agent rows alike -- which is what makes the scale
+comparison survive it.
+
+[CORRECTED] I first measured this with `cb.versionspace.equivalence_class` alone, on
+UNCONDITIONED draws, and it said the environment was cheap -- 267 candidates and 0.18 s at
+8 edges. Both halves were wrong. The expensive step is the attribution enumeration
+downstream of `equivalence_class`, and `episode_mix="confounded"` selects precisely for the
+bidirected structure that enumeration is exponential in. The same 8-edge bucket measured
+through the real `env.reset` on confounded draws takes 32 s. A profile of the first two
+episodes had earlier reported a comfortable 1.76 s/episode for the same reason -- it
+sampled the head of a heavy tail. Three separate cheap measurements agreed with each other
+and were all misleading; only timing the real thing on the real mix was informative.
