@@ -496,7 +496,59 @@ class IndependentPPO:
         self.rng = np.random.default_rng(config.seed)
         arch = getattr(env.config, "policy_arch", "mlp")
         n_others = env.topology.n_agents - 1
-        if arch == "gnn_portable":
+        if arch == "gnn_hybrid":
+            # SHARED TRUNK, PER-AGENT HEADS. The middle ground between one network for
+            # everyone and one per agent, and it separates two things the other two arms
+            # confound: how to READ a causal belief (universal, and worth pooling everyone's
+            # experience to learn) from what to DO about it (this agent's own role and
+            # preferences). Measured motivation: `gnn_solo` did WORSE than full sharing at 8
+            # agents (0.040 against 0.080), which points at sample efficiency rather than
+            # representation -- solo gives each network an eighth of the data.
+            self.nets = {
+                agent: PortableRoleActorCritic(env.windows[agent], n_others,
+                                               hidden=config.hidden,
+                                               layers=config.gnn_layers)
+                for agent in env.topology.agents}
+            first = self.nets[env.topology.agents[0]]
+            for agent in env.topology.agents[1:]:
+                # Tie the trunk by sharing the MODULE OBJECTS, so gradients from every agent
+                # land on one set of trunk parameters while each head stays private.
+                self.nets[agent].edge_encoder = first.edge_encoder
+                self.nets[agent].node_encoder = first.node_encoder
+                self.nets[agent].rounds = first.rounds
+            self.shared_net = None
+            self.hybrid = True
+            unique = {id(param): param
+                      for net in self.nets.values() for param in net.parameters()}
+            optimiser = torch.optim.Adam(list(unique.values()), lr=config.lr)
+            self.opts = {agent: optimiser for agent in env.topology.agents}
+        elif arch == "gnn_solo":
+            # FULLY DECENTRALISED, and the point of it: portability comes from the
+            # ARCHITECTURE, not from sharing weights. `PortableRoleActorCritic` scores one
+            # variable at a time from features that never reference how many variables
+            # exist or which specific partner acted (partner blocks are pooled), so the
+            # same weights are meaningful at any window size or agent count. Giving each
+            # agent its OWN complete copy -- own body, own scorer, own critic, trained only
+            # on its own experience with no gradients crossing -- keeps every bit of that
+            # and removes the one thing that was not decentralised.
+            #
+            # Weight sharing decides WHOSE EXPERIENCE trains the weights. The architecture
+            # decides whether the weights MEAN anything at a different size. Two separate
+            # choices; `gnn_portable` conflates them and this arm separates them.
+            #
+            # Testing at MORE agents than were trained needs more networks than exist. That
+            # is a deployment question, not a training one: a new participant joins by
+            # adopting a peer's published policy, which is a real federated scenario and
+            # involves no shared training.
+            self.nets = {
+                agent: PortableRoleActorCritic(env.windows[agent], n_others,
+                                               hidden=config.hidden,
+                                               layers=config.gnn_layers)
+                for agent in env.topology.agents}
+            self.shared_net = None
+            self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
+                         for agent, net in self.nets.items()}
+        elif arch == "gnn_portable":
             # ONE network, shared by every agent, because with the number of agents varying
             # across the training mixture there is no stable agent identity to give a net
             # to. This is PARAMETER SHARING with decentralised execution: each agent still
@@ -527,6 +579,7 @@ class IndependentPPO:
             self.shared_net = None
             self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
                          for agent, net in self.nets.items()}
+        self.hybrid = getattr(self, "hybrid", False)
         self.history: List[dict] = []
         self.first_success_episode: Optional[int] = None
 
@@ -540,15 +593,28 @@ class IndependentPPO:
         "binding" them to another environment would be a silent reinterpretation of learned
         weights rather than a rebind.
         """
-        if self.shared_net is None:
-            raise ValueError("bind requires policy_arch='gnn_portable' -- other "
-                             "architectures have window-shaped parameters")
         n_others = env.topology.n_agents - 1
-        self.shared_net.rebind(env.windows[env.topology.agents[0]], n_others)
+        if self.shared_net is not None:
+            self.shared_net.rebind(env.windows[env.topology.agents[0]], n_others)
+            self.env = env
+            self.nets = {agent: self.shared_net for agent in env.topology.agents}
+            optimiser = next(iter(self.opts.values()))
+            self.opts = {agent: optimiser for agent in env.topology.agents}
+            return self
+        if not all(isinstance(net, PortableRoleActorCritic) for net in self.nets.values()):
+            raise ValueError("bind requires a portable architecture ('gnn_portable' or "
+                             "'gnn_solo') -- others have window-shaped parameters")
+        # ONE NETWORK PER AGENT, each rebound to that agent's own window. Where the new
+        # environment has MORE agents than were trained, the extra slots adopt an existing
+        # agent's policy -- onboarding, not training-time sharing: no gradient ever crossed.
+        trained = list(self.nets.values())
+        self.nets = {agent: trained[index % len(trained)].rebind(
+                         env.windows[agent], n_others)
+                     for index, agent in enumerate(env.topology.agents)}
+        opts = list(self.opts.values())
+        self.opts = {agent: opts[index % len(opts)]
+                     for index, agent in enumerate(env.topology.agents)}
         self.env = env
-        self.nets = {agent: self.shared_net for agent in env.topology.agents}
-        optimiser = next(iter(self.opts.values()))
-        self.opts = {agent: optimiser for agent in env.topology.agents}
         return self
 
     # -- rollout ------------------------------------------------------------------------
@@ -636,6 +702,37 @@ class IndependentPPO:
 
     def update(self, buffers: Dict[int, dict]) -> None:
         cfg = self.config
+        if self.hybrid:
+            # ONE optimiser step over everyone. Each agent's experience flows through its
+            # OWN head and the shared trunk, so gradients must be accumulated across agents
+            # and stepped once -- stepping per agent would apply the trunk update n times
+            # and make the effective learning rate scale with the agent count.
+            optimiser = next(iter(self.opts.values()))
+            for _ in range(cfg.epochs):
+                optimiser.zero_grad()
+                for agent in self.env.topology.agents:
+                    buf = buffers[agent]
+                    advantages, returns = self._advantages(buf)
+                    std = advantages.std()
+                    normed = (advantages - advantages.mean()) / (std + 1e-8)
+                    obs = torch.as_tensor(buf["obs"], dtype=torch.float32)
+                    actions = torch.as_tensor(buf["action"], dtype=torch.long)
+                    old_logp = torch.as_tensor(buf["logp"], dtype=torch.float32)
+                    adv = torch.as_tensor(normed, dtype=torch.float32)
+                    ret = torch.as_tensor(returns, dtype=torch.float32)
+                    logits, values = self.nets[agent](obs)
+                    dist = torch.distributions.Categorical(logits=logits)
+                    logp = dist.log_prob(actions)
+                    ratio = torch.exp(logp - old_logp)
+                    clipped = torch.clamp(ratio, 1 - cfg.clip, 1 + cfg.clip)
+                    loss = (-torch.min(ratio * adv, clipped * adv).mean()
+                            + cfg.value_coef * F.mse_loss(values, ret)
+                            - cfg.entropy_coef * dist.entropy().mean())
+                    (loss / len(self.env.topology.agents)).backward()
+                for net in self.nets.values():
+                    nn.utils.clip_grad_norm_(net.parameters(), 0.5)
+                optimiser.step()
+            return
         if self.shared_net is not None:
             # One network, so ONE update over every agent's experience pooled. Stepping the
             # shared optimiser once per agent instead would make the effective learning rate
