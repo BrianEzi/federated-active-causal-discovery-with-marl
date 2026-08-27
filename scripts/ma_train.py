@@ -174,7 +174,7 @@ def main(argv=None) -> dict:
     ap.add_argument("--vs_evidence_alpha", type=float, default=0.001,
                     help="evidence threshold; 1e-3 measured optimal (2026-08-27) -- "
                          "stricter is NOT safer, power-based pruning takes over")
-    ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn", "gnn_portable", "gnn_solo"])
+    ap.add_argument("--policy_arch", default="mlp", choices=["mlp", "gnn", "gnn_portable", "gnn_solo", "gnn_hybrid"])
     ap.add_argument("--cb_n_boot", type=int, default=12,
                     help="bootstrap replicates per refresh (constraint backend only)")
     ap.add_argument("--gnn_layers", type=int, default=2)
