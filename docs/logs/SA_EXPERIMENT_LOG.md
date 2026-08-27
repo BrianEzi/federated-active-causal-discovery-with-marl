@@ -4133,3 +4133,69 @@ when the direct test was already running and 40 minutes away.
 CROSS-GENERATOR NUMBERS ARE NOT PAIRED and are not reported as if they were: the two
 generators draw different graphs, so those are arm means with a standard error over 3
 seeds. Within a run every arm sees identical episodes, so each ratio IS paired.
+
+---
+
+## 2026-08-27, evening -- THE GREEDY BASELINE WAS UNDER-CONFIGURED, AND FIXING IT INVERTS THE ATTRIBUTION RESULT
+
+[MEASURED -- and this invalidates today's headline] `UncertaintyGreedyAgent` takes
+`bar=0.7` and EVERY construction in the repository uses that default
+(`ma/baselines.py:549`, `scripts/ma_train.py:327`, `scripts/attr_score.py:201`), while the
+deterministic and attributed backends grade at `claim_bar=1.0`. Greedy therefore treats a
+claim that 70% of surviving hypotheses agree on as SETTLED and stops scoring it, and
+forfeits the round when nothing clears its own bar -- while the environment still counts
+that claim open. The baseline was blind to a band of open questions by construction.
+
+Job 5 configuration, 4 agents, budget 8, 150 identical episodes, joint success:
+
+    generator     learned   greedy@0.7   greedy@0.9   greedy@1.0   nopass@1.0   random
+    scale-free      0.993       0.580        0.813        0.813        0.800      0.107
+    Erdos-Renyi     0.980       0.400        0.407        0.407        0.473      0.120
+
+The fix is worth +0.233 on scale-free and +0.007 on Erdos-Renyi. Forbidding greedy to pass
+is worth almost nothing, so the mechanism is the SCORING bar, not the forfeit.
+
+[CORRECTED -- the attribution headline REVERSES] Attributed backend, 3 agents, private 2,
+budget 12, shared-reward checkpoint seed 0, 150 identical episodes:
+
+    arm                  identified   attribution   structure
+    greedy@1.0               0.824        0.879       0.944
+    learned                  0.733        0.800       0.903
+    probe_then_work          0.700        0.844       0.901
+    random_vary              0.373        0.510       0.882
+
+Paired, learned minus greedy: **-0.091 +/- 0.025** against +0.142 +/- 0.024 at bar 0.7 on
+the SAME episodes. Greedy at the bar the task is graded on BEATS the best learned arm by
+about 3.6 standard errors, and also beats the hand-designed `probe_then_work`. Every
+learned-vs-greedy margin reported today (+0.065, +0.086, +0.142, +0.158, +0.229) was
+measured against the handicapped baseline and must be re-run before any of it is quoted.
+
+Greedy at bar 1.0 remains TRUTH-FREE -- it reads only its own belief frequencies, at the
+threshold the grading uses. This is a fairer opponent, not a stronger form of cheating.
+
+[MEASURED] WHY THE BAR FIX HELPS SCALE-FREE AND NOT ERDOS-RENYI. Where the initial belief's
+claim frequencies sit, 60 episodes, all pairs and channels:
+
+    band                              scale-free   Erdos-Renyi
+    settled (exactly 0 or 1)              0.469       0.568
+    0.7-1.0, INVISIBLE at bar 0.7         0.275       0.146
+    genuinely open (< 0.7)                0.257       0.286
+
+Scale-free puts nearly twice as much mass in the band greedy could not see, which is the
+whole of the bar effect. This is a complete explanation of the bar SENSITIVITY.
+
+[NOT EXPLAINED, and two hypotheses refuted] Why greedy is worse on Erdos-Renyi in ABSOLUTE
+terms (0.407 against 0.813) is still open. Refuted:
+
+  * TIE-BREAKING / COLLISIONS. Mean argmax tie size 1.80 (er) against 1.84 (sf); rounds in
+    which two agents picked the same node: 0.000 on BOTH. The near-tie margin is also the
+    same (0.178 er, 0.168 sf). Greedy is not degenerating into coin flips on dense graphs.
+  * COUNTING CLAIMS TOUCHED RATHER THAN COMPLETED. A pair's type needs BOTH endpoints
+    intervened, so a degree-seeking rule should half-resolve many pairs and finish none.
+    Measured, adjacent pairs with both endpoints intervened: greedy 0.708 (er) against
+    0.704 (sf) -- unchanged -- and on Erdos-Renyi greedy MATCHES the learned policy (0.697)
+    while scoring less than half as well. Coverage is not the differentiator.
+
+So greedy's behaviour is statistically indistinguishable across generators and its
+coverage matches the learner's, yet it resolves far fewer claims on Erdos-Renyi. The
+difference must lie in WHICH pairs are left incomplete rather than how many. Open.
