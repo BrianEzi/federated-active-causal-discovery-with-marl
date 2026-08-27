@@ -4088,3 +4088,114 @@ through the real `env.reset` on confounded draws takes 32 s. A profile of the fi
 episodes had earlier reported a comfortable 1.76 s/episode for the same reason -- it
 sampled the head of a heavy tail. Three separate cheap measurements agreed with each other
 and were all misleading; only timing the real thing on the real mix was informative.
+
+---
+
+## 2026-08-27, evening -- JOB 5: the generator confound is resolved, and it was UNDER-TRAINING
+
+[MEASURED] 4 agents x 1 private + 3 shared, budget 8, version_space backend, 20,000
+training episodes, 3 seeds per generator, 150 eval episodes with every arm on IDENTICAL
+episodes within a run (`scripts/run_job5_local.sh`, `results/vs_generator/`). Joint success
+-- every agent simultaneously correct:
+
+    generator     learned            greedy            random   ratio
+    scale-free    0.956 +/- 0.010    0.562 +/- 0.018   0.129    1.70x
+    Erdos-Renyi   0.911 +/- 0.031    0.436 +/- 0.024   0.122    2.09x
+
+THE HEADLINE REPRODUCES UNDER BOTH GENERATORS. The original 4-agent figure (learned 0.937,
+greedy 0.405, 2.3x) was Erdos-Renyi at 20,000 episodes; converged here it is 0.911 / 0.436
+/ 2.09x. The scale-free run that had learned LOSING to greedy (0.442 against 0.583) was
+measured at 3,000 episodes; the same configuration at 20,000 reaches 0.956, the highest
+score of any arm in the table. The unattributable comparison is therefore attributed:
+EPISODE COUNT, not the generator. The learning curve reading recorded in the addendum was
+correct.
+
+[MEASURED] THE GENERATOR DOES MOVE ONE ARM, AND IT IS THE BASELINE. Greedy scores
+0.562 on scale-free against 0.436 on Erdos-Renyi -- a gap of 0.126 against a combined
+standard error of 0.030, about 4.2 SE. The LEARNED policy is statistically indistinguishable
+across the two (0.956 vs 0.911, about 1.4 SE). So the ratio differs by generator entirely
+through greedy's denominator, not through anything the learner does.
+
+This independently corroborates the attribution measurement on the same axis (2 seeds,
+3 agents): greedy 0.356 on Erdos-Renyi against 0.604 on scale-free, with the learned policy
+beating it by +0.229 +/- 0.028 there against +0.065 +/- 0.020 on scale-free. Two different
+backends, two different agent counts, same direction and similar magnitude.
+
+[CORRECTED -- my own reading, made before the evidence] From the attribution ER result I
+suggested that "part of the 2.3x headline is likely a real generator effect rather than an
+episode-count artefact", and flagged it as something that might weaken the headline. Half
+right and the wrong half was the one I emphasised. The generator effect on the RATIO is
+real (2.09x vs 1.70x) and it is entirely greedy's; the headline itself is not weakened at
+all, because scale-free at convergence is the better configuration for the learner. I
+inferred across backends and agent counts from one seed before the direct test had run,
+when the direct test was already running and 40 minutes away.
+
+CROSS-GENERATOR NUMBERS ARE NOT PAIRED and are not reported as if they were: the two
+generators draw different graphs, so those are arm means with a standard error over 3
+seeds. Within a run every arm sees identical episodes, so each ratio IS paired.
+
+---
+
+## 2026-08-27, evening -- THE GREEDY BASELINE WAS UNDER-CONFIGURED, AND FIXING IT INVERTS THE ATTRIBUTION RESULT
+
+[MEASURED -- and this invalidates today's headline] `UncertaintyGreedyAgent` takes
+`bar=0.7` and EVERY construction in the repository uses that default
+(`ma/baselines.py:549`, `scripts/ma_train.py:327`, `scripts/attr_score.py:201`), while the
+deterministic and attributed backends grade at `claim_bar=1.0`. Greedy therefore treats a
+claim that 70% of surviving hypotheses agree on as SETTLED and stops scoring it, and
+forfeits the round when nothing clears its own bar -- while the environment still counts
+that claim open. The baseline was blind to a band of open questions by construction.
+
+Job 5 configuration, 4 agents, budget 8, 150 identical episodes, joint success:
+
+    generator     learned   greedy@0.7   greedy@0.9   greedy@1.0   nopass@1.0   random
+    scale-free      0.993       0.580        0.813        0.813        0.800      0.107
+    Erdos-Renyi     0.980       0.400        0.407        0.407        0.473      0.120
+
+The fix is worth +0.233 on scale-free and +0.007 on Erdos-Renyi. Forbidding greedy to pass
+is worth almost nothing, so the mechanism is the SCORING bar, not the forfeit.
+
+[CORRECTED -- the attribution headline REVERSES] Attributed backend, 3 agents, private 2,
+budget 12, shared-reward checkpoint seed 0, 150 identical episodes:
+
+    arm                  identified   attribution   structure
+    greedy@1.0               0.824        0.879       0.944
+    learned                  0.733        0.800       0.903
+    probe_then_work          0.700        0.844       0.901
+    random_vary              0.373        0.510       0.882
+
+Paired, learned minus greedy: **-0.091 +/- 0.025** against +0.142 +/- 0.024 at bar 0.7 on
+the SAME episodes. Greedy at the bar the task is graded on BEATS the best learned arm by
+about 3.6 standard errors, and also beats the hand-designed `probe_then_work`. Every
+learned-vs-greedy margin reported today (+0.065, +0.086, +0.142, +0.158, +0.229) was
+measured against the handicapped baseline and must be re-run before any of it is quoted.
+
+Greedy at bar 1.0 remains TRUTH-FREE -- it reads only its own belief frequencies, at the
+threshold the grading uses. This is a fairer opponent, not a stronger form of cheating.
+
+[MEASURED] WHY THE BAR FIX HELPS SCALE-FREE AND NOT ERDOS-RENYI. Where the initial belief's
+claim frequencies sit, 60 episodes, all pairs and channels:
+
+    band                              scale-free   Erdos-Renyi
+    settled (exactly 0 or 1)              0.469       0.568
+    0.7-1.0, INVISIBLE at bar 0.7         0.275       0.146
+    genuinely open (< 0.7)                0.257       0.286
+
+Scale-free puts nearly twice as much mass in the band greedy could not see, which is the
+whole of the bar effect. This is a complete explanation of the bar SENSITIVITY.
+
+[NOT EXPLAINED, and two hypotheses refuted] Why greedy is worse on Erdos-Renyi in ABSOLUTE
+terms (0.407 against 0.813) is still open. Refuted:
+
+  * TIE-BREAKING / COLLISIONS. Mean argmax tie size 1.80 (er) against 1.84 (sf); rounds in
+    which two agents picked the same node: 0.000 on BOTH. The near-tie margin is also the
+    same (0.178 er, 0.168 sf). Greedy is not degenerating into coin flips on dense graphs.
+  * COUNTING CLAIMS TOUCHED RATHER THAN COMPLETED. A pair's type needs BOTH endpoints
+    intervened, so a degree-seeking rule should half-resolve many pairs and finish none.
+    Measured, adjacent pairs with both endpoints intervened: greedy 0.708 (er) against
+    0.704 (sf) -- unchanged -- and on Erdos-Renyi greedy MATCHES the learned policy (0.697)
+    while scoring less than half as well. Coverage is not the differentiator.
+
+So greedy's behaviour is statistically indistinguishable across generators and its
+coverage matches the learner's, yet it resolves far fewer claims on Erdos-Renyi. The
+difference must lie in WHICH pairs are left incomplete rather than how many. Open.

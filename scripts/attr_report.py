@@ -131,6 +131,31 @@ def paired_between(data, left: str, right: str) -> None:
               f"({'outside' if abs(arr.mean()) > 2 * se else 'INSIDE'} 2 se)")
 
 
+def guard_distortion(data, unguarded: str, guarded: str) -> None:
+    """What the density guard did to the TASK, measured through the fixed baselines.
+
+    The guard rejects ~26% of confounded draws, so the two arms see different episode SETS
+    by construction and no per-episode pairing between them can exist -- `paired_between`
+    correctly refuses. That refusal is not a dead end: `probe_then_work`,
+    `greedy_uncertainty` and `random_vary` are fixed policies that read nothing about the
+    guard, so any shift in THEIR scores is the change in episode difficulty and nothing
+    else. This is a cleaner instrument than a paired learner comparison would have been,
+    because the baselines cannot adapt to the distribution the way a trained policy does.
+    """
+    if unguarded not in data or guarded not in data:
+        return
+    a = data[unguarded][min(data[unguarded])]["arms"]
+    b = data[guarded][min(data[guarded])]["arms"]
+    print(f"\n=== what the guard did to the task: {guarded} minus {unguarded}, "
+          f"read off the FIXED baselines ===")
+    print(f"{'baseline':22s} {'unguarded':>10s} {'guarded':>10s} {'shift':>9s}")
+    for label in ("probe_then_work", "greedy_uncertainty", "random_vary"):
+        if label in a and label in b:
+            print(f"{label:22s} {a[label]['identified']:10.3f} {b[label]['identified']:10.3f} "
+                  f"{b[label]['identified'] - a[label]['identified']:+9.3f}")
+    print("  A positive shift means the guard made episodes EASIER for that fixed policy.")
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dir", default="results/attr_scale")
@@ -146,6 +171,7 @@ def main(argv=None) -> None:
     paired_between(data, "attr3a_peragent", "attr3a_shared")
     # Job 1's control: what does the density guard cost, at a size cheap enough to ask?
     paired_between(data, "attr3a_peragent", "attr3a_guarded")
+    guard_distortion(data, "attr3a_peragent", "attr3a_guarded")
 
 
 if __name__ == "__main__":

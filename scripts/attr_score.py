@@ -180,6 +180,12 @@ def main(argv=None) -> dict:
     ap.add_argument("--per_agent_reward", action="store_true", default=True)
     ap.add_argument("--shared_reward", dest="per_agent_reward", action="store_false",
                     help="job 2's control arm: the all-agents conjunction pays everyone")
+    # MEASURED 2026-08-27: UncertaintyGreedyAgent defaults to bar=0.7 while these
+    # backends grade at claim_bar=1.0, so greedy stops scoring claims the task still
+    # counts open. Worth +0.233 to greedy on scale-free at 4 agents. Exposed so the
+    # baseline can be run at the bar it is actually graded on.
+    ap.add_argument("--greedy_bar", type=float, default=0.7,
+                    help="confidence bar for greedy_uncertainty; 1.0 matches the grading")
     ap.add_argument("--max_edges", type=int, default=None,
                     help="density guard; must match the training arm")
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py")
@@ -198,7 +204,8 @@ def main(argv=None) -> dict:
     # Constructed one at a time. `make_baselines` would also build `GreedyAgent`, whose
     # enumeration refuses past window size 5 -- job 3 runs at 6.
     arms["probe_then_work"] = {a: ProbeThenWorkAgent(a, args.seed) for a in agents}
-    arms["greedy_uncertainty"] = {a: UncertaintyGreedyAgent(a, args.seed) for a in agents}
+    arms["greedy_uncertainty"] = {a: UncertaintyGreedyAgent(a, args.seed, bar=args.greedy_bar)
+                                  for a in agents}
     arms["random_vary"] = {a: RandomAgent(a, args.seed, allow_clamp=False) for a in agents}
 
     report = {"config": vars(args), "arms": {}, "rows": {}, "paired": {}}
