@@ -1,4 +1,4 @@
-# Session state — 27 August 2026, 21:15
+# Session state — 27 August 2026, 21:30
 
 > **READ THIS BOX FIRST.** The second agent found, late on 27 August (`dd6131d`), that
 > `UncertaintyGreedyAgent` takes `bar=0.7` while these backends GRADE at `claim_bar=1.0`, so
@@ -132,11 +132,36 @@ observation sizes 158 → 1,852 unchanged.
 | 6 | 16 | 0.169 ± 0.029 | 0.067 | **0.598** |
 | 8 | 20 | 0.080 ± 0.031 | 0.038 | **0.520** |
 
-Metric is joint success (every agent correct). **Three readings:**
-1. **Bigger windows are fine** — ~1.6x over greedy at k=8 and k=12.
-2. **More agents breaks it, abruptly, between 3 and 6.** Greedy holds ~0.55 while learning
-   falls to 0.08. THE BIGGEST OPEN PROBLEM.
-3. **Sharing beats solo about 2:1 everywhere** — a measured cost of full decentralisation.
+Metric is joint success (every agent correct).
+
+**THE AGENT LADDER AT 6 AND 8 IS NOT A RESULT — THOSE POLICIES NEVER TRAINED.** Measured
+after the fact, mutual information between observation and action, I(S;A)/H, exact from the
+policy rather than estimated:
+
+| run | I(S;A)/H | final entropy | max entropy |
+|---|---|---|---|
+| w08 (learning wins) | **0.616** | 0.910 | 2.20 |
+| w12 (learning wins) | **0.513** | 1.094 | 2.56 |
+| a08 (learning "fails") | **0.034** | 1.800 | 1.946 |
+
+At 8 agents the policy barely reads its observation and sits a hair below uniform entropy —
+a fixed mixture wearing a network, the same signature the second agent found in the
+attribution learners (0.035). So "learning collapses between 3 and 6 agents" was written up
+here as a property of the task, with three seeds and error bars, and it is a TRAINING
+FAILURE. Nothing about coordination was measured at 6 or 8 agents.
+
+**What stands:**
+1. **Bigger windows are fine** — ~1.6x over greedy at k=8 and k=12, and those policies
+   demonstrably learned (I(S;A)/H 0.51–0.62).
+2. **Agent scaling is UNDETERMINED above 3.** Consistent with credit-assignment noise: at 8
+   agents each acts in 3 of 24 rounds while its reward depends on a window 7 partners
+   disturb, so the gradient never moves it off initialisation. `a08long` (16,000 episodes)
+   is the decisive test.
+3. **Sharing beats solo about 2:1** — but check I(S;A)/H per arm before trusting any cell,
+   since an untrained policy's number says nothing about sharing.
+
+**RUN THE MUTUAL-INFORMATION CHECK BEFORE REPORTING ANY LEARNED RESULT.**
+`mi_check.py` in the session scratchpad; it is exact and takes two minutes.
 
 ### Attribution — the novel contribution, 3 agents only
 
@@ -180,19 +205,36 @@ reproduces it, not that "differently shaped" would.
 
 ---
 
-## 6. Running at 21:00, and what each decides
+## 6. Running at 21:30, and what each decides
 
-| job | decides | ETA |
+| job | decides | state |
 |---|---|---|
-| `a08long` — 8 agents, 16,000 episodes | is the agent collapse a SAMPLE-SIZE problem? at update 410/1000 | ~1 h |
-| `mode_at_scale.py` | does CLAMP earn its keep at 3 private vars on scale-free graphs, in the statistical AND sampled engines? | ~1 h |
-| ladder `w20`, `w30`, both arms | the last two points of the window ladder | ~2 h |
-| cluster (second agent) | attribution scaling, reward ablation, generator confound, converged dial | overnight |
+| `a08long` — 8 agents, 16,000 episodes | is the agent-count failure UNDERTRAINING? | update 790/1000, entropy **1.800 → 1.473**, window rate **0.852** — moving off initialisation, which the 4,000-episode run never did. Looking like YES. |
+| `mode_at_scale.py` | does CLAMP earn its keep at 3 private vars on scale-free, in the statistical AND sampled engines? | running, no output yet |
+| ladder `w20`, `w30` | last two points of the window ladder | w20 shared done, w30 shared training, solo behind |
+| cluster (second agent) | attribution at 20,000 episodes — the decisive rerun | theirs |
 
-Logs in the session scratchpad `logs/`; results in `results/ladder/`, `results/vs_scale/`,
-`results/vs_attr/`, `results/transfer/`.
+Logs in the session scratchpad `logs/`. Results: `results/ladder/`, `results/vs_scale/`,
+`results/vs_attr/`, `results/attr_bar1/` and `results/vs_generator/` (both theirs),
+`results/transfer/`.
 
----
+### The second agent's findings, merged and confirmed
+
+1. **The greedy baseline was configured at bar 0.7 while grading happens at 1.0** — see the
+   box at the top of this file for the verified scope. Real, and it inverts every
+   `attributed` and `version_space` margin.
+2. **The attribution learners never converged** — I(S;A)/H of 0.035–0.291 against greedy's
+   1.000. So the attribution result is **UNDETERMINED, not negative**. 20,000 episodes
+   decides it and is running on the cluster.
+3. **The objective mismatch is NOT the cause.** Their attribution-aware greedy
+   (`ma/attribution_greedy.py`) is WORSE than plain greedy (0.784 vs 0.824), because unsure
+   groups' children are always shared nodes, so the term steers greedy off the private
+   probes whose structural pruning was resolving attribution anyway. A clean negative that
+   rules out the obvious explanation.
+4. **A private probe advances the PROBER'S OWN attribution ~3x more than a partner's**
+   (1.265 vs 0.425). This tightens the standing caveat considerably: private probes are
+   largely self-serving on the attribution axis too, so budget share is even further from
+   being an altruism measure.
 
 ## 7. Open questions, ranked
 
@@ -262,7 +304,23 @@ Logs in the session scratchpad `logs/`; results in `results/ladder/`, `results/v
 
 ---
 
-## 11. Immediate next actions
+## 11. THE CHECK THAT MUST RUN BEFORE ANY LEARNED NUMBER IS REPORTED
+
+Three times on 27 August a number was interpreted before checking whether the arm producing
+it was functional: the learner blindfolded to the channel it was scored on (26 Aug), the
+BASELINE blindfolded (found by the second agent), and the learner never having trained at
+all (found by applying their check to our ladder).
+
+`mi_check.py` in the session scratchpad computes, exactly and in two minutes:
+
+    I(S;A)/H   mutual information between observation and action, normalised
+               ~0.03  = a fixed mixture wearing a network. Nothing was measured.
+               >0.5   = the policy genuinely conditions on what it sees.
+
+Read it alongside final training entropy against its maximum, ln(n_actions). Entropy within
+10% of maximum plus near-zero mutual information is the untrained signature. Both are free.
+
+## 12. Immediate next actions
 
 1. **Collect the four running jobs** (§6) and fold them into `FINDINGS_2026_08_27.md`.
 2. **Build factored attribution** (§7.2) — the highest-value remaining build, and the only
