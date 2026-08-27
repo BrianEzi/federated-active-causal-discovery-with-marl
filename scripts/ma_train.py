@@ -16,7 +16,8 @@ import time
 
 import numpy as np
 
-from ma.baselines import make_baselines
+from ma.baselines import (GreedyAgent, PassAgent, ProbeThenWorkAgent, RandomAgent,
+                          UncertaintyGreedyAgent)
 from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
@@ -290,7 +291,20 @@ def main(argv=None) -> dict:
     }
 
     arms = {"learned": ppo.policies(deterministic=False)}
-    reference = {agent: make_baselines(env, agent, seed=args.seed) for agent in env.topology.agents}
+    # ONE CONSTRUCTOR PER LABEL, and the labels are chosen BEFORE anything is built.
+    # `make_baselines` built all of them eagerly, `GreedyAgent` among them, and that
+    # constructor enumerates the window and REFUSES past size 5. So at --private_size 3
+    # (k=6) a run died before playing a single episode, on a backend where the greedy
+    # oracle arm is not in `labels` at all -- measured 2026-08-27 on the attribution
+    # timing probe. Building only what will be scored removes the whole class of failure.
+    factories = {
+        "pass": lambda agent: PassAgent(agent, args.seed),
+        "random_vary": lambda agent: RandomAgent(agent, args.seed, allow_clamp=False),
+        "random_clamp": lambda agent: RandomAgent(agent, args.seed, allow_clamp=True),
+        "greedy": lambda agent: GreedyAgent(agent, env, args.seed),
+        "greedy_uncertainty": lambda agent: UncertaintyGreedyAgent(agent, args.seed),
+        "probe_then_work": lambda agent: ProbeThenWorkAgent(agent, args.seed),
+    }
     # A baseline appears only where it has legal moves and a working oracle: the random
     # arms follow the action modes, and `greedy` reads the exact DP's score tables so it
     # exists only on the exact backend (`enumerated_posterior` raises otherwise -- a
@@ -309,7 +323,7 @@ def main(argv=None) -> dict:
         # arms that are not scored on the thing it is trained for.
         labels.insert(-1, "probe_then_work")
     for label in labels:
-        arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
+        arms[label] = {agent: factories[label](agent) for agent in env.topology.agents}
 
     for label, policies in arms.items():
         t0 = time.time()
