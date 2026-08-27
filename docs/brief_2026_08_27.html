@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Also published at https://claude.ai/code/artifact/86b61fa3-c8c5-495f-8ae3-33c2ae954dd9
+     This copy is standalone: open it in any browser, no server needed. Fonts come
+     from Google Fonts and degrade to the declared fallbacks offline. -->
+<title>Federated Causal Discovery — Branch Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --paper:#f2f5f7; --card:#ffffff; --ink:#151c24; --ink-soft:#4a5763; --ink-faint:#7d8b98;
+  --rule:#d8e0e7; --rule-soft:#e8eef2;
+  --private:#a8641f; --shared:#12706e; --latent:#5f4a8c;
+  --good:#1f6b4c; --bad:#a63a30; --warn:#8a6510;
+  --accent:#12706e; --accent-soft:#e0efee;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e141a; --card:#161e26; --ink:#e6edf3; --ink-soft:#a9b7c4; --ink-faint:#74838f;
+    --rule:#2a353f; --rule-soft:#1e2831;
+    --private:#dc9a4e; --shared:#4fbdb8; --latent:#a48ed4;
+    --good:#5cbd8e; --bad:#e2796d; --warn:#d8a53c;
+    --accent:#4fbdb8; --accent-soft:#16302f;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e141a; --card:#161e26; --ink:#e6edf3; --ink-soft:#a9b7c4; --ink-faint:#74838f;
+  --rule:#2a353f; --rule-soft:#1e2831;
+  --private:#dc9a4e; --shared:#4fbdb8; --latent:#a48ed4;
+  --good:#5cbd8e; --bad:#e2796d; --warn:#d8a53c;
+  --accent:#4fbdb8; --accent-soft:#16302f;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16.5px; line-height:1.62; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px 120px}
+.col{max-width:660px}
+h1,h2,h3{font-family:"Newsreader",Georgia,serif;font-weight:600;text-wrap:balance;line-height:1.15}
+h1{font-size:clamp(2.3rem,5vw,3.5rem);margin:0 0 .2em;letter-spacing:-.015em}
+h2{font-size:1.85rem;margin:0 0 .5rem;letter-spacing:-.01em}
+h3{font-size:1.16rem;margin:2rem 0 .4rem}
+p{margin:0 0 1.05em}
+a{color:var(--accent)}
+.lede{font-family:"Newsreader",Georgia,serif;font-size:1.32rem;line-height:1.5;color:var(--ink-soft);font-weight:300}
+.eyebrow{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);
+  font-weight:700;margin:0 0 .8rem}
+header{padding:76px 0 40px;border-bottom:1px solid var(--rule)}
+.meta{display:flex;flex-wrap:wrap;gap:1.6rem;margin-top:2rem;font-size:.85rem;color:var(--ink-faint);
+  font-family:"IBM Plex Mono",monospace}
+.meta b{color:var(--ink);font-weight:500}
+section{padding:52px 0;border-bottom:1px solid var(--rule-soft)}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* callouts */
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:1rem 1.2rem;margin:1.6rem 0;border-radius:0 6px 6px 0;font-size:.95rem}
+.note.warn{border-left-color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.note.bad{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.note p:last-child{margin-bottom:0}
+.note strong{font-weight:700}
+
+/* tables */
+.tablewrap{overflow-x:auto;margin:1.6rem 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:460px}
+th,td{text-align:right;padding:.5rem .7rem;border-bottom:1px solid var(--rule-soft)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);
+  border-bottom:1px solid var(--rule);font-weight:700}
+tbody td{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+tbody td:first-child{font-family:"Public Sans",sans-serif}
+tr.hi td{background:var(--accent-soft);font-weight:700}
+tr.dim td{color:var(--ink-faint)}
+
+/* cards + grid */
+.grid{display:grid;gap:18px;margin:1.8rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:9px;padding:1.15rem 1.25rem}
+.card h4{margin:0 0 .35rem;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-faint);font-weight:700}
+.big{font-family:"IBM Plex Mono",monospace;font-size:2rem;font-weight:500;line-height:1.1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.card p{font-size:.86rem;color:var(--ink-soft);margin:.5rem 0 0}
+.up{color:var(--good)} .down{color:var(--bad)}
+
+/* timeline */
+.tl{border-left:2px solid var(--rule);padding-left:1.6rem;margin:2rem 0}
+.tl .step{position:relative;padding-bottom:1.7rem}
+.tl .step::before{content:"";position:absolute;left:calc(-1.6rem - 6px);top:.45rem;
+  width:10px;height:10px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 4px var(--paper)}
+.tl h3{margin:0 0 .3rem;font-size:1.05rem}
+.tl p{font-size:.94rem;margin:0 0 .5em;color:var(--ink-soft)}
+.tl p strong{color:var(--ink)}
+
+/* episode filmstrip */
+.film{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 14px;margin:1.4rem 0}
+.frame{flex:0 0 132px;background:var(--card);border:1px solid var(--rule);border-radius:8px;
+  padding:.65rem .6rem;font-size:.76rem}
+.frame .r{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-faint);
+  letter-spacing:.06em;text-transform:uppercase}
+.frame .act{margin:.35rem 0 .5rem;font-weight:700;font-size:.85rem;line-height:1.25}
+.chip{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.66rem;
+  font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.chip.private{background:color-mix(in srgb,var(--private) 18%,transparent);color:var(--private)}
+.chip.shared{background:color-mix(in srgb,var(--shared) 18%,transparent);color:var(--shared)}
+.bars{display:flex;flex-direction:column;gap:3px;margin-top:.45rem}
+.bar{display:flex;align-items:center;gap:5px;font-size:.66rem;
+  font-family:"IBM Plex Mono",monospace;color:var(--ink-faint)}
+.bar .track{flex:1;height:5px;background:var(--rule-soft);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;background:var(--latent);border-radius:3px}
+.legend{display:flex;flex-wrap:wrap;gap:1.1rem;font-size:.8rem;color:var(--ink-soft);margin:.6rem 0 0}
+.legend span{display:flex;align-items:center;gap:.4rem}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+
+figure{margin:1.8rem 0}
+figcaption{font-size:.84rem;color:var(--ink-faint);margin-top:.6rem;max-width:620px}
+svg{display:block;max-width:100%;height:auto}
+.axis{stroke:var(--rule);stroke-width:1}
+.gridline{stroke:var(--rule-soft);stroke-width:1}
+.lbl{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--ink-faint)}
+.lbl-b{font-family:"Public Sans",sans-serif;font-size:11.5px;fill:var(--ink);font-weight:600}
+ul{padding-left:1.15rem;margin:0 0 1.1em}
+li{margin-bottom:.42em}
+.status{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;padding:.15rem .5rem;border-radius:4px}
+.status.done{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.status.run{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.status.open{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Branch report · explore/constraint-based</p>
+  <h1>Learning who to ask,<br>and what to ask them</h1>
+  <p class="lede col">Agents that each see part of one causal system, choose their own
+  experiments, and must work out not only their own structure but <em>which partner's
+  hidden variable</em> is interfering with it.</p>
+  <div class="meta">
+    <span><b>27 August 2026</b> · supervisor brief</span>
+    <span>freeze <b>31 Aug</b> · dissertation <b>8 Sep</b></span>
+    <span><b>337</b> tests passing</span>
+  </div>
+</header>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">The problem</p>
+    <h2>Why this is not just causal discovery with more computers</h2>
+    <p>Several organisations hold different slices of one system. Each sees its own
+    <strong style="color:var(--private)">private variables</strong> plus a
+    <strong style="color:var(--shared)">shared set</strong> everyone observes. Each can run
+    experiments, but only on what it can see, and none will hand over its raw data.</p>
+    <p>Two things follow that don't arise with a single agent. Experiments are
+    <em>contended</em> — two agents testing the same shared variable have wasted a round
+    between them. And every agent's private variables are
+    <strong style="color:var(--latent)">invisible confounders</strong> for everyone else:
+    they create correlations in your window that you cannot explain, because their cause is
+    behind someone else's wall.</p>
+    <p>The question this branch set out to answer is whether agents can <em>learn</em> to
+    divide that work better than a sensible rule of thumb, without sharing data.</p>
+  </div>
+
+  <div class="grid g3">
+    <div class="card">
+      <h4>Answered</h4>
+      <div class="big up">2.3×</div>
+      <p>Learned agents against the rule-of-thumb baseline on the joint metric, four agents,
+      three seeds.</p>
+    </div>
+    <div class="card">
+      <h4>New target</h4>
+      <div class="big">0.670</div>
+      <p>Attribution: naming <em>whose</em> hidden variable causes what. Matches a strategy
+      derived from theory (0.667), beats greedy (0.582).</p>
+    </div>
+    <div class="card">
+      <h4>Scale reached</h4>
+      <div class="big">30</div>
+      <p>Variables per window, from a hard ceiling of 6 this morning. 60 nodes total,
+      349&nbsp;ms per episode.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">How we got here</p>
+    <h2>The route, and why each turn was taken</h2>
+  </div>
+
+  <div class="tl col">
+    <div class="step">
+      <h3>The results were real but the setting was broken</h3>
+      <p>The grading exempted a whole class of question on a false argument about what
+      observation can determine. Removing the exemption made the task harder — and exposed
+      that <strong>the budget made 25 of 40 episodes unsolvable by any assignment
+      whatsoever.</strong> Every earlier comparison was partly scored on impossible
+      episodes. Budget is now set so the ceiling is 100%.</p>
+    </div>
+    <div class="step">
+      <h3>Agents could not remember what their partners had done</h3>
+      <p>Partners announce their moves each round, but the policy is feedforward and cannot
+      retain an announcement. We added cumulative per-partner counts — converting disclosure
+      into memory without disclosing anything new.</p>
+    </div>
+    <div class="step">
+      <h3>A policy was welded to one exact configuration</h3>
+      <p>Nothing in the network's learned weights depended on window size; two bookkeeping
+      details did. Fixing them made one checkpoint run at
+      <strong>four different window sizes and agent counts</strong> — the prerequisite for
+      any claim about generality.</p>
+    </div>
+    <div class="step">
+      <h3>The graph generator was a leftover</h3>
+      <p>Erdős–Rényi came from a Bayesian method we no longer use. Moving to scale-free —
+      at matched density — gives <strong>5.3× as many hidden-common-cause signatures</strong>,
+      the exact structure this thesis is about. It was incidental before and is routine now.</p>
+    </div>
+    <div class="step">
+      <h3>The target changed: from “what” to “whose”</h3>
+      <p>A confounded pair used to be recorded as “something unobserved links these two”, full
+      stop. It is now a <strong>named claim</strong>: which group of your variables one hidden
+      cause explains, and which agent owns it. This is a question single-agent causal
+      discovery cannot even pose.</p>
+    </div>
+    <div class="step">
+      <h3>And that exposed something uncomfortable</h3>
+      <p>The old idealised environment could not see a partner's private experiment at all —
+      not under-rewarded, <strong>invisible</strong>. So its headline number is about
+      dividing shared work and contains no cooperation, and never could have.</p>
+    </div>
+    <div class="step">
+      <h3>Scale was blocked by the wrong suspect</h3>
+      <p>We assumed the belief representation. Profiling said otherwise: the
+      <em>ground-truth</em> computation was searching every subset of variables. Replaced with
+      a polynomial algorithm, validated at <strong>1440/1440 exact agreement</strong>. That,
+      plus a pairwise belief, took the ceiling from 6 variables to 30.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Result one</p>
+    <h2>Coordination is learnable, and it holds as the problem grows</h2>
+    <p>Deterministic environment, joint success — <em>every</em> agent simultaneously correct,
+    the hardest available measure. All arms on identical episodes.</p>
+  </div>
+  <div class="tablewrap col">
+    <table>
+      <thead><tr><th>configuration</th><th>nodes</th><th>learned</th><th>greedy</th><th>ratio</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td>4 agents · 1 private each</td><td>7</td><td>0.937</td><td>0.405</td><td>2.3×</td></tr>
+        <tr><td>4 agents · 2 private each</td><td>11</td><td>0.530</td><td>0.223</td><td>2.4×</td></tr>
+        <tr><td>8 agents · 1 private each</td><td>11</td><td>0.445</td><td>0.383</td><td>1.2×</td></tr>
+        <tr class="dim"><td>8 agents · 2 private each</td><td>19</td><td>0.120</td><td>0.108</td><td>1.1×</td></tr>
+        <tr class="dim"><td>20 agents · 1 private each</td><td>23</td><td>0.000</td><td>0.240</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col">
+    <div class="note warn">
+      <p><strong>Read the last two rows honestly.</strong> Joint success falls exponentially
+      with agent count whatever the policy does, so the column is not comparable down the
+      page. But the 20-agent row is a genuine failure, not an artefact — greedy manages 0.240
+      there and the learned policy manages nothing. Likely under-training (each agent sees
+      only two of its own moves per episode) but that is a guess, not a measurement.</p>
+    </div>
+    <p>The 8-agent row is explained rather than excused. With the shared set held at three
+    variables, doubling the agents doubles the crowding — and a separate sweep shows the
+    room-to-improve over the baseline halving as it does. There is simply less left to
+    coordinate over.</p>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Result two · the new contribution</p>
+    <h2>Naming whose hidden variable it is</h2>
+    <p>Two facts make this well-posed. A hidden cause of two shared variables must live in
+    exactly one named agent's private block — so it's a choice among a handful of suspects,
+    not a search over arbitrary structures. And “one hidden cause of three things” versus
+    “three separate hidden causes” is <em>observationally indistinguishable</em> but
+    interventionally separable — by an experiment only the owner can run.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 720 260" role="img" aria-label="Attribution accuracy and identification for four fixed strategies">
+      <text x="0" y="14" class="lbl-b">Fixed strategies · 3 agents · 40 episodes</text>
+      <g transform="translate(0,32)">
+        <line x1="182" y1="0" x2="182" y2="196" class="axis"/>
+        <line x1="182" y1="196" x2="700" y2="196" class="axis"/>
+        <g class="lbl">
+          <text x="182" y="212" text-anchor="middle">0</text>
+          <text x="311" y="212" text-anchor="middle">0.25</text>
+          <text x="441" y="212" text-anchor="middle">0.50</text>
+          <text x="570" y="212" text-anchor="middle">0.75</text>
+          <text x="700" y="212" text-anchor="middle">1.00</text>
+        </g>
+        <line x1="311" y1="0" x2="311" y2="196" class="gridline"/>
+        <line x1="441" y1="0" x2="441" y2="196" class="gridline"/>
+        <line x1="570" y1="0" x2="570" y2="196" class="gridline"/>
+
+        <text x="174" y="20" text-anchor="end" class="lbl-b">shared only</text>
+        <rect x="182" y="8" width="1" height="15" fill="var(--latent)"/>
+        <rect x="182" y="26" width="1" height="15" fill="var(--shared)"/>
+        <text x="192" y="20" class="lbl" fill="var(--bad)">0.000 — never</text>
+
+        <text x="174" y="66" text-anchor="end" class="lbl-b">private only</text>
+        <rect x="182" y="54" width="509" height="15" fill="var(--latent)"/>
+        <rect x="182" y="72" width="152" height="15" fill="var(--shared)"/>
+        <text x="699" y="66" class="lbl" text-anchor="end" fill="#fff">0.981</text>
+
+        <text x="174" y="112" text-anchor="end" class="lbl-b">probe, then work</text>
+        <rect x="182" y="100" width="471" height="15" fill="var(--latent)"/>
+        <rect x="182" y="118" width="342" height="15" fill="var(--shared)"/>
+        <text x="661" y="112" class="lbl">0.907</text>
+
+        <text x="174" y="158" text-anchor="end" class="lbl-b">random</text>
+        <rect x="182" y="146" width="211" height="15" fill="var(--latent)"/>
+        <rect x="182" y="164" width="143" height="15" fill="var(--shared)"/>
+        <text x="401" y="158" class="lbl">0.407</text>
+      </g>
+      <g transform="translate(182,248)" class="lbl">
+        <rect x="0" y="-9" width="11" height="11" rx="2" fill="var(--latent)"/>
+        <text x="17" y="0">attribution accuracy</text>
+        <rect x="150" y="-9" width="11" height="11" rx="2" fill="var(--shared)"/>
+        <text x="167" y="0">problems fully solved</text>
+      </g>
+    </svg>
+    <figcaption>An agent that never touches its own private variables solves structure
+    normally and attribution <strong>never</strong> — 0.000, not “rarely”. The evidence only
+    exists when a partner spends a round on something that pays them nothing. Either pure
+    strategy lands near 0.29 solved; the mixture more than doubles it.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="note">
+      <p><strong>And the agents find it themselves.</strong> Three seeds, all arms on
+      identical episodes: learned <b class="num">0.670&nbsp;±&nbsp;0.005</b> against the
+      theory-derived schedule's <b class="num">0.667</b> and greedy's
+      <b class="num">0.582</b>. They discovered a strategy as good as the one we derived —
+      <em>without being told it</em>, and while being paid only for their own window.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">One episode, step by step</p>
+    <h2>What cooperation actually looks like</h2>
+    <p>Three agents, two private variables each, three shared. Agents&nbsp;1 and&nbsp;2 both
+    have a confounded pair in their window, caused by something inside
+    <strong style="color:var(--private)">agent&nbsp;0</strong>. Neither can see it. The bars
+    show how many explanations each agent still has open.</p>
+  </div>
+
+  <div class="film">
+    <div class="frame">
+      <div class="r">start</div>
+      <div class="act" style="color:var(--ink-faint)">observation only</div>
+      <div class="bars">
+        <div class="bar"><span>a0</span><span class="track"><span class="fill" style="width:30%"></span></span><span>305</span></div>
+        <div class="bar"><span>a1</span><span class="track"><span class="fill" style="width:24%"></span></span><span>241</span></div>
+        <div class="bar"><span>a2</span><span class="track"><span class="fill" style="width:100%"></span></span><span>1025</span></div>
+      </div>
+    </div>
+    <div class="frame" style="border-color:var(--private);border-width:2px">
+      <div class="r">round 1</div>
+      <div class="act">agent 0 tests<br>its own var 0</div>
+      <span class="chip private">private</span>
+      <div class="bars">
+        <div class="bar"><span>a0</span><span class="track"><span class="fill" style="width:1%"></span></span><span>13</span></div>
+        <div class="bar"><span>a1</span><span class="track"><span class="fill" style="width:5%"></span></span><span>46</span></div>
+        <div class="bar"><span>a2</span><span class="track"><span class="fill" style="width:38%"></span></span><span>390</span></div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="r">round 2</div>
+      <div class="act">agent 1 tests<br>shared var 7</div>
+      <span class="chip shared">shared</span>
+      <div class="bars">
+        <div class="bar"><span>a0</span><span class="track"><span class="fill" style="width:1%"></span></span><span>12</span></div>
+        <div class="bar"><span>a1</span><span class="track"><span class="fill" style="width:4%"></span></span><span>38</span></div>
+        <div class="bar"><span>a2</span><span class="track"><span class="fill" style="width:34%"></span></span><span>350</span></div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="r">round 3</div>
+      <div class="act">agent 2 tests<br>its own var 4</div>
+      <span class="chip private">private</span>
+      <div class="bars">
+        <div class="bar"><span>a0</span><span class="track"><span class="fill" style="width:1%"></span></span><span>12</span></div>
+        <div class="bar"><span>a1</span><span class="track"><span class="fill" style="width:4%"></span></span><span>38</span></div>
+        <div class="bar"><span>a2</span><span class="track"><span class="fill" style="width:25%"></span></span><span>260</span></div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="r">rounds 4–5</div>
+      <div class="act">shared work<br>continues</div>
+      <span class="chip shared">shared</span>
+      <div class="bars">
+        <div class="bar"><span>a0</span><span class="track"><span class="fill" style="width:1%"></span></span><span>1</span></div>
+        <div class="bar"><span>a1</span><span class="track"><span class="fill" style="width:1%"></span></span><span>2</span></div>
+        <div class="bar"><span>a2</span><span class="track"><span class="fill" style="width:1%"></span></span><span>8</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="note">
+      <p><strong>Round 1 is the whole thesis in one move.</strong> Agent&nbsp;0 spends its
+      turn on its own private variable. That does almost nothing for agent&nbsp;0 — but both
+      partners immediately go from <em>not knowing</em> whose hidden variable is disturbing
+      them to <em>knowing it is agent 0's</em>, and agent 1's open explanations collapse from
+      241 to 46. It is a favour, and the agent was never paid for it.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Result three</p>
+    <h2>Transfer to noisy data fails — and we know why</h2>
+    <p>The hope was to train cheaply in the idealised setting and carry the policy into
+    realistic, finite data. It does not work, and the interesting part is the mechanism.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4>In the environment it trained on</h4>
+      <div class="big up">0.988</div>
+      <p>Problems solved, with only 4% of shared work duplicated. Near-perfect division of
+      labour.</p>
+    </div>
+    <div class="card">
+      <h4>Moved to noisy data</h4>
+      <div class="big down">0.171</div>
+      <p>Below random (0.208) and below greedy (0.229). Not confusion — a confused policy
+      drifts <em>toward</em> random, not past it.</p>
+    </div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 720 250" role="img" aria-label="Blurring only the policy's inputs reproduces the transfer failure">
+      <text x="0" y="14" class="lbl-b">Blur only what the policy SEES, in the environment it has mastered</text>
+      <g transform="translate(46,32)">
+        <line x1="0" y1="0" x2="0" y2="170" class="axis"/>
+        <line x1="0" y1="170" x2="620" y2="170" class="axis"/>
+        <g class="lbl">
+          <text x="-8" y="4" text-anchor="end">1.0</text>
+          <text x="-8" y="89" text-anchor="end">0.5</text>
+          <text x="-8" y="174" text-anchor="end">0.0</text>
+        </g>
+        <line x1="0" y1="85" x2="620" y2="85" class="gridline"/>
+        <!-- identified: 0.988 .954 .929 .633 .412 at blur 0 .25 .5 .75 1 -->
+        <polyline points="0,2 155,8 310,12 465,62 620,100" fill="none"
+          stroke="var(--shared)" stroke-width="2.5"/>
+        <!-- private share: .558 .588 .635 .727 .744 -->
+        <polyline points="0,75 155,70 310,62 465,46 620,44" fill="none"
+          stroke="var(--private)" stroke-width="2.5" stroke-dasharray="5 4"/>
+        <circle cx="465" cy="62" r="5" fill="var(--bad)"/>
+        <circle cx="465" cy="46" r="5" fill="var(--bad)"/>
+        <line x1="465" y1="30" x2="465" y2="170" stroke="var(--bad)" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="472" y="26" class="lbl" fill="var(--bad)">matches the transferred policy</text>
+        <g class="lbl">
+          <text x="0" y="188" text-anchor="middle">0.00</text>
+          <text x="155" y="188" text-anchor="middle">0.25</text>
+          <text x="310" y="188" text-anchor="middle">0.50</text>
+          <text x="465" y="188" text-anchor="middle">0.75</text>
+          <text x="620" y="188" text-anchor="middle">1.00</text>
+          <text x="310" y="206" text-anchor="middle" fill="var(--ink-soft)">how much its view is blurred</text>
+        </g>
+      </g>
+      <g transform="translate(46,244)" class="lbl">
+        <rect x="0" y="-9" width="16" height="3" fill="var(--shared)"/>
+        <text x="22" y="0">problems solved</text>
+        <rect x="140" y="-9" width="16" height="3" fill="var(--private)"/>
+        <text x="162" y="0">share of budget spent on its own variable</text>
+      </g>
+    </svg>
+    <figcaption>Same task, same reward, same exact belief underneath — only the numbers the
+    policy <em>looks at</em> were blurred. At 0.75 the behaviour matches the transferred
+    policy almost exactly (0.727 vs 0.691 on budget share; 0.53 vs 0.55 on shared coverage).
+    In the clean environment every belief is settled or wide open; in the noisy one they sit
+    in the middle. The policy has never seen a half-settled belief, and retreats to the move
+    that was always safe.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="note bad">
+      <p><strong>A hypothesis we killed, worth mentioning because it nearly cost a day.</strong>
+      The first explanation was that the idealisation teaches agents never to repeat an
+      experiment, while repeating buys statistical power on real data. A sweep refuted it:
+      dividing the work is better in <em>both</em> environments, in identical order. We built
+      the test before the fix.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Result four · today</p>
+    <h2>From six variables to thirty</h2>
+    <p>The belief used to hold an explicit list of every possible structure — exact, and
+    growing as 3 to the power of the connections. At 30 variables that is about 10<sup>19</sup>
+    entries. Two changes removed the wall.</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 720 250" role="img" aria-label="Cost per episode against window size, old and new representations">
+      <text x="0" y="14" class="lbl-b">Milliseconds per episode · log scale</text>
+      <g transform="translate(50,30)">
+        <line x1="0" y1="0" x2="0" y2="168" class="axis"/>
+        <line x1="0" y1="168" x2="620" y2="168" class="axis"/>
+        <g class="lbl">
+          <text x="-8" y="4" text-anchor="end">1000</text>
+          <text x="-8" y="60" text-anchor="end">100</text>
+          <text x="-8" y="116" text-anchor="end">10</text>
+          <text x="-8" y="172" text-anchor="end">1</text>
+        </g>
+        <line x1="0" y1="56" x2="620" y2="56" class="gridline"/>
+        <line x1="0" y1="112" x2="620" y2="112" class="gridline"/>
+        <!-- enumerated: k3=4ms k5=87 k6=882 then dies. x: k3=0 k5=100 k6=150 k8=250 k15=400 k20=490 k30=620 -->
+        <polyline points="0,134 100,59 150,10" fill="none" stroke="var(--bad)" stroke-width="2.5"/>
+        <circle cx="150" cy="10" r="4.5" fill="var(--bad)"/>
+        <text x="160" y="8" class="lbl" fill="var(--bad)">gives up beyond here</text>
+        <!-- factored: 2,4,8,15,56,121,349 -->
+        <polyline points="0,150 100,134 150,117 250,102 400,66 490,54 620,26" fill="none"
+          stroke="var(--good)" stroke-width="2.5"/>
+        <circle cx="620" cy="26" r="4.5" fill="var(--good)"/>
+        <text x="612" y="16" class="lbl" text-anchor="end" fill="var(--good)">349 ms at k=30</text>
+        <g class="lbl">
+          <text x="0" y="186" text-anchor="middle">3</text>
+          <text x="100" y="186" text-anchor="middle">5</text>
+          <text x="150" y="186" text-anchor="middle">6</text>
+          <text x="250" y="186" text-anchor="middle">8</text>
+          <text x="400" y="186" text-anchor="middle">15</text>
+          <text x="490" y="186" text-anchor="middle">20</text>
+          <text x="620" y="186" text-anchor="middle">30</text>
+          <text x="310" y="204" text-anchor="middle" fill="var(--ink-soft)">variables per agent's window</text>
+        </g>
+      </g>
+      <g transform="translate(50,244)" class="lbl">
+        <rect x="0" y="-9" width="16" height="3" fill="var(--bad)"/>
+        <text x="22" y="0">explicit list of structures</text>
+        <rect x="190" y="-9" width="16" height="3" fill="var(--good)"/>
+        <text x="212" y="0">pairwise belief (new)</text>
+      </g>
+    </svg>
+    <figcaption>The pairwise belief tracks each pair of variables separately — 1,740 numbers
+    at 30 variables instead of 10<sup>19</sup>. It works because the evidence we collect is
+    already pairwise: experimenting on A and watching B respond tells you about the A–B link
+    and nothing else.</figcaption>
+  </figure>
+
+  <div class="col">
+    <p><strong>The wall was not where we assumed.</strong> After building the pairwise belief
+    it still died at 15 variables. Profiling found the cost in the <em>ground-truth</em>
+    computation used to grade the agents, which was searching every subset of variables — 2ⁿ
+    per pair. Swapped for a polynomial algorithm and checked against the old one on 1,440
+    cases: <b class="num">1440/1440</b> identical.</p>
+    <p>And the new belief is a <em>conservative</em> approximation, not a different answer:
+    across 1,920 pairs it is sometimes less decisive than the exact version and
+    <strong>never once contradicts it</strong>.</p>
+    <div class="note">
+      <p><strong>First trained result at scale, an hour old.</strong> 8-variable windows,
+      20 nodes, 150 episodes: learned <b class="num">0.698&nbsp;±&nbsp;0.027</b> against
+      greedy's <b class="num">0.605</b>, and more than double on the all-agents-correct
+      measure (0.413 vs 0.193). One seed.</p>
+    </div>
+    <div class="note warn">
+      <p><strong>The honest cost.</strong> The exact “best possible score” is computed by
+      enumeration, so it exists only below 6 variables. Above that we have honest bounds.
+      The write-up should say exactly that: exact headroom at small scale, bounds above.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <p class="eyebrow">Status</p>
+    <h2>Running, waiting, and open</h2>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>work</th><th>where</th><th style="text-align:left">state</th></tr></thead>
+      <tbody>
+        <tr><td>15- and 30-variable training</td><td>here</td><td style="text-align:left"><span class="status run">running</span> too early to read</td></tr>
+        <tr><td>Attribution beyond 3 agents</td><td>cluster</td><td style="text-align:left"><span class="status run">running</span> 14-task array</td></tr>
+        <tr><td>Per-agent vs shared reward</td><td>cluster</td><td style="text-align:left"><span class="status run">running</span> the cooperation question</td></tr>
+        <tr><td>Erdős–Rényi vs scale-free, converged</td><td>cluster</td><td style="text-align:left"><span class="status open">queued</span> resolves a confound</td></tr>
+        <tr><td>Noise-dial training</td><td>here</td><td style="text-align:left"><span class="status open">inconclusive</span> under-trained, needs a rerun</td></tr>
+        <tr><td>Six agents with attribution</td><td>—</td><td style="text-align:left"><span class="status open">out of reach</span> cost grows with partner count</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col">
+    <h3>What we are not claiming</h3>
+    <ul>
+      <li><strong>That individual agents are altruistic.</strong> Testing your own private
+      variable also helps you, so budget share doesn't separate the motives. The reward
+      ablation is running.</li>
+      <li><strong>That the headline is generator-independent.</strong> The 2.3× result has
+      only been measured on one graph type. Resolving that is the top queued job.</li>
+      <li><strong>That the noise dial fixes transfer.</strong> The machinery works at three
+      noise levels; whether it helps is unmeasured.</li>
+      <li><strong>That attribution scales.</strong> It exists at three agents. Its cost grows
+      with the number of <em>partners</em>, and the pairwise belief does not help with that —
+      a pairwise <em>attribution</em> is the missing piece.</li>
+    </ul>
+
+    <h3>Corrections made against ourselves</h3>
+    <p>Six claims were withdrawn over two days, four of them for the same reason: a
+    difference reported that was smaller than its own noise. Two process changes followed —
+    every comparison is now paired on identical episodes, and nothing is reported below 150
+    episodes. The withdrawals are recorded in the findings document alongside the results.</p>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
