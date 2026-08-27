@@ -140,7 +140,7 @@ def main(argv=None) -> dict:
     # checkpoint, and refused on mismatch at load -- performance belongs to the
     # (policy, backend, arch) triple.
     ap.add_argument("--backend", default="exact",
-                    choices=["exact", "constraint", "version_space"])
+                    choices=["exact", "constraint", "version_space", "attributed"])
     ap.add_argument("--claim_bar", type=float, default=None,
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
@@ -304,6 +304,10 @@ def main(argv=None) -> dict:
         labels.insert(-1, "greedy")
     else:
         labels.insert(-1, "greedy_uncertainty")
+    if args.backend == "attributed":
+        # The attribution-aware reference. Without it the learner is compared only against
+        # arms that are not scored on the thing it is trained for.
+        labels.insert(-1, "probe_then_work")
     for label in labels:
         arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
 

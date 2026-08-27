@@ -461,6 +461,52 @@ class GreedyAgent:
         return int(self.candidates[slot])
 
 
+class ProbeThenWorkAgent:
+    """Probe your own private variables first, then work on the shared ones.
+
+    THE REFERENCE FOR THE ATTRIBUTED ENVIRONMENT, and it has to exist or the comparison is
+    rigged. `greedy_uncertainty` scores unsure STRUCTURE claims and knows nothing about
+    attribution, so against a learner that is rewarded for attribution it would look
+    artificially bad -- the same unfair comparison found and fixed on 2026-08-26 when the
+    learner was the blindfolded one.
+
+    Not a serious policy either: it is fixed, ignores the belief entirely, and cannot
+    respond to what a partner has already settled. It is the "coordination is available if
+    you pay for it" arm, in the same spirit as `forced_clamp`.
+
+    Measured 2026-08-26 at 3 agents x 2 private, scale-free, budget 12: attribution 0.907
+    and identification 0.658, against 0.000/0.000 for shared-only and 0.981/0.292 for
+    private-only. A private probe pays only the PARTNERS, so the ordering is the whole
+    point: neither pure strategy comes close to the mixture.
+    """
+
+    def __init__(self, agent: int, seed: int = 0, probe_rounds: Optional[int] = None):
+        self.agent = int(agent)
+        self.probe_rounds = probe_rounds
+        self._seed = _agent_seed(seed, self.agent)
+        self.turn = 0
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.turn = 0
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        private, shared = list(window.private), list(window.shared)
+        # Count only the turns this agent actually held: under turn-taking the policy is
+        # queried every round and the environment discards the inactive agent's move, so
+        # counting queries would advance the schedule several times per real action.
+        if env.active is not None and env.active != self.agent and env.round > 0:
+            pass
+        probe = len(private) if self.probe_rounds is None else self.probe_rounds
+        index = self.turn
+        self.turn += 1
+        if index < probe and private:
+            return window.action_index(private[index % len(private)], prefer=VARY)
+        if not shared:
+            return window.pass_index
+        return window.action_index(shared[(index - probe) % len(shared)], prefer=VARY)
+
+
 def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, object]:
     return {
         "pass": PassAgent(agent, seed),
@@ -469,4 +515,5 @@ def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, obj
         "forced_clamp": ForcedClampAgent(agent, seed),
         "greedy": GreedyAgent(agent, env, seed),
         "greedy_uncertainty": UncertaintyGreedyAgent(agent, seed),
+        "probe_then_work": ProbeThenWorkAgent(agent, seed),
     }
