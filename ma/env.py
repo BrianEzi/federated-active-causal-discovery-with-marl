@@ -67,10 +67,15 @@ VERSION_SPACE = "version_space"
 # See cb/attribution.py. Deterministic, like VERSION_SPACE, and it adds the
 # only channel through which one agent can help another in that environment.
 ATTRIBUTED = "attributed"
-BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED)
+# Pairwise belief: one small version space PER PAIR, O(k^2) state and update,
+# so it carries to window sizes the enumerated belief cannot reach. See
+# cb/factored.py for what it gives up -- joint constraints, and with them the
+# exact ceiling and exact optimum.
+FACTORED = "factored"
+BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED)
 # Backends whose belief exposes bootstrap-shaped claim frequencies, so `cb.claims` and the
 # constraint-side greedy read them the same way.
-CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED)
+CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -398,6 +403,11 @@ class AgentWindow:
             self.belief = VersionSpaceBackend(self.k, shared_positions,
                                               evidence=vs_evidence,
                                               evidence_alpha=vs_evidence_alpha)
+        elif backend == FACTORED:
+            from cb.factored import FactoredBackend
+            self.belief = FactoredBackend(self.k, shared_positions,
+                                          evidence=vs_evidence,
+                                          evidence_alpha=vs_evidence_alpha)
         elif backend == ATTRIBUTED:
             from cb.attribution import AttributedVersionSpaceBackend
             self.belief = AttributedVersionSpaceBackend(
@@ -499,7 +509,7 @@ class TwoAgentEnv:
                 "backend has no replicates. Use the constraint backend, or 'u14'.")
         if config.oracle_obs_structure and config.belief_backend != CONSTRAINT:
             raise ValueError("oracle_obs_structure requires the constraint backend")
-        if config.belief_backend == VERSION_SPACE:
+        if config.belief_backend in (VERSION_SPACE, FACTORED):
             if config.reward_criterion != "claims":
                 raise ValueError("version_space belief only scores the claims criterion")
             # Below 1.0 a MAJORITY of survivors could carry a wrong answer over the bar and
@@ -603,7 +613,10 @@ class TwoAgentEnv:
             # Per-episode resample stream: see ConstraintBackend.set_episode.
             if hasattr(window.belief, "set_episode"):
                 window.belief.set_episode(seed if seed is not None else 0)
-        if cfg.belief_backend == ATTRIBUTED:
+        if cfg.belief_backend == FACTORED:
+            for agent, window in self.windows.items():
+                window.belief.reset(self._true_mag(agent))
+        elif cfg.belief_backend == ATTRIBUTED:
             # Needs the GLOBAL graph, not only the window's MAG: the true latent groups and
             # the response of each to a partner's action are properties of the whole system.
             # Truth is used only to prune and to score -- oracle-side, exactly as the reward

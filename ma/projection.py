@@ -103,6 +103,54 @@ def d_separated(adjacency: np.ndarray, u: int, v: int, cond: Sequence[int]) -> b
     return True
 
 
+def _inducing_path_exists(adjacency, anc, observed_set, u: int, v: int) -> bool:
+    """Is there an INDUCING PATH between u and v relative to the hidden nodes?
+
+    Verma & Pearl's characterisation, and the reason it matters here is purely
+    computational: u and v are adjacent in the MAG over `observed` exactly when such a path
+    exists, so this replaces a search over every conditioning subset -- 2^(k-2) per pair,
+    which made ground truth, not the belief, the thing that could not scale past k~8.
+
+    A path between u and v is inducing relative to the hidden set when every node strictly
+    between the endpoints is either
+      - a COLLIDER on the path AND an ancestor of u or of v, or
+      - a NON-COLLIDER that is HIDDEN.
+
+    Searched as reachability over states (node, did we arrive by an arrowhead), which is
+    what makes colliders decidable locally: in a DAG the edge x -> w puts an arrowhead at w,
+    so w is a collider on the path exactly when both its edges point into it.
+    """
+    d = adjacency.shape[0]
+    neighbours = [np.flatnonzero((adjacency[w] > 0) | (adjacency[:, w] > 0))
+                  for w in range(d)]
+    # state: (node, arrived_by_arrowhead)
+    start = [(int(w), bool(adjacency[u, w] > 0)) for w in neighbours[u]]
+    seen = set()
+    stack = [state for state in start]
+    for state in stack:
+        seen.add(state)
+    while stack:
+        node, in_arrow = stack.pop()
+        if node == v:
+            return True
+        for nxt in neighbours[node]:
+            nxt = int(nxt)
+            if nxt == u:
+                continue
+            out_arrow_at_node = bool(adjacency[nxt, node] > 0)   # nxt -> node
+            collider = in_arrow and out_arrow_at_node
+            if collider:
+                if not (anc[node, u] or anc[node, v]):
+                    continue
+            elif node in observed_set:
+                continue                    # a visible non-collider blocks the path
+            state = (nxt, bool(adjacency[node, nxt] > 0))
+            if state not in seen:
+                seen.add(state)
+                stack.append(state)
+    return False
+
+
 def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndarray:
     """MAG over `observed`, as a `[k, k]` matrix of edge codes indexed by position in
     `observed` (not by global node id).
@@ -112,19 +160,10 @@ def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndar
     anc = ancestor_matrix(adjacency)
     proj = np.zeros((k, k), dtype=np.int8)
 
+    observed_set = set(observed)
     for i, j in combinations(range(k), 2):
         u, v = observed[i], observed[j]
-        rest = [w for w in observed if w not in (u, v)]
-
-        separable = False
-        for size in range(len(rest) + 1):
-            for cond in combinations(rest, size):
-                if d_separated(adjacency, u, v, cond):
-                    separable = True
-                    break
-            if separable:
-                break
-        if separable:
+        if not _inducing_path_exists(adjacency, anc, observed_set, u, v):
             continue                      # non-adjacent in the MAG
 
         if anc[u, v]:

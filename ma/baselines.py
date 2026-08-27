@@ -509,13 +509,39 @@ class ProbeThenWorkAgent:
         return window.action_index(shared[(index - probe) % len(shared)], prefer=VARY)
 
 
+class _LazyBaselines(dict):
+    """Baselines built ON ACCESS, not up front.
+
+    `GreedyAgent` enumerates the window and refuses past k=5, and raises on any non-exact
+    backend when called. Building it eagerly meant a caller that only wanted
+    `greedy_uncertainty` still crashed -- which took down the frontier sweep at window size
+    6 and an attribution run's report. Nothing changes for a caller that asks for an arm
+    this environment can supply.
+    """
+
+    def __init__(self, builders):
+        super().__init__()
+        self._builders = builders
+
+    def __getitem__(self, key):
+        if key not in self and key in self._builders:
+            super().__setitem__(key, self._builders[key]())
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        return key in self._builders
+
+    def keys(self):
+        return self._builders.keys()
+
+
 def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, object]:
-    return {
-        "pass": PassAgent(agent, seed),
-        "random_vary": RandomAgent(agent, seed, allow_clamp=False),
-        "random_clamp": RandomAgent(agent, seed, allow_clamp=True),
-        "forced_clamp": ForcedClampAgent(agent, seed),
-        "greedy": GreedyAgent(agent, env, seed),
-        "greedy_uncertainty": UncertaintyGreedyAgent(agent, seed),
-        "probe_then_work": ProbeThenWorkAgent(agent, seed),
-    }
+    return _LazyBaselines({
+        "pass": lambda: PassAgent(agent, seed),
+        "random_vary": lambda: RandomAgent(agent, seed, allow_clamp=False),
+        "random_clamp": lambda: RandomAgent(agent, seed, allow_clamp=True),
+        "forced_clamp": lambda: ForcedClampAgent(agent, seed),
+        "greedy": lambda: GreedyAgent(agent, env, seed),
+        "greedy_uncertainty": lambda: UncertaintyGreedyAgent(agent, seed),
+        "probe_then_work": lambda: ProbeThenWorkAgent(agent, seed),
+    })
