@@ -492,14 +492,16 @@ class ProbeThenWorkAgent:
     def __call__(self, env: TwoAgentEnv, result) -> int:
         window = env.windows[self.agent]
         private, shared = list(window.private), list(window.shared)
-        # Count only the turns this agent actually held: under turn-taking the policy is
-        # queried every round and the environment discards the inactive agent's move, so
-        # counting queries would advance the schedule several times per real action.
-        if env.active is not None and env.active != self.agent and env.round > 0:
-            pass
+        # HOW MANY MOVES THIS AGENT HAS ACTUALLY MADE, read from the environment rather
+        # than counted here. Under turn-taking the policy is queried EVERY round and the
+        # environment discards the inactive agent's move, so a local counter advances once
+        # per round instead of once per action -- at three agents it ran three times too
+        # fast, the probe phase was over before the agent had acted at all, and the arm
+        # scored 0.000 attribution while the standalone version of the same policy scored
+        # 0.907. `own_counts` is incremented only when a move is APPLIED, so it cannot
+        # drift from what happened.
+        index = int(env.own_counts[self.agent].sum())
         probe = len(private) if self.probe_rounds is None else self.probe_rounds
-        index = self.turn
-        self.turn += 1
         if index < probe and private:
             return window.action_index(private[index % len(private)], prefer=VARY)
         if not shared:
