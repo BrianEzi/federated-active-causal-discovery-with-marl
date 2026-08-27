@@ -186,6 +186,19 @@ class MAConfig:
     # no engine now in use reads `prior_p`, so this is free to vary.
     graph_model: str = ER
     sf_m: int = 2
+    # WHERE THE DETERMINISTIC BACKENDS GET THEIR EVIDENCE. "oracle" consults the true graph
+    # and answers exactly at any distance -- the original idealisation. "sampled" asks the
+    # DATA, with a test that is sound but not complete, so weak and distant effects fail to
+    # prune and the belief carries intermediate frequencies like the statistical engine's.
+    #
+    # This turns `n_int` into a NOISE DIAL on one environment family, instead of leaving two
+    # incomparable worlds with a leap between them. Measured 2026-08-27: blurring only what
+    # the policy SEES reproduces the transfer failure almost exactly (private share 0.727
+    # against transfer's 0.691, shared coverage 0.53 against 0.55), so the input
+    # distribution is the mechanism -- and sampled evidence produces the right distribution
+    # for the right reason rather than by adding artificial noise.
+    vs_evidence: str = "oracle"
+    vs_evidence_alpha: float = 0.001
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
     score_rule: str = JOINT_CONF
     # One bit per round: "I clamped something you cannot see". OFF by default -- the no-bit
@@ -341,6 +354,7 @@ class AgentWindow:
                  observe_belief_channels: bool = False,
                  observe_partner_counts: bool = False,
                  mode_by_role: bool = False,
+                 vs_evidence: str = "oracle", vs_evidence_alpha: float = 0.001,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
@@ -381,7 +395,9 @@ class AgentWindow:
                                             base_seed=100003 * (self.agent + 1))
         elif backend == VERSION_SPACE:
             from cb.versionspace import VersionSpaceBackend
-            self.belief = VersionSpaceBackend(self.k, shared_positions)
+            self.belief = VersionSpaceBackend(self.k, shared_positions,
+                                              evidence=vs_evidence,
+                                              evidence_alpha=vs_evidence_alpha)
         elif backend == ATTRIBUTED:
             from cb.attribution import AttributedVersionSpaceBackend
             self.belief = AttributedVersionSpaceBackend(
@@ -515,6 +531,8 @@ class TwoAgentEnv:
                                observe_belief_channels=config.observe_belief_channels,
                                observe_partner_counts=config.observe_partner_counts,
                                mode_by_role=config.mode_by_role,
+                               vs_evidence=config.vs_evidence,
+                               vs_evidence_alpha=config.vs_evidence_alpha,
                                cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)

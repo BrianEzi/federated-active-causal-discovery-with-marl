@@ -264,9 +264,18 @@ class VersionSpaceBackend:
 
     can_handle_multi_hidden = True
 
-    def __init__(self, k: int, shared_positions: Sequence[int] = (), **_ignored):
+    def __init__(self, k: int, shared_positions: Sequence[int] = (),
+                 evidence: str = "oracle", evidence_alpha: float = 0.001, **_ignored):
         self.k = int(k)
         self.shared_positions = tuple(shared_positions)
+        # "oracle": prune by the true ancestry, exactly, at any distance -- the original
+        # idealisation. "sampled": prune by what the DATA shows, which is sound but not
+        # complete, so weak and distant effects simply fail to prune. One code path with a
+        # flag rather than two backends, so the two cannot drift apart.
+        if evidence not in ("oracle", "sampled"):
+            raise ValueError(f"evidence must be 'oracle' or 'sampled', got {evidence!r}")
+        self.evidence = evidence
+        self.evidence_alpha = float(evidence_alpha)
         self.truth: Optional[tuple] = None
         self.last: Optional[VersionSpaceBelief] = None
         self._space: tuple = ()
@@ -278,6 +287,7 @@ class VersionSpaceBackend:
         self._current: tuple = ()
         self._current_signatures: tuple = ()
         self._applied: frozenset = frozenset()
+        self._detected: dict = {}
 
     def reset(self, true_mag: np.ndarray) -> None:
         self.truth = marks_from_mag(true_mag)
@@ -288,6 +298,7 @@ class VersionSpaceBackend:
         self._current = self._space
         self._current_signatures = self._signatures
         self._applied = frozenset()
+        self._detected = {}
         self.last = VersionSpaceBelief(self._space, self.k)
 
     def edge_marginals(self, data, known_intervened, told=None, score_rule=None,
@@ -309,6 +320,34 @@ class VersionSpaceBackend:
             raise RuntimeError("VersionSpaceBackend.reset(true_mag) must be called first")
         mask = np.asarray(known_intervened) > 0.5
         intervened = frozenset(x for x in range(self.k) if mask[:, x].any())
+
+        if self.evidence == "sampled":
+            # NOT INCREMENTAL, and it cannot be. Every round adds rows, so a weak effect
+            # invisible at round two can clear the threshold at round six -- and evidence
+            # can only ever ACCUMULATE, never be withdrawn. Pruning incrementally would
+            # freeze each node's verdict at the moment it was first intervened on and throw
+            # away every later row. So the space is rebuilt from the start each refresh,
+            # against all the evidence gathered so far.
+            if not intervened:
+                if self.last is None:
+                    self.last = VersionSpaceBelief(self._space, self.k)
+                return self.last.directed
+            detected = {x: estimated_reveal(data, known_intervened, x, self.k,
+                                            alpha=self.evidence_alpha, foreign=told)
+                        for x in intervened}
+            if detected == self._detected and self.last is not None:
+                return self.last.directed          # nothing new was resolved this round
+            self._detected = detected
+            self._current = tuple(
+                marks for marks in self._space
+                if all(consistent_with_evidence(reveal(marks, self.k, x), *detected[x])
+                       for x in intervened))
+            self._current_signatures = tuple(
+                self._signatures[self._space.index(m)] for m in self._current)
+            self._applied = intervened
+            self.last = VersionSpaceBelief(self._current, self.k)
+            return self.last.directed
+
         if not intervened >= self._applied:
             self._current, self._current_signatures = self._space, self._signatures
             self._applied = frozenset()
@@ -338,3 +377,74 @@ class VersionSpaceBackend:
     @property
     def bidirected(self) -> np.ndarray:
         return self.last.bidirected if self.last is not None else np.zeros((self.k, self.k))
+
+
+# =========================================================================================
+# SAMPLED EVIDENCE -- the same version space, fed by finite data instead of by an oracle.
+# =========================================================================================
+
+
+def estimated_reveal(data, intervened, x: int, k: int, alpha: float = 0.001,
+                     foreign=None) -> tuple:
+    """What do(x) shows on FINITE data: the same tuple `reveal` returns, estimated.
+
+    `reveal` asks the true graph whether x is an ancestor of each other window node and
+    answers exactly, at any distance. This asks the DATA, with
+    `cb.citest.FisherZ.ancestral_evidence` -- did intervening on x demonstrably change y.
+
+    SOUND, NOT COMPLETE, and everything downstream depends on that asymmetry. What the test
+    reports is real; what it misses is real too. So a `True` here is trustworthy and a
+    `False` means only "not detected", never "not there".
+
+    THIS IS WHERE EFFECT RANGE ENTERS THE MODEL, and it enters for free. An effect along a
+    chain multiplies coefficients while each intermediate adds noise, so a distant ancestor
+    moves its descendant too little to detect, returns False, and prunes nothing. Under the
+    oracle a five-hop ancestor is exactly as informative as a direct parent, which is not a
+    small idealisation -- it changes which experiment is WORTH RUNNING, not merely what the
+    agent sees. Nothing here models decay explicitly; the data does it.
+
+    STRICTER THRESHOLD THAN THE REST OF THE ENGINE, deliberately. The errors are not
+    symmetric: a false positive prunes the TRUTH out of the version space and destroys the
+    property the whole environment exists for, while a false negative only leaves the belief
+    coarser for another round. 0.001 rather than 0.01 buys the expensive direction.
+    """
+    from cb.citest import FisherZ
+    test = FisherZ(np.asarray(data), np.asarray(intervened) > 0.5, alpha=alpha,
+                   foreign=foreign)
+    evidence = test.ancestral_evidence()
+    # POWER, alongside the verdict, and it is what lets the belief converge. Without it the
+    # rule can only prune candidates that DENY detected evidence, so a candidate that
+    # OVER-claims an effect survives however much data arrives -- measured 2026-08-27:
+    # 4.48 survivors at 4000 rows an experiment against the oracle's 1.40, and flat in the
+    # row count. `pair_power` says whether an effect of detectable size WOULD have shown,
+    # which turns a silent test from "no information" into "no effect" exactly when the
+    # data can support that reading.
+    powered = test.pair_power()
+    return (tuple(bool(evidence[x, y]) for y in range(k) if y != x),
+            tuple(bool(powered[x, y]) for y in range(k) if y != x))
+
+
+def consistent_with_evidence(candidate_reveal: tuple, detected: tuple,
+                             powered: tuple = None) -> bool:
+    """Prune a candidate that contradicts the evidence, in EITHER direction where the data
+    can support the reading.
+
+    DETECTED ancestry must be present in the candidate -- the test is sound, so what it
+    reports is real.
+
+    UNDETECTED ancestry refutes a candidate ONLY where the pair was POWERED: an effect of
+    detectable size would have shown, and did not, so the candidate claiming it is wrong.
+    Where the pair is under-powered, silence means nothing and the candidate stands. That is
+    what keeps weak and DISTANT effects from being read as absent -- an effect along a chain
+    multiplies coefficients and accumulates noise, so a far-off ancestor is under-powered by
+    nature and its candidates must survive.
+
+    `powered=None` restores the purely one-directional rule, which is sound but does not
+    converge: over-claiming candidates are never eliminated.
+    """
+    for index, (claimed, hit) in enumerate(zip(candidate_reveal, detected)):
+        if hit and not claimed:
+            return False
+        if powered is not None and claimed and not hit and powered[index]:
+            return False
+    return True
