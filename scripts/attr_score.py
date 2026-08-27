@@ -33,6 +33,7 @@ import numpy as np
 
 from cb.attribution import score_groups
 from cb.claims import score_window
+from ma.attribution_greedy import AttributionGreedyAgent
 from ma.baselines import ProbeThenWorkAgent, RandomAgent, UncertaintyGreedyAgent
 from ma.density_guard import DensityGuardedEnv
 from ma.env import ATTRIBUTED, PASS_ACTION, ROUND_ROBIN, VARY, MAConfig, TwoAgentEnv
@@ -166,6 +167,26 @@ def paired(rows_a: List[Dict[str, float]], rows_b: List[Dict[str, float]]) -> Di
             "delta_se": float(delta.std(ddof=1) / np.sqrt(len(delta))) if len(delta) > 1 else 0.0}
 
 
+def _tempered(ppo, agent: int, temperature: float):
+    """The trained policy sampled at a given temperature.
+
+    Written here rather than in ma/policy.py because the other session owns that file.
+    Mirrors `IndependentPPO.policy` exactly apart from dividing the logits.
+    """
+    import torch
+
+    net = ppo.nets[agent]
+
+    def act(env, result) -> int:
+        obs = torch.as_tensor(env.observation(agent), dtype=torch.float32)
+        with torch.no_grad():
+            logits, _ = net(obs)
+        if temperature <= 0:
+            return int(torch.argmax(logits))
+        return int(torch.distributions.Categorical(logits=logits / temperature).sample())
+    return act
+
+
 def main(argv=None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--n_agents", type=int, required=True)
@@ -188,6 +209,18 @@ def main(argv=None) -> dict:
                     help="confidence bar for greedy_uncertainty; 1.0 matches the grading")
     ap.add_argument("--max_edges", type=int, default=None,
                     help="density guard; must match the training arm")
+    # Evaluation is STOCHASTIC by default, matching scripts/ma_train.py. That samples from
+    # the policy while every baseline plays its argmax, so the learner is scored on a draw
+    # and the rules are scored on their best move -- an asymmetry worth measuring, since
+    # these policies finish training at entropy ~1.05 of a possible ~1.95.
+    # TEMPERATURE on the action distribution. Sampling at T=1 and the argmax (T->0) are the
+    # two ends of one dial and neither is obviously the right way to score a policy against
+    # deterministic rules; measured 2026-08-27, the argmax is WORSE (0.613 against 0.733),
+    # so the sharpness that maximises the score is an empirical question, not a default.
+    ap.add_argument("--temperature", type=float, default=None,
+                    help="divide logits by this before sampling; overrides --deterministic")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="evaluate the learned policy at its argmax, like the baselines")
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py")
     ap.add_argument("--episodes", type=int, default=150)
     ap.add_argument("--seed", type=int, default=0)
@@ -200,11 +233,20 @@ def main(argv=None) -> dict:
     arms = {}
     if args.policy:
         ppo = IndependentPPO.load(args.policy, env)
-        arms["learned"] = ppo.policies(deterministic=False)
+        if args.temperature is not None:
+            arms["learned"] = {a: _tempered(ppo, a, args.temperature) for a in agents}
+        else:
+            arms["learned"] = ppo.policies(deterministic=args.deterministic)
     # Constructed one at a time. `make_baselines` would also build `GreedyAgent`, whose
     # enumeration refuses past window size 5 -- job 3 runs at 6.
     arms["probe_then_work"] = {a: ProbeThenWorkAgent(a, args.seed) for a in agents}
     arms["greedy_uncertainty"] = {a: UncertaintyGreedyAgent(a, args.seed, bar=args.greedy_bar)
+                                  for a in agents}
+    # The adaptive baseline scored on the SAME objective as the learner. Without it the
+    # comparison is an adaptive rule playing the wrong game (greedy_uncertainty) against a
+    # right-game rule that cannot adapt (probe_then_work).
+    arms["greedy_attribution"] = {a: AttributionGreedyAgent(a, args.seed,
+                                                            bar=args.greedy_bar)
                                   for a in agents}
     arms["random_vary"] = {a: RandomAgent(a, args.seed, allow_clamp=False) for a in agents}
 

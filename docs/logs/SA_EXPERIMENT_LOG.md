@@ -4199,3 +4199,106 @@ terms (0.407 against 0.813) is still open. Refuted:
 So greedy's behaviour is statistically indistinguishable across generators and its
 coverage matches the learner's, yet it resolves far fewer claims on Erdos-Renyi. The
 difference must lie in WHICH pairs are left incomplete rather than how many. Open.
+
+---
+
+## 2026-08-27, night -- the attribution learners have not converged, and that is the real story
+
+Prompted by the student asking whether greedy was a fair opponent. It was not, and chasing
+that turned up the larger problem.
+
+[MEASURED] TWO WAYS THE COMPARISON COULD HAVE BEEN UNFAIR TO GREEDY. Both tested, one real.
+
+  * THE BAR (real, and it inverts everything) -- logged above.
+  * THE OBJECTIVE (not the problem). `UncertaintyGreedyAgent` scores unsure STRUCTURE
+    claims and knows nothing about attribution, while the learner is graded on both. Built
+    `ma/attribution_greedy.py::AttributionGreedyAgent`, which adds a term for unsure latent
+    GROUPS and is still truth-free. It is WORSE than plain greedy at the same bar: 0.784
+    against 0.824, with private share collapsing 0.600 -> 0.405. Every bidirected edge
+    joins two SHARED nodes, so an unsure group's children are always shared, and the
+    attribution term steers greedy off its own private variables -- losing the structural
+    pruning that was resolving attribution as a side effect. ATTRIBUTION IS BETTER SERVED BY
+    RESOLVING STRUCTURE THAN BY TARGETING CONFOUNDED PAIRS. Both greedy variants still beat
+    the learner, so the learner's deficit is not an artefact of a mis-scoped baseline.
+
+[MEASURED] TWO WAYS IT COULD HAVE BEEN UNFAIR TO THE LEARNER. Both tested, neither real.
+
+  * DETERMINISTIC vs SAMPLED. Baselines play their argmax; the learner is sampled. Scoring
+    the learner at its argmax makes it WORSE, 0.613 against 0.733, with private share
+    jumping to 0.886 -- the mode is "probe privately" in every state.
+  * TEMPERATURE. Sweeping the logit temperature gives a clean interior optimum at T=0.75
+    (0.762 against 0.733 at T=1.0). It does NOT survive validation: on held-out episode
+    seeds 1 and 2 with the same checkpoint, T=0.75 gives 0.762 and 0.722 against T=1.0's
+    0.716 and 0.749 -- one seed each way, mean advantage +0.009 against +0.029 on the set
+    it was chosen from. The optimum was SELECTION BIAS across six candidates. Do not quote
+    a tuned temperature.
+
+[MEASURED -- and this is the finding] THE POLICIES BARELY CONDITION ON THEIR OBSERVATION.
+Mutual information between state and action, I(S;A) = H(mean_s pi) - mean_s H(pi), over 80
+episodes of the 3-agent shared-reward checkpoint:
+
+    agent   H(marginal)   E[H(per-state)]   I(S;A)   I/H
+      0        1.509           1.225         0.284   0.188
+      1        1.403           1.354         0.050   0.035
+      2        1.471           1.044         0.427   0.291
+
+Between 3.5% and 29% of the policy's action entropy is explained by what it sees; greedy is
+1.000 by construction. Agent 1 is very nearly a FIXED MIXTURE -- it emits the same
+distribution whatever the belief in front of it. That single fact explains the whole shape:
+the argmax is bad because the mode of a state-independent mixture is one action repeated;
+temperature cannot help because sharpening a fixed mixture only makes it a fixed action;
+and the reward ablation moved private share by 0.005 (0.748 -> 0.743) because it was
+retuning mixture weights rather than a decision rule.
+
+[HYPOTHESIS, well supported and NOT yet established] UNDERTRAINING. Final training entropy
+against the converged runs:
+
+    job 5, version_space, 20,000 episodes   entropy 0.30 - 0.50   solve 1.000
+    attribution runs,      4,000 episodes   entropy ~1.05         loses to greedy
+
+This is the SAME failure mode as the generator confound resolved this morning, where a
+3,000-episode scale-free run appeared to lose to greedy and needed 20,000. That lesson was
+available and I did not apply it to the attribution runs, which were left at the handover's
+4,000.
+
+THE HONEST POSITION ON ATTRIBUTION IS THEREFORE "UNDETERMINED", NOT "NEGATIVE". The learner
+loses to a correctly configured greedy, but the learner has not converged. Retraining at
+20,000 episodes is the experiment that decides it, and nothing currently on disk does.
+
+[MEASURED] AN OWN PRIVATE PROBE IS MOSTLY SELF-SERVING. Drop in an agent's own attribution
+uncertainty per round, by who acted:
+
+    own private move    -> own attribution   1.265   (42% of rounds)
+    own shared move     -> own attribution   0.473   (22%)
+    partner private     -> my attribution    0.425   (23%)
+    partner shared      -> my attribution    0.456   (20%)
+
+An agent's own private probe advances its OWN attribution about three times more than a
+partner's does, because the belief is factored into (structures x attributions) per
+bidirected-pair bucket and pruning structures deletes whole buckets. This refutes the
+assumption that attribution evidence reaches an agent only through partners, and it
+tightens the standing caveat: private probes cannot be read as altruism, because they are
+primarily self-serving on the attribution axis too.
+
+[BUG, reporting only, in the other session's file] `ma/evaluate.py::_claims_success` calls
+`score_window` with default arguments -- no `confounding_claims=False`, and no
+`score_groups` -- so under the attributed backend it scores the SUPERSEDED criterion
+(structure plus the bidirected claim attribution was meant to replace) and ignores
+attribution entirely. `ma/env.py::_result` does it correctly, so TRAINING IS UNAFFECTED and
+so is every number reported from `scripts/attr_score.py`. What is wrong is the `success`
+field in every `results/attr_scale/*.json`, which is measuring the pre-attribution task and
+must not be quoted. Same class as the two hard-coded backend lists already logged for this
+file.
+
+[MEASURED] FULL RE-SCORE AT THE GRADED BAR, paired per episode, greedy at bar 1.0
+(`results/attr_bar1/`, produced from the saved checkpoints -- no retraining):
+
+    arm                learned - greedy      learned - probe_then_work
+    attr4a (4 agents)  -0.239 +/- 0.021      -0.022 +/- 0.031
+    attr3a_guarded     -0.163 +/- 0.021      -0.002 +/- 0.027
+    attr3a_peragent    -0.154 +/- 0.016      +0.002 +/- 0.023
+    attr3a_shared      -0.104 +/- 0.015      +0.053 +/- 0.022
+
+Level with the hand-designed schedule, behind a correctly configured greedy, everywhere,
+and the deficit GROWS with agent count rather than shrinking. Read against the undertraining
+finding above, not as a converged result.
