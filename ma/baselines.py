@@ -386,6 +386,85 @@ class UncertaintyGreedyAgent:
         return window.action_index(node, prefer=VARY)
 
 
+class PartitionedGreedyAgent(UncertaintyGreedyAgent):
+    """Uncertainty targeting that DIVIDES THE SHARED SURFACE by convention, without learning.
+
+    The reason this exists: the learned policy's advantage over `UncertaintyGreedyAgent` is
+    almost entirely on the JOINT criterion, and the measured mechanism is division of labour
+    -- duplicate coverage of the shared surface is roughly four times lower. But the obvious
+    objection is that the baseline was never trying to divide anything, so the comparison
+    rewards the learned policy for a job its opponent was not doing. A referee asks this
+    first, and "our baseline is uncoordinated" is not an answer.
+
+    So: the same myopic rule, restricted to a fixed share of the shared nodes. The partition
+    is positional and identical for every agent -- shared node i belongs to agent
+    i mod n_agents -- so it needs NO communication, no central assignment and no learning.
+    Every agent can compute it from the topology it already knows, which keeps the baseline
+    as decentralised as the policy it is being compared against.
+
+    Private nodes are always the agent's own. When its own share is exhausted it falls back
+    to the unrestricted rule rather than passing, so it is never worse off for having a share
+    -- the partition can only redirect effort, never waste it.
+
+    THE PARTITION ALONE IS NOT ENOUGH, which the first version of this class demonstrated by
+    scoring duplicate coverage of 0.167 against the plain rule's 0.169 -- i.e. not
+    coordinating at all. With four agents on four shared nodes each agent owns exactly one,
+    settles it in a single move, and then spends every remaining round in the fallback,
+    piling onto its partners' nodes. The fallback destroys what the partition buys.
+
+    So the rule also breaks ties towards the LEAST ALREADY-TOUCHED node, reading the same
+    disclosed partner counts the learned policy gets in its observation -- no privileged
+    information, no communication beyond what the environment already broadcasts. That is
+    what makes this a control rather than a second uncoordinated arm.
+    """
+
+    def __init__(self, agent: int, n_agents: int, seed: int = 0, bar: float = 0.7):
+        super().__init__(agent, seed=seed, bar=bar)
+        self.n_agents = int(n_agents)
+
+    def _mine(self, window) -> set:
+        """This agent's private nodes plus its positional share of the shared ones."""
+        shared = list(window.shared)
+        return set(window.private) | {
+            node for index, node in enumerate(shared)
+            if index % self.n_agents == self.agent % self.n_agents}
+
+    def _touches(self, env: TwoAgentEnv, window, node: int) -> float:
+        """How many interventions this node has already had, as far as this agent can know.
+
+        Own counts are always known. Partner counts are the DISCLOSED cumulative table, and
+        name a node only when it is shared -- a partner's private work arrives as an unnamed
+        tally, which is exactly the privacy the setting promises and is unusable here.
+        """
+        seen = float(env.own_counts[self.agent][window.pos[node]])
+        table = getattr(env, "partner_counts", {}).get(self.agent)
+        if table is not None and node in window.shared:
+            seen += float(table[:, window.shared.index(node)].sum())
+        return seen
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        belief = window.belief.last
+        if belief is None:
+            return int(self.rng.integers(0, window.n_actions - 1))
+        counts = self._unsure_touching(belief, window.k)
+        mine = self._mine(window)
+        for scope in (mine & set(window.authority), set(window.authority)):
+            scores = {node: counts[window.pos[node]] for node in scope}
+            if not scores:
+                continue
+            best = max(scores.values())
+            if best <= 0:
+                continue                                 # nothing open in this scope
+            candidates = [n for n, s in scores.items() if s == best]
+            # Among equally informative targets, take the one the group has spent least on.
+            fewest = min(self._touches(env, window, n) for n in candidates)
+            candidates = [n for n in candidates
+                          if self._touches(env, window, n) == fewest]
+            return window.action_index(int(self.rng.choice(candidates)), prefer=VARY)
+        return window.pass_index                         # nothing open anywhere
+
+
 class GreedyAgent:
     """Myopic expected information gain over the agent's own window.
 
@@ -547,5 +626,10 @@ def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, obj
         "forced_clamp": lambda: ForcedClampAgent(agent, seed),
         "greedy": lambda: GreedyAgent(agent, env, seed),
         "greedy_uncertainty": lambda: UncertaintyGreedyAgent(agent, seed),
+        # The coordinated control: same rule, shared surface divided by a positional
+        # convention. See `PartitionedGreedyAgent` for why a comparison against the
+        # uncoordinated rule alone is not enough.
+        "greedy_partitioned": lambda: PartitionedGreedyAgent(
+            agent, env.topology.n_agents, seed),
         "probe_then_work": lambda: ProbeThenWorkAgent(agent, seed),
     })
