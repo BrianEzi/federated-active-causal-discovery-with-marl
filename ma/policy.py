@@ -496,7 +496,33 @@ class IndependentPPO:
         self.rng = np.random.default_rng(config.seed)
         arch = getattr(env.config, "policy_arch", "mlp")
         n_others = env.topology.n_agents - 1
-        if arch == "gnn_portable":
+        if arch == "gnn_solo":
+            # FULLY DECENTRALISED, and the point of it: portability comes from the
+            # ARCHITECTURE, not from sharing weights. `PortableRoleActorCritic` scores one
+            # variable at a time from features that never reference how many variables
+            # exist or which specific partner acted (partner blocks are pooled), so the
+            # same weights are meaningful at any window size or agent count. Giving each
+            # agent its OWN complete copy -- own body, own scorer, own critic, trained only
+            # on its own experience with no gradients crossing -- keeps every bit of that
+            # and removes the one thing that was not decentralised.
+            #
+            # Weight sharing decides WHOSE EXPERIENCE trains the weights. The architecture
+            # decides whether the weights MEAN anything at a different size. Two separate
+            # choices; `gnn_portable` conflates them and this arm separates them.
+            #
+            # Testing at MORE agents than were trained needs more networks than exist. That
+            # is a deployment question, not a training one: a new participant joins by
+            # adopting a peer's published policy, which is a real federated scenario and
+            # involves no shared training.
+            self.nets = {
+                agent: PortableRoleActorCritic(env.windows[agent], n_others,
+                                               hidden=config.hidden,
+                                               layers=config.gnn_layers)
+                for agent in env.topology.agents}
+            self.shared_net = None
+            self.opts = {agent: torch.optim.Adam(net.parameters(), lr=config.lr)
+                         for agent, net in self.nets.items()}
+        elif arch == "gnn_portable":
             # ONE network, shared by every agent, because with the number of agents varying
             # across the training mixture there is no stable agent identity to give a net
             # to. This is PARAMETER SHARING with decentralised execution: each agent still
@@ -540,15 +566,28 @@ class IndependentPPO:
         "binding" them to another environment would be a silent reinterpretation of learned
         weights rather than a rebind.
         """
-        if self.shared_net is None:
-            raise ValueError("bind requires policy_arch='gnn_portable' -- other "
-                             "architectures have window-shaped parameters")
         n_others = env.topology.n_agents - 1
-        self.shared_net.rebind(env.windows[env.topology.agents[0]], n_others)
+        if self.shared_net is not None:
+            self.shared_net.rebind(env.windows[env.topology.agents[0]], n_others)
+            self.env = env
+            self.nets = {agent: self.shared_net for agent in env.topology.agents}
+            optimiser = next(iter(self.opts.values()))
+            self.opts = {agent: optimiser for agent in env.topology.agents}
+            return self
+        if not all(isinstance(net, PortableRoleActorCritic) for net in self.nets.values()):
+            raise ValueError("bind requires a portable architecture ('gnn_portable' or "
+                             "'gnn_solo') -- others have window-shaped parameters")
+        # ONE NETWORK PER AGENT, each rebound to that agent's own window. Where the new
+        # environment has MORE agents than were trained, the extra slots adopt an existing
+        # agent's policy -- onboarding, not training-time sharing: no gradient ever crossed.
+        trained = list(self.nets.values())
+        self.nets = {agent: trained[index % len(trained)].rebind(
+                         env.windows[agent], n_others)
+                     for index, agent in enumerate(env.topology.agents)}
+        opts = list(self.opts.values())
+        self.opts = {agent: opts[index % len(opts)]
+                     for index, agent in enumerate(env.topology.agents)}
         self.env = env
-        self.nets = {agent: self.shared_net for agent in env.topology.agents}
-        optimiser = next(iter(self.opts.values()))
-        self.opts = {agent: optimiser for agent in env.topology.agents}
         return self
 
     # -- rollout ------------------------------------------------------------------------
