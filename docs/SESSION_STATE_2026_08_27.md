@@ -1,4 +1,27 @@
-# Session state — 27 August 2026, 21:00
+# Session state — 27 August 2026, 21:15
+
+> **READ THIS BOX FIRST.** The second agent found, late on 27 August (`dd6131d`), that
+> `UncertaintyGreedyAgent` takes `bar=0.7` while these backends GRADE at `claim_bar=1.0`, so
+> greedy stopped targeting claims that were 70% settled and was blind to a band of open
+> questions by construction. On the attributed 3-agent task, fixing it REVERSES the
+> headline: learned minus greedy goes from +0.142 ± 0.024 to **−0.091 ± 0.025**.
+>
+> **Verified here, and the scope is narrower than "everything".** The handicap can only bite
+> where claim frequencies actually land in the 0.7–1.0 band. Measured, 30 episodes each:
+>
+> | backend | claim mass in the blind band | affected? |
+> |---|---|---|
+> | `factored` | **0 / 2879 = 0.000** | **NO** |
+> | `version_space` | 17 / 1299 = 0.013 | yes |
+> | `attributed` | 24 / 1505 = 0.016 | yes |
+>
+> The factored belief leaves 1, 2 or 3 candidates per pair, so its frequencies are quantised
+> to {1.00, 0.50, 0.33} and NOTHING can fall in the band. Re-running greedy at bar 1.0 on
+> the ladder configuration gives numbers identical to three decimals.
+>
+> **Therefore: §5's SCALING LADDER STANDS (it is `factored`). The ATTRIBUTION result in §5
+> and the older `version_space` headlines DO NOT — re-run those against greedy at the graded
+> bar before quoting them.**
 
 **Resume point for a fresh session. Read this file completely before touching anything.**
 Companions: `docs/FINDINGS_2026_08_27.md` (the measurements and every withdrawn claim),
