@@ -4088,3 +4088,48 @@ through the real `env.reset` on confounded draws takes 32 s. A profile of the fi
 episodes had earlier reported a comfortable 1.76 s/episode for the same reason -- it
 sampled the head of a heavy tail. Three separate cheap measurements agreed with each other
 and were all misleading; only timing the real thing on the real mix was informative.
+
+---
+
+## 2026-08-27, evening -- JOB 5: the generator confound is resolved, and it was UNDER-TRAINING
+
+[MEASURED] 4 agents x 1 private + 3 shared, budget 8, version_space backend, 20,000
+training episodes, 3 seeds per generator, 150 eval episodes with every arm on IDENTICAL
+episodes within a run (`scripts/run_job5_local.sh`, `results/vs_generator/`). Joint success
+-- every agent simultaneously correct:
+
+    generator     learned            greedy            random   ratio
+    scale-free    0.956 +/- 0.010    0.562 +/- 0.018   0.129    1.70x
+    Erdos-Renyi   0.911 +/- 0.031    0.436 +/- 0.024   0.122    2.09x
+
+THE HEADLINE REPRODUCES UNDER BOTH GENERATORS. The original 4-agent figure (learned 0.937,
+greedy 0.405, 2.3x) was Erdos-Renyi at 20,000 episodes; converged here it is 0.911 / 0.436
+/ 2.09x. The scale-free run that had learned LOSING to greedy (0.442 against 0.583) was
+measured at 3,000 episodes; the same configuration at 20,000 reaches 0.956, the highest
+score of any arm in the table. The unattributable comparison is therefore attributed:
+EPISODE COUNT, not the generator. The learning curve reading recorded in the addendum was
+correct.
+
+[MEASURED] THE GENERATOR DOES MOVE ONE ARM, AND IT IS THE BASELINE. Greedy scores
+0.562 on scale-free against 0.436 on Erdos-Renyi -- a gap of 0.126 against a combined
+standard error of 0.030, about 4.2 SE. The LEARNED policy is statistically indistinguishable
+across the two (0.956 vs 0.911, about 1.4 SE). So the ratio differs by generator entirely
+through greedy's denominator, not through anything the learner does.
+
+This independently corroborates the attribution measurement on the same axis (2 seeds,
+3 agents): greedy 0.356 on Erdos-Renyi against 0.604 on scale-free, with the learned policy
+beating it by +0.229 +/- 0.028 there against +0.065 +/- 0.020 on scale-free. Two different
+backends, two different agent counts, same direction and similar magnitude.
+
+[CORRECTED -- my own reading, made before the evidence] From the attribution ER result I
+suggested that "part of the 2.3x headline is likely a real generator effect rather than an
+episode-count artefact", and flagged it as something that might weaken the headline. Half
+right and the wrong half was the one I emphasised. The generator effect on the RATIO is
+real (2.09x vs 1.70x) and it is entirely greedy's; the headline itself is not weakened at
+all, because scale-free at convergence is the better configuration for the learner. I
+inferred across backends and agent counts from one seed before the direct test had run,
+when the direct test was already running and 40 minutes away.
+
+CROSS-GENERATOR NUMBERS ARE NOT PAIRED and are not reported as if they were: the two
+generators draw different graphs, so those are arm means with a standard error over 3
+seeds. Within a run every arm sees identical episodes, so each ratio IS paired.
