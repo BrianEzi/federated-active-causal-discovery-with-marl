@@ -120,7 +120,7 @@ def main(argv=None) -> dict:
                     help="a baseline name, or the path to a saved policy pair (.pt)")
     ap.add_argument("--oracle_obs", action="store_true")
     ap.add_argument("--backend", default="constraint",
-                    choices=["constraint", "version_space"])
+                    choices=["constraint", "version_space", "attributed"])
     ap.add_argument("--n_agents", type=int, default=None)
     ap.add_argument("--per_agent_reward", action="store_true")
     ap.add_argument("--out", default="results/traces/trace.json")

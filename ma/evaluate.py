@@ -29,7 +29,7 @@ import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
 from crosscheck.belief_dp import JOINT_CONF
-from ma.env import TwoAgentEnv
+from ma.env import CLAIM_BACKENDS, TwoAgentEnv
 from ma.graphs import is_acyclic, mec_signature
 
 
@@ -105,7 +105,12 @@ def agent_report(env: TwoAgentEnv, agent: int) -> Dict[str, float]:
     `mass_equivalent`, private-pinned for `mass_credit`. `map_index` has no analogue --
     nothing enumerates the window -- and is -1.
     """
-    if env.config.belief_backend in ("constraint", "version_space"):
+    # CLAIM_BACKENDS, not a literal list. This was hard-coded twice and both copies were
+    # missed when the attributed backend landed, so a run trained for 25 minutes and then
+    # died in its own report -- the checkpoint survived, the evaluation did not. Any backend
+    # that scores CLAIMS has no enumerable posterior, so this is the correct predicate and
+    # it cannot fall out of date.
+    if env.config.belief_backend in CLAIM_BACKENDS:
         window = env.windows[agent]
         mag = env._true_mag(agent)
         private_positions = [window.pos[n] for n in window.private]
@@ -208,7 +213,12 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
     """Every criterion for one finished episode."""
     threshold = env.config.identify_threshold
     reports = {agent: agent_report(env, agent) for agent in env.topology.agents}
-    if env.config.belief_backend in ("constraint", "version_space"):
+    # CLAIM_BACKENDS, not a literal list. This was hard-coded twice and both copies were
+    # missed when the attributed backend landed, so a run trained for 25 minutes and then
+    # died in its own report -- the checkpoint survived, the evaluation did not. Any backend
+    # that scores CLAIMS has no enumerable posterior, so this is the correct predicate and
+    # it cannot fall out of date.
+    if env.config.belief_backend in CLAIM_BACKENDS:
         union = _constraint_union(env)
     else:
         map_indices = {agent: reports[agent]["map_index"] for agent in env.topology.agents}
