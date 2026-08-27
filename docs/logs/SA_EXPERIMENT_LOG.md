@@ -3096,3 +3096,26 @@ That is the argument for the disclosure work stated as a measurement rather than
 expectation: some channel carrying de-confounding information is NECESSARY for the task to
 be learnable, the only channel currently implemented is exact at n = 2, and therefore a
 channel that scales is the contribution rather than an enhancement.
+
+### [MEASURED] The no-bit ladder, PROPERLY POWERED — 5 seeds x 200 eval episodes
+
+Myriad array 213008. Supersedes the local 1-2 seed run above, which was flagged
+underpowered; the verdicts are unchanged and the intervals are now tight.
+
+    rung                 d   n   learned  greedy  random   pass   paired vs best
+    rung0_2a_1p_3x       5   5    0.016   0.014   0.016   0.005   +0.000 [-0.003,+0.003]  ties
+    rung1_3a_1p_3x       6   5    0.014   0.016   0.015   0.005   -0.002 [-0.006,+0.000]  ties
+    rung2_5a_1p_3x       8   5    0.013   0.007   0.011   0.000   +0.002 [+0.000,+0.006]  ties
+
+Against the same two-agent shape WITH the bit: +0.177, CI [+0.143, +0.209], 5/5 seeds.
+
+This is a properly powered NULL, not an absence of evidence: the intervals are narrow enough
+to exclude any effect above about half a percentage point. Agent count makes no difference
+because there is nothing to make a difference to — every arm, including a policy that never
+acts, sits within noise of every other.
+
+The complete pair of statements the two-agent chapter can now make:
+
+  * a de-confounding channel is NECESSARY for the task to be learnable at all -- without it
+    the learned policy is indistinguishable from passing, at 2, 3 and 5 agents alike;
+  * the channel that works is exact only at 2 agents.
