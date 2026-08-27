@@ -524,7 +524,11 @@ class _LazyBaselines(dict):
         self._builders = builders
 
     def __getitem__(self, key):
-        if key not in self and key in self._builders:
+        # `super().__contains__`, NOT `key not in self`: __contains__ below reports what can
+        # be built, so `not in self` was False for every buildable key and nothing was ever
+        # constructed. Caught by a smoke test after the merge, not by the suite, because no
+        # test indexed this mapping.
+        if not super().__contains__(key) and key in self._builders:
             super().__setitem__(key, self._builders[key]())
         return super().__getitem__(key)
 

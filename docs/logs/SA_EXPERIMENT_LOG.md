@@ -3973,3 +3973,118 @@ the damage against the deterministic environment where the right answer is known
 chose the third: adjust only on observed degradation. Expectation on record, so it can be
 checked: the student expects the harm to be small. If it is not, the fallback is
 block-conditioning.
+
+---
+
+## 2026-08-27 -- the attribution jobs: two blockers found by timing them first
+
+[MEASURED] COST AT FOUR AGENTS IS HEAVY-TAILED, NOT MERELY HIGH, and it is what makes
+job 1 of `docs/HANDOVER_2026_08_27.md` infeasible as written. Timing probe on Myriad,
+32 train + 8 eval episodes per arm, `timeout 3000`:
+
+    j2_n3    3 agents, private 2 (k=5)      34 s     OK
+    j4_er    3 agents, private 2, ER        67 s     OK
+    j3_n3p3  3 agents, private 3 (k=6)      71 s     crashed in eval, see below
+    j1_n4    4 agents, private 2 (k=5)   >3000 s     TIMED OUT
+    j1_n6    6 agents, private 2 (k=5)   >3000 s     TIMED OUT
+
+The window is k=5 at BOTH 3 and 4 agents, so this is not window size. Measured directly
+(scratchpad/reset_tail.py), per-episode reset cost and the initial candidate count at
+4 agents:
+
+    ep 0   0.64 s   candidates [  2037,   2037,   2037,   2037]
+    ep 1   0.78 s   candidates [  5984,   6165,   1361,   5984]
+    ep 2   3.13 s   candidates [ 43479,   4496,    829,   5984]
+    ep 3  48.13 s   candidates [  2037,   2037, 181878, 181878]
+    ep 4  did not finish in 20 minutes
+
+Median under a second, and a tail that is at best 60x the median and at worst did not
+terminate. Mean cost is therefore the wrong statistic: cProfile over episodes 0-1 gives a
+comfortable 1.76 s/episode, which is exactly the number that would have justified
+launching sixteen 4000-episode runs.
+
+WHY IT IS THE PARTNER COUNT. The attribution candidate set is a choice of clique partition
+TIMES a choice of owner, and the owner is one of the partners -- so adding an agent
+multiplies the space without changing the window. A dense confounded draw at 4 agents puts
+181878 candidates in one window against 2037 in another in the SAME episode.
+
+NOT FIXED, and the fix is a design decision rather than a tuning one: capping the candidate
+count at reset would cut the tail, but it also changes the episode distribution, and the
+2026-08-26 density guard at k=7 is the precedent for that going wrong -- a 94% rejection
+rate sampled an unrepresentative sparse tail and the row was discarded rather than
+reported. Escalated to the student rather than chosen here.
+
+[FIXED] `make_baselines` TOOK DOWN A THIRD JOB, exactly as section 5 of the handover
+warned. At `--private_size 3` (k=6) the eager `GreedyAgent(agent, env, seed)` raises "the
+greedy oracle enumerates and k=6 is past the limit of 5" before a single episode is
+played -- on the attributed backend, where the greedy oracle arm is not in `labels` at all.
+`scripts/ma_train.py` now chooses its labels BEFORE constructing anything and builds only
+those. Verified at k=6: all five arms construct and score.
+
+[CORRECTED] The `private_share` column in the handover's section 3 tables cannot be
+reproduced and is not comparable to anything measured from now on. Counting APPLIED moves
+(`env.last_chosen`, after the protocol has forced the inactive agents to pass) gives greedy
+0.508 and random 0.410 at the 3-agent configuration, against 0.175 and 0.359 in the
+handover. The obvious explanation -- that the old scorer counted SUBMITTED actions, three
+per round under turn-taking -- was tested and REFUTED: the submitted split gives 0.439, not
+0.175. The old scorer lived in a session scratchpad and is gone, so the definition cannot
+be recovered. `scripts/attr_score.py` now defines it in code, and only its column may be
+quoted.
+
+[NOTED] Jobs 2, 3 (at 3 agents) and 4 were submitted on this evidence: array tasks 5-12
+and 15-16 of `cluster/submit_attr_scale.sh`. Job 1 (4 and 6 agents) and the 4-agent half of
+job 3 are held. Job 4 needs no de-scoping -- ER at private_size 2 costs 67 s where the
+handover warned it might be unusable, so the fallback to private_size 1 is not needed.
+
+[MEASURED] THE DENSITY GUARD RESCUES FOUR AGENTS AND CANNOT RESCUE SIX. `ma/density_guard.py`
+rejects draws whose densest window MAG exceeds `max_edges`, before any enumeration -- the
+existing `max_candidates` cap cannot help, because it truncates AFTER
+`cb.versionspace.equivalence_class`, and the enumeration is the cost.
+
+Reset cost at `max_edges 7`, 12 episodes per row:
+
+    3 agents   median 0.29 s   max 0.48 s   candidates <= 1025    rejections  8/43
+    4 agents   median 0.73 s   max 3.22 s   candidates <= 35170   rejections  3/25
+    6 agents   ONE reset did not complete in 30 minutes
+
+Against unguarded 4 agents -- median under a second, one draw at 48 s with 181878
+candidates, one that did not finish in 20 minutes -- the guard converts an unbounded tail
+into a bounded one at four agents. Four agents is now feasible: ~1 s/episode, so a
+4000-episode run is about an hour.
+
+[MEASURED] THE COST DRIVER IS THE PARTNER COUNT, NOT WINDOW DENSITY, and this was nearly
+misdiagnosed. The distribution of the densest window's edge count on confounded draws is
+almost IDENTICAL at 3, 4 and 6 agents (600 draws each):
+
+    max_edges     3 agents   4 agents   6 agents
+        <= 6         0.127      0.173      0.207
+           7         0.605      0.563      0.585
+        >= 8         0.268      0.263      0.208
+
+So density cannot explain why 3 agents costs 34 s per 32-episode probe and 4 agents exceeds
+3000 s. The attribution space is a clique partition TIMES a choice of owner, and the owner
+is one of the partners: 2 partners at 3 agents, 3 at 4, 5 at 6. That multiplier is what no
+edge cap can reach, which is why the guard works at four agents and fails at six. Reaching
+six needs a cap at 6 edges, which rejects 79% of draws -- the 2026-08-26 k=7 guard rejected
+94%, sampled an unrepresentative sparse tail, and its row was discarded rather than
+reported. SIX AGENTS IS THEREFORE NOT ATTEMPTED, and that is a reported result with a
+mechanism, not a gap.
+
+[NOTED, and it is the condition on every guarded number] The guard rejects ~26% of
+confounded draws, which is a change to the task and not a tuning detail. Three agents runs
+cheaply BOTH ways, so `attr3a_guarded` (guarded) and `attr3a_peragent` (unguarded) are the
+same configuration either side of the guard and MEASURE the distortion. No guarded
+four-agent result may be reported without that pair beside it. Note also that the guard
+removes almost exactly the same slice at every agent count (the table above), so whatever
+it costs, it costs the 3-agent and 4-agent rows alike -- which is what makes the scale
+comparison survive it.
+
+[CORRECTED] I first measured this with `cb.versionspace.equivalence_class` alone, on
+UNCONDITIONED draws, and it said the environment was cheap -- 267 candidates and 0.18 s at
+8 edges. Both halves were wrong. The expensive step is the attribution enumeration
+downstream of `equivalence_class`, and `episode_mix="confounded"` selects precisely for the
+bidirected structure that enumeration is exponential in. The same 8-edge bucket measured
+through the real `env.reset` on confounded draws takes 32 s. A profile of the first two
+episodes had earlier reported a comfortable 1.76 s/episode for the same reason -- it
+sampled the head of a heavy tail. Three separate cheap measurements agreed with each other
+and were all misleading; only timing the real thing on the real mix was informative.

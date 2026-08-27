@@ -16,7 +16,9 @@ import time
 
 import numpy as np
 
-from ma.baselines import make_baselines
+from ma.baselines import (GreedyAgent, PassAgent, ProbeThenWorkAgent, RandomAgent,
+                          UncertaintyGreedyAgent)
+from ma.density_guard import DensityGuardedEnv
 from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
 from ma.evaluate import run_arm
@@ -214,6 +216,15 @@ def main(argv=None) -> dict:
     # measured justification. Off/default until a comparison confirms they help HERE too.
     ap.add_argument("--entropy_coef", type=float, default=0.01)
     ap.add_argument("--orthogonal_init", action="store_true")
+    # Density guard. Measured 2026-08-27: at four agents the attributed episode cost is
+    # heavy-TAILED -- median under a second, one draw in five at 48 s, one that did not
+    # finish in twenty minutes -- and the cost is exponential in the window's EDGE count.
+    # Rejecting dense draws changes the episode distribution, so the rejection rate is
+    # reported and no guarded result above three agents may be quoted without the
+    # three-agent guarded/unguarded control beside it.
+    ap.add_argument("--max_edges", type=int, default=None,
+                    help="reject draws whose densest window MAG has more than this many "
+                         "edges; unset disables the guard")
     ap.add_argument("--out", default=None)
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
@@ -261,7 +272,10 @@ def main(argv=None) -> dict:
                        claims_require_all_types=not args.legacy_claim_exemption,
                        **({"reward_criterion": args.reward_criterion}
                           if args.reward_criterion else {}))
-    env = TwoAgentEnv(config)
+    # `--max_edges` routes through the density guard; without it this is the ordinary
+    # environment, and DensityGuardedEnv(max_edges=None) is its parent's behaviour exactly,
+    # so both halves of the three-agent guarded/unguarded control share one code path.
+    env = DensityGuardedEnv(config, max_edges=args.max_edges)
     config_record = _config_record(config, topology, args)
     run = _wandb_run(args, config_record)
     started = time.time()
@@ -299,7 +313,20 @@ def main(argv=None) -> dict:
     }
 
     arms = {"learned": ppo.policies(deterministic=False)}
-    reference = {agent: make_baselines(env, agent, seed=args.seed) for agent in env.topology.agents}
+    # ONE CONSTRUCTOR PER LABEL, and the labels are chosen BEFORE anything is built.
+    # `make_baselines` built all of them eagerly, `GreedyAgent` among them, and that
+    # constructor enumerates the window and REFUSES past size 5. So at --private_size 3
+    # (k=6) a run died before playing a single episode, on a backend where the greedy
+    # oracle arm is not in `labels` at all -- measured 2026-08-27 on the attribution
+    # timing probe. Building only what will be scored removes the whole class of failure.
+    factories = {
+        "pass": lambda agent: PassAgent(agent, args.seed),
+        "random_vary": lambda agent: RandomAgent(agent, args.seed, allow_clamp=False),
+        "random_clamp": lambda agent: RandomAgent(agent, args.seed, allow_clamp=True),
+        "greedy": lambda agent: GreedyAgent(agent, env, args.seed),
+        "greedy_uncertainty": lambda agent: UncertaintyGreedyAgent(agent, args.seed),
+        "probe_then_work": lambda agent: ProbeThenWorkAgent(agent, args.seed),
+    }
     # A baseline appears only where it has legal moves and a working oracle: the random
     # arms follow the action modes, and `greedy` reads the exact DP's score tables so it
     # exists only on the exact backend (`enumerated_posterior` raises otherwise -- a
@@ -318,7 +345,7 @@ def main(argv=None) -> dict:
         # arms that are not scored on the thing it is trained for.
         labels.insert(-1, "probe_then_work")
     for label in labels:
-        arms[label] = {agent: reference[agent][label] for agent in env.topology.agents}
+        arms[label] = {agent: factories[label](agent) for agent in env.topology.agents}
 
     for label, policies in arms.items():
         t0 = time.time()

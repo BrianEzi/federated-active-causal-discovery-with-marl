@@ -15,7 +15,7 @@ from ma.topology import federated_topology
 TOPO = federated_topology(3, private_size=1, n_shared=3)
 
 
-def _env(**kw):
+def _env(topology_override=None, **kw):
     kw.setdefault("belief_backend", "version_space")
     kw.setdefault("reward_criterion", "claims")
     kw.setdefault("claim_bar", 1.0)
@@ -23,7 +23,7 @@ def _env(**kw):
     kw.setdefault("disclose_regime", True)
     kw.setdefault("budget", 6)
     kw.setdefault("action_modes", (VARY,))
-    return TwoAgentEnv(MAConfig(topology=TOPO, n_obs=60, n_int=20,
+    return TwoAgentEnv(MAConfig(topology=topology_override or TOPO, n_obs=60, n_int=20,
                                 turn_order=ROUND_ROBIN, **kw), seed=0)
 
 
@@ -215,3 +215,24 @@ def test_rounds_to_identification_latches_the_first_round():
                 seen[agent] = env.rounds_used
     for agent, first in seen.items():
         assert env.identified_round[agent] == first
+
+
+def test_baselines_are_built_lazily_and_actually_build():
+    """`GreedyAgent` enumerates and refuses past window size 5, so building every arm
+    eagerly crashed callers that never wanted it -- a trap that took three separate jobs.
+    The lazy mapping fixes that, and this pins BOTH halves: a window too large for the
+    enumerating arm still yields the others, and the mapping really does construct them.
+
+    The second half is not hypothetical. The first version overrode `__contains__` to report
+    what could be built, which made its own `key not in self` guard always false, so it
+    never constructed anything and every lookup raised KeyError.
+    """
+    from ma.baselines import UncertaintyGreedyAgent, make_baselines
+
+    env = _env(belief_backend="factored", topology_override=federated_topology(3, 3, 3))
+    baselines = make_baselines(env, 0, seed=0)
+    assert isinstance(baselines["greedy_uncertainty"], UncertaintyGreedyAgent)
+    assert baselines["greedy_uncertainty"] is baselines["greedy_uncertainty"]   # cached
+    assert "greedy" in baselines                                               # offered...
+    with pytest.raises(ValueError):
+        _ = baselines["greedy"]                                                # ...but refuses
