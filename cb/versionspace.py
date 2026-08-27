@@ -338,10 +338,16 @@ class VersionSpaceBackend:
             if detected == self._detected and self.last is not None:
                 return self.last.directed          # nothing new was resolved this round
             self._detected = detected
-            self._current = tuple(
+            survivors = tuple(
                 marks for marks in self._space
                 if all(consistent_with_evidence(reveal(marks, self.k, x), *detected[x])
                        for x in intervened))
+            # AN EMPTY VERSION SPACE IS NECESSARILY WRONG -- the truth is one of the
+            # candidates, so if nothing survives, the evidence contradicted itself and at
+            # least one test fired falsely. Keeping the previous set is not a repair (the
+            # truth may already be gone) but it prevents the belief reporting frequencies
+            # over nothing, which reads downstream as unanimous confidence.
+            self._current = survivors if survivors else self._current
             self._current_signatures = tuple(
                 self._signatures[self._space.index(m)] for m in self._current)
             self._applied = intervened

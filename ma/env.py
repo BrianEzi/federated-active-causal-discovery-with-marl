@@ -838,9 +838,15 @@ class TwoAgentEnv:
         which node the partner touched. That asymmetry is the whole privacy claim, and it is
         what makes the recovered object an attribution to an AGENT rather than to a variable.
         """
-        from cb.attribution import response_signature
+        from cb.attribution import estimated_moved, response_signature
         if self.config.belief_backend != ATTRIBUTED or not self.config.disclose_signals:
             return
+        sampled = self.config.vs_evidence == "sampled"
+        if sampled:
+            # The rows this round produced, against the rows in which nothing hidden was
+            # touched. Both sides are needed because the evidence is a CHANGE, not a level.
+            fresh = np.zeros(len(self.samples), dtype=bool)
+            fresh[-self.config.n_int:] = True
         for actor in self.topology.agents:
             node, _mode = chosen[actor]
             if node == PASS_ACTION or node in self.topology.exposed:
@@ -851,10 +857,17 @@ class TwoAgentEnv:
                 groups = window.belief.true_groups
                 if not groups:
                     continue
-                responded = response_signature(self.true_adjacency, self.topology,
-                                               agent, groups, node)
-                moved = frozenset(pair for group, hit in zip(groups, responded) if hit
-                                  for pair in group.pairs())
+                if sampled:
+                    baseline = ~self.hidden_intervened[agent]
+                    pairs = sorted({pair for group in groups for pair in group.pairs()})
+                    moved = estimated_moved(self.samples[:, window.nodes], fresh,
+                                            baseline, pairs,
+                                            alpha=self.config.vs_evidence_alpha)
+                else:
+                    responded = response_signature(self.true_adjacency, self.topology,
+                                                   agent, groups, node)
+                    moved = frozenset(pair for group, hit in zip(groups, responded) if hit
+                                      for pair in group.pairs())
                 window.belief.observe_partner(actor, moved)
 
     def _append_observational_batch(self) -> None:

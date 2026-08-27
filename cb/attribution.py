@@ -649,3 +649,52 @@ class AttributedVersionSpaceBackend:
     @property
     def bidirected(self) -> np.ndarray:
         return self.last.bidirected if self.last is not None else np.zeros((self.k, self.k))
+
+
+def estimated_moved(data, actor_rows, baseline_rows, pairs, alpha: float = 0.001,
+                    min_rows: int = 30) -> FrozenSet[Tuple[int, int]]:
+    """Which confounded pairs CHANGED when a partner worked privately, read from the data.
+
+    The sampled counterpart of `response_signature`, which consults the true graph. For each
+    confounded pair, compare its correlation in the rows where the partner acted against the
+    rows where nobody hidden did, by Fisher's z for a difference of two correlations. A
+    latent that was disturbed changes the association it induces; one that was not, does not.
+
+    SOUND-LEANING, by the same argument as `cb.versionspace.estimated_reveal`: a detection
+    is trustworthy and silence means "not detected", never "did not move". So the pruning it
+    feeds only ever eliminates candidates that DENY a detected movement, and a partner whose
+    latent sits far upstream produces a change too small to see and prunes nothing -- which
+    is the effect-range property, arriving here for the same reason it arrives there.
+
+    Returns an empty set when either side is too thin to compare, so a short episode
+    degrades to "no evidence" rather than to noise.
+    """
+    data = np.asarray(data)
+    actor_rows = np.asarray(actor_rows, dtype=bool)
+    baseline_rows = np.asarray(baseline_rows, dtype=bool)
+    n_a, n_b = int(actor_rows.sum()), int(baseline_rows.sum())
+    if n_a < min_rows or n_b < min_rows:
+        return frozenset()
+    from scipy import stats
+    moved = []
+    for u, v in pairs:
+        a, b = data[actor_rows], data[baseline_rows]
+        if a[:, u].std() < 1e-12 or a[:, v].std() < 1e-12:
+            continue
+        if b[:, u].std() < 1e-12 or b[:, v].std() < 1e-12:
+            continue
+        ra = float(np.corrcoef(a[:, u], a[:, v])[0, 1])
+        rb = float(np.corrcoef(b[:, u], b[:, v])[0, 1])
+        if not (np.isfinite(ra) and np.isfinite(rb)):
+            continue
+        za = 0.5 * np.log((1 + np.clip(ra, -0.999999, 0.999999))
+                          / (1 - np.clip(ra, -0.999999, 0.999999)))
+        zb = 0.5 * np.log((1 + np.clip(rb, -0.999999, 0.999999))
+                          / (1 - np.clip(rb, -0.999999, 0.999999)))
+        se = np.sqrt(1.0 / (n_a - 3) + 1.0 / (n_b - 3))
+        if se <= 0:
+            continue
+        p = 2.0 * float(stats.norm.sf(abs(za - zb) / se))
+        if p < alpha:
+            moved.append((min(u, v), max(u, v)))
+    return frozenset(moved)
