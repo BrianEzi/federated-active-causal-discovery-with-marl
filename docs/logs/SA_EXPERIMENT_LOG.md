@@ -3973,3 +3973,65 @@ the damage against the deterministic environment where the right answer is known
 chose the third: adjust only on observed degradation. Expectation on record, so it can be
 checked: the student expects the harm to be small. If it is not, the fallback is
 block-conditioning.
+
+---
+
+## 2026-08-27 -- the attribution jobs: two blockers found by timing them first
+
+[MEASURED] COST AT FOUR AGENTS IS HEAVY-TAILED, NOT MERELY HIGH, and it is what makes
+job 1 of `docs/HANDOVER_2026_08_27.md` infeasible as written. Timing probe on Myriad,
+32 train + 8 eval episodes per arm, `timeout 3000`:
+
+    j2_n3    3 agents, private 2 (k=5)      34 s     OK
+    j4_er    3 agents, private 2, ER        67 s     OK
+    j3_n3p3  3 agents, private 3 (k=6)      71 s     crashed in eval, see below
+    j1_n4    4 agents, private 2 (k=5)   >3000 s     TIMED OUT
+    j1_n6    6 agents, private 2 (k=5)   >3000 s     TIMED OUT
+
+The window is k=5 at BOTH 3 and 4 agents, so this is not window size. Measured directly
+(scratchpad/reset_tail.py), per-episode reset cost and the initial candidate count at
+4 agents:
+
+    ep 0   0.64 s   candidates [  2037,   2037,   2037,   2037]
+    ep 1   0.78 s   candidates [  5984,   6165,   1361,   5984]
+    ep 2   3.13 s   candidates [ 43479,   4496,    829,   5984]
+    ep 3  48.13 s   candidates [  2037,   2037, 181878, 181878]
+    ep 4  did not finish in 20 minutes
+
+Median under a second, and a tail that is at best 60x the median and at worst did not
+terminate. Mean cost is therefore the wrong statistic: cProfile over episodes 0-1 gives a
+comfortable 1.76 s/episode, which is exactly the number that would have justified
+launching sixteen 4000-episode runs.
+
+WHY IT IS THE PARTNER COUNT. The attribution candidate set is a choice of clique partition
+TIMES a choice of owner, and the owner is one of the partners -- so adding an agent
+multiplies the space without changing the window. A dense confounded draw at 4 agents puts
+181878 candidates in one window against 2037 in another in the SAME episode.
+
+NOT FIXED, and the fix is a design decision rather than a tuning one: capping the candidate
+count at reset would cut the tail, but it also changes the episode distribution, and the
+2026-08-26 density guard at k=7 is the precedent for that going wrong -- a 94% rejection
+rate sampled an unrepresentative sparse tail and the row was discarded rather than
+reported. Escalated to the student rather than chosen here.
+
+[FIXED] `make_baselines` TOOK DOWN A THIRD JOB, exactly as section 5 of the handover
+warned. At `--private_size 3` (k=6) the eager `GreedyAgent(agent, env, seed)` raises "the
+greedy oracle enumerates and k=6 is past the limit of 5" before a single episode is
+played -- on the attributed backend, where the greedy oracle arm is not in `labels` at all.
+`scripts/ma_train.py` now chooses its labels BEFORE constructing anything and builds only
+those. Verified at k=6: all five arms construct and score.
+
+[CORRECTED] The `private_share` column in the handover's section 3 tables cannot be
+reproduced and is not comparable to anything measured from now on. Counting APPLIED moves
+(`env.last_chosen`, after the protocol has forced the inactive agents to pass) gives greedy
+0.508 and random 0.410 at the 3-agent configuration, against 0.175 and 0.359 in the
+handover. The obvious explanation -- that the old scorer counted SUBMITTED actions, three
+per round under turn-taking -- was tested and REFUTED: the submitted split gives 0.439, not
+0.175. The old scorer lived in a session scratchpad and is gone, so the definition cannot
+be recovered. `scripts/attr_score.py` now defines it in code, and only its column may be
+quoted.
+
+[NOTED] Jobs 2, 3 (at 3 agents) and 4 were submitted on this evidence: array tasks 5-12
+and 15-16 of `cluster/submit_attr_scale.sh`. Job 1 (4 and 6 agents) and the 4-agent half of
+job 3 are held. Job 4 needs no de-scoping -- ER at private_size 2 costs 67 s where the
+handover warned it might be unusable, so the fallback to private_size 1 is not needed.
