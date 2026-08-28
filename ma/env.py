@@ -252,6 +252,13 @@ class MAConfig:
     # default so every number measured before 2026-08-26 stays reproducible; the shared
     # reward remains what `both_identified` reports either way.
     per_agent_reward: bool = False
+    # DIFFERENCE REWARD. Pays each agent for the credit ITS OWN interventions caused,
+    # instead of for the state its window happens to be in. Measured 2026-08-28: under the
+    # plain reward an agent's return correlates with its PARTNERS' causal contribution more
+    # closely than with its own at every agent count (3.2x at eight agents), and NEGATIVELY
+    # with its own at two and three -- the gradient points away from contributing. See
+    # `docs/FINDINGS_2026_08_27.md` and `scripts/../free_riding.py`.
+    difference_reward: bool = False
     # SHOW THE POLICY THE CHANNELS ITS REWARD IS SCORED ON. The observation carried only
     # DIRECTED edge frequencies, so an agent could not see which pairs it believed
     # CONFOUNDED -- the one claim the thesis is about, always required, and the largest
@@ -658,6 +665,10 @@ class TwoAgentEnv:
         # ROUNDS TO IDENTIFICATION, per agent. `None` until the window is identified; then
         # the round it first happened. Censored at the budget when it never does. A
         # continuous metric with a true zero, against the binary rate's 1-bit-per-episode.
+        # WHO touched WHAT, for the difference reward. Ground truth rather than the
+        # disclosed table: this is the environment scoring itself, not an agent reasoning,
+        # so it may see everything. Nothing reads it unless `difference_reward` is set.
+        self._touched_by: Dict[int, set] = {}
         self.identified_round: Dict[int, Optional[int]] = {
             a: None for a in self.topology.agents}
         self.signals: Dict[int, str] = {a: NO_INTERVENTION for a in self.topology.agents}
@@ -742,6 +753,9 @@ class TwoAgentEnv:
         # inactive agent still submits a move and it is discarded, so counting submissions
         # double-counts the moves and corrupts any per-move statistic.
         self.last_chosen = {a: self.windows[a].actions[actions[a]] for a in self.topology.agents}
+        for _agent, (_node, _mode) in self.last_chosen.items():
+            if _node != PASS_ACTION:
+                self._touched_by.setdefault(_node, set()).add(_agent)
         self._record_signals()
         self._tally(cfg)
 
@@ -1231,7 +1245,19 @@ class TwoAgentEnv:
                     previous = (self._last_agent_fraction.get(a)
                                 if self._last_agent_fraction is not None else None)
                     delta = 0.0 if previous is None else own - previous
-                    self._agent_rewards[a] = delta + (1.0 if identified[a] else 0.0)
+                    if self.config.difference_reward:
+                        # Two changes, both aimed at the same fault. The DELTA is paid only
+                        # to whoever actually moved this round: under turn-taking a partner's
+                        # intervention on a shared node raises this agent's window credit
+                        # too, and paying for that is the dense half of the free-riding.
+                        # The OUTCOME bonus, which is the larger half, is replaced by the
+                        # agent's own causal contribution -- a level, exactly as the +1 was.
+                        if self.active is None or a == self.active:
+                            self._agent_rewards[a] = delta + self.difference_credit(a)
+                        else:
+                            self._agent_rewards[a] = self.difference_credit(a)
+                    else:
+                        self._agent_rewards[a] = delta + (1.0 if identified[a] else 0.0)
                 self._last_agent_fraction = dict(mass)
             claim_info = {a: {"right": s.n_right, "wrong": s.n_wrong,
                               "unsure": s.n_unsure,
@@ -1297,6 +1323,35 @@ class TwoAgentEnv:
         )
 
     # -- behavioural metrics --------------------------------------------------------------
+
+    def difference_credit(self, agent: int) -> float:
+        """Credit this agent's OWN interventions caused, as a difference reward.
+
+        `credit(what happened) - credit(what would have happened had this agent passed all
+        episode)`. A node a PARTNER also reached stays in the counterfactual set: had this
+        agent stayed home the partner would still have reached it, so it is nobody's marginal
+        contribution and crediting it is precisely the free-riding the plain reward suffers.
+
+        Exact, not estimated, because under oracle evidence the belief is a deterministic
+        function of the intervened set. Factored backend only -- `credit_for_set` replays
+        `_apply_ancestry`, which no other backend exposes.
+        """
+        from cb.factored import credit_for_set
+
+        window = self.windows[agent]
+        in_window = set(window.nodes)
+        realised, own_only = set(), set()
+        for node, actors in self._touched_by.items():
+            if node not in in_window:
+                continue
+            realised.add(window.pos[node])
+            if actors == {agent}:
+                own_only.add(window.pos[node])
+        if not own_only:
+            return 0.0
+        mag = self._true_mag(agent)
+        return (credit_for_set(mag, window.k, realised)
+                - credit_for_set(mag, window.k, realised - own_only))
 
     def duplicate_coverage(self) -> float:
         """Fraction of shared-node interventions that landed on an already-covered node.

@@ -110,6 +110,31 @@ class FactoredBelief:
         return sum(1 for m in self.possible.values() if len(m) == 1)
 
 
+def credit_for_set(true_mag, k: int, positions) -> float:
+    """Window credit had EXACTLY `positions` been intervened on. Oracle evidence only.
+
+    This is what makes a difference reward computable rather than estimable here: under
+    oracle evidence `edge_marginals` prunes from the SET of intervened nodes and nothing
+    else, so "what would my window look like if I had never acted" is a replay, not a
+    counterfactual guess. Rebuilt from scratch rather than rolled back, because
+    `_apply_ancestry` only ever narrows a pair and undoing it is not defined.
+
+    Denominator matches `FactoredBackend.credit_fraction` -- ALL pairs, not just adjacent
+    ones -- so the two numbers can be subtracted from each other without a scale error.
+    """
+    from cb.versionspace import reveal
+
+    backend = FactoredBackend(k)
+    backend.reset(true_mag)
+    backend.reset_marks()
+    for x in sorted(positions):
+        backend._apply_ancestry(x, reveal(backend.truth, k, x))
+    truth = marks_from_mag(true_mag)
+    hits = sum(1 for index, key in enumerate(pairs(k))
+               if backend._possible[key] == frozenset({truth[index]}))
+    return hits / max(len(backend._possible), 1)
+
+
 class FactoredBackend:
     """Pairwise belief, updated by ancestry. O(k^2) state, O(k^2) per update.
 
