@@ -4302,3 +4302,66 @@ file.
 Level with the hand-designed schedule, behind a correctly configured greedy, everywhere,
 and the deficit GROWS with agent count rather than shrinking. Read against the undertraining
 finding above, not as a converged result.
+
+---
+
+## 2026-08-28, overnight -- the dial holds against a FAIR greedy; the transition fix does not rescue eight agents
+
+[MEASURED] THE NOISE DIAL, CONVERGED AT 20,000 EPISODES AND RE-SCORED AT THE GRADED BAR.
+`scripts/rescore_from_config.py` rebuilds each environment from the run's OWN config block
+and sweeps greedy's confidence bar; joint success, 150 identical episodes per arm, paired
+per episode:
+
+    run              learned   greedy@0.7   greedy@1.0   random   paired learned - greedy@1.0
+    dial_n100_s0       0.473      0.247        0.427      0.133     +0.047 +/- 0.027
+    dial_n100_s1       0.520      0.293        0.460      0.093     +0.060 +/- 0.034
+    dial_n1000_s0      0.687      0.480        0.593      0.100     +0.093 +/- 0.036
+    dial_n1000_s1      0.807      0.440        0.700      0.120     +0.107 +/- 0.036
+
+    POOLED n_int 100   +0.053 +/- 0.022 (n=300)
+    POOLED n_int 1000  +0.100 +/- 0.025 (n=300)
+
+The bar correction costs most of the apparent margin -- +0.227 becomes +0.047 at n_int 100 --
+and the learner STILL WINS, at both noise levels, in four runs of four. The margin grows
+with data quality. This is the first learned-vs-greedy result in the project that survives a
+correctly configured baseline.
+
+IT ALSO DISSOCIATES THE TWO BACKENDS. On the attributed backend the same correction INVERTS
+the result and greedy wins in six arms of six; on version_space with sampled evidence the
+learner wins in four of four. Whatever is wrong with attribution is specific to it and not a
+general property of the comparison.
+
+[MEASURED] THE DIAL SATURATES. Solve rises 0.51 -> 0.76 from n_int 100 to 1000 and is flat
+from 1000 to 4000. Beyond about a thousand samples per intervention more data buys nothing,
+so the three levels do not span the range a transfer study needs -- the informative interval
+is below 1000.
+
+[MEASURED, and it does NOT support my own hypothesis] TURN-AWARE CREDIT HELPS AT EIGHT
+AGENTS AND DOES NOT FIX IT. Matched to the other session's a08 config, verified field by
+field (window_rate at update 0: 0.531 against their 0.53125):
+
+    update      baseline    turn-aware
+       0          1.946        1.946
+      10          1.931        1.889
+      20          1.929        1.842
+      30          1.926        1.846
+      60          1.910        1.845
+
+A real divergence -- five times the baseline's entropy drop -- and then a PLATEAU at ~1.845,
+which is 95% of the 1.946 maximum. Trained policies on this codebase sit at 0.5-0.9. Solve
+stays at 0.000-0.062. The gradient-noise diagnosis is therefore PARTIAL: it identifies a
+genuine defect and removing it is not sufficient at eight agents.
+
+Sobering comparison: their `a08long` at 16,000 episodes and NO fix reached entropy 1.437,
+better than the fixed run at 4,000. Not matched on episodes, so not a clean refutation, but
+more episodes has done more for eight agents than the transition fix has.
+
+[NOTED] THE FIX IS STILL WORTH KEEPING on its own terms -- it removes gradients computed on
+actions that were never executed, which is wrong regardless of how much it buys -- but it
+must not be sold as the answer to the agent-count collapse. Default remains OFF pending the
+other session's agreement, since it changes every turn-taking result in the project.
+
+[PROCESS] Three changes tonight looked applied and were not: a scripted `str.replace` that
+silently failed while the file still parsed, a comparison built from a neighbouring
+experiment's config, and two output pipes buffered behind `grep`/`tail`. All three were
+caught by reading the artefact rather than trusting the command's exit status.

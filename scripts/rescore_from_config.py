@@ -27,7 +27,7 @@ import numpy as np
 
 from ma.baselines import RandomAgent, UncertaintyGreedyAgent
 from ma.env import MAConfig, TwoAgentEnv
-from ma.evaluate import run_arm
+from ma.evaluate import evaluate_episode, run_arm
 from ma.policy import IndependentPPO
 from ma.topology import Topology
 
@@ -63,6 +63,33 @@ def env_from_config(config: dict, seed: int = 0) -> TwoAgentEnv:
     return TwoAgentEnv(MAConfig(**kwargs), seed=seed)
 
 
+def play_paired(env: TwoAgentEnv, policies, episodes: int, seed: int) -> List[float]:
+    """Per-episode joint success, so differences between arms can be PAIRED.
+
+    `run_arm` returns aggregates only, which makes a difference of two means the best it can
+    support -- the exact error this project has corrected three times. Every arm replays
+    `seed * 100_000 + episode`, so these vectors are aligned across arms and their
+    difference has a standard error of its own.
+    """
+    for policy in policies.values():
+        if hasattr(policy, "reset"):
+            policy.reset(seed)
+    out: List[float] = []
+    for episode in range(episodes):
+        result = env.reset(seed=seed * 100_000 + episode)
+        while not result.done:
+            result = env.step({a: policies[a](env, result) for a in env.topology.agents})
+        out.append(float(evaluate_episode(env)["success"]))
+    return out
+
+
+def paired(a: List[float], b: List[float]) -> str:
+    d = np.asarray(a) - np.asarray(b)
+    se = d.std(ddof=1) / np.sqrt(len(d)) if len(d) > 1 else 0.0
+    flag = "" if abs(d.mean()) > 2 * se else "  (inside 2 se)"
+    return f"{d.mean():+.3f} +/- {se:.3f}{flag}"
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("result", help="a *.json written by scripts/ma_train.py")
@@ -87,18 +114,20 @@ def main(argv=None) -> None:
     arms["greedy_bar1.0"] = {a: UncertaintyGreedyAgent(a, seed, bar=1.0) for a in agents}
     arms["random_vary"] = {a: RandomAgent(a, seed, allow_clamp=False) for a in agents}
 
-    out: Dict[str, dict] = {"source": str(path), "seed": seed, "arms": {}}
+    out: Dict[str, dict] = {"source": str(path), "seed": seed, "arms": {}, "rows": {}}
     print(f"\n=== {path.name}  ({args.episodes} identical episodes, seed {seed}) ===")
-    print(f"{'arm':16s} {'joint success':>14s} {'rounds':>8s}")
+    print(f"{'arm':16s} {'joint success':>14s}")
     for label, policies in arms.items():
-        row = run_arm(env, policies, args.episodes, seed=seed)
-        out["arms"][label] = {k: v for k, v in row.items() if isinstance(v, (int, float))}
-        print(f"{label:16s} {row['success']:14.3f} {row['mean_rounds']:8.2f}")
+        rows = play_paired(env, policies, args.episodes, seed)
+        out["rows"][label] = rows
+        out["arms"][label] = {"success": float(np.mean(rows))}
+        print(f"{label:16s} {np.mean(rows):14.3f}")
 
-    if "learned" in out["arms"]:
-        for bar in ("greedy_bar0.7", "greedy_bar1.0"):
-            d = out["arms"]["learned"]["success"] - out["arms"][bar]["success"]
-            print(f"  learned - {bar:14s} {d:+.3f}")
+    if "learned" in out["rows"]:
+        for other in ("greedy_bar0.7", "greedy_bar1.0", "random_vary"):
+            if other in out["rows"]:
+                print(f"  PAIRED learned - {other:14s} "
+                      f"{paired(out['rows']['learned'], out['rows'][other])}")
     if args.out:
         p = pathlib.Path(args.out)
         p.parent.mkdir(parents=True, exist_ok=True)
