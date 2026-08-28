@@ -4470,3 +4470,19 @@ four-agent case 0.060 behind greedy on a single seed.
 still a gain of about +0.08 on the mean, flattening rather than flat. That is the third time
 in two days a curve's shape was read off an unfinished run. Treat any trend claim from
 partial training as inadmissible, not merely caveated.
+
+[MEASURED] THE COMPLETE NOISE DIAL AT THE GRADED BAR, six runs of 20,000 episodes, paired
+per episode, 150 identical episodes per arm:
+
+    n_int   learned   greedy@1.0   pooled paired margin
+      100    0.497      0.443      +0.053 +/- 0.022
+     1000    0.747      0.647      +0.100 +/- 0.025
+     4000    0.863      0.740      +0.123 +/- 0.025
+
+THE MARGIN GROWS MONOTONICALLY WITH DATA QUALITY. All six runs positive. The cleaner the
+belief signal, the more a learned policy can exploit that a myopic rule cannot -- under noisy
+beliefs there is less structure to plan against, so greedy gives up little by being greedy.
+
+[CORRECTED, second time on the same claim] "The dial saturates above n_int 1000" was wrong in
+BOTH senses: the learner's absolute score keeps climbing (0.747 -> 0.863) and so does its
+margin over greedy (+0.100 -> +0.123). Both readings came from the same 74%-trained run.
