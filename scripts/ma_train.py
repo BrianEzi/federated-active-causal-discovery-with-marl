@@ -57,6 +57,8 @@ def _config_record(config, topology, args) -> dict:
             "claim_penalty": config.claim_penalty,
             "per_agent_reward": config.per_agent_reward,
             "difference_reward": config.difference_reward,
+            "difference_reward_mode": config.difference_reward_mode,
+            "reward_scale": config.reward_scale,
             "observe_belief_channels": config.observe_belief_channels,
             "observe_partner_counts": config.observe_partner_counts,
             "mode_by_role": config.mode_by_role,
@@ -150,6 +152,14 @@ def main(argv=None) -> dict:
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
                     help="pay each agent for its own window, not the all-agents conjunction")
+    ap.add_argument("--difference_reward_mode", default="both",
+                    choices=("both", "delta", "bonus"),
+                    help="which half of the difference reward to apply: 'delta' gates the "
+                         "dense term to whoever moved, 'bonus' replaces the outcome bonus "
+                         "with own causal contribution, 'both' does each.")
+    ap.add_argument("--reward_scale", type=float, default=1.0,
+                    help="uniform multiplier on the per-agent reward; the control that "
+                         "separates credit assignment from policy/value loss balance.")
     ap.add_argument("--difference_reward", action="store_true",
                     help="pay each agent for the credit ITS OWN interventions caused, "
                          "instead of for the state its window happens to be in. Under the "
@@ -277,6 +287,8 @@ def main(argv=None) -> dict:
                        **({"claim_bar": args.claim_bar} if args.claim_bar else {}),
                        per_agent_reward=args.per_agent_reward,
                        difference_reward=args.difference_reward,
+                       difference_reward_mode=args.difference_reward_mode,
+                       reward_scale=args.reward_scale,
                        observe_belief_channels=args.observe_belief_channels,
                        observe_partner_counts=args.observe_partner_counts,
                        mode_by_role=args.mode_by_role,

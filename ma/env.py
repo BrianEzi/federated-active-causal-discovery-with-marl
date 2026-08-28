@@ -259,6 +259,17 @@ class MAConfig:
     # with its own at two and three -- the gradient points away from contributing. See
     # `docs/FINDINGS_2026_08_27.md` and `scripts/../free_riding.py`.
     difference_reward: bool = False
+    # WHICH HALF. `difference_reward` changes two things at once -- the dense delta is paid
+    # only to whoever moved, and the outcome bonus becomes the agent's own causal
+    # contribution -- so a win cannot be attributed to either without splitting them.
+    # "delta" and "bonus" apply one half each; "both" is the combined form.
+    difference_reward_mode: str = "both"
+    # Uniform multiplier on the per-agent reward. Exists for ONE control: the difference
+    # reward is 4.7x smaller than the plain one, and though PPO normalises advantages (so a
+    # rescale cannot move the policy gradient), `value_coef` is fixed and the
+    # policy-loss/value-loss balance does shift. Scaling the plain reward to the difference
+    # reward's magnitude separates "credit assignment" from "loss balance".
+    reward_scale: float = 1.0
     # SHOW THE POLICY THE CHANNELS ITS REWARD IS SCORED ON. The observation carried only
     # DIRECTED edge frequencies, so an agent could not see which pairs it believed
     # CONFOUNDED -- the one claim the thesis is about, always required, and the largest
@@ -514,6 +525,10 @@ class TwoAgentEnv:
             raise ValueError(
                 "reward_criterion='claims' scores bootstrap claim frequencies; the exact "
                 "backend has no replicates. Use the constraint backend, or 'u14'.")
+        if config.difference_reward_mode not in ("both", "delta", "bonus"):
+            raise ValueError(
+                "difference_reward_mode must be 'both', 'delta' or 'bonus', got "
+                f"{config.difference_reward_mode!r}")
         if config.oracle_obs_structure and config.belief_backend != CONSTRAINT:
             raise ValueError("oracle_obs_structure requires the constraint backend")
         if config.belief_backend in (VERSION_SPACE, FACTORED):
@@ -1245,6 +1260,7 @@ class TwoAgentEnv:
                     previous = (self._last_agent_fraction.get(a)
                                 if self._last_agent_fraction is not None else None)
                     delta = 0.0 if previous is None else own - previous
+                    mode = self.config.difference_reward_mode
                     if self.config.difference_reward:
                         # Two changes, both aimed at the same fault. The DELTA is paid only
                         # to whoever actually moved this round: under turn-taking a partner's
@@ -1252,12 +1268,18 @@ class TwoAgentEnv:
                         # too, and paying for that is the dense half of the free-riding.
                         # The OUTCOME bonus, which is the larger half, is replaced by the
                         # agent's own causal contribution -- a level, exactly as the +1 was.
-                        if self.active is None or a == self.active:
-                            self._agent_rewards[a] = delta + self.difference_credit(a)
-                        else:
-                            self._agent_rewards[a] = self.difference_credit(a)
+                        moved = self.active is None or a == self.active
+                        # The delta half: a partner's move on a shared node raises this
+                        # agent's window credit too, so paying for it is the dense share of
+                        # the free-riding. Gated unless this arm keeps the plain delta.
+                        paid_delta = delta if (moved or mode == "bonus") else 0.0
+                        # The bonus half: contribution rather than outcome.
+                        bonus = (self.difference_credit(a) if mode in ("both", "bonus")
+                                 else (1.0 if identified[a] else 0.0))
+                        self._agent_rewards[a] = paid_delta + bonus
                     else:
                         self._agent_rewards[a] = delta + (1.0 if identified[a] else 0.0)
+                    self._agent_rewards[a] *= self.config.reward_scale
                 self._last_agent_fraction = dict(mass)
             claim_info = {a: {"right": s.n_right, "wrong": s.n_wrong,
                               "unsure": s.n_unsure,
