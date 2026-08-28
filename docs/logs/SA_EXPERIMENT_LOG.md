@@ -4396,3 +4396,43 @@ last fifty updates) where the baseline was flattening. That is consistent with a
 mid-descent rather than a plateau, and it is NOT evidence for anything: the same
 extrapolation from partial training was made twice on 27 August and was wrong both times.
 A longer run is the only way to settle it.
+
+[MEASURED] ATTRIBUTION AT 20,000 EPISODES: UNDERTRAINING WAS MOST OF IT. Four agents,
+private 2, budget 16, density guard at 7 edges, scored against greedy at the GRADED bar
+(1.0), 150 identical episodes. Seed 1; seed 0 still running.
+
+    arm                  4,000 eps   20,000 eps
+    learned                  0.613        0.810
+    greedy_uncertainty       0.870        0.870
+    probe_then_work          0.640        0.640
+    random_vary              0.418        0.418
+
+The three baselines are IDENTICAL across the two runs -- they are deterministic on the same
+episodes -- so only the learner moved and the comparison is like for like.
+
+    paired                        4,000 eps          20,000 eps
+    learned - greedy_uncertainty  -0.257 +/- 0.030   -0.060 +/- 0.021
+    learned - probe_then_work     -0.027 +/- 0.044   +0.170 +/- 0.037
+    learned - greedy_attribution        --           +0.040 +/- 0.028
+    learned - random_vary         +0.195 +/- 0.044   +0.392 +/- 0.038
+
+77% OF THE DEFICIT CLOSES WITH EPISODES ALONE. The learner now beats the theory-derived
+schedule by +0.170 (4.6 SE) and edges the attribution-aware greedy, and trails a correctly
+configured myopic greedy by 0.060 +/- 0.021 -- real, small, and 2.9 SE.
+
+FOUR INDEPENDENT MEASUREMENTS AGREE, which is why this is a diagnosis rather than a
+suggestive number:
+
+    final training entropy        ~1.05  ->  0.670
+    I(S;A)/H, per agent           0.035 / 0.188 / 0.291  ->  0.481 / 0.339 / 0.599 / 0.498
+    deficit vs fair greedy        -0.257 -> -0.060
+    vs the theory schedule        -0.027 -> +0.170
+
+The mutual information now sits in the range the other session measured for their TRAINED
+window ladder (0.513-0.616), against the 0.034 of their untrained 8-agent arm. The policy
+conditions on its observation instead of emitting a fixed mixture.
+
+[CORRECTED] The 27 August conclusion that "the learner loses to a correctly configured
+greedy at every arm" was measured entirely on 4,000-episode policies that had not converged.
+The greedy BAR correction stands and was necessary; the interpretation built on top of it --
+that attribution is a negative result -- does not survive training the policies properly.
