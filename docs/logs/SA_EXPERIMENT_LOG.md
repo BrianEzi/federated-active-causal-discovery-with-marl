@@ -4665,3 +4665,67 @@ training paid for, and **the reported numbers are not shown to be wrong**. The c
 stated at that strength, not stronger. With fewer windows or a stronger policy the difference
 would reach the joint verdict, which is why the regression test pins the WINDOW level -- an
 episode-level test passes against the bug and proves nothing.
+
+[MEASURED] THE AGENT LADDER IS NOT BUDGET-STARVED -- IT IS THE BEST-FUNDED PART OF THE WHOLE
+DESIGN. The window ladder's top end turned out to be below its required cover, so the same
+question was put to the agent axis. It comes out the other way:
+
+    rung  agents  budget  rounds/agent  own window needs  system needs  budget/system
+    a02      2       6       3.00            3.95             5.88          1.02
+    a03      3       9       3.00            4.15             6.78          1.33
+    a06      6      18       3.00            4.08             8.05          2.24
+    a08      8      24       3.00            3.78             8.88          2.70
+
+a06 and a08 have MORE slack than any window rung, and still score 0.213 and 0.100. **The
+agent-count collapse is not a resource problem**, and the difference-reward and reward-scale
+results were not measured on a starved arm.
+
+The structure underneath is the useful part. Every rung gives each agent exactly 3.00 rounds
+against a ~4-node own-window requirement, so the per-agent shortfall is CONSTANT at about one
+node across the whole ladder. What grows with agent count is the REDUNDANCY: the system-level
+union grows sublinearly because windows overlap on the shared set, so slack rises 1.02 to
+2.70. The large-n rungs are therefore exactly tasks that are unsolvable by an agent working
+alone and comfortably solvable by agents that divide the work. That is the coordination claim
+restated as a resource fact, and it is the cleanest available account of why a two-line
+positional convention (`PartitionedGreedyAgent`, 0.880) beats the learner at eight agents.
+
+[MEASURED] THREE SEEDS ON THE BUDGET-NORMALISED CURVE, evaluation only on checkpoints that
+already existed. The single-seed margins reported earlier today were flattering:
+
+    k     learned   greedy@1.0   per-seed margins
+    4      0.800      0.769      +0.083  +0.092  -0.083
+    6      0.594      0.606      +0.133  +0.092  -0.258
+    8      0.317      0.211      +0.092  +0.183  +0.042
+    12     0.217      0.125      +0.092  +0.158  +0.025
+
+**k=8 and k=12 are 3/3 positive. k=4 and k=6 are not established** -- one negative seed each,
+both seed 2, and at k=6 it drags the mean below greedy. The defensible claim is that the
+learned advantage holds at the larger windows and is within seed noise at the small ones.
+
+At matched ratio the learned margin GROWS with window size, because greedy declines
+monotonically in k and the learner does not. Pooled, ratio 1.5-2.0:
+
+    k            4       6       8      12
+    learned    0.808   0.552   0.667   0.619
+    greedy     0.728   0.526   0.404   0.381
+    margin    +0.080  +0.026  +0.263  +0.238
+
+Below ratio 1.0 the zero-success floor now holds over 288 episodes.
+
+[MEASURED] EVERY SEED PASSED THE MI GATE, so none of the above is void.
+`scripts/mi_gate.py` had to be REBUILT -- `mi_check2.py`, which produced the "did this rung
+train" numbers quoted in PLAN and FINDINGS, is not in the repository. Third scratchpad tool
+lost this way after `attr_score.py` and the private-share scorer.
+
+    w04  0.378 / 0.483 / 0.406      w08  0.595 / 0.603 / 0.480
+    w06  0.437 / 0.412 / 0.246      w12  0.546 / 0.530 / 0.471
+    w20  0.429                      w20iso 0.354
+
+w06_s2 at 0.246 is the weakest and is the seed that reverses the k=6 result -- entropy 1.304
+against its siblings' 0.92 and 0.99. It is nonetheless ABOVE the floor, and the standing rule
+is that the gate is a floor and not a quality measure, so it is a legitimately worse seed and
+**must not be dropped**. Seed variance is the honest account of k=6, not a bad run.
+
+Caution worth keeping: `w20iso` has the LOWEST mutual information on the ladder (0.354) and
+the highest final entropy (1.877), and it is the best-performing arm at 0.825. The gate says
+nothing about quality.
