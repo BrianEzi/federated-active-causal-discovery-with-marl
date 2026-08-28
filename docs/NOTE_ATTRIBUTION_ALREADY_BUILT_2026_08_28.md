@@ -135,10 +135,22 @@ any of them **without retraining**. That is 20,000-episode training you do not h
 
 ## 5. Two live defects on this axis, so you do not trip over them
 
-- **`ma/evaluate.py::_claims_success` is wrong for the attributed backend.** It calls
-  `score_window` with defaults, so it scores the superseded criterion and ignores attribution
-  entirely. Training and every number from `attr_score.py` are unaffected, but the `success`
-  field in `results/attr_scale/*.json` **must not be quoted**. Unfixed as of this commit.
+- **`ma/evaluate.py::_claims_success` was wrong for the attributed backend -- FIXED, and the
+  claim about it was too strong.** It called `score_window` with defaults, so it used the
+  default `require_all_types` rather than the configured one and ignored attribution entirely.
+  Fixed 2026-08-28 to mirror `_result`, with a regression test.
+
+  **Correction to what I wrote above and to `SUMMARY_2026_08_28.md` section 7.** I said the
+  `success` field in `results/attr_scale/*.json` "must not be quoted". Measured since: at the
+  `attr3a` configuration the old rule is strictly WEAKER per window -- it credits 23 of 714
+  windows the env would not, and none the other way -- but it moved **no episode verdict in
+  604 sampled states** across two configurations, because a joint verdict needs every window
+  and the over-credited window was never the last blocker. So the defect was real and the
+  criterion was more permissive than the one training paid for, but **those numbers are not
+  shown to be wrong**. Quote them; do not re-run anything on my account.
+
+  Worth keeping for its own sake: an episode-level regression test PASSES against this bug.
+  The difference is only reachable at the window level.
 - **The `private_share` column in `HANDOVER_2026_08_27.md` §3 is unreproducible.** It came from
   a scratchpad scorer that no longer exists and disagrees with `attr_score.py` on the same
   configuration. Use `attr_score.py`'s. Identification and attribution columns are unaffected.
