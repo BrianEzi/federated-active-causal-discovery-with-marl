@@ -165,3 +165,60 @@ def test_the_tracker_ignores_a_move_the_protocol_discarded():
               2: env.windows[2].action_index(shared_b, prefer=VARY)})
     assert env._touched_by == {shared_a: {0}}, env._touched_by
     assert env.difference_credit(1) == pytest.approx(0.0)
+
+
+# -- the ablation ------------------------------------------------------------------------
+
+
+def _reward_for(mode, scale=1.0, difference=True):
+    """One shared move by agent 0, then read what each agent was paid."""
+    env = _env(difference, difference_reward_mode=mode, reward_scale=scale)
+    env.reset(seed=11)
+    result = _act(env, 0, TOPO.exposed[0])
+    return {a: float(v) for a, v in result.info["agent_rewards"].items()}
+
+
+def test_the_delta_half_gates_the_dense_term_but_keeps_the_outcome_bonus():
+    """`delta` alone must stop paying bystanders for a partner's move, while still paying
+    the flat +1 for the window being identified however it got that way."""
+    delta_only = _reward_for("delta")
+    plain = _env(False)
+    plain.reset(seed=11)
+    plain_rewards = _act(plain, 0, TOPO.exposed[0]).info["agent_rewards"]
+    assert plain_rewards[1] > 0.0                     # precondition: the bystander is paid
+    assert delta_only[1] == pytest.approx(0.0)        # ...and now is not
+    # Whatever agent 0 receives is the plain delta plus a FLAT bonus, never a contribution
+    # level, so it must match the plain reward exactly on this move.
+    assert delta_only[0] == pytest.approx(float(plain_rewards[0]))
+
+
+def test_the_bonus_half_keeps_the_plain_delta_and_replaces_only_the_outcome_term():
+    """`bonus` alone must still pay bystanders their dense delta -- that is the half it
+    deliberately leaves alone -- so it is distinguishable from `delta` and from `both`."""
+    bonus_only, both = _reward_for("bonus"), _reward_for("both")
+    plain = _env(False)
+    plain.reset(seed=11)
+    plain_rewards = _act(plain, 0, TOPO.exposed[0]).info["agent_rewards"]
+    assert bonus_only[1] == pytest.approx(float(plain_rewards[1])), "delta half left alone"
+    assert both[1] == pytest.approx(0.0), "both gates it"
+    assert bonus_only[0] != pytest.approx(float(plain_rewards[0]))
+
+
+def test_reward_scale_is_a_uniform_multiplier_and_nothing_else():
+    """The scale control must change magnitude only. If it altered the ratio between agents
+    it would be a second treatment wearing a control's name."""
+    one, scaled = _reward_for("both", scale=1.0), _reward_for("both", scale=0.25)
+    for agent in TOPO.agents:
+        assert scaled[agent] == pytest.approx(0.25 * one[agent], abs=1e-9)
+    plain_one = _env(False, reward_scale=1.0)
+    plain_one.reset(seed=11)
+    a = float(_act(plain_one, 0, TOPO.exposed[0]).info["agent_rewards"][0])
+    plain_q = _env(False, reward_scale=0.25)
+    plain_q.reset(seed=11)
+    b = float(_act(plain_q, 0, TOPO.exposed[0]).info["agent_rewards"][0])
+    assert b == pytest.approx(0.25 * a, abs=1e-9), "scale must apply to the plain reward too"
+
+
+def test_an_unknown_mode_is_refused_rather_than_silently_treated_as_both():
+    with pytest.raises(ValueError, match="difference_reward_mode"):
+        _env(True, difference_reward_mode="contribution")
