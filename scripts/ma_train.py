@@ -68,7 +68,18 @@ def _config_record(config, topology, args) -> dict:
                          "exposed": list(topology.exposed)},
             "train_episodes": args.train_episodes,
             "potential_shaping": args.potential_shaping,
-            "step_cost": config.step_cost}
+            "step_cost": config.step_cost,
+            # THE OPTIMISER SETTINGS, added 2026-08-28. Until now none of these were
+            # recorded, so a result file could not say what PPO was actually run with --
+            # which made adding a seed to an old rung a matter of trusting that the
+            # defaults had been used. `scripts/train_from_config.py` reconstructs a
+            # training command from this block and can only check what is in it.
+            "entropy_coef": args.entropy_coef,
+            "orthogonal_init": args.orthogonal_init,
+            "gnn_layers": args.gnn_layers,
+            "turn_aware_credit": args.turn_aware_credit,
+            "mask_pass_updates": args.mask_pass_updates,
+            "max_edges": args.max_edges}
 
 
 def _wandb_run(args, config_record: dict):

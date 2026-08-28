@@ -4510,3 +4510,62 @@ policies trained to convergence: the learner is LEVEL with adaptive greedy at th
 0.064 behind at four, and ahead of both hand-designed references at both sizes. Attribution
 scales from three to four agents on the schedule comparison and loses ground on the greedy
 comparison.
+
+## 2026-08-28 — the required cover, and the direction of the normalisation error
+
+[MEASURED] THE FORCED COVER IS REAL, AND THE CLOSED FORM IS CONFIRMED AGAINST THE MECHANISM.
+`scripts/required_cover.py` does not implement PLAN F1's rule -- it asks
+`cb.factored._apply_ancestry`, by replay, which position sets settle which pair, and then
+compares. On 176 windows at k=4, 6 and 8: **zero pairs had more than one minimal cover**, so
+the requirement is genuinely forced rather than a set-cover choice, and **zero windows
+disagreed with the closed form** (tails of directed edges, both endpoints of confounded
+pairs). The rule is therefore safe to apply at k=20 and k=30, where the exhaustive search is
+not affordable.
+
+[MEASURED] THE SUBLINEARITY IS CONFIRMED. Per-window required cover, 50 episodes per rung:
+
+    k     per-window required   per node    PLAN F1 predicted
+    4         3.00               0.749       0.757
+    6         4.01               0.668
+    8         4.96               0.621
+    12        7.05               0.588
+    20       11.04               0.552
+    30       16.35               0.545       0.542
+
+So F1's measurement reproduces at both ends to within 0.01.
+
+[CORRECTED] THE CONCLUSION DRAWN FROM IT IS BACKWARDS. F1 reads the sublinearity as "the
+iso-budget normalisation quietly favours large windows". That inference needs the budget to
+have scaled with k. It did not -- it scaled MORE slowly than the requirement, and the
+requirement that matters is the SYSTEM one, the union over agents of the forced positions in
+global node ids, because `budget` is a shared pool of rounds and the windows overlap on the
+shared set:
+
+    k    agents  budget   required (system)   budget / required
+    4      4       8            4.86               1.65
+    6      4      12            7.00               1.71
+    8      4      12           10.34               1.16
+    12     4      16           14.44               1.11
+    20     4      20           22.50               0.89
+    30     3      15           28.72               0.52
+
+**The ratio falls monotonically from 1.71 to 0.52.** The large rungs were STARVED, not
+favoured. At k=20 and k=30 the budget is below the cover the episode requires, so a large
+fraction of those episodes cannot be jointly identified by any policy whatever -- the ceiling
+is not 1.0 and the arm is not measuring window size.
+
+The objection F1 was written to answer therefore does not land in the direction it was aimed.
+The correct statement is the stronger and less comfortable one: the ladder's decline is
+confounded with budget, and the confound works AGAINST the learner, not for it.
+
+[MEASURED] A SECOND CONFOUND IN THE SAME FIGURE. **The k=30 rung uses THREE agents; every
+other rung uses four.** Read straight off the config blocks. So the top of the window ladder
+varies agent count as well as window size, and the agent axis is the one with the known
+collapse. The k=30 point cannot be quoted as a pure window-size measurement.
+
+[DECIDED] The budget-normalised curve is built from natural episode-to-episode variation in
+the DENOMINATOR at each rung's own trained budget, not by re-running policies at budgets they
+never saw. `budget_left` is in the observation, so a re-budgeted evaluation is off
+distribution. The required cover varies enough on its own -- at k=8 it runs 6 to 14 over 50
+draws, a ratio span of 0.86 to 2.00 -- to build overlapping curves with every point in
+distribution. `scripts/budget_curve.py`.
