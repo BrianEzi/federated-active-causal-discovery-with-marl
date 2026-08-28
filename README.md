@@ -1,14 +1,28 @@
 # Federated Active Causal Discovery with Multi-Agent RL
 
-MSc thesis. Several agents each see part of a causal system, choose interventions to run, and
-must recover the structure — **without a central server and without sharing private data.**
-The difficulty the setting creates: a variable one agent cannot see can confound two it can,
-so an agent must sometimes spend a move that helps only its partner.
+MSc thesis. Several institutions each hold **different measurements about overlapping
+populations** and cannot pool raw data. The causal structure they care about **crosses their
+boundaries**. Experiments that would settle it are expensive. The objective is to let them
+**jointly recover structure that none of them could recover alone**, spending a scarce
+experimental budget, with **no central coordinator and no raw data leaving any site**.
+
+The insight the whole project turns on: **a bidirected edge is usually someone else's
+variable.** When a site sees two of its variables move together with no local explanation,
+standard discovery writes "hidden common cause, unknown" — but in a federated setting that
+cause is typically held by a partner. So the question is not *is there a latent* but **whose
+latent is it**. If an agent intervenes on its own private variable and a partner's confounded
+pair resolves, the hidden cause has been *located*. That is **attribution**, it is the
+centrepiece, and per the 2026 federated causal discovery survey no existing method does it.
+
+**Read [`docs/OBJECTIVE.md`](docs/OBJECTIVE.md) first.** It states the top-line goal, what an
+exceptional version of this project demonstrates, and the verified boundary of the novelty
+claim. Every other document answers to it.
 
 ## Start here
 
 | you want | read |
 |---|---|
+| **what this is all for** | **`docs/OBJECTIVE.md`** — the top-line goal and the novelty boundary |
 | what is true right now | **`docs/STATE_OF_TRUTH.md`** — established, retracted, open |
 | how scoring works | `docs/SCORING.md` |
 | what every term means | `docs/GLOSSARY.md` |
