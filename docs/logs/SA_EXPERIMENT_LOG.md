@@ -4436,3 +4436,37 @@ conditions on its observation instead of emitting a fixed mixture.
 greedy at every arm" was measured entirely on 4,000-episode policies that had not converged.
 The greedy BAR correction stands and was necessary; the interpretation built on top of it --
 that attribution is a negative result -- does not survive training the policies properly.
+
+[MEASURED] THE THREE-AGENT ATTRIBUTION RESULT AT 20,000 EPISODES, THREE SEEDS, shared
+reward, greedy at the graded bar, 150 identical episodes per arm, paired per episode:
+
+    seed   learned   vs fair greedy      vs theory schedule
+     0      0.807    -0.018 +/- 0.021    +0.107 +/- 0.034
+     1      0.831    +0.002 +/- 0.013    +0.153 +/- 0.032
+     2      0.813    -0.004 +/- 0.016    +0.189 +/- 0.037
+    mean    0.817    -0.007 +/- 0.006    ~ +0.150
+
+LEVEL WITH A CORRECTLY CONFIGURED GREEDY -- three seeds within 0.02 of it, each individually
+inside its own noise of zero, and the mean over seeds is -0.007 +/- 0.006. Ahead of the
+hand-designed schedule in all three, and ahead of the attribution-aware greedy
+(+0.049 +/- 0.019 on seed 1).
+
+Four agents, one seed so far: -0.060 +/- 0.021 against fair greedy, +0.170 +/- 0.037 against
+the schedule.
+
+    configuration   vs fair greedy      vs theory schedule
+    3 agents        -0.007 +/- 0.006    +0.150 (3 seeds)
+    4 agents        -0.060 +/- 0.021    +0.170 (1 seed)
+
+WHAT THE DAY'S TWO CORRECTIONS LEAVE STANDING. The greedy bar mismatch was real and
+necessary to fix; the conclusion drawn from it -- that attribution is a negative result --
+was measured on policies that had not converged. Both corrections hold, and neither cancels
+the other. The supportable claim is that the learner MATCHES a correctly configured adaptive
+baseline at three agents and BEATS both hand-designed references at three and four, with the
+four-agent case 0.060 behind greedy on a single seed.
+
+[CORRECTED] I described the noise dial as SATURATING above n_int 1000, from runs that were
+74% trained. Completed, n_int 4000 scores 0.807 / 0.860 against n_int 1000's 0.693 / 0.820 --
+still a gain of about +0.08 on the mean, flattening rather than flat. That is the third time
+in two days a curve's shape was read off an unfinished run. Treat any trend claim from
+partial training as inadmissible, not merely caveated.
