@@ -56,6 +56,7 @@ def _config_record(config, topology, args) -> dict:
             "claim_bar": config.claim_bar,
             "claim_penalty": config.claim_penalty,
             "per_agent_reward": config.per_agent_reward,
+            "difference_reward": config.difference_reward,
             "observe_belief_channels": config.observe_belief_channels,
             "observe_partner_counts": config.observe_partner_counts,
             "mode_by_role": config.mode_by_role,
@@ -149,6 +150,12 @@ def main(argv=None) -> dict:
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
                     help="pay each agent for its own window, not the all-agents conjunction")
+    ap.add_argument("--difference_reward", action="store_true",
+                    help="pay each agent for the credit ITS OWN interventions caused, "
+                         "instead of for the state its window happens to be in. Under the "
+                         "plain reward an agent's return tracks its PARTNERS' contribution "
+                         "more closely than its own at every agent count (3.2x at eight) "
+                         "and negatively at two and three. Factored backend only.")
     ap.add_argument("--observe_belief_channels", action="store_true",
                     help="show the policy its confounding and adjacency beliefs, not just "
                          "directed-edge frequencies (found 2026-08-26: without this the "
@@ -269,6 +276,7 @@ def main(argv=None) -> dict:
                        oracle_obs_structure=args.oracle_obs,
                        **({"claim_bar": args.claim_bar} if args.claim_bar else {}),
                        per_agent_reward=args.per_agent_reward,
+                       difference_reward=args.difference_reward,
                        observe_belief_channels=args.observe_belief_channels,
                        observe_partner_counts=args.observe_partner_counts,
                        mode_by_role=args.mode_by_role,
