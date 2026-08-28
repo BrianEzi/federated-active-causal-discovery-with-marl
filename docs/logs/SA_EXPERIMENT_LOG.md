@@ -4486,3 +4486,27 @@ beliefs there is less structure to plan against, so greedy gives up little by be
 [CORRECTED, second time on the same claim] "The dial saturates above n_int 1000" was wrong in
 BOTH senses: the learner's absolute score keeps climbing (0.747 -> 0.863) and so does its
 margin over greedy (+0.100 -> +0.123). Both readings came from the same 74%-trained run.
+
+[MEASURED] THE COMPLETE 20,000-EPISODE ATTRIBUTION SET, five runs, greedy at the graded bar,
+150 identical episodes per arm, paired per episode:
+
+    run                  learned   vs fair greedy      vs theory schedule
+    attr3a_shared20k_s0    0.807   -0.018 +/- 0.021    +0.107 +/- 0.034
+    attr3a_shared20k_s1    0.831   +0.002 +/- 0.013    +0.153 +/- 0.032
+    attr3a_shared20k_s2    0.813   -0.004 +/- 0.016    +0.189 +/- 0.037
+    attr4a20k_s0           0.840   -0.068 +/- 0.022    +0.135 +/- 0.036
+    attr4a20k_s1           0.810   -0.060 +/- 0.021    +0.170 +/- 0.037
+
+    3 agents (3 seeds)   vs greedy -0.007 +/- 0.006   vs schedule +0.150 +/- 0.024
+    4 agents (2 seeds)   vs greedy -0.064 +/- 0.004   vs schedule +0.153 +/- 0.018
+
+Both four-agent seeds agree to 0.008, so the -0.064 gap there is a stable property of the
+configuration rather than seed noise -- as is the level result at three agents. The learner
+beats the hand-designed schedule by the SAME margin at both sizes (+0.150, +0.153) while its
+standing against greedy degrades with agent count.
+
+THE DEFENSIBLE CLAIM. Against a baseline configured at the bar the task grades on, and with
+policies trained to convergence: the learner is LEVEL with adaptive greedy at three agents,
+0.064 behind at four, and ahead of both hand-designed references at both sizes. Attribution
+scales from three to four agents on the schedule comparison and loses ground on the greedy
+comparison.
