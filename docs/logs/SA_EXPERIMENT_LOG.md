@@ -4365,3 +4365,34 @@ other session's agreement, since it changes every turn-taking result in the proj
 silently failed while the file still parsed, a comparison built from a neighbouring
 experiment's config, and two output pipes buffered behind `grep`/`tail`. All three were
 caught by reading the artefact rather than trusting the command's exit status.
+
+[MEASURED -- and it refutes the hypothesis I proposed it to test] TURN-AWARE CREDIT AT EIGHT
+AGENTS, FULL 4,000-EPISODE RUN, matched to the other session's a08 config:
+
+    update          10      30      60     100     150     200     249
+    baseline     1.931   1.926   1.910   1.903   1.891   1.856   1.814
+    turn-aware   1.889   1.846   1.845   1.839   1.797   1.757   1.666
+    difference  -0.042  -0.080  -0.065  -0.064  -0.094  -0.098  -0.148
+
+    arm                  baseline   turn-aware
+    learned                 0.100        0.107
+    greedy_uncertainty      0.480        0.480
+    random_vary             0.027        0.027
+
+THE FIX IMPROVES THE OPTIMISATION AND BUYS NO PERFORMANCE. Entropy is better throughout and
+the gap widens with training, so the gradient signal genuinely improved. Joint success is
+unchanged -- 0.100 against 0.107 -- while greedy sits at 0.480 (and that greedy is at
+bar 0.7, so the true gap is larger still). Identical greedy and random confirm the episodes
+were matched.
+
+So the gradient-noise account is REAL BUT NOT THE CAUSE of the agent-count collapse. I
+proposed it as the root cause on the strength of a mechanism plus a monotonic entropy trend
+across the agent ladder, and the direct test does not support that reading. The fix stays --
+crediting an action that was never executed is wrong however little it buys -- but it is not
+the answer, and it must not be reported as one.
+
+The entropy curve was still descending and steepening at the end (1.757 -> 1.666 over the
+last fifty updates) where the baseline was flattening. That is consistent with a run in
+mid-descent rather than a plateau, and it is NOT evidence for anything: the same
+extrapolation from partial training was made twice on 27 August and was wrong both times.
+A longer run is the only way to settle it.
