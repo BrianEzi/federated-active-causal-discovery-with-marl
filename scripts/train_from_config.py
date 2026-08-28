@@ -53,7 +53,8 @@ UNRECORDED_DEFAULTS = {
 POST_HOC_INERT = dict(UNRECORDED_DEFAULTS,
                       difference_reward=False,
                       difference_reward_mode="both",
-                      reward_scale=1.0)
+                      reward_scale=1.0,
+                      normalise_returns=False)
 
 
 def topology_flags(topology: dict) -> List[str]:
