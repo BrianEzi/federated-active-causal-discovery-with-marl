@@ -59,6 +59,23 @@ class PPOConfig:
     # 3), so it is NOT confirmed this bites ma the same way -- hence a flag and a measured
     # comparison, not a silent default change. See docs/logs/MA_BUILD_LOG.md, 2026-08-22.
     orthogonal_init: bool = False
+    # TURN-AWARE CREDIT (2026-08-27). Under a turn-taking protocol `env.step` forces every
+    # agent except the active one to pass and DISCARDS its submitted move, but `collect`
+    # stored a transition for every agent every round -- pairing an action that never
+    # executed with a reward a partner caused. At n agents that is (n-1)/n of the batch.
+    #
+    # The measured fingerprint, on the other session's agent ladder (window and budget per
+    # agent held fixed, so the SIGNAL per agent is constant at 3 real transitions while the
+    # noise grows linearly): final entropy 0.467 / 0.699 / 1.645 / 1.814 at 2 / 3 / 6 / 8
+    # agents -- monotonic in (n-1)/n. Four episodes' worth of extra training, a lower
+    # entropy coefficient and a shared trunk all failed to move the 8-agent case, which is
+    # what a structural noise floor looks like rather than a tuning problem.
+    #
+    # ON: one transition per agent per TURN, with rewards arriving while it is inactive
+    # accrued FORWARD onto its most recent action -- a partner's probe really does sharpen
+    # this agent's belief and that credit belongs to the action that preceded it.
+    # OFF (default): byte-identical to the old behaviour, so no existing result moves.
+    turn_aware_credit: bool = False
     value_coef: float = 0.5
     epochs: int = 4
     episodes_per_update: int = 16
@@ -648,12 +665,18 @@ class IndependentPPO:
         for episode in range(episodes):
             result = self.env.reset(seed=int(self.rng.integers(1 << 30)))
             potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
+            # Index of each agent's most recent OPEN transition, per episode. Rewards from
+            # rounds it did not act in accrue here rather than becoming their own rows.
+            open_at = {a: None for a in self.env.topology.agents}
             while not result.done:
                 obs = {a: self.env.observation(a) for a in self.env.topology.agents}
                 picks = {a: self._act(a, obs[a], mask_pass) for a in self.env.topology.agents}
                 result = self.env.step({a: picks[a][0] for a in self.env.topology.agents})
                 new_potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
                 per_agent = result.info.get("agent_rewards")
+                # Whose move the protocol actually applied. None under simultaneous play,
+                # where every agent acts and the old and new paths coincide exactly.
+                active = result.info.get("active") if cfg.turn_aware_credit else None
                 for agent in self.env.topology.agents:
                     # Per-agent pay when the environment provides it, otherwise the shared
                     # scalar. Nothing else in the loop changes.
@@ -664,13 +687,23 @@ class IndependentPPO:
                             cfg.gamma * new_potential[agent] - potential[agent])
                     action, logp, value, entropy = picks[agent]
                     buf = buffers[agent]
-                    buf["obs"].append(obs[agent])
-                    buf["action"].append(action)
-                    buf["logp"].append(logp)
-                    buf["value"].append(value)
-                    buf["reward"].append(shaped)
-                    buf["done"].append(float(result.done))
-                    entropies.append(entropy)
+                    acted = (not cfg.turn_aware_credit) or active is None or agent == active
+                    if acted:
+                        buf["obs"].append(obs[agent])
+                        buf["action"].append(action)
+                        buf["logp"].append(logp)
+                        buf["value"].append(value)
+                        # Under turn-aware credit the row opens EMPTY and this round's
+                        # reward is accrued just below, together with every later round
+                        # until the agent acts again.
+                        buf["reward"].append(0.0 if cfg.turn_aware_credit else shaped)
+                        buf["done"].append(float(result.done))
+                        open_at[agent] = len(buf["reward"]) - 1
+                        entropies.append(entropy)
+                    if cfg.turn_aware_credit and open_at[agent] is not None:
+                        buf["reward"][open_at[agent]] += shaped
+                        # `done` belongs to the agent's LAST row, whenever the episode ends.
+                        buf["done"][open_at[agent]] = float(result.done)
                 potential = new_potential
             windows_identified += result.info.get("identified_fraction", 0.0)
             if result.info["both_identified"]:

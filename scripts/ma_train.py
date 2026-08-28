@@ -222,6 +222,9 @@ def main(argv=None) -> dict:
     # Rejecting dense draws changes the episode distribution, so the rejection rate is
     # reported and no guarded result above three agents may be quoted without the
     # three-agent guarded/unguarded control beside it.
+    ap.add_argument("--turn_aware_credit", action="store_true",
+                    help="one transition per agent per TURN, not per round; rewards "
+                         "from rounds it did not act in accrue onto its most recent action")
     ap.add_argument("--max_edges", type=int, default=None,
                     help="reject draws whose densest window MAG has more than this many "
                          "edges; unset disables the guard")
@@ -284,6 +287,7 @@ def main(argv=None) -> dict:
         total_episodes=args.train_episodes, seed=args.seed,
         potential_shaping=args.potential_shaping,
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
+        turn_aware_credit=args.turn_aware_credit,
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
     history = ppo.train(verbose=True, on_update=_wandb_logger(run))
     train_seconds = time.time() - started
