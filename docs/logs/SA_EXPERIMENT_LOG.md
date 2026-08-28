@@ -4569,3 +4569,99 @@ never saw. `budget_left` is in the observation, so a re-budgeted evaluation is o
 distribution. The required cover varies enough on its own -- at k=8 it runs 6 to 14 over 50
 draws, a ratio span of 0.86 to 2.00 -- to build overlapping curves with every point in
 distribution. `scripts/budget_curve.py`.
+
+[MEASURED] THE BUDGET-NORMALISED CURVE, 120 episodes per rung, one seed, greedy at bar 1.0,
+each rung played at ITS OWN trained budget with the x-axis coming from episode-to-episode
+variation in the required cover (`scripts/budget_curve.py`).
+
+**Below a ratio of 1.0 the success rate is EXACTLY ZERO, everywhere, for both arms.**
+
+    k=8    ratio 0.8-1.0   n  22   learned 0.000   greedy 0.000
+    k=12   ratio 0.8-1.0   n  23   learned 0.000   greedy 0.000
+    k=20   ratio 0.5-1.0   n  68   learned 0.000   greedy 0.000
+    k=30   ratio 0.5-1.0   n  90   learned 0.000   greedy 0.000
+
+203 episodes below the cover, zero successes. The forced-cover computation predicts
+IMPOSSIBILITY and impossibility is what is observed -- an independent confirmation of the
+closed form that does not go through `_apply_ancestry` at all, since it is measured by
+playing episodes rather than by replaying belief updates.
+
+**The k=30 rung is not a measurement.** Every one of its 120 episodes falls below ratio 1.0,
+both arms score 0.000, and no policy can be distinguished from any other there. Combined with
+its three-agent topology, the k=30 point must be withdrawn from the window figure rather than
+reported as a low score.
+
+[MEASURED] AT MATCHED RATIO THE COLLAPSE IS ROUGHLY HALVED. Learned, by ratio bin:
+
+    ratio        k=4     k=6     k=8     k=12    k=20
+    1.2-1.5     0.593   0.471   0.436   0.405   0.600
+    1.5-2.0     0.857   0.718   0.611   0.600     --
+    2.0-3.0     0.952   0.968   0.857   0.500*    --      (* n=2)
+
+Against the raw iso-budget figures for the same runs -- 0.825, 0.750, 0.308, 0.242, 0.083 --
+the decline across k=4 to k=12 falls from 0.58 raw to about 0.26 at a matched ratio of
+1.5-2.0. **So more than half of the apparent decline with window size is budget starvation.**
+The curves do not collapse onto one line, so scale-agnosticism does NOT hold in its strong
+form; what holds is the weaker and still useful claim that the window axis costs far less
+than the iso-budget figure shows.
+
+[MEASURED] THE LEARNED MARGIN OVER A FAIR GREEDY SURVIVES THE WHOLE LADDER.
+
+    k         4       6       8      12      20
+    learned  0.825   0.750   0.308   0.242   0.083
+    greedy   0.742   0.617   0.217   0.150   0.042
+
+Ahead at every rung, and at nearly every ratio bin within each rung. One inversion, k=6 at
+ratio 1.2-1.5 (greedy 0.588 against learned 0.471, n=17), inside noise. Note this greedy is
+at the GRADED bar of 1.0, not the 0.7 default that flattered the learner elsewhere.
+
+CAVEAT, and it is the standing one: ONE seed per rung. The three-seed set is in flight.
+
+[MEASURED] THE WITHIN-k BUDGET CONTROL, and it settles the F1 question. `w20iso_s0` is the
+SAME window size, the SAME four agents and the SAME topology as `w20_s0`. The only difference
+is the budget it was trained and evaluated at, 40 against 20:
+
+    rung        k    agents   budget   budget/required   learned   greedy@1.0
+    w20_s0     20      4        20          0.96          0.083      0.042
+    w20iso_s0  20      4        40          1.91          0.825      0.625
+
+**k=20 goes from 0.083 to 0.825 on budget alone** -- level with k=4's 0.825. Window size was
+not what was killing the ladder.
+
+At matched ratio the rungs line up with no monotone trend in k at all:
+
+    ratio        k=4     k=6     k=8    k=12    k=20(iso)
+    1.5-2.0     0.857   0.718   0.611   0.600     0.804
+    2.0-3.0     0.952   0.968   0.857   0.500*    0.942     (* n=2)
+
+k=20 sits ABOVE k=8 and k=12 at the same ratio. The residual spread, 0.60 to 0.86, is not
+ordered by window size.
+
+[CORRECTED] My own entry above says "the curves do not collapse onto one line, so
+scale-agnosticism does NOT hold in its strong form". That was read off rungs that all sit near
+ratio 1.2 and it is too pessimistic. With the k=20 control at ratio 1.9 in hand, the honest
+statement is: **at a matched budget-to-requirement ratio there is no monotone decline in
+window size over k=4 to k=20**, and the apparent collapse in the iso-budget figure is a
+budget effect. The residual variation between rungs is real but unordered.
+
+CAVEAT, and it is not small. `w20iso_s0` was TRAINED at budget 40, so this is a comparison of
+two training conditions, not an evaluation-only control. That is the right experiment for the
+question -- can a policy solve k=20 when it can afford to -- but it is not the claim that a
+budget-20 policy would have succeeded given more rounds at test time. One seed.
+
+[MEASURED] The learned margin over a fair greedy is LARGEST at the largest properly-funded
+window: +0.200 at w20iso (0.825 against 0.625), against +0.083 at k=4 and +0.133 at k=6. The
+starved rungs compress the margin because neither arm can do anything.
+
+[CORRECTED] `_claims_success` -- what the fix actually cost, measured rather than asserted.
+`docs/SUMMARY_2026_08_28.md` section 7 says the `success` field in `results/attr_scale/*.json`
+"must not be quoted", and I repeated that in the note to the other agent. Measured at the
+`attr3a` configuration the old criterion is strictly WEAKER per window -- it credits 23 of 714
+windows the env would not, and none the other way, so `new implies old`. But it moved NO
+episode verdict in 604 sampled states across two configurations, because a joint verdict needs
+every window and the over-credited window was never the last blocker. So the defect in the
+arguments is real and now fixed, the criterion was genuinely more permissive than the one
+training paid for, and **the reported numbers are not shown to be wrong**. The claim should be
+stated at that strength, not stronger. With fewer windows or a stronger policy the difference
+would reach the joint verdict, which is why the regression test pins the WINDOW level -- an
+episode-level test passes against the bug and proves nothing.

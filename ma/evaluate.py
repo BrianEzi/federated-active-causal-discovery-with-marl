@@ -29,7 +29,7 @@ import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
 from crosscheck.belief_dp import JOINT_CONF
-from ma.env import CLAIM_BACKENDS, TwoAgentEnv
+from ma.env import ATTRIBUTED, CLAIM_BACKENDS, TwoAgentEnv
 from ma.graphs import is_acyclic, mec_signature
 
 
@@ -254,12 +254,45 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
 
 
 def _claims_success(env: TwoAgentEnv) -> bool:
+    """Whether every window is identified, on EXACTLY the criterion `_result` pays for.
+
+    MUST MIRROR `TwoAgentEnv._result`. It did not (found 2026-08-27, fixed 2026-08-28):
+
+      * it called `score_window` with the DEFAULT `require_all_types` instead of the
+        configured `claims_require_all_types`, so a run that relaxed the criterion was
+        graded on the strict one;
+      * on the ATTRIBUTED backend it scored `confounding_claims` -- the very claims that
+        backend replaces -- and never looked at attribution at all.
+
+    WHAT THAT ACTUALLY COST, measured rather than assumed. The old criterion is strictly
+    WEAKER per window: over 714 windows at the `attr3a` configuration it credited 23 the env
+    would not, and zero the other way, so `new implies old` and the old rule over-credits
+    about 3% of windows. But it did NOT move a single EPISODE verdict in 604 sampled states
+    across two configurations -- a joint verdict needs every window, and the over-credited
+    window was never the last one blocking. So the `success` field in
+    `results/attr_scale/*.json` is not shown to be wrong; the criterion was simply more
+    permissive than the one training paid for, and with fewer windows or a stronger policy
+    that difference would reach the joint verdict.
+
+    `tests/ma/test_claims_success_mirrors_env.py` fails if the two drift apart again,
+    whichever side moves. It checks the WINDOW level as well as the episode level, because
+    the episode level is where the difference is currently unreachable.
+    """
+    from cb.attribution import score_groups
     from cb.claims import score_window
+
+    cfg = env.config
+    attributed = cfg.belief_backend == ATTRIBUTED
     for agent, window in env.windows.items():
         score = score_window(window.belief.last, env._true_mag(agent),
                              [window.pos[n] for n in window.private],
-                             bar=env.config.claim_bar)
+                             bar=cfg.claim_bar,
+                             require_all_types=cfg.claims_require_all_types,
+                             confounding_claims=not attributed)
         if not score.identified:
+            return False
+        if attributed and not score_groups(window.belief.last, window.belief.true_groups,
+                                           bar=cfg.claim_bar)["identified"]:
             return False
     return True
 
