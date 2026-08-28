@@ -4729,3 +4729,48 @@ is that the gate is a floor and not a quality measure, so it is a legitimately w
 Caution worth keeping: `w20iso` has the LOWEST mutual information on the ladder (0.354) and
 the highest final entropy (1.877), and it is the best-performing arm at 0.825. The gate says
 nothing about quality.
+
+[MEASURED] THE MI GATE, REBUILT, ANSWERS TWO OPEN QUESTIONS AT ONCE.
+
+    rung           mean MI   entropy   verdict
+    a02_s0          0.717     0.467    trained
+    a03_s0          0.601     0.699    trained
+    a06_s0          0.075     1.645    BELOW FLOOR (0.15)
+    a06_s1          0.080     1.633    BELOW FLOOR
+    a06_s2          0.031     1.776    BELOW FLOOR
+    a08_s0          0.033     1.814    BELOW FLOOR
+    scale21_s0      0.229     1.340    trained
+    scale21_s1      0.263     1.270    trained
+
+**All THREE a06 seeds fail the gate, not only s0.** `PLAN_2026_08_28.md` names a06_s0 as
+the one unfair row and implies a retrain would fix it. It will not by itself: a06_s1 and
+a06_s2 are equally near-uniform (MI 0.080, 0.031) despite being independent seeds, so this
+is not a bad draw -- the plain reward does not train ANY six-agent seed at 4,000 episodes.
+The six-agent coordination row needs `--reward_scale` or `--normalise_returns`, not a
+retrain under the plain reward, before it is quotable at all.
+
+**`scale21` clears the floor convincingly, at both its seeds (0.229, 0.263).** So the
+reward-scale run this whole comparison is built on top of is itself legitimately trained, not
+merely a change in entropy that looks like training. `normalise_returns` needs to reach this
+neighbourhood, not merely move off zero, to count as reproducing the mechanism.
+
+[MEASURED] THE AGENT LADDER AGAINST ITS OWN BUDGET RATIO, and it is the sharpest result of
+the day: RESOURCE-RICH RUNGS STILL COLLAPSE, and a fair greedy does not collapse with them.
+
+    rung   agents  budget/required   learned   greedy@1.0
+    a02       2         1.06          0.408      0.217
+    a03       3         1.43          0.900      0.550
+    a06       6         2.30          0.167      0.617
+    a08       8         2.82          0.083      0.517
+
+At a06 and a08 -- MORE budget headroom than ANY window rung reaches -- greedy still solves
+52-62% of episodes while the learner solves 8-17%. This is not the "starved and everyone
+fails" pattern the window ladder showed: at ratio 2.0-3.0 for a08, greedy scores **0.369**
+against the learner's **0.015** on the SAME 65 episodes. Whatever an untrained policy is doing
+at six and eight agents, it is actively worse than either giving up or a heuristic that reads
+only its own belief. Combined with the MI gate result immediately above, the account is now
+complete: it is not budget (ratio 2.82), not the greedy baseline being unfair (bar 1.0, and it
+still wins), and not seed luck (all three a06 seeds fail identically) -- it is that the plain
+reward does not train these rungs at all, and the fix is the SCALE of the reward, confirmed
+now from two directions (`scale21`'s MI, and the collapse's total absence wherever `scale21`
+or the pending `normalise_returns` arms are used instead).
