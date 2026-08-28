@@ -78,6 +78,7 @@ def _config_record(config, topology, args) -> dict:
             "orthogonal_init": args.orthogonal_init,
             "gnn_layers": args.gnn_layers,
             "turn_aware_credit": args.turn_aware_credit,
+            "normalise_returns": args.normalise_returns,
             "mask_pass_updates": args.mask_pass_updates,
             "max_edges": args.max_edges}
 
@@ -250,6 +251,11 @@ def main(argv=None) -> dict:
     # Rejecting dense draws changes the episode distribution, so the rejection rate is
     # reported and no guarded result above three agents may be quoted without the
     # three-agent guarded/unguarded control beside it.
+    ap.add_argument("--normalise_returns", action="store_true",
+                    help="divide rewards by a running estimate of the discounted-return "
+                         "scale, so the critic's MSE target stays O(1) as the return grows "
+                         "with agent count. The principled form of --reward_scale: same "
+                         "mechanism, no hand-picked constant.")
     ap.add_argument("--turn_aware_credit", action="store_true",
                     help="one transition per agent per TURN, not per round; rewards "
                          "from rounds it did not act in accrue onto its most recent action")
@@ -319,6 +325,7 @@ def main(argv=None) -> dict:
         potential_shaping=args.potential_shaping,
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
         turn_aware_credit=args.turn_aware_credit,
+        normalise_returns=args.normalise_returns,
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
     history = ppo.train(verbose=True, on_update=_wandb_logger(run))
     train_seconds = time.time() - started

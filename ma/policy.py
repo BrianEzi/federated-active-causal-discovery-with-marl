@@ -90,6 +90,23 @@ class PPOConfig:
     # because a node's usefulness depends on its DESCENDANTS -- multi-hop by nature; the
     # supervised probe topping out at 0.89 with layers=1 is the standing evidence.
     gnn_layers: int = 2
+    # RETURN NORMALISATION (2026-08-28). The advantages are already standardised before the
+    # policy loss, but the CRITIC's target is not: `F.mse_loss(values, ret)` runs on raw
+    # returns, so its magnitude grows as the SQUARE of the return while the policy term
+    # stays O(1). Per-agent return grows 1.66 to 11.86 from two agents to eight, which puts
+    # roughly a 50x weight ratio between the two ends of the agent ladder -- and a hand-
+    # picked `MAConfig.reward_scale` of 0.214 was measured to take eight agents from 0.110
+    # to 0.653. This is that fix without the magic constant: divide rewards by a RUNNING
+    # estimate of the discounted-return scale, so the critic sees an O(1) target at every
+    # agent count and nothing is tuned per rung.
+    #
+    # Scaling only, never centring. Subtracting a mean from the reward changes the
+    # optimal policy under a finite horizon with a terminal bonus -- it would pay an agent
+    # for surviving steps. Dividing by a positive scalar leaves the argmax untouched.
+    #
+    # OFF by default: flag off is byte-identical, the same discipline turn_aware_credit was
+    # held to, so no existing result moves.
+    normalise_returns: bool = False
 
 
 
@@ -511,6 +528,11 @@ class IndependentPPO:
         self.config = config
         torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
+        # Running discounted-return statistics for `normalise_returns`. Pooled over every
+        # batch, shared across agents: the scale is a property of the TASK, and a per-agent
+        # divisor would rescale the agents relative to each other, which is a reward change
+        # rather than a normalisation.
+        self._return_mean, self._return_var, self._return_count = 0.0, 0.0, 0
         arch = getattr(env.config, "policy_arch", "mlp")
         n_others = env.topology.n_agents - 1
         if arch == "gnn_hybrid":
@@ -720,9 +742,50 @@ class IndependentPPO:
 
     # -- learning -----------------------------------------------------------------------
 
+    def _return_scale(self, rewards: np.ndarray, dones: np.ndarray) -> float:
+        """A running estimate of the discounted return's standard deviation.
+
+        Estimated from the REWARDS alone, never from the critic's own predictions: a scale
+        read off `buf["value"]` would be a function of the thing it is about to rescale, and
+        the two would chase each other. The accumulator is the same backward discounted sum
+        the returns use, reset at episode boundaries.
+
+        RUNNING, not per batch. A per-batch divisor changes the effective learning rate
+        every update and, early in training when almost every episode scores zero, divides
+        by the noise in a handful of lucky episodes. The running variance is pooled across
+        every batch seen so far, so it settles quickly and then moves slowly.
+        """
+        cfg = self.config
+        accumulator, discounted = 0.0, np.empty_like(rewards)
+        for t in range(len(rewards) - 1, -1, -1):
+            accumulator = rewards[t] + cfg.gamma * (0.0 if dones[t] else accumulator)
+            discounted[t] = accumulator
+        count = len(discounted)
+        if count == 0:
+            return max(float(np.sqrt(self._return_var)), 1e-6)
+        mean, var = float(discounted.mean()), float(discounted.var())
+        total = self._return_count + count
+        delta = mean - self._return_mean
+        # Chan's parallel variance update: the batch is pooled with everything seen so far
+        # rather than blended with a decay constant, which would be one more free parameter.
+        new_mean = self._return_mean + delta * count / total
+        m2 = (self._return_var * self._return_count + var * count
+              + delta * delta * self._return_count * count / total)
+        self._return_mean, self._return_var, self._return_count = new_mean, m2 / total, total
+        # Floored, not clamped to 1.0: before any episode has scored, the returns really are
+        # all zero and the honest scale is "unknown". Dividing by the floor leaves the
+        # all-zero batch all-zero, which is the same no-op the raw path would produce.
+        return max(float(np.sqrt(self._return_var)), 1e-6)
+
     def _advantages(self, buf: dict) -> Tuple[np.ndarray, np.ndarray]:
         cfg = self.config
         rewards, values, dones = buf["reward"], buf["value"], buf["done"]
+        if cfg.normalise_returns:
+            # Scale BEFORE the GAE loop so rewards, values, returns and advantages are all
+            # in one unit system. Scaling the returns afterwards instead would leave the
+            # bootstrap `values[t + 1]` -- which the critic produced in scaled units -- being
+            # added to an unscaled reward, and the two would silently disagree.
+            rewards = rewards / self._return_scale(rewards, dones)
         advantages = np.zeros_like(rewards)
         running = 0.0
         for t in range(len(rewards) - 1, -1, -1):
