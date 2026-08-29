@@ -4805,3 +4805,19 @@ genuine near-threshold measurement, unlike k=30.
 
 [DECIDED] Item 1 of the roadmap (three seeds per headline window rung) is now complete for
 every rung k=4 through k=30.
+
+[MEASURED] w30's checkpoint, evaluated OFF-DISTRIBUTION at higher budgets (trained at 15,
+never saw this pacing), climbs exactly where the required-cover computation predicts it
+should (`scripts/eval_at_budget.py`, `results/cover/w30_offdist_eval.json`):
+
+    budget   ratio vs OWN required cover (28.7)   learned   greedy@1.0
+      15                0.52                        0.000      0.000
+      22                0.77                        0.000      0.000
+      30                1.04                        0.100      0.067
+      45                1.57                        0.633      0.583
+
+Flat zero below the cover, a sharp jump right at ratio ~1.0, climbing above it -- a SECOND
+independent confirmation of the k=30 required-cover number, this time from a policy that
+never trained at the target budget, so the effect cannot be an artefact of how the k=30
+checkpoints happened to train. Not to be quoted as k=30's achievable ceiling -- that needs a
+`w30iso`, trained at the higher budget, which this is not.
