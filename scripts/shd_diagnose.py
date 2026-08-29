@@ -360,8 +360,95 @@ def spend(path: pathlib.Path, episodes: int, seed: int) -> None:
         print(f"    {field:8s} {_paired(out['learned_argmax'][field], out['greedy'][field])}")
 
 
+# ------------------------------------------------------------------------------ global
+
+def global_shd(path: pathlib.Path, episodes: int, seed: int) -> None:
+    """SHD over the union of covered pairs, each pair counted ONCE.
+
+    WHY. `scripts/shd.py` sums over windows and divides by the total window-pair count, so a
+    pair of SHARED nodes is counted once PER AGENT -- n times. Soft SHD therefore prices a
+    shared move at roughly n private ones, which is exactly the channel greedy exploits
+    (`spend`: greedy puts 44-71% of its moves on the shared surface against the learner's
+    35-59%). If the metric is de-duplicated the channel should close.
+
+    Cross-private pairs -- one agent's private node against another's -- are in NOBODY's
+    window and are excluded. That is not a gap in the measurement, it is the federated
+    constraint: no agent can hold a belief about them, so no arm can differ on them. They
+    are about half of all pairs, so including them would only add a constant.
+
+    THREE NUMBERS.
+      per_window  the existing metric, reproduced as a control.
+      dedup       each covered pair counted once; a pair in several windows contributes the
+                  MEAN of its per-window soft values. Each window is still scored against
+                  its OWN MAG, so there is no projection ambiguity. This is the clean test.
+      pooled      additionally intersects the survivor sets across windows before scoring --
+                  the federated belief. Sound because under oracle evidence every agent's
+                  survivor set contains the truth, so the intersection does too.
+
+    THE ONE SUBTLETY, reported rather than hidden. A shared pair's true mark is a LATENT
+    PROJECTION into a window, and different windows project out different private nodes, so
+    two agents can legitimately hold different true marks for the same shared pair. The
+    `mark_disagree` column counts it. Where it happens, `pooled` cannot intersect and falls
+    back to the per-window mean, same as `dedup`.
+    """
+    _, env, ppo = _load(path, seed)
+    print(f"\n=== {path.stem}: SHD de-duplicated over covered pairs ===")
+    header = (f"{'arm':16s} {'per_window':>11s} {'dedup':>9s} {'pooled':>9s} "
+              f"{'mark_disagree':>14s}")
+    print(header)
+    print("-" * len(header))
+    out: Dict[str, dict] = {}
+    for name, policies in _arms(env, ppo, seed, with_sample=False).items():
+        acc = collections.defaultdict(list)
+        for _ in _rollout(env, policies, episodes, seed):
+            per_pair: Dict[tuple, list] = collections.defaultdict(list)
+            window_soft = window_pairs = 0.0, 0
+            window_soft, window_pairs = 0.0, 0
+            for agent, window in env.windows.items():
+                mag = np.asarray(env._true_mag(agent))
+                belief = window.belief.last
+                for u, v in combinations(range(window.k), 2):
+                    truth = _truth_index(mag, u, v)
+                    soft = 1.0 - _masses(belief, u, v)[truth]
+                    window_soft += soft
+                    window_pairs += 1
+                    key = tuple(sorted((window.nodes[u], window.nodes[v])))
+                    per_pair[key].append((soft, truth, _survivors(belief, u, v)))
+            dedup = pooled = 0.0
+            disagree = 0
+            for entries in per_pair.values():
+                dedup += float(np.mean([e[0] for e in entries]))
+                marks = {e[1] for e in entries}
+                if len(marks) > 1:
+                    disagree += 1
+                    pooled += float(np.mean([e[0] for e in entries]))
+                    continue
+                sets = [e[2] for e in entries if e[2] is not None]
+                if not sets:
+                    pooled += float(np.mean([e[0] for e in entries]))
+                    continue
+                merged = set(sets[0])
+                for other in sets[1:]:
+                    merged &= set(other)
+                truth_mark = MARK_OF[entries[0][1]]
+                pooled += (1.0 - 1.0 / len(merged)) if merged and truth_mark in merged \
+                    else float(np.mean([e[0] for e in entries]))
+            n = max(len(per_pair), 1)
+            acc["per_window"].append(window_soft / max(window_pairs, 1))
+            acc["dedup"].append(dedup / n)
+            acc["pooled"].append(pooled / n)
+            acc["disagree"].append(disagree / n)
+        out[name] = {key: np.asarray(v) for key, v in acc.items()}
+        m = out[name]
+        print(f"{name:16s} {m['per_window'].mean():11.4f} {m['dedup'].mean():9.4f} "
+              f"{m['pooled'].mean():9.4f} {m['disagree'].mean():14.4f}")
+    print("\n  paired learned_argmax - greedy (+ means the learned arm is worse)")
+    for field in ("per_window", "dedup", "pooled"):
+        print(f"    {field:11s} {_paired(out['learned_argmax'][field], out['greedy'][field])}")
+
+
 CHECKS = {"decompose": decompose, "identity": identity, "descent": descent,
-          "targeting": targeting, "spend": spend}
+          "targeting": targeting, "spend": spend, "global": global_shd}
 
 
 def main(argv=None) -> int:

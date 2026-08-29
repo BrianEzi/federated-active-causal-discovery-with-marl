@@ -168,12 +168,53 @@ Those are different quantities and only the second is what SHD measures here.
 at every rung — 0.338 vs 0.303 (w08), 0.299 vs 0.273 (w12), 0.239 vs 0.227 (w20), all
 significant. It spends its budget on more nodes of lower degree.
 
+## 5b. De-duplicating the metric removes greedy's win entirely
+
+`scripts/shd.py` sums over windows and divides by total window-pair count, so a SHARED pair
+is counted once PER AGENT — n times. That is exactly the over-weighting §3b identified.
+Counting each covered pair once (`shd_diagnose.py --check global`, 100 episodes, argmax):
+
+| rung | per-window (published) | de-duplicated |
+|---|---|---|
+| w04 | +0.0142 ± 0.0055 **SIG** | +0.0077 ± 0.0051 ns |
+| w08 | +0.0059 ± 0.0026 **SIG** | **−0.0027 ± 0.0013 SIG (learner wins)** |
+| w12 | +0.0046 ± 0.0014 **SIG** | −0.0004 ± 0.0007 ns |
+| w20 | +0.0070 ± 0.0012 **SIG** | +0.0005 ± 0.0004 ns |
+| w30 | +0.0049 ± 0.0007 **SIG** | +0.0009 ± 0.0003 **SIG** (5.4x smaller) |
+
+**Greedy's advantage vanishes at w04, w12 and w20, reverses at w08, and survives only at
+w30** — where it is still significant but 5.4 times smaller. So de-duplication accounts for
+most of the published gap but not all of it at the largest window. The raw scores show why:
+de-duplication roughly HALVES the learned arm
+(w20 0.0119 → 0.0060, w08 0.0166 → 0.0085) and slightly RAISES greedy (0.0049 → 0.0054,
+0.0107 → 0.0112). The learner's residual sits on the shared surface, which the window
+average multiplied by n; greedy's sits on private pairs, which were never over-counted.
+
+**Cross-private pairs are excluded, and that is not a gap.** `Topology.allowed_edges` permits
+an edge only where one agent sees both endpoints, so cross-private edges cannot exist —
+verified, 0 allowed at w20. They are ~half of all pairs and are guaranteed true non-edges, so
+including them would add exactly zero error and dilute every difference by a constant.
+
+**Federated pooling buys nothing here.** Intersecting survivor sets across agents before
+scoring (`pooled`) equals `dedup` to four decimals at every rung: all agents already hold
+identical beliefs about shared–shared pairs, because they all see the same shared
+interventions. The asymmetry is entirely about private nodes, which pooling cannot cross.
+
+**One caveat.** 2.7–6.7% of shared pairs carry DIFFERENT true marks in different windows — a
+shared pair's mark is a latent projection, and each window projects out a different set of
+private nodes. Those fall back to the per-window mean. It is small but it should be stated:
+there is no single global truth for a shared pair.
+
 ## 6. Consequence for the thesis
 
 **The SHD figure cannot be an error curve under oracle evidence — by construction, not by
 accident.** The belief is incapable of being confidently wrong, so the y-axis is residual
 ambiguity and the baseline is its greedy minimiser. Two options, and they are not exclusive:
 
+0. **Report the de-duplicated metric** (§5b). The published per-window figure double-counts
+   the shared surface, which accounts for the whole gap at w04/w12/w20 and reverses it at
+   w08. At w30 a small significant residual survives (+0.0009 +/- 0.0003) and should be
+   reported as such rather than claimed away. Cheapest fix, already computed.
 1. **Run SHD under sampled evidence.** There the belief *can* be confidently wrong, the WRONG
    bucket becomes non-zero, and SHD becomes the structural-error metric everyone reads it as.
    This is now a much stronger reason to run the sampled-evidence version than the hunch it
