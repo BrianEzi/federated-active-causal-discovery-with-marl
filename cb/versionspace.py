@@ -332,9 +332,8 @@ class VersionSpaceBackend:
                 if self.last is None:
                     self.last = VersionSpaceBelief(self._space, self.k)
                 return self.last.directed
-            detected = {x: estimated_reveal(data, known_intervened, x, self.k,
-                                            alpha=self.evidence_alpha, foreign=told)
-                        for x in intervened}
+            detected = estimated_reveal_all(data, known_intervened, tuple(intervened),
+                                            self.k, alpha=self.evidence_alpha, foreign=told)
             if detected == self._detected and self.last is not None:
                 return self.last.directed          # nothing new was resolved this round
             self._detected = detected
@@ -414,6 +413,25 @@ def estimated_reveal(data, intervened, x: int, k: int, alpha: float = 0.001,
     property the whole environment exists for, while a false negative only leaves the belief
     coarser for another round. 0.001 rather than 0.01 buys the expensive direction.
     """
+    return estimated_reveal_all(data, intervened, (x,), k, alpha=alpha,
+                                foreign=foreign)[x]
+
+
+def estimated_reveal_all(data, intervened, nodes, k: int, alpha: float = 0.001,
+                         foreign=None) -> dict:
+    """`estimated_reveal` for MANY x at once, building the test exactly once.
+
+    WHY THIS EXISTS. `FisherZ` depends only on (data, intervened, alpha, foreign) -- never
+    on x -- and `ancestral_evidence()` / `pair_power()` each return the FULL [k, k] matrix.
+    Both callers ran `{x: estimated_reveal(data, known_intervened, x, ...) for x in
+    intervened}`, so with m intervened nodes they computed the same two k x k matrices m
+    times and kept one row of each. m grows to the budget over an episode, so the waste grows
+    with BOTH window size and budget -- which is why sampled-evidence training cost was
+    scaling nearer k^4 than the k^2 the test count predicts.
+
+    Exactly equivalent by construction: same matrices, same rows, same order. Verified in
+    `tests/cb/test_reveal_batching.py`.
+    """
     from cb.citest import FisherZ
     test = FisherZ(np.asarray(data), np.asarray(intervened) > 0.5, alpha=alpha,
                    foreign=foreign)
@@ -426,8 +444,9 @@ def estimated_reveal(data, intervened, x: int, k: int, alpha: float = 0.001,
     # which turns a silent test from "no information" into "no effect" exactly when the
     # data can support that reading.
     powered = test.pair_power()
-    return (tuple(bool(evidence[x, y]) for y in range(k) if y != x),
-            tuple(bool(powered[x, y]) for y in range(k) if y != x))
+    return {x: (tuple(bool(evidence[x, y]) for y in range(k) if y != x),
+                tuple(bool(powered[x, y]) for y in range(k) if y != x))
+            for x in nodes}
 
 
 def consistent_with_evidence(candidate_reveal: tuple, detected: tuple,

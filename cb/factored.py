@@ -239,10 +239,9 @@ class FactoredBackend:
                 if self.last is None:
                     self.last = FactoredBelief(self._possible, self.k)
                 return self.last.directed
-            from cb.versionspace import estimated_reveal
-            detected = {x: estimated_reveal(data, known_intervened, x, self.k,
-                                            alpha=self.evidence_alpha, foreign=told)
-                        for x in intervened}
+            from cb.versionspace import estimated_reveal_all
+            detected = estimated_reveal_all(data, known_intervened, tuple(intervened),
+                                            self.k, alpha=self.evidence_alpha, foreign=told)
             if detected == self._detected and self.last is not None:
                 return self.last.directed
             self._detected = detected
