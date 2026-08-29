@@ -29,7 +29,7 @@ import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
 from crosscheck.belief_dp import JOINT_CONF
-from ma.env import ATTRIBUTED, CLAIM_BACKENDS, TwoAgentEnv
+from ma.env import ATTRIBUTED, CLAIM_BACKENDS, RANDOM_TURN, TwoAgentEnv
 from ma.graphs import is_acyclic, mec_signature
 
 
@@ -359,6 +359,34 @@ def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
     }
 
 
+def _mean_where(rows, keep) -> float:
+    """Mean `success` over the episodes `keep` selects; nan when it selects none."""
+    picked = [float(bool(r["success"])) for r in rows if keep(r)]
+    return float(np.mean(picked)) if picked else float("nan")
+
+
+def _evenness_null(env: TwoAgentEnv, draws: int = 4000) -> float:
+    """`effort_evenness` the PROTOCOL alone would produce, with no policy involved.
+
+    Round-robin hands every agent exactly `budget // n` moves, so the null is 1.0 and any
+    shortfall is behaviour (an agent that passed). Random turn order draws the actor
+    uniformly each round, so the counts are multinomial and the ratio is small for
+    arithmetic reasons alone -- which is what makes the raw index useless for comparing the
+    two protocols. Simultaneous play gives every agent a move every round, so the null is
+    again 1.0. Estimated by simulation rather than in closed form: E[min/max] of a
+    multinomial has no tidy expression and this costs microseconds.
+    """
+    order = env.config.turn_order
+    if order != RANDOM_TURN:
+        return 1.0
+    n = env.topology.n_agents
+    rng = np.random.default_rng(0)
+    counts = rng.multinomial(env.config.budget, [1.0 / n] * n, size=draws)
+    lo, hi = counts.min(axis=1), counts.max(axis=1)
+    live = hi > 0
+    return float(np.mean(lo[live] / hi[live])) if live.any() else float("nan")
+
+
 def _per_agent_block(env: TwoAgentEnv, rows: List[Dict[str, object]]) -> Dict[str, object]:
     """Per-agent behaviour, the connectedness split, and the free-rider index.
 
@@ -366,6 +394,29 @@ def _per_agent_block(env: TwoAgentEnv, rows: List[Dict[str, object]]) -> Dict[st
     the agents pull their weight evenly, 0.0 when one agent did nothing at all. Episodes in
     which NOBODY acted are excluded -- the ratio is undefined there and would otherwise read
     as perfect cooperation.
+
+    THE NAME IS BACKWARDS AND THE NUMBER IS PROTOCOL-CONFOUNDED. It is reported unchanged so
+    that older result files stay readable, but three fields are added beside it:
+
+      `effort_evenness`       the same quantity under a name that says which way is good.
+      `effort_evenness_null`  what the PROTOCOL alone produces, with no policy at all. Under
+                              `random` turn order the actor is drawn uniformly, so per-agent
+                              move counts are Multinomial(budget, 1/n) and the ratio is small
+                              by arithmetic: measured 0.140 at 8 agents / budget 24 against a
+                              pure-sampling expectation of 0.158. Under round-robin every
+                              agent is handed exactly budget/n moves, so the null is 1.0.
+                              Quote `effort_evenness / effort_evenness_null`, never the raw
+                              number, whenever turn orders are compared.
+      `some_agent_never_acted`  the fraction of episodes in which at least ONE agent got no
+                              move. This is the field that matters and it did not exist:
+                              `never_acted_episodes` tests `max(...) == 0`, i.e. whether
+                              NOBODY acted, which is almost never true and hides the failure
+                              mode entirely. At 8 agents with budget 24 under random turns,
+                              29.9% of episodes leave some agent with zero moves -- and an
+                              agent that never acts can never settle its own private nodes,
+                              because `Topology.allowed_edges` forbids cross-private edges.
+                              Those episodes are unwinnable for ANY policy, so joint success
+                              must be read against this. See `docs/FINDINGS_TURN_ORDER_2026_08_29.md`.
 
     Every headline is also reported split by CONNECTED. A disconnected graph gives the agents
     independent subproblems -- no cross-boundary path, so no confounding and nothing to
@@ -388,8 +439,19 @@ def _per_agent_block(env: TwoAgentEnv, rows: List[Dict[str, object]]) -> Dict[st
         "clamps_shared_per_agent": {a: mean_over("clamps_shared", a) for a in env.topology.agents},
         "done_bit_per_agent": {a: mean_over("done_bit", a) for a in env.topology.agents},
         "free_rider_index": float(np.mean(ratios)) if ratios else float("nan"),
+        # Same quantity, named so the direction is unambiguous: HIGHER IS MORE EVEN.
+        "effort_evenness": float(np.mean(ratios)) if ratios else float("nan"),
+        "effort_evenness_null": _evenness_null(env),
+        # `never_acted_episodes` asks whether NOBODY acted (max == 0). Kept for old files.
         "never_acted_episodes": float(np.mean(
             [max(r["interventions"][a] for a in env.topology.agents) == 0 for r in rows])),
+        # The one that matters: did SOME agent get no move at all? Those episodes cannot be
+        # jointly solved by any policy, because no partner can reach another's private nodes.
+        "some_agent_never_acted": float(np.mean(
+            [min(r["interventions"][a] for a in env.topology.agents) == 0 for r in rows])),
+        # Joint success restricted to episodes every agent could in principle have solved.
+        "success_feasible": _mean_where(
+            rows, lambda r: min(r["interventions"][a] for a in env.topology.agents) > 0),
         "connected_fraction": float(np.mean([r["connected"] for r in rows])),
     }
     for label, want in (("connected", True), ("disconnected", False)):

@@ -1332,6 +1332,9 @@ class TwoAgentEnv:
                   # See the notes on these two in `reset`.
                   "shared_touches": dict(self.shared_touches),
                   "duplicate_coverage": self.duplicate_coverage(),
+                  # Read duplicate_coverage AGAINST this: past `len(exposed)` shared
+                  # interventions, duplication is forced rather than chosen.
+                  "duplicate_coverage_floor": self.duplicate_coverage_floor(),
                   "identified_round": dict(self.identified_round),
                   "connected": bool(self.connected),
                   "mix_draws": self.mix_draws,
@@ -1396,6 +1399,27 @@ class TwoAgentEnv:
             return 0.0
         distinct = sum(1 for count in self.shared_touches.values() if count > 0)
         return float((spent - distinct) / spent)
+
+    def duplicate_coverage_floor(self) -> float:
+        """The SMALLEST duplicate coverage this episode could have had, given the spend.
+
+        WHY THIS IS NEEDED TO READ THE NUMBER ABOVE. There are only `len(exposed)` shared
+        nodes, so once an arm has spent more shared interventions than there are shared
+        nodes, duplication is FORCED: distinct can never exceed the surface. An arm that
+        spends more on the shared surface therefore duplicates more no matter how well it
+        coordinates, and comparing raw duplicate coverage across arms that spend differently
+        credits the one that spent less. Measured 2026-08-29: greedy puts 44-71% of its moves
+        on the shared surface against the learned policy's 35-59%, so the two are NOT on the
+        same footing (`docs/FINDINGS_SHD_2026_08_29.md` section 3b).
+
+        Report `duplicate_coverage - duplicate_coverage_floor`, or the two side by side.
+        Zero floor means the surface was never saturated and the raw number stands alone.
+        """
+        spent = sum(self.shared_touches.values())
+        if spent == 0:
+            return 0.0
+        surface = len(self.topology.exposed)
+        return float(max(0.0, (spent - surface) / spent))
 
     def rounds_to_identification(self, censor: Optional[int] = None) -> Dict[int, int]:
         """Per agent, the round its window was first identified; `censor` if it never was.

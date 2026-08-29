@@ -137,6 +137,44 @@ coordination claim at 6 or 8 agents is supportable.
 | False-attribution rate under noise | blocked on the above |
 | `owner_channel` | the per-agent owner distribution the policy observes |
 
+## 8b. The change list — what to fix before freeze, and how
+
+Ranked by whether it changes a number we would report.
+
+### Fix now — these make a reported number wrong
+
+| metric | what is wrong | the fix | status |
+|---|---|---|---|
+| `never_acted_episodes` | Tests `max(interventions) == 0` — whether NOBODY acted, which is almost never true. It reads 0.0 under random turns while **29.9% of episodes leave some agent with no move at all**, and those episodes are unwinnable for any policy. It hid the entire random-turn failure mode. | Added **`some_agent_never_acted`** = `mean(min(...) == 0)`. Old field kept so historic files still parse. | **DONE** |
+| `free_rider_index` | Two problems. The name is backwards — it is `min/max` interventions, so **higher is better**. And it is protocol arithmetic: under random turns per-agent counts are Multinomial(budget, 1/n), and pure sampling with no policy gives 0.158 against the measured 0.140. | Added **`effort_evenness`** (same number, honest name) and **`effort_evenness_null`** (what the protocol alone yields: 1.0 for round-robin and simultaneous, ~0.16 for random). **Quote the ratio to null, never the raw value, whenever protocols differ.** | **DONE** |
+| `duplicate_coverage` | Past `len(exposed)` shared interventions duplication is FORCED, so an arm that spends more on the shared surface duplicates more however well it coordinates. Greedy spends 44–71% of moves there against the learner's 35–59%, so the arms were never on the same footing. | Added **`duplicate_coverage_floor`**. Report the excess over floor, or both side by side. | **DONE** |
+| Joint success | Zero-tolerance across every window, so it silently absorbs structurally impossible episodes. | Added **`success_feasible`** — joint success restricted to episodes where every agent got at least one move. | **DONE** |
+| soft SHD, per-window average | Counts a shared pair once PER AGENT. Under oracle that double-counting alone accounts for greedy's entire win at w04/w12/w20 and reverses it at w08. | Report the de-duplicated version (`shd_diagnose --check global`) as primary. | script exists, not yet the default in `shd.py` |
+| `shd.py` learned arm | Loaded with `deterministic=False`. Argmax was worth half the gap at w08/w12 and REVERSES at w04. | Argmax primary, report both, **per rung — never as a blanket rule**. | not done |
+| `score_groups` | Oracle control fails: reports `wrong` at 0.075–0.113 where its docstring says wrong is impossible. | Debug `cb/attribution.py:514`. **Gates every attribution number.** | not done |
+
+### Fix the reporting, not the metric
+
+| metric | the fix |
+|---|---|
+| soft SHD under **oracle** | It is a residual-ambiguity count, not a distance — the WRONG bucket is exactly 0.0000. **Call it residual ambiguity in oracle results and reserve "SHD" for sampled evidence.** Always publish the WRONG / UNSETTLED split rather than the composite. |
+| soft SHD under **sampled** | Error was only ~6% of the metric at w04, and `random_vary` had the LOWEST error rate because an arm that settles nothing cannot be wrong. **Never report the error component alone** — it rewards inaction. |
+| `rounds_to_identification` | Censoring is severe. **Median or restricted mean, never a plain average, and report the censoring rate beside it.** |
+| regret vs optimum | Exact only on enumerable backends. **Label it a bound on the factored path.** |
+| I(S;A)/H | A precondition, not a diagnostic. **Run before quoting any learned number, and record it in the result file** so a reader can check it without re-running. |
+| `connected` split | Already computed and already correct. **Promote it to primary** — disconnected graphs give independent subproblems, so pooling them dilutes the effect the project exists to measure. |
+
+### Replace — broken at the scale we actually run
+
+| metric | why | replacement |
+|---|---|---|
+| `union_graph`, `union_acyclic`, `union_matches_truth`, `union_equivalent` | Reads `_Window.get(k).dags[map_index]` — it **enumerates**, so it dies above k=5 and the whole factored ladder is out of reach. `_constraint_union` is the fallback but is majority-vote **binary adjacency with no edge types**, and neither runs on the `claims` criterion every ladder run uses. | The pooled survivor-set intersection in `shd_diagnose --check global`: sound because under oracle evidence every site's set contains the truth, so the intersection does too. ~2 hours to promote to a reported metric. |
+
+### Leave alone
+
+Three-outcome claim scoring (right / wrong / **unsure**); hub targeting and shared-vs-private
+spend; per-window solve rate; `duplicate_coverage` itself as a belief-free transfer diagnostic.
+
 ## 9. Known reporting traps
 
 1. **`scripts/shd.py` loads the learned arm with `deterministic=False`.** Argmax was worth
