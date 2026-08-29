@@ -469,6 +469,17 @@ def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
         row["clamps_shared"] = dict(info["clamps_shared"])
         row["done_bit"] = dict(info["done_bit"])
         row["connected"] = bool(info["connected"])
+        # Coordination mechanism, and the structural floor it has to be read against. These
+        # live on `info`, not on `evaluate_episode`, and were never copied across -- so they
+        # existed per episode and reached no result file.
+        # Time to identification, per agent, ALREADY CENSORED. `info["identified_round"]`
+        # holds None where a window was never identified, and None propagates to nan through
+        # the survival summary -- so the censor must be applied here, by the function that
+        # owns its meaning, rather than left to the consumer.
+        row["identified_round"] = dict(
+            env.rounds_to_identification(censor=env.config.budget + 1))
+        row["duplicate_coverage"] = float(info["duplicate_coverage"])
+        row["duplicate_coverage_floor"] = float(info.get("duplicate_coverage_floor", 0.0))
         rows.append(row)
 
     def rate(key) -> float:
@@ -487,6 +498,22 @@ def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
         # both are reported and neither may be quoted as the other across protocols.
         "mean_steps": float(np.mean([r["steps"] for r in rows])),
         "mean_rounds": float(np.mean([r["rounds"] for r in rows])),
+        # The pooled global graph. Computed per episode by `evaluate_episode` and previously
+        # dropped here, so the metric that REPLACES the union_* fields reached no result
+        # file. nan-safe because non-claim backends report nan by design.
+        **{key: float(np.nanmean([r[key] for r in rows]))
+           for key in ("global_soft_shd", "global_hard_shd", "global_resolved_fraction",
+                       "global_mark_disagreement", "global_contradiction")
+           if key in rows[0]},
+        "global_pairs": int(rows[0].get("global_pairs", 0)),
+        # Duplicate coverage AND its floor: past `len(exposed)` shared interventions
+        # duplication is forced, so the raw number is not comparable across arms that spend
+        # differently on the shared surface.
+        "duplicate_coverage": float(np.mean([r["duplicate_coverage"] for r in rows])),
+        "duplicate_coverage_floor": float(
+            np.mean([r["duplicate_coverage_floor"] for r in rows])),
+        "duplicate_coverage_excess": float(np.mean(
+            [r["duplicate_coverage"] - r["duplicate_coverage_floor"] for r in rows])),
         **_per_agent_block(env, rows),
         "clamp_fraction": float(clamps / moves) if moves else float("nan"),
     }
