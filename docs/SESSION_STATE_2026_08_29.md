@@ -1,6 +1,9 @@
 # Session state — 29 August 2026
 
-**Resume point.** Read §1 first: the live thread is the SHD result and it is unresolved.
+**Resume point.** §1 is RESOLVED as of 29 Aug — see
+[`FINDINGS_SHD_2026_08_29.md`](FINDINGS_SHD_2026_08_29.md), commit `f276751`. The mechanism
+recorded in §1 below is RETRACTED; the banner at the top of §1 says what replaced it. The
+next thing to run is the sampled-evidence SHD, for a stronger reason than §1 gives.
 Design freeze **31 Aug morning**, experiments to **2 Sep morning**, write-up to **7 Sep 3pm**,
 24h buffer to the 8th.
 
@@ -12,7 +15,23 @@ Shareable: candidate slate https://claude.ai/code/artifact/44a05921-2f17-4c5b-af
 
 ---
 
-## 1. THE LIVE THREAD — SHD contradicts joint success
+## 1. ~~THE LIVE THREAD~~ — RESOLVED 29 Aug, see `FINDINGS_SHD_2026_08_29.md`
+
+> **What this section got wrong.** The mechanism below — "joint success is zero-tolerance" —
+> is **RETRACTED**. Under argmax the learner beats greedy on *per-window* solve too, so it is
+> not a joint-versus-marginal mismatch. The real answer is that under oracle evidence the
+> factored belief is structurally incapable of being confidently wrong (WRONG bucket is
+> exactly 0.0000 for every arm at every rung), so soft SHD per pair is identically
+> `1 - 1/|surviving marks|` — a count of residual ambiguity, not a distance to truth. And
+> `UncertaintyGreedyAgent`'s decision rule is *literally* the count of nonzero-SHD pairs
+> incident to each node (6,976 node-scores compared, 0 disagreements), so the baseline
+> descends the evaluation metric by construction. Two measured channels: hub-seeking, and
+> spending 44–71% of moves on the shared surface where soft SHD's window-average pays n times.
+> Also: the table below evaluates the learned arm with `deterministic=False`; argmax roughly
+> halves the gap at w08 and w12.
+>
+> **Do not quote the table below as "greedy's belief is closer to the true MAG."** It is not
+> what was measured.
 
 Second agent's commit `cacd4e1`, `scripts/shd.py`, results in `results/cover/shd_ladder.json`.
 Soft (mass-weighted) and hard (MAP) structural Hamming distance, sanity-checked on three
@@ -36,9 +55,10 @@ joint success at every rung.** Same checkpoints, opposite orderings.
 there, so this is not one arm having given up more than the other — under identical
 structural impossibility greedy's belief is still measurably closer.
 
-**Mechanism, theirs and I agree:** joint success is ZERO-TOLERANCE, so it rewards
+~~**Mechanism, theirs and I agree:** joint success is ZERO-TOLERANCE, so it rewards
 concentrating confidence on whichever claims complete a window rather than minimising
-average structural error. Two different objectives; our policy optimises the first.
+average structural error. Two different objectives; our policy optimises the first.~~
+**RETRACTED 29 Aug** — the learner also wins per-window solve under argmax. See the banner.
 
 **Why it is urgent.** The student's result 2 was "under realistic sampled inference the RL
 policy beats greedy at fixed budget, shown as SHD against budget". On ORACLE evidence SHD
