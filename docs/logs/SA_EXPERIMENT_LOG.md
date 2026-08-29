@@ -4821,3 +4821,47 @@ independent confirmation of the k=30 required-cover number, this time from a pol
 never trained at the target budget, so the effect cannot be an artefact of how the k=30
 checkpoints happened to train. Not to be quoted as k=30's achievable ceiling -- that needs a
 `w30iso`, trained at the higher budget, which this is not.
+
+## 2026-08-29 -- SHD: how close the belief actually gets, and it tells a different story
+
+[MEASURED] Built `scripts/shd.py` -- structural Hamming distance between each window's belief
+and its true MAG, per pair (missing/extra edge = 1, wrong orientation/type = 1, matching
+Tsamardinos et al.'s definition exactly by construction: adjacency and type are scored as
+independent questions). Two readings: SOFT (expected SHD, `1 - P(true mark)` read directly
+off the belief's frequency matrices) and HARD (MAP mark per pair, ties defaulting to NONE).
+Sanity-checked against three hand-built cases (exact match -> 0, uniform ignorance -> the
+closed-form expectation, one wrong orientation -> exactly 1) before running on real data.
+
+100 episodes per rung, normalised by pair count so window sizes are comparable:
+
+    k     learned soft   greedy soft   learned - greedy (paired)
+    4        0.0095        0.0098      -0.0003 +/- 0.0038  (inside 2 se)
+    8        0.0230        0.0107      +0.0122 +/- 0.0030
+    12       0.0136        0.0053      +0.0083 +/- 0.0018
+    20       0.0129        0.0049      +0.0080 +/- 0.0012
+    30       0.0209        0.0154      +0.0054 +/- 0.0006
+
+**Greedy is CLOSER to the truth at every rung except k=4, where the two are statistically
+tied.** This is the opposite of the joint-success ranking, where the learner beats a fair
+greedy at every rung (`SUMMARY_2026_08_28.md`, `budget_curve.json`: 0.825/0.742 at k=4 down
+to 0.083/0.042 at k=20). Both arms are far ahead of `random_vary` (0.05-0.09) throughout, so
+this is not "the learner does nothing" -- it is a genuine divergence in what KIND of error
+each policy makes.
+
+The likely mechanism: `score_window`'s joint-success criterion is zero-tolerance -- every
+required claim right, nothing settled wrong -- which rewards a policy for CONCENTRATING
+confidence on whichever claims complete a window, and does not penalise a larger average
+error elsewhere. Greedy's uncertainty-reduction rule spreads effort more evenly across the
+window and ends up structurally closer to the truth on average, while winning the all-or-
+nothing game less often. **This holds even at k=30, where both arms score EXACTLY 0.000 on
+joint success** -- greedy's belief is still measurably closer under the identical structural
+impossibility (0.0154 against 0.0209), so the SHD gap cannot be explained by one arm having
+"given up" more than the other.
+
+[FLAG FOR THE WRITE-UP] The training objective and SHD are measuring genuinely different
+things, and the zero-tolerance design may be selecting for a policy that gambles on
+completing specific claims rather than one that minimises expected structural error. Whether
+that is the right trade for the thesis's claim (which is about identification, not about
+graph closeness per se) is a framing decision, not a bug -- but it should be stated, not
+left implicit, since a reader who assumes "learned wins" means "learned's beliefs are better"
+would be drawing the wrong conclusion from the k=8-30 numbers above.
