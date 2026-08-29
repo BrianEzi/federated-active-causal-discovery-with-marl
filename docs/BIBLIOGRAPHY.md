@@ -461,17 +461,44 @@ than porting elimination to it.
 `mooij2020jci` is the formal basis for treating the disclosed regime bit as a VARIABLE
 rather than a filter. JCI adds context variables as NODES alongside system variables, pools
 all contexts into one dataset, and runs standard discovery on the joint set; it does not
-require knowing intervention targets or types. Assumptions as reported: JCI 0 (the
-meta-system is a simple SCM), JCI 1 exogeneity (no system variable causes a context
-variable), JCI 2 randomization (no context/system pair is confounded), JCI 3 genericity
-(no arrows among context variables).
+require knowing intervention targets or types.
 
-CAVEAT recorded with the reference: our interventions are chosen ADAPTIVELY from beliefs
-that are functions of past data, so the context variable is caused by past system variables
-and JCI 1 fails if rows are pooled naively across rounds. Treat each round as its own
-context, or condition on history. NOTE also that the assumption wording above is PARAPHRASE
-from the abstract and secondary summaries -- the PDF would not parse for verbatim quotes,
-so check sections 2-3 before quoting in the thesis.
+ASSUMPTIONS, now VERBATIM from the paper (read in full 2026-08-29; the earlier entry was a
+paraphrase from the abstract and got JCI 3 WRONG):
+- **JCI 0** ("Joint SCM", required): the data-generating mechanism is a simple SCM jointly
+  modelling system and context, with graph on nodes `I union K`.
+- **JCI 1** ("Exogeneity", optional): no system variable causes any context variable,
+  `for all k in K, i in I : i -> k not in G(M)`.
+- **JCI 2** ("Complete randomized context", optional): no context variable is confounded
+  with a system variable, `for all k in K, i in I : i <-> k not in G(M)`.
+- **JCI 3** ("Generic context model", optional): `for all k != k' in K : k <-> k' in G(M)
+  AND k -> k' not in G(M)`.
+
+**The JCI 3 correction matters.** The old entry said "no arrows among context variables".
+The assumption is the opposite in spirit: every pair of context variables IS connected, by a
+BIDIRECTED edge, and none by a directed one. That is why FCI-JCI123 does not remove edges
+between context variables in its adjacency phase (Section 4.2.4). An implementation built
+from the old paraphrase would have deleted exactly the edges the assumption asserts.
+
+CAVEAT, and the paper states it itself (Section 3.4.2): our interventions are chosen
+ADAPTIVELY from beliefs that are functions of past data, so the context variable is caused
+by past system variables and JCI 1 fails. Their own example is a doctor who "first diagnoses
+a patient before deciding on treatment", for which "JCI Assumption 1 would not apply", and
+footnote 15 notes that sticking to a protocol FIXED BEFOREHAND is what excludes the
+influence. Active experimental design is therefore outside JCI's exogeneity assumption by
+construction. Treat each round as its own context, or condition on history, and say so.
+
+TWO FURTHER POINTS THAT BEAR ON THIS PROJECT:
+- **JCI cannot handle different variables per context.** Table 4's "Different variables in
+  each context" column is a MINUS for Joint Causal Inference, FCI-JCI and ASD-JCI alike;
+  Section 4.3.7 says it needs a strengthened faithfulness assumption, and Section 6 lists it
+  as future work. Our vertical setting sits in that named gap. The methods that DO have a
+  plus there are Claassen & Heskes (2010), Tillman & Spirtes (2011), Hyttinen et al. (2014),
+  Triantafillou & Tsamardinos (2015) and Forre & Mooij (2018).
+- **Multiple context variables beat one merged variable** (Section 4.3.5, Figures 20 and 23),
+  and merging "typically loses information". Our `clean` is a SCALAR fraction per row batch,
+  i.e. a merged context variable -- and `ma/env.py` already documents the symptom in its own
+  words: the mixture "knows how MANY hidden nodes were clamped, never WHICH".
 
 `hauser2012interventional` gives the characterisation used to settle clamp-vs-vary: two
 DAGs are I-Markov equivalent iff, for every intervention target set S, the graphs with
