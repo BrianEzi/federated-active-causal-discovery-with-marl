@@ -86,8 +86,16 @@ def _survivors(belief, u: int, v: int):
     return belief.possible.get((u, v), belief.possible.get((v, u)))
 
 
+EVIDENCE_OVERRIDE = None
+
+
 def _load(path: pathlib.Path, seed: int):
     config = json.loads(path.read_text())["config"]
+    if EVIDENCE_OVERRIDE is not None:
+        # TRANSFER when it differs from the trained regime: greedy is truth-free and works
+        # natively under either, the learned policy was trained on whatever the config says.
+        # Biased AGAINST the learned arm. Say so wherever the number is quoted.
+        config = {**config, "vs_evidence": EVIDENCE_OVERRIDE}
     env = env_from_config(config, seed=seed)
     ppo = IndependentPPO.load(str(path.with_suffix(".pt")), env)
     return config, env, ppo
@@ -458,7 +466,16 @@ def main(argv=None) -> int:
     ap.add_argument("--check", default="decompose", choices=[*CHECKS, "all"])
     ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--evidence", default=None, choices=["oracle", "sampled"],
+                    help="override the run's vs_evidence. Evaluating an oracle-trained "
+                         "policy under 'sampled' is a TRANSFER test and is biased against "
+                         "it; greedy is truth-free and transfers for nothing.")
     args = ap.parse_args(argv)
+    global EVIDENCE_OVERRIDE
+    EVIDENCE_OVERRIDE = args.evidence
+    if args.evidence:
+        print(f"\n*** vs_evidence OVERRIDDEN to {args.evidence!r}. The learned arm was "
+              f"trained on the config's regime -- this is a transfer test. ***")
     names = list(CHECKS) if args.check == "all" else [args.check]
     for result in args.results:
         for name in names:
