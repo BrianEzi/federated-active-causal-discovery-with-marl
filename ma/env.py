@@ -296,6 +296,11 @@ class MAConfig:
     # best, and named as further work rather than claimed.
     # Off by default because it changes obs_size and voids old checkpoints.
     observe_partner_counts: bool = False
+    # See `cb.attribution.consistent_with_partner`. True keeps the LOCAL-DISTURBANCE
+    # assumption -- a partner's own latents are among the movers when it acts. False keeps
+    # only atomicity, which is sound but, measured, refutes almost nothing. The pair is the
+    # sensitivity analysis the assumption must be reported with.
+    attribution_local_disturbance: bool = True
     # Grade every type claim, not only the private-incident ones. True since 2026-08-26 --
     # the old exemption rested on a false claim about Markov equivalence. See cb/claims.py.
     claims_require_all_types: bool = True
@@ -376,6 +381,7 @@ class AgentWindow:
                  cb_skeleton_alpha: Optional[float] = None,
                  observe_belief_channels: bool = False,
                  observe_partner_counts: bool = False,
+                 attribution_local_disturbance: bool = True,
                  mode_by_role: bool = False,
                  vs_evidence: str = "oracle", vs_evidence_alpha: float = 0.001,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
@@ -429,7 +435,8 @@ class AgentWindow:
         elif backend == ATTRIBUTED:
             from cb.attribution import AttributedVersionSpaceBackend
             self.belief = AttributedVersionSpaceBackend(
-                self.k, shared_positions, n_agents=topology.n_agents, agent=self.agent)
+                self.k, shared_positions, n_agents=topology.n_agents, agent=self.agent,
+                local_disturbance=attribution_local_disturbance)
         else:
             self.belief = WindowBeliefDP(self.k, shared_positions)
 
@@ -562,6 +569,7 @@ class TwoAgentEnv:
                                cb_skeleton_alpha=config.cb_skeleton_alpha,
                                observe_belief_channels=config.observe_belief_channels,
                                observe_partner_counts=config.observe_partner_counts,
+                               attribution_local_disturbance=config.attribution_local_disturbance,
                                mode_by_role=config.mode_by_role,
                                vs_evidence=config.vs_evidence,
                                vs_evidence_alpha=config.vs_evidence_alpha,

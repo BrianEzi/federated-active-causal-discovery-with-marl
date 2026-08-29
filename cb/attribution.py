@@ -372,10 +372,18 @@ def predicted_response(groups: Sequence[LatentGroup], owner: int) -> Tuple[bool,
 
 
 def consistent_with_partner(groups: Sequence[LatentGroup], owner: int,
-                            moved: FrozenSet[Tuple[int, int]]) -> bool:
+                            moved: FrozenSet[Tuple[int, int]],
+                            local_disturbance: bool = True) -> bool:
     """Could this attribution have produced `moved` when `owner` acted privately?
 
-    TWO RULES, and the first is SOUND-LEANING RATHER THAN SOUND -- see the measurement below.
+    TWO RULES. The first is an explicit MODELLING ASSUMPTION, not a theorem, and it is named
+    and switchable so its cost can be measured rather than argued.
+
+    THE LOCAL-DISTURBANCE ASSUMPTION (`local_disturbance=True`, the default): when a partner
+    acts and pairs move, that partner's OWN latents are among the movers. It is false in
+    general -- see the measurement below -- and it is what buys the channel its power. Set
+    `local_disturbance=False` to drop it and keep only the provably sound rule, which is the
+    sensitivity analysis this assumption has to be reported with.
 
     1. At least ONE pair that moved must be covered by a group this candidate attributes to
        `owner`. It used to demand ALL of them, which was strictly worse.
@@ -422,14 +430,18 @@ def consistent_with_partner(groups: Sequence[LatentGroup], owner: int,
         return True                        # nothing observed, nothing to contradict
     covered = set()
     for group in groups:
-        if group.owner != owner:
-            continue
         pairs = set(group.pairs())
         hit = pairs & moved
         if hit and hit != pairs:
-            return False                   # atomicity: a clique moved only partly
-        covered |= pairs
-    return bool(moved & covered)           # owner must explain SOMETHING that moved
+            # ATOMICITY, and it holds for EVERY owner: one latent moves as a unit, so a
+            # candidate that assigns a clique to a latent and then sees part of it move is
+            # refuted whoever it named. This rule is sound unconditionally.
+            return False
+        if group.owner == owner:
+            covered |= pairs
+    if not local_disturbance:
+        return True                        # sound-only mode: atomicity was the whole test
+    return bool(moved & covered)           # local-disturbance: owner explains SOMETHING
 
 
 class AttributedBelief:
@@ -574,7 +586,8 @@ class AttributedVersionSpaceBackend:
     can_handle_multi_hidden = True
 
     def __init__(self, k: int, shared_positions: Sequence[int] = (), n_agents: int = 2,
-                 agent: int = 0, max_candidates: int = 200_000, **_ignored):
+                 agent: int = 0, max_candidates: int = 200_000,
+                 local_disturbance: bool = True, **_ignored):
         self.k = int(k)
         self.shared_positions = tuple(shared_positions)
         self.n_agents = int(n_agents)
@@ -584,6 +597,9 @@ class AttributedVersionSpaceBackend:
         # Times an elimination channel would have emptied the candidate set. Non-zero means
         # the soundness guarantee broke; `score_groups` reports UNSURE rather than WRONG.
         self.contradictions = 0
+        # Times a disclosed message refuted the TRUE attribution -- the local-disturbance
+        # assumption failing, measured rather than assumed away.
+        self.assumption_violations = 0
         self.last: Optional[AttributedBelief] = None
         self._buckets: Dict[tuple, tuple] = {}
         self._initial: Dict[tuple, tuple] = {}
@@ -594,6 +610,10 @@ class AttributedVersionSpaceBackend:
         # scale-free at the same size. Truncation is REPORTED rather than silent, because a
         # truncated belief is not a confident one and must never be read as one.
         self.max_candidates = int(max_candidates)
+        # See `consistent_with_partner`. True keeps the assumption that a partner's own
+        # latents are among the movers -- powerful and false in general. False keeps only
+        # atomicity, which is sound and, measured, refutes almost nothing.
+        self.local_disturbance = bool(local_disturbance)
         self.truncated = False
 
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
@@ -625,6 +645,7 @@ class AttributedVersionSpaceBackend:
             self._buckets = kept
             self._initial = dict(kept)
         self.contradictions = 0
+        self.assumption_violations = 0
         self.true_groups = (observable_groups(adjacency, topology, self.agent)
                             if adjacency is not None else ())
         self.last = AttributedBelief(self._buckets, self.k)
@@ -666,10 +687,18 @@ class AttributedVersionSpaceBackend:
         """Prune the ATTRIBUTION by a named partner's private experiment."""
         if not moved:
             return                                  # no evidence, no work
+        # Did this message refute the TRUTH? Under oracle evidence that can only happen when
+        # the local-disturbance assumption fails, so counting it measures the assumption's
+        # violation rate directly, per episode, with no extra instrumentation.
+        if self.true_groups and not consistent_with_partner(
+                self.true_groups, owner, moved, local_disturbance=self.local_disturbance):
+            self.assumption_violations += 1
         changed = False
         buckets = {}
         for key, (structures, attributions) in self._buckets.items():
-            kept = tuple(a for a in attributions if consistent_with_partner(a, owner, moved))
+            kept = tuple(a for a in attributions
+                         if consistent_with_partner(a, owner, moved,
+                                                    local_disturbance=self.local_disturbance))
             changed |= len(kept) != len(attributions)
             if structures and kept:
                 buckets[key] = (structures, kept)
