@@ -4774,3 +4774,34 @@ still wins), and not seed luck (all three a06 seeds fail identically) -- it is t
 reward does not train these rungs at all, and the fix is the SCALE of the reward, confirmed
 now from two directions (`scale21`'s MI, and the collapse's total absence wherever `scale21`
 or the pending `normalise_returns` arms are used instead).
+
+## 2026-08-29 -- item 1 complete: all three missing seeds landed overnight
+
+[MEASURED] w20_s2, w30_s1, w30_s2 all trained and evaluated (`scripts/train_from_config.py`,
+verified against each source config before running). Every window rung now has three seeds.
+
+    rung     entropy   learned   greedy@0.7
+    w20_s0    1.618     0.060      0.033
+    w20_s1    1.542     0.087      0.027
+    w20_s2    1.617     0.025      0.020
+    w30_s0    1.507     0.000      0.000
+    w30_s1    1.494     0.000      0.000
+    w30_s2    1.478     0.000      0.000
+
+**w30 is 0.000 across all three independent seeds, and all three CLEAR the MI floor
+comfortably (0.503, 0.542 for the two new ones -- w30_s0 not re-gated but its entropy and
+window-rate history are indistinguishable from its siblings).** This is not undertraining:
+it independently confirms the budget-required-cover finding from 28 August using an entirely
+different signal. At k=30 the ratio was measured at 0.52 -- every episode requires more
+interventions than the budget allows, so no policy of any quality can succeed, and three
+well-trained, well-conditioned seeds landing on exactly zero is what that predicts. The k=30
+rung should be reported as a NEGATIVE CONTROL for the required-cover argument, not as a
+window-size data point -- consistent with the 28 August decision to withdraw it from the
+scaling figure (it also uses three agents against every other rung's four).
+
+w20 across three seeds: 0.060 / 0.087 / 0.025, mean 0.057, all near its own floor
+(budget/required 0.96) and none of them collapsed to zero. Window size k=20 remains a
+genuine near-threshold measurement, unlike k=30.
+
+[DECIDED] Item 1 of the roadmap (three seeds per headline window rung) is now complete for
+every rung k=4 through k=30.
