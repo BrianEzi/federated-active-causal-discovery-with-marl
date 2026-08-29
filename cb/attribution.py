@@ -375,20 +375,44 @@ def consistent_with_partner(groups: Sequence[LatentGroup], owner: int,
                             moved: FrozenSet[Tuple[int, int]]) -> bool:
     """Could this attribution have produced `moved` when `owner` acted privately?
 
-    TWO RULES, and between them they are the whole elimination channel.
+    TWO RULES, and the first is SOUND-LEANING RATHER THAN SOUND -- see the measurement below.
 
-    1. Every pair that MOVED must be covered by a group this candidate attributes to
-       `owner`. Something moved when that partner acted, so that partner owns it.
+    1. At least ONE pair that moved must be covered by a group this candidate attributes to
+       `owner`. It used to demand ALL of them, which was strictly worse.
 
-    2. Every group owned by `owner` must have moved ENTIRELY or not at all. One latent
-       responds atomically: disturb it and every pair it explains shifts together.
+    2. ATOMICITY. Every group in the candidate must have moved ENTIRELY or not at
+    all. One latent responds as a unit: disturb it and every pair it explains shifts
+    together, so a candidate that assigns a clique to a latent and then sees only part of
+    that clique move is refuted.
+
+    THE KNOWN UNSOUNDNESS IN RULE 1, measured rather than argued. It required the pairs that moved to be
+    covered by groups the candidate attributes to `owner` -- "something moved when that
+    partner acted, so that partner owns it." That inference does not hold. `responds_to`
+    marks a group as responding when the intervened node is an ANCESTOR of that group's
+    owner's latent, and an actor's private node can sit above a THIRD agent's latent through
+    the shared block. So the actor genuinely causes movement in pairs it does not own, and
+    the message mixes owners. Measured 2026-08-29 at 3 agents: `moved` carried a foreign
+    owner's pairs in 10 of 115 signals, and the TRUE attribution was refuted by its own
+    evidence in 9 of them. Weakening it from "all" to "at least one" did not help -- in
+    those 9 the actor owned NOTHING that moved -- so no version of rule 1 is sound, and this
+    is the defect behind the residual "wrong" verdicts in `score_groups`.
+
+    WHY RULE 1 IS KEPT ANYWAY, and what it costs. Deleting it and generalising atomicity to
+    every owner IS sound, and it was tried: `right` collapsed from 72 to 0 over the same 162
+    groups, because atomicity alone never refutes enough candidates to reach bar 1.0. Rule 1
+    carries the entire discriminative power of the channel. So the engine is knowingly
+    sound-LEANING here, and the cost is bounded and reported: `score_groups` returns
+    `exhausted` and the backend counts `contradictions`, and residual `wrong` verdicts under
+    ORACLE evidence are engine error rather than attribution error and must be read as such.
+    Removing this caveat needs a signal that separates "the actor's latent moved" from "the
+    actor's node sits above someone else's latent", which is a modelling change, not a fix.
 
     WHAT IS DELIBERATELY NOT A RULE: a group owned by `owner` that did not move is NOT
     evidence against it. The agent is told which PARTNER acted, never which of that
     partner's variables, so a silent group may simply belong to a variable the partner did
-    not touch this round. Adding that rule would be the one way to make this unsound.
+    not touch this round. Adding that rule would be the other way to make this unsound.
 
-    Rule 2 is where the discrimination lives, and it explains what coordination has to
+        Atomicity is where the discrimination lives, and it explains what coordination has to
     learn. A partner action that moves EVERYTHING separates nothing. A PARTIAL response
     refutes a single-clique hypothesis outright. So an agent needs its partner to probe its
     private variables ONE AT A TIME -- only possible when partners hold two or more, and
@@ -403,9 +427,9 @@ def consistent_with_partner(groups: Sequence[LatentGroup], owner: int,
         pairs = set(group.pairs())
         hit = pairs & moved
         if hit and hit != pairs:
-            return False                   # rule 2: a clique moved only partly
+            return False                   # atomicity: a clique moved only partly
         covered |= pairs
-    return moved <= covered                # rule 1
+    return bool(moved & covered)           # owner must explain SOMETHING that moved
 
 
 class AttributedBelief:
@@ -507,12 +531,23 @@ def score_groups(belief, true_groups: Sequence[LatentGroup], bar: float = 1.0):
 
     The guarantee carries over from the version space: the truth never leaves the candidate
     set, so at bar 1.0 "settled" implies "settled correctly" and settled-wrong cannot occur.
+
+    WHEN THAT GUARANTEE HAS ALREADY FAILED, SAY SO RATHER THAN SCORING IT AS AN ERROR. If
+    the candidate set is empty, every true group is absent from `group_frequency`, `freq`
+    defaults to 0.0, and `1 - 0 >= 1` marked all of them WRONG -- reporting an engine
+    contradiction as a confident misattribution, which is the one failure mode that
+    corrupts every attribution number downstream. An exhausted belief knows nothing, so the
+    honest verdict is UNSURE, and the contradiction is surfaced in its own field instead of
+    being laundered into the score.
     """
+    exhausted = not getattr(belief, "group_frequency", None) or not getattr(belief, "total", 0)
     right = wrong = unsure = 0
     detail = []
     for group in true_groups:
-        freq = belief.group_frequency.get(group, 0.0)
-        if freq >= bar:
+        freq = belief.group_frequency.get(group, 0.0) if not exhausted else 0.0
+        if exhausted:
+            outcome, unsure = "unsure", unsure + 1
+        elif freq >= bar:
             outcome, right = "right", right + 1
         elif 1.0 - freq >= bar:
             outcome, wrong = "wrong", wrong + 1
@@ -520,7 +555,7 @@ def score_groups(belief, true_groups: Sequence[LatentGroup], bar: float = 1.0):
             outcome, unsure = "unsure", unsure + 1
         detail.append((group, outcome, freq))
     return {"right": right, "wrong": wrong, "unsure": unsure,
-            "total": len(true_groups), "detail": detail,
+            "total": len(true_groups), "detail": detail, "exhausted": bool(exhausted),
             "identified": wrong == 0 and right == len(true_groups)}
 
 
@@ -546,6 +581,9 @@ class AttributedVersionSpaceBackend:
         self.agent = int(agent)
         self.truth: Optional[tuple] = None
         self.true_groups: Tuple[LatentGroup, ...] = ()
+        # Times an elimination channel would have emptied the candidate set. Non-zero means
+        # the soundness guarantee broke; `score_groups` reports UNSURE rather than WRONG.
+        self.contradictions = 0
         self.last: Optional[AttributedBelief] = None
         self._buckets: Dict[tuple, tuple] = {}
         self._initial: Dict[tuple, tuple] = {}
@@ -586,6 +624,7 @@ class AttributedVersionSpaceBackend:
                 running += cost
             self._buckets = kept
             self._initial = dict(kept)
+        self.contradictions = 0
         self.true_groups = (observable_groups(adjacency, topology, self.agent)
                             if adjacency is not None else ())
         self.last = AttributedBelief(self._buckets, self.k)
@@ -612,9 +651,13 @@ class AttributedVersionSpaceBackend:
                             if all(reveal(m, self.k, x) == target[x] for x in fresh)),
                       attributions)
                 for key, (structures, attributions) in self._buckets.items()}
-            self._buckets = {k_: v for k_, v in self._buckets.items() if v[0] and v[1]}
+            pruned = {k_: v for k_, v in self._buckets.items() if v[0] and v[1]}
+            if not pruned:
+                self.contradictions += 1        # same guard as `observe_partner`
+            else:
+                self._buckets = pruned
+                self.last = AttributedBelief(self._buckets, self.k)
             self._applied = intervened
-            self.last = AttributedBelief(self._buckets, self.k)
         elif self.last is None:
             self.last = AttributedBelief(self._buckets, self.k)
         return self.last.directed
@@ -631,6 +674,13 @@ class AttributedVersionSpaceBackend:
             if structures and kept:
                 buckets[key] = (structures, kept)
         if changed:
+            if not buckets:
+                # CONTRADICTION. Every candidate was refuted, but the truth is one of them,
+                # so the evidence -- not the belief -- is at fault. Refuse the update and
+                # record it, exactly as `cb/factored.py::_apply_ancestry` does for marks.
+                # Propagating an empty space would read downstream as unanimous confidence.
+                self.contradictions += 1
+                return
             self._buckets = buckets
             self.last = AttributedBelief(self._buckets, self.k)
 
