@@ -89,6 +89,25 @@ def window_shd(belief, true_mag: np.ndarray) -> Tuple[float, int, int]:
     return soft, hard, n_pairs
 
 
+def window_shd_pair(belief, true_mag: np.ndarray, u: int, v: int) -> Tuple[float, int, int]:
+    """One pair's contribution, so the de-duplicated path reuses the window path's rules."""
+    mag = np.asarray(true_mag)
+    p_none = 1.0 - float(np.asarray(belief.adjacency)[u, v])
+    p_fwd = float(np.asarray(belief.directed)[u, v])
+    p_back = float(np.asarray(belief.directed)[v, u])
+    p_bi = float(np.asarray(belief.bidirected)[u, v])
+    masses = np.array([p_none, p_fwd, p_back, p_bi])
+    if mag[u, v] == MAG_BIDIRECTED:
+        index = 3
+    elif mag[u, v] == MAG_DIRECTED:
+        index = 1
+    elif mag[v, u] == MAG_DIRECTED:
+        index = 2
+    else:
+        index = 0
+    return 1.0 - float(masses[index]), int(np.argmax(masses) != index), 1
+
+
 def _factories(env, seed: int) -> Dict[str, object]:
     labels = {
         "random_vary": lambda a: __import__("ma.baselines", fromlist=["RandomAgent"])
@@ -100,7 +119,8 @@ def _factories(env, seed: int) -> Dict[str, object]:
     return labels
 
 
-def measure(result_path: pathlib.Path, episodes: int, seed: int, arms: List[str]) -> dict:
+def measure(result_path: pathlib.Path, episodes: int, seed: int, arms: List[str],
+            deterministic: bool = True, both_policies: bool = False) -> dict:
     report = json.loads(result_path.read_text())
     config = report["config"]
     if config["belief_backend"] not in CLAIM_BACKENDS:
@@ -112,8 +132,14 @@ def measure(result_path: pathlib.Path, episodes: int, seed: int, arms: List[str]
     built: Dict[str, dict] = {}
     checkpoint = result_path.with_suffix(".pt")
     if "learned" in arms and checkpoint.exists():
-        built["learned"] = IndependentPPO.load(str(checkpoint), env).policies(
-            deterministic=False)
+        # ARGMAX IS THE DEFAULT since 2026-08-29. This loaded the policy with
+        # deterministic=False, and sampling was quietly handicapping the learned arm: it was
+        # worth half the measured gap at w08 and w12. It REVERSES at w04, so both are
+        # reported and neither is a blanket rule -- see docs/FINDINGS_SHD_2026_08_29.md.
+        ppo = IndependentPPO.load(str(checkpoint), env)
+        built["learned"] = ppo.policies(deterministic=deterministic)
+        if both_policies:
+            built["learned_sampled"] = ppo.policies(deterministic=False)
     factories = _factories(env, use_seed)
     for label in arms:
         if label != "learned" and label in factories:
@@ -124,27 +150,43 @@ def measure(result_path: pathlib.Path, episodes: int, seed: int, arms: List[str]
         for policy in policies.values():
             if hasattr(policy, "reset"):
                 policy.reset(use_seed)
-        soft_rows, hard_rows, norm_rows = [], [], []
+        soft_rows, hard_rows, norm_rows, dedup_rows = [], [], [], []
         for episode in range(episodes):
             result = env.reset(seed=use_seed * 100_000 + episode)
             while not result.done:
                 result = env.step({a: policies[a](env, result)
                                    for a in env.topology.agents})
             soft_total = hard_total = pairs_total = 0
+            # A shared pair sits in EVERY agent's window, so summing over windows counts it
+            # once per agent -- n times. Under oracle that double-counting alone accounted
+            # for greedy's entire win at w04/w12/w20 and reversed it at w08. Accumulate the
+            # de-duplicated value in parallel: each covered pair contributes once, as the
+            # mean of its per-window values.
+            per_pair: Dict[tuple, list] = {}
             for agent, window in env.windows.items():
                 soft, hard, n_pairs = window_shd(window.belief.last, env._true_mag(agent))
                 soft_total += soft
                 hard_total += hard
                 pairs_total += n_pairs
+                mag = env._true_mag(agent)
+                belief = window.belief.last
+                for u, v in combinations(range(window.k), 2):
+                    one, _h, _n = window_shd_pair(belief, mag, u, v)
+                    per_pair.setdefault(
+                        tuple(sorted((window.nodes[u], window.nodes[v]))), []).append(one)
             soft_rows.append(soft_total / max(pairs_total, 1))
             hard_rows.append(hard_total / max(pairs_total, 1))
+            dedup_rows.append(sum(float(np.mean(v)) for v in per_pair.values())
+                              / max(len(per_pair), 1))
             norm_rows.append(pairs_total)
         out["arms"][label] = {
             "soft_shd_mean": float(np.mean(soft_rows)),
             "soft_shd_sd": float(np.std(soft_rows)),
             "hard_shd_mean": float(np.mean(hard_rows)),
             "hard_shd_sd": float(np.std(hard_rows)),
-            "soft_rows": soft_rows, "hard_rows": hard_rows,
+            "dedup_shd_mean": float(np.mean(dedup_rows)),
+            "dedup_shd_sd": float(np.std(dedup_rows)),
+            "soft_rows": soft_rows, "hard_rows": hard_rows, "dedup_rows": dedup_rows,
         }
     return out
 
@@ -164,23 +206,35 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--arms", default="learned,greedy,random_vary")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--sample", action="store_true",
+                    help="evaluate the learned arm by SAMPLING rather than argmax. Argmax "
+                         "is the default because sampling handicapped the learned arm by "
+                         "roughly half the measured gap at w08 and w12 -- but it REVERSES "
+                         "at w04, so report per rung.")
+    ap.add_argument("--both_policies", action="store_true",
+                    help="report argmax and sampled side by side")
     args = ap.parse_args(argv)
 
     arms = args.arms.split(",")
     payload = []
     for path in args.results:
-        row = measure(pathlib.Path(path), args.episodes, args.seed, arms)
+        row = measure(pathlib.Path(path), args.episodes, args.seed, arms,
+                      deterministic=not args.sample, both_policies=args.both_policies)
         payload.append(row)
         print(f"\n=== {pathlib.Path(path).stem}  ({args.episodes} episodes, "
              f"normalised per pair, k unknown -- see source config) ===")
-        print(f"{'arm':14s} {'soft SHD/pair':>14s} {'hard SHD/pair':>14s}")
+        print(f"{'arm':16s} {'dedup SHD':>11s} {'per-window':>11s} {'hard/pair':>11s}")
+        print("  (dedup counts each covered pair ONCE and is the number to quote)")
         for label, data in row["arms"].items():
-            print(f"{label:14s} {data['soft_shd_mean']:14.4f} {data['hard_shd_mean']:14.4f}")
+            print(f"{label:16s} {data['dedup_shd_mean']:11.4f} "
+                  f"{data['soft_shd_mean']:11.4f} {data['hard_shd_mean']:11.4f}")
         if "learned" in row["arms"]:
             for other in ("greedy", "probe_then_work", "random_vary"):
                 if other in row["arms"]:
-                    print(f"  PAIRED learned - {other:15s} (soft) "
-                         f"{paired(row['arms']['learned']['soft_rows'], row['arms'][other]['soft_rows'])}")
+                    print(f"  PAIRED learned - {other:15s} (dedup) "
+                          f"{paired(row['arms']['learned']['dedup_rows'], row['arms'][other]['dedup_rows'])}")
+                    print(f"  PAIRED learned - {other:15s} (per-window) "
+                          f"{paired(row['arms']['learned']['soft_rows'], row['arms'][other]['soft_rows'])}")
 
     if args.out:
         out = pathlib.Path(args.out)

@@ -71,3 +71,42 @@ def test_duplicate_coverage_floor_rises_once_spend_exceeds_the_surface():
     assert env.duplicate_coverage_floor() == pytest.approx((spent - surface) / spent)
     # And the floor is a genuine lower bound on what was actually measured.
     assert env.duplicate_coverage() >= env.duplicate_coverage_floor() - 1e-12
+
+
+# -- time-to-identification: survival, not averaging --------------------------------------
+
+def test_survival_median_is_undefined_when_fewer_than_half_ever_identify():
+    """A number here would be extrapolation past the censoring horizon. nan is the honest
+    answer, and `censored_fraction` is what the reader needs beside it."""
+    from ma.evaluate import survival_summary
+    out = survival_summary([2.0, 13.0, 13.0, 13.0], censor=13)
+    assert np.isnan(out["median_rounds"])
+    assert out["censored_fraction"] == pytest.approx(0.75)
+
+
+def test_survival_median_is_defined_at_exactly_half():
+    from ma.evaluate import survival_summary
+    out = survival_summary([2.0, 2.0, 13.0, 13.0], censor=13)
+    assert out["median_rounds"] == pytest.approx(2.0)
+
+
+def test_restricted_mean_is_bounded_by_the_censoring_horizon():
+    """The property that makes it safe to report when everything is censored: it can never
+    claim a duration longer than the budget allowed."""
+    from ma.evaluate import survival_summary
+    for rounds in ([13.0] * 5, [1.0, 13.0], [1.0, 2.0]):
+        assert survival_summary(rounds, censor=13)["restricted_mean"] <= 13.0
+
+
+def test_fully_censored_sample_reports_the_horizon_and_says_so():
+    from ma.evaluate import survival_summary
+    out = survival_summary([13.0, 13.0], censor=13)
+    assert out["censored_fraction"] == 1.0
+    assert out["restricted_mean"] == pytest.approx(13.0)
+    assert np.isnan(out["median_rounds"])   # nothing identified: no median exists
+
+
+def test_empty_sample_is_nan_not_zero():
+    from ma.evaluate import survival_summary
+    out = survival_summary([], censor=13)
+    assert out["n"] == 0 and np.isnan(out["restricted_mean"])

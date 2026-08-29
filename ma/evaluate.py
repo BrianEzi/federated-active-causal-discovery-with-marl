@@ -359,6 +359,41 @@ def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
     }
 
 
+def survival_summary(rounds: Sequence[float], censor: int) -> Dict[str, float]:
+    """Summarise time-to-identification WITHOUT averaging across censored observations.
+
+    WHY A PLAIN MEAN IS WRONG HERE. `rounds_to_identification` right-censors at `budget + 1`
+    for every window that was never identified, and censoring on this task is severe -- most
+    episodes at the harder rungs never identify at all. Averaging then reports the censoring
+    horizon rather than the policy: an arm that solves 10% of episodes in 2 rounds and an arm
+    that solves none both land near budget+1, and pushing the budget up moves the "mean" for
+    every arm at once. `docs/METRICS.md` flags this; this is the fix.
+
+    Three numbers, none of which pretends the censored observations were finite:
+
+      `censored_fraction`     how much of the sample never identified. Report it BESIDE the
+                              others -- the other two are uninterpretable without it.
+      `median_rounds`         the smallest round by which at least half identified, or nan
+                              when fewer than half ever do. Undefined is the honest answer;
+                              a number would be extrapolation.
+      `restricted_mean`       mean of min(round, censor) -- the restricted mean survival
+                              time at the censoring horizon. Always defined, bounded by
+                              `censor`, and comparable across arms at the SAME budget only.
+    """
+    values = np.asarray(list(rounds), dtype=float)
+    if values.size == 0:
+        return {"censored_fraction": float("nan"), "median_rounds": float("nan"),
+                "restricted_mean": float("nan"), "n": 0}
+    censored = values >= censor
+    finished = np.sort(values[~censored])
+    half = 0.5 * values.size
+    median = float(finished[int(np.ceil(half)) - 1]) if finished.size >= half else float("nan")
+    return {"censored_fraction": float(censored.mean()),
+            "median_rounds": median,
+            "restricted_mean": float(np.minimum(values, censor).mean()),
+            "n": int(values.size)}
+
+
 def _mean_where(rows, keep) -> float:
     """Mean `success` over the episodes `keep` selects; nan when it selects none."""
     picked = [float(bool(r["success"])) for r in rows if keep(r)]
@@ -453,6 +488,13 @@ def _per_agent_block(env: TwoAgentEnv, rows: List[Dict[str, object]]) -> Dict[st
         "success_feasible": _mean_where(
             rows, lambda r: min(r["interventions"][a] for a in env.topology.agents) > 0),
         "connected_fraction": float(np.mean([r["connected"] for r in rows])),
+        # Time-to-identification, summarised as survival rather than averaged. See
+        # `survival_summary` for why a plain mean reports the censoring horizon.
+        "time_to_identification": {
+            a: survival_summary(
+                [r["identified_round"][a] for r in rows if a in r.get("identified_round", {})],
+                censor=env.config.budget + 1)
+            for a in env.topology.agents},
     }
     for label, want in (("connected", True), ("disconnected", False)):
         subset = [r for r in rows if r["connected"] is want]
