@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from itertools import combinations
+
 import numpy as np
 
 from ma.baselines import _Window, enumerated_posterior
@@ -190,6 +192,133 @@ def union_graph(env: TwoAgentEnv, map_indices: Dict[int, int]) -> np.ndarray:
     return union
 
 
+NONE, FWD, BACK, BI = 0, 1, 2, 3
+_MARK_NAMES = ("none", "->", "<-", "<->")
+
+
+def _pair_masses(belief, u: int, v: int) -> np.ndarray:
+    """(NONE, FWD, BACK, BI) mass for one pair, from the frequency matrices every claim
+    backend exposes. Backend-agnostic on purpose: on the factored path the frequencies are
+    uniform over the surviving marks, so `mass > 0` recovers the survivor set EXACTLY, and
+    on the bootstrap path it means "some replicate still supports this mark", which is the
+    same notion one level down."""
+    return np.array([1.0 - float(np.asarray(belief.adjacency)[u, v]),
+                     float(np.asarray(belief.directed)[u, v]),
+                     float(np.asarray(belief.directed)[v, u]),
+                     float(np.asarray(belief.bidirected)[u, v])])
+
+
+def _true_index(mag: np.ndarray, u: int, v: int) -> int:
+    from ma.projection import BIDIRECTED as _BI, DIRECTED as _DIR
+    if mag[u, v] == _BI:
+        return BI
+    if mag[u, v] == _DIR:
+        return FWD
+    if mag[v, u] == _DIR:
+        return BACK
+    return NONE
+
+
+def pooled_global_belief(env: TwoAgentEnv, tol: float = 1e-9) -> Dict[tuple, dict]:
+    """Assemble ONE global belief from the sites, by intersecting their surviving marks.
+
+    WHY THIS REPLACES `union_graph`. That function reads `_Window.get(k).dags[map_index]`,
+    so it ENUMERATES: it dies above k=5 and the entire factored ladder is out of its reach.
+    `_constraint_union` is the non-enumerating fallback but it is majority-vote BINARY
+    ADJACENCY -- no orientations, no bidirected marks -- and neither runs on the `claims`
+    criterion every ladder run uses. So in practice the project had no working global-graph
+    metric at the sizes it actually reports.
+
+    WHY INTERSECTION IS THE RIGHT POOLING, and why it is sound. Each site's mark set for a
+    pair contains the truth (`cb/factored.py`: every update is individually sound, so the
+    belief stays unsure rather than settling wrongly). A family of sets that each contain the
+    truth has an intersection that contains it too, so the pooled belief is at least as tight
+    as any single site's and never excludes the true mark. That is exactly federated
+    aggregation of a graph, which is what the causal-discovery literature federates -- not
+    the parameters of a policy network.
+
+    CROSS-PRIVATE PAIRS ARE ABSENT AND THAT IS NOT A GAP. `Topology.allowed_edges` permits an
+    edge only where one agent observes both endpoints, so a pair spanning two private blocks
+    cannot exist and no site holds a belief about it. They are roughly half of all pairs and
+    are guaranteed true non-edges, so including them would add exactly zero error and dilute
+    every difference by a constant.
+
+    THE ONE SUBTLETY, reported rather than hidden. A shared pair's true mark is a LATENT
+    PROJECTION into a window, and different windows project out different private blocks, so
+    two sites can legitimately hold DIFFERENT true marks for the same pair. Those pairs are
+    flagged `mark_disagreement` and scored against each site's own truth, averaged -- there
+    is no single global answer to score against.
+
+    Returns `{(global_u, global_v): {...}}`, one entry per covered pair.
+    """
+    # SCOPE. This reads the `adjacency` / `directed` / `bidirected` frequency matrices, which
+    # are the CLAIM_BACKENDS interface. The exact DP belief (`WindowBeliefDP`) has no `.last`
+    # and no per-pair mark set, so there is nothing to intersect -- the caller gets an empty
+    # map and `global_graph_report` reports nan rather than a fabricated zero.
+    if env.config.belief_backend not in CLAIM_BACKENDS:
+        return {}
+    seen: Dict[tuple, dict] = {}
+    for agent, window in env.windows.items():
+        belief = getattr(window.belief, "last", None)
+        if belief is None or not hasattr(belief, "adjacency"):
+            continue
+        mag = np.asarray(env._true_mag(agent))
+        for u, v in combinations(range(window.k), 2):
+            key = tuple(sorted((window.nodes[u], window.nodes[v])))
+            masses = _pair_masses(belief, u, v)
+            entry = seen.setdefault(key, {"marks": [], "truth": [], "soft": []})
+            entry["marks"].append(frozenset(np.flatnonzero(masses > tol).tolist()))
+            entry["truth"].append(_true_index(mag, u, v))
+            entry["soft"].append(1.0 - float(masses[_true_index(mag, u, v)]))
+
+    out: Dict[tuple, dict] = {}
+    for key, entry in seen.items():
+        truths = set(entry["truth"])
+        pooled = frozenset.intersection(*entry["marks"]) if entry["marks"] else frozenset()
+        disagree = len(truths) > 1
+        if disagree or not pooled or entry["truth"][0] not in pooled:
+            # No single truth to score against, or the sites contradict each other. Fall
+            # back to the per-site mean rather than inventing a pooled verdict.
+            soft = float(np.mean(entry["soft"]))
+            hard = int(soft > 0.5)
+            contradiction = bool(not disagree and (not pooled
+                                                   or entry["truth"][0] not in pooled))
+        else:
+            soft = 1.0 - 1.0 / len(pooled)
+            hard = int(len(pooled) > 1 or next(iter(pooled)) != entry["truth"][0])
+            contradiction = False
+        out[key] = {"soft": soft, "hard": hard, "sites": len(entry["marks"]),
+                    "resolved": bool(not disagree and len(pooled) == 1),
+                    "mark_disagreement": disagree, "contradiction": contradiction}
+    return out
+
+
+def global_graph_report(env: TwoAgentEnv) -> Dict[str, float]:
+    """Headline numbers for the pooled global graph -- the object a federated causal
+    discovery paper reports on. Each covered pair counts ONCE, unlike the per-window average
+    in `scripts/shd.py`, which counts a shared pair once per agent."""
+    pooled = pooled_global_belief(env)
+    if not pooled:
+        return {"global_soft_shd": float("nan"), "global_hard_shd": float("nan"),
+                "global_resolved_fraction": float("nan"), "global_pairs": 0,
+                "global_mark_disagreement": float("nan"),
+                "global_contradiction": float("nan")}
+    n = len(pooled)
+    return {
+        "global_soft_shd": float(sum(p["soft"] for p in pooled.values()) / n),
+        "global_hard_shd": float(sum(p["hard"] for p in pooled.values()) / n),
+        "global_resolved_fraction": float(sum(p["resolved"] for p in pooled.values()) / n),
+        "global_pairs": n,
+        # Shared pairs whose true mark differs between windows, because each window projects
+        # out a different set of private blocks. Small but real: 2.7-6.7% on the ladder.
+        "global_mark_disagreement": float(
+            sum(p["mark_disagreement"] for p in pooled.values()) / n),
+        # Sites whose surviving mark sets have empty intersection, or exclude the truth.
+        # Non-zero means a site's belief was unsound, not that the graph is hard.
+        "global_contradiction": float(sum(p["contradiction"] for p in pooled.values()) / n),
+    }
+
+
 def _constraint_union(env: TwoAgentEnv) -> np.ndarray:
     """The constraint-side union: majority-vote directed edges, OR-stitched.
 
@@ -239,6 +368,10 @@ def evaluate_episode(env: TwoAgentEnv) -> Dict[str, object]:
         "union_acyclic": acyclic,
         "union_matches_truth": matches_truth,
         "union_equivalent": globally_equivalent,
+        # The pooled global graph -- see `pooled_global_belief`. These SUPERSEDE the three
+        # union_* fields above, which enumerate and are therefore unavailable above k=5.
+        # Kept side by side so older comparisons stay reproducible.
+        **global_graph_report(env),
         # All three parts of [U14], which is the number to report -- EXCEPT under the
         # claims criterion, where success is the claims verdict itself. BUG 9, found
         # 2026-08-24 when a probe's "success" (4%) contradicted the direct decomposition

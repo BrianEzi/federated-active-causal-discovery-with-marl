@@ -164,11 +164,33 @@ Ranked by whether it changes a number we would report.
 | I(S;A)/H | A precondition, not a diagnostic. **Run before quoting any learned number, and record it in the result file** so a reader can check it without re-running. |
 | `connected` split | Already computed and already correct. **Promote it to primary** — disconnected graphs give independent subproblems, so pooling them dilutes the effect the project exists to measure. |
 
-### Replace — broken at the scale we actually run
+### Replaced — was broken at the scale we actually run
 
-| metric | why | replacement |
-|---|---|---|
-| `union_graph`, `union_acyclic`, `union_matches_truth`, `union_equivalent` | Reads `_Window.get(k).dags[map_index]` — it **enumerates**, so it dies above k=5 and the whole factored ladder is out of reach. `_constraint_union` is the fallback but is majority-vote **binary adjacency with no edge types**, and neither runs on the `claims` criterion every ladder run uses. | The pooled survivor-set intersection in `shd_diagnose --check global`: sound because under oracle evidence every site's set contains the truth, so the intersection does too. ~2 hours to promote to a reported metric. |
+`union_graph` and the three `union_*` fields read `_Window.get(k).dags[map_index]`, so they
+**enumerate**: they raise above k=5 and the entire factored ladder was out of their reach.
+`_constraint_union` is the non-enumerating fallback but is majority-vote **binary adjacency
+with no edge types**, and neither runs on the `claims` criterion every ladder run uses. In
+practice the project had **no working global-graph metric at the sizes it reports.**
+
+**`pooled_global_belief` / `global_graph_report` replace them (DONE).** Each covered pair is
+assembled once by INTERSECTING the surviving mark sets across every window that contains it.
+Sound because each site's set contains the truth, so the intersection does too — and it is
+at least as tight as any single site. Backend-agnostic: it reads the frequency matrices, so
+`mass > 0` recovers the survivor set exactly on the factored path and means "some replicate
+still supports this mark" on the bootstrap path. Non-claim backends get nan, not a
+fabricated zero.
+
+| new field | meaning |
+|---|---|
+| `global_soft_shd` / `global_hard_shd` | pooled distance, **each covered pair counted once** |
+| `global_resolved_fraction` | pairs the federation settled to a single mark |
+| `global_pairs` | covered pairs — 625 at w20, against 1,225 total; the rest are cross-private and cannot exist |
+| `global_mark_disagreement` | shared pairs whose true mark differs between windows, because each projects out a different private block. **3.0% at w20** |
+| `global_contradiction` | sites whose mark sets have empty intersection. **0.000 measured** — non-zero would mean a site was unsound, not that the graph is hard |
+
+Measured at w20 (k=20, where `union_graph` raises), 12 episodes: greedy `global_soft_shd`
+0.0060 against random's 0.0653, resolved 0.959 against 0.874. The `union_*` fields are kept
+beside the new ones so older comparisons stay reproducible.
 
 ### Leave alone
 
