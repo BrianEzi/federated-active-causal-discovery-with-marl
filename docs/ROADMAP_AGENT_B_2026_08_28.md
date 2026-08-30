@@ -1,5 +1,11 @@
 # Roadmap — second agent — 28 to 31 August
 
+> **CORRECTED 30 Aug 2026.** The clamp-only 0.233 vs vary-only 0.589 figure below is
+> withdrawn: `mode_at_scale.py` was never committed, the comparison was two of four
+> arms, and the direction -- though real under SAMPLED evidence -- is inert under
+> ORACLE evidence, where mode provably cannot affect the belief at all. See
+> [`FINDINGS_CLAMP_2026_08_30.md`](FINDINGS_CLAMP_2026_08_30.md).
+
 High level by design. Brian will take the detail with you directly. Freeze Monday 31 Aug,
 dissertation 8 Sep.
 
