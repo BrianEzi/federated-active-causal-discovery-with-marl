@@ -155,3 +155,70 @@ SCM's noise scale. Clamping is scale-free by construction.
   substitute it relies on is a variance contrast that is strong at our chosen intervention
   scale and weak at the SCM's own. That is a fragility to state, and a sensitivity curve to
   publish, not a gap to hide.
+
+## Finding 4 — "rescue" does not exist on this backend, and that answers the hard question
+
+The hard question is: *you use vary, and you picked an intervention scale that gives vary a
+detectable signal in your setup — why not just use clamp?* Without an answer, `--vary_only`
+looks like a convenience dressed as a design.
+
+There is an answer, and it is a measurement. Agent 0 sweeps its own window with vary; the
+only thing that changes between arms is what the PARTNER does to its private nodes. Scored
+on the pairs that are genuinely bidirected in agent 0's true MAG:
+
+| evidence | partner's mode | confounded pairs settled right |
+|---|---|---|
+| oracle | vary | 100.0% |
+| oracle | **clamp** | **100.0%** |
+| sampled | vary | 61.8% |
+| sampled | **clamp** | **61.8%** |
+
+**A partner clamping the confounder helps exactly as much as varying it: not at all.**
+Combined with Finding 2 — clamp-only costs 3.3x to 5.5x on soft SHD for the agent's own
+inference, at every sample size — clamp is **dominated** on this backend, not merely
+unchosen. That is the answer: not "vary is good enough", but "clamp buys your partner
+nothing here and costs you your own experiment".
+
+**Why rescue vanished, and it is structural rather than incidental.** The factored backend
+seeds its skeleton from truth (`reset_marks` reads `self.truth`), so adjacency is KNOWN and
+only the mark is open. A confounded pair is then settled by intervening on BOTH endpoints
+and finding neither is an ancestor of the other — the state of a third node cannot enter.
+On an engine that must LEARN the skeleton, a live confounder makes u and v look adjacent,
+and clamping it genuinely rescues the partner. That is the engine the rescue measurement
+was taken on.
+
+## The document that now contradicts the code
+
+`MA_PROBLEM_STATEMENT.md` says, of the mode split:
+
+> *For your partner*, only CLAMP works... Rescue rate is 0.000 at `intervene_scale` 2.0 and
+> 1.0, and rises only as the scale goes to zero. So **clamping is a genuine sacrifice**: it
+> removes a confounder for your partner at the cost of a much weaker experiment for
+> yourself. **That trade-off is the coordination problem**, and it is measured rather than
+> assumed.
+
+Every clause is true of the bootstrap engine it was measured on, and the last one is false
+of the engine the thesis now runs. On the factored backend there is no sacrifice to make,
+because there is nothing to rescue. **The coordination problem here is ALLOCATION** — not
+duplicating effort on the contended surface — which is what `ROADMAP_RUNGS` already says
+leads, and what the duplicate-coverage and effort-evenness metrics measure.
+
+This inconsistency should be fixed in the problem statement before submission rather than
+left for a reader to find, because the two framings imply different headline claims.
+
+## Where `intervene_scale` actually bites, and how to defend it
+
+Narrower than feared. It has no effect under oracle evidence, and none on rescue, which
+does not exist. It affects the **attribution** signal only (Finding 3).
+
+The defence is not realism. It is that **an intervention which reproduces the observational
+marginal is uninformative by construction** — so the interventional scale must sit outside
+the natural noise range or the experiment carries no information about what the node drives.
+`noise_range=(0.5, 1.5)` is itself principled: it spans 3x specifically to avoid the
+EQUAL-VARIANCE condition, under which a linear-Gaussian DAG becomes identifiable from
+observational data alone (Peters & Buhlmann) — which would hand the agents the answer for
+free. `intervene_scale=2.0` sits clearly outside that range, and the V-curve minimum at 1.0
+is exactly the degenerate uninformative case.
+
+State the requirement, publish the curve, and report the value in the parameters table. It
+is then a design constraint with a measurement behind it rather than a magic number.
