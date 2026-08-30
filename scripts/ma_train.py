@@ -25,7 +25,7 @@ from ma.policy import IndependentPPO, PPOConfig
 from ma.topology import Topology, federated_topology, two_agent
 
 
-def _config_record(config, topology, args) -> dict:
+def _config_record(config, topology, args, ppo_config=None) -> dict:
     """The RESOLVED settings, read off the config object rather than off `args`.
 
     `prior_p` is derived from `d` when left unset and `identify_threshold` has no flag at
@@ -93,6 +93,16 @@ def _config_record(config, topology, args) -> dict:
     from dataclasses import fields as _fields
     for field in _fields(config):
         record.setdefault(field.name, getattr(config, field.name))
+    # AND EVERY PPOConfig FIELD, for exactly the same reason. The block above was a
+    # HAND-MAINTAINED list of training hyperparameters and it had drifted the same way the
+    # MAConfig list once did: on 30 Aug 2026 a FedAdam run recorded `local_epochs` and
+    # `turn_aware_credit` and NOTHING about `server_optimiser`, `client_optimiser`, `lr` or
+    # `server_lr` -- so the result file could not say whether it was FedAdam or plain
+    # FedAvg, which is the entire distinction the run existed to measure. Prefixed, because
+    # `lr` and `seed` would otherwise collide with fields that mean something else here.
+    if ppo_config is not None:
+        for field in _fields(ppo_config):
+            record.setdefault(f"ppo_{field.name}", getattr(ppo_config, field.name))
     record["topology"] = {"name": topology.name,
                           "private": [list(b) for b in topology.private],
                           "exposed": list(topology.exposed)}
@@ -180,6 +190,20 @@ def main(argv=None) -> dict:
     # Show the policy WHO it blames for each confounded pair, not merely that the pair is
     # confounded. Needs the attributed backend and an identity-preserving architecture --
     # gnn_portable pools partners away, which is the symmetry that destroys attribution.
+    ap.add_argument("--server_optimiser", default="none",
+                    choices=["none", "adam", "yogi"],
+                    help="server-side adaptivity for FedAvg (Reddi et al. 2021). Plain "
+                         "FedAvg rebuilds its Adam moments from zero every round, which "
+                         "measurement showed is where the whole pooled-vs-FedAvg gap lives; "
+                         "this keeps the moments on the SERVER, where they persist.")
+    ap.add_argument("--server_lr", type=float, default=1.0)
+    ap.add_argument("--client_optimiser", default="adam", choices=["adam", "sgd"],
+                    help="FedAdam specifies SGD clients; local Adam under an adaptive "
+                         "server is doubly adaptive -- measured at 30.46 displacement "
+                         "against pooled's 0.343 for a single update.")
+    ap.add_argument("--lr", type=float, default=3e-4,
+                    help="client learning rate. SGD clients need far more than Adam's "
+                         "3e-4, so FedAdam runs must set it explicitly.")
     ap.add_argument("--observe_owner_channel", action="store_true",
                     help="feed the per-pair, per-agent ownership belief to the policy")
     # DEFAULT ZERO since 2026-08-21. At 0.05 a random-level policy has expected value
@@ -381,11 +405,10 @@ def main(argv=None) -> dict:
     # environment, and DensityGuardedEnv(max_edges=None) is its parent's behaviour exactly,
     # so both halves of the three-agent guarded/unguarded control share one code path.
     env = DensityGuardedEnv(config, max_edges=args.max_edges)
-    config_record = _config_record(config, topology, args)
-    run = _wandb_run(args, config_record)
-    started = time.time()
 
-    ppo = IndependentPPO(env, PPOConfig(
+    # Built BEFORE the record, so the record can sweep every training hyperparameter out of
+    # it rather than relying on a hand-maintained list -- see `_config_record`.
+    ppo_config = PPOConfig(
         total_episodes=args.train_episodes, seed=args.seed,
         potential_shaping=args.potential_shaping,
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
@@ -394,7 +417,12 @@ def main(argv=None) -> dict:
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers,
         local_epochs=args.local_epochs, lr=args.lr,
         server_optimiser=args.server_optimiser, server_lr=args.server_lr,
-        client_optimiser=args.client_optimiser))
+        client_optimiser=args.client_optimiser)
+    config_record = _config_record(config, topology, args, ppo_config)
+    run = _wandb_run(args, config_record)
+    started = time.time()
+
+    ppo = IndependentPPO(env, ppo_config)
     # Checkpointing rides the existing `on_update` hook, so the training loop is untouched.
     # Both callbacks fire; a checkpointing failure is swallowed inside the writer so it can
     # never take down a run that has already spent hours of compute.
