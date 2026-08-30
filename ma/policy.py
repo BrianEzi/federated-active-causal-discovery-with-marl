@@ -45,6 +45,13 @@ DEVICE = torch.device("cpu")
 class PPOConfig:
     hidden: int = 128
     lr: float = 3e-4
+    # FEDAVG. 0 keeps the historical pooled path, which CONCATENATES every site's raw
+    # trajectories -- data pooling, strictly more centralised than gradient sharing. Any
+    # positive value selects FedAvg over the shared network with that many local epochs per
+    # site per round, and nothing but weights leaves a site. E=1 is the correctness check
+    # (it should reproduce pooled closely); E>1 is the experiment, because cutting
+    # communication by a factor of E is what FedAvg is for. See `_fedavg_update`.
+    local_epochs: int = 0
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip: float = 0.2
@@ -541,6 +548,9 @@ class IndependentPPO:
         # divisor would rescale the agents relative to each other, which is a reward change
         # rather than a normalisation.
         self._return_mean, self._return_var, self._return_count = 0.0, 0.0, 0
+        # Weight-averaging rounds under FedAvg. The axis a communication-cost result is
+        # plotted against -- E local epochs cuts this by a factor of E.
+        self.communication_rounds = 0
         arch = getattr(env.config, "policy_arch", "mlp")
         n_others = env.topology.n_agents - 1
         if arch == "gnn_hybrid":
@@ -804,6 +814,91 @@ class IndependentPPO:
         returns = advantages + values
         return advantages, returns
 
+    def _fedavg_update(self, buffers: Dict[int, dict]) -> None:
+        """FedAvg over one shared network: local epochs per site, then average the weights.
+
+        WHAT IT REPLACES, AND WHY THAT MATTERS. The pooled path concatenates every site's
+        RAW TRAJECTORIES into one buffer -- data pooling, which is strictly more centralised
+        than gradient sharing and is precisely the thing a federated setting forbids. Here
+        nothing but weights leaves a site.
+
+        THE ONE KNOB IS `local_epochs` (E), AND IT IS THE WHOLE EXPERIMENT. E>1 is what
+        FedAvg is FOR: it cuts communication rounds by a factor of E. The cost is client
+        drift, and our clients are non-IID by construction -- each holds a different private
+        block and plays a different role -- which is the regime where FedAvg degrades most.
+        So the degradation is the result, and the axis to plot it against is communication
+        rounds, not updates.
+
+        E=1 IS NOT EQUIVALENT TO THE POOLED PATH, and it would be convenient but wrong to
+        claim it is. Two differences survive. The pooled path takes `cfg.epochs` steps on
+        the MERGED batch, so matching it needs E = cfg.epochs, not E = 1. And advantage
+        normalisation differs by construction: pooled normalises over every site's
+        experience together, FedAvg normalises within a site, because a site that had to
+        share its advantage statistics would be leaking exactly what FedAvg exists to keep
+        local. The clean equivalence check is therefore the SINGLE-SITE case, where there is
+        nothing to average and nothing to normalise differently -- pinned in
+        `tests/ma/test_fedavg.py`.
+
+        WHY AVERAGING IS MEANINGFUL HERE AT ALL. Only because the architecture is portable:
+        `PortableRoleActorCritic` scores one variable at a time from features that never
+        reference how many variables exist, so every site's parameters carry the same
+        semantics and a coordinate-wise mean is a policy rather than a mixture of
+        incompatible representations. Averaging non-portable nets across sites with
+        different window sizes would be meaningless, which is why this path requires
+        `shared_net`.
+
+        The optimiser is re-created per site per round on purpose: carrying one server-side
+        optimiser across rounds would let its moment estimates accumulate across weight
+        averages they were never computed for, which is a different algorithm.
+        """
+        import copy
+
+        cfg = self.config
+        agents = list(self.env.topology.agents)
+        server = {key: value.detach().clone()
+                  for key, value in self.shared_net.state_dict().items()}
+        # Weight each site by how much experience it contributed, as FedAvg specifies.
+        # Under round-robin every site holds the same share, but under random turn order it
+        # does not -- and an unweighted mean would then quietly over-count a site that
+        # happened to draw few turns.
+        sizes = {a: max(1, len(buffers[a]["obs"])) for a in agents}
+        total = float(sum(sizes.values()))
+
+        accumulated = {key: torch.zeros_like(value) for key, value in server.items()}
+        for agent in agents:
+            self.shared_net.load_state_dict(server)          # every site starts from the
+            local = torch.optim.Adam(self.shared_net.parameters(), lr=cfg.lr)  # same weights
+            buf = buffers[agent]
+            advantages, returns = self._advantages(buf)
+            std = advantages.std()
+            normed = (advantages - advantages.mean()) / (std + 1e-8)
+            obs = torch.as_tensor(buf["obs"], dtype=torch.float32)
+            actions = torch.as_tensor(buf["action"], dtype=torch.long)
+            old_logp = torch.as_tensor(buf["logp"], dtype=torch.float32)
+            adv = torch.as_tensor(normed, dtype=torch.float32)
+            ret = torch.as_tensor(returns, dtype=torch.float32)
+
+            for _ in range(cfg.local_epochs):
+                logits, values = self.shared_net(obs)
+                dist = torch.distributions.Categorical(logits=logits)
+                logp = dist.log_prob(actions)
+                ratio = torch.exp(logp - old_logp)
+                clipped = torch.clamp(ratio, 1 - cfg.clip, 1 + cfg.clip)
+                loss = (-torch.min(ratio * adv, clipped * adv).mean()
+                        + cfg.value_coef * F.mse_loss(values, ret)
+                        - cfg.entropy_coef * dist.entropy().mean())
+                local.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.shared_net.parameters(), 0.5)
+                local.step()
+
+            share = sizes[agent] / total
+            for key, value in self.shared_net.state_dict().items():
+                accumulated[key] += value.detach() * share
+
+        self.shared_net.load_state_dict(accumulated)
+        self.communication_rounds += 1
+
     def update(self, buffers: Dict[int, dict]) -> None:
         cfg = self.config
         if self.hybrid:
@@ -837,12 +932,18 @@ class IndependentPPO:
                     nn.utils.clip_grad_norm_(net.parameters(), 0.5)
                 optimiser.step()
             return
+        if self.shared_net is not None and cfg.local_epochs > 0:
+            return self._fedavg_update(buffers)
         if self.shared_net is not None:
             # One network, so ONE update over every agent's experience pooled. Stepping the
             # shared optimiser once per agent instead would make the effective learning rate
             # scale with the number of agents, and would make the update order matter --
             # both of which would show up as the mixture arm behaving differently at 4 and
             # at 8 agents for reasons that have nothing to do with the task.
+            #
+            # NOTE WHAT THIS IS: raw trajectories from every site are CONCATENATED. That is
+            # data pooling, which is strictly more centralised than gradient sharing, and it
+            # is not what "federated" means. `local_epochs > 0` selects FedAvg instead.
             merged = {key: np.concatenate([buffers[a][key]
                                            for a in self.env.topology.agents])
                       for key in buffers[self.env.topology.agents[0]]}

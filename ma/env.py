@@ -278,6 +278,10 @@ class MAConfig:
     # Found 2026-08-26 while diagnosing learned < greedy in the deterministic environment.
     # Off by default because it changes obs_size and voids old checkpoints.
     observe_belief_channels: bool = False
+    # Feed the per-pair, per-agent OWNERSHIP belief to the policy, not just the aggregate
+    # "something confounds these". Requires the attributed backend and an identity-preserving
+    # architecture -- see `_belief_channels`.
+    observe_owner_channel: bool = False
     # CUMULATIVE PARTNER-INTERVENTION COUNTS (2026-08-26). Per (other agent x shared node),
     # budget-normalised, plus one column per partner counting its PRIVATE interventions
     # without saying which node.
@@ -380,6 +384,7 @@ class AgentWindow:
                  modes: Sequence[str] = MODES, backend: str = EXACT,
                  cb_skeleton_alpha: Optional[float] = None,
                  observe_belief_channels: bool = False,
+                 observe_owner_channel: bool = False,
                  observe_partner_counts: bool = False,
                  attribution_local_disturbance: bool = True,
                  mode_by_role: bool = False,
@@ -413,6 +418,7 @@ class AgentWindow:
         self.n_actions = len(self.actions)
         self.pass_index = self.n_actions - 1
         self._observe_channels = bool(observe_belief_channels)
+        self._observe_owner_channel = bool(observe_owner_channel)
         self._observe_partner_counts = bool(observe_partner_counts)
         shared_positions = [self.pos[n] for n in self.shared]
         if backend == CONSTRAINT:
@@ -478,6 +484,9 @@ class AgentWindow:
                 + self.k
                 # Bidirected + adjacency upper triangles (2026-08-26), when enabled.
                 + (self.k * (self.k - 1) if self._observe_channels else 0)
+                # Per-pair x per-agent ownership, when enabled. See `_belief_channels`.
+                + ((self.k * (self.k - 1) // 2) * self.topology.n_agents
+                   if (self._observe_channels and self._observe_owner_channel) else 0)
                 # Cumulative partner counts (2026-08-26): per other agent, one column per
                 # SHARED node plus one for "private, node unspecified". See
                 # MAConfig.observe_partner_counts.
@@ -568,6 +577,7 @@ class TwoAgentEnv:
                                cb_n_boot=config.cb_n_boot, cb_alpha=config.cb_alpha,
                                cb_skeleton_alpha=config.cb_skeleton_alpha,
                                observe_belief_channels=config.observe_belief_channels,
+                               observe_owner_channel=config.observe_owner_channel,
                                observe_partner_counts=config.observe_partner_counts,
                                attribution_local_disturbance=config.attribution_local_disturbance,
                                mode_by_role=config.mode_by_role,
@@ -1205,12 +1215,36 @@ class TwoAgentEnv:
         window = self.windows[agent]
         if not self.config.observe_belief_channels:
             return np.zeros(0)
+        n_owner = ((window.k * (window.k - 1) // 2) * self.topology.n_agents
+                   if self.config.observe_owner_channel else 0)
         belief = window.belief.last
         if belief is None:
-            return np.zeros(window.k * (window.k - 1))
+            return np.zeros(window.k * (window.k - 1) + n_owner)
         rows, cols = np.triu_indices(window.k, k=1)
-        return np.concatenate([np.asarray(belief.bidirected)[rows, cols],
-                               np.asarray(belief.adjacency)[rows, cols]])
+        channels = [np.asarray(belief.bidirected)[rows, cols],
+                    np.asarray(belief.adjacency)[rows, cols]]
+        if self.config.observe_owner_channel:
+            # WHO the agent blames for each confounded pair, not merely THAT it is
+            # confounded. `AttributedBelief.owner_channel` has existed since the attributed
+            # backend landed, its docstring says it "replaces the single bidirected channel
+            # in the observation" -- and nothing ever called it. So every attributed run
+            # trained a policy that could see "this pair is confounded" and never "and I
+            # blame agent 2", which is the same blindfold this method's own docstring
+            # records fixing one level down for confounding.
+            #
+            # It carries no foreign node identities: only an agent index and a pair of THIS
+            # window's positions, so it discloses nothing beyond the ownership this agent
+            # has already inferred for itself.
+            #
+            # NOT PORTABLE, and deliberately so. The width is per-pair x per-agent, and
+            # `PortableRoleActorCritic` pools partner blocks to be permutation-INVARIANT --
+            # which is the right symmetry for generic behaviour and destroys exactly the
+            # identity attribution needs. Its own docstring says per-partner attribution "is
+            # not expressible by this variant". Use `policy_arch="gnn"` when this is on.
+            owner = getattr(belief, "owner_channel", None)
+            channels.append(owner(self.topology.n_agents).reshape(-1) if owner is not None
+                            else np.zeros(n_owner))
+        return np.concatenate(channels)
 
     def _result(self, reward: float, passed: bool = False) -> StepResult:
         threshold = self.config.identify_threshold

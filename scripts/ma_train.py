@@ -87,6 +87,8 @@ def _config_record(config, topology, args) -> dict:
             "turn_aware_credit": args.turn_aware_credit,
             "normalise_returns": args.normalise_returns,
             "mask_pass_updates": args.mask_pass_updates,
+            "local_epochs": args.local_epochs,
+            "observe_owner_channel": args.observe_owner_channel,
             "max_edges": args.max_edges}
     # EVERY REMAINING MAConfig FIELD, swept in rather than listed. See the docstring.
     from dataclasses import fields as _fields
@@ -171,6 +173,16 @@ def main(argv=None) -> dict:
     ap.add_argument("--rule", default="joint_conf")
     ap.add_argument("--potential_shaping", type=float, default=0.0)
     ap.add_argument("--mask_pass_updates", type=int, default=0)
+    # FEDAVG. 0 keeps the historical pooled path, which concatenates every site's RAW
+    # TRAJECTORIES -- data pooling, more centralised than gradient sharing. Any positive
+    # value trains locally and averages weights, so nothing but weights leaves a site.
+    ap.add_argument("--local_epochs", type=int, default=0,
+                    help="FedAvg local epochs per site per round; 0 = pooled (not federated)")
+    # Show the policy WHO it blames for each confounded pair, not merely that the pair is
+    # confounded. Needs the attributed backend and an identity-preserving architecture --
+    # gnn_portable pools partners away, which is the symmetry that destroys attribution.
+    ap.add_argument("--observe_owner_channel", action="store_true",
+                    help="feed the per-pair, per-agent ownership belief to the policy")
     # DEFAULT ZERO since 2026-08-21. At 0.05 a random-level policy has expected value
     # -0.255 against 0.000 for passing, so PASSING WAS OPTIMAL and every recorded collapse
     # was the agent being correct. Coupled to the absence of voluntary termination -- see
@@ -353,6 +365,7 @@ def main(argv=None) -> dict:
                        difference_reward_mode=args.difference_reward_mode,
                        reward_scale=args.reward_scale,
                        observe_belief_channels=args.observe_belief_channels,
+                       observe_owner_channel=args.observe_owner_channel,
                        observe_partner_counts=args.observe_partner_counts,
                        mode_by_role=args.mode_by_role,
                        claims_require_all_types=not args.legacy_claim_exemption,
@@ -372,7 +385,8 @@ def main(argv=None) -> dict:
         entropy_coef=args.entropy_coef, orthogonal_init=args.orthogonal_init,
         turn_aware_credit=args.turn_aware_credit,
         normalise_returns=args.normalise_returns,
-        mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
+        mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers,
+        local_epochs=args.local_epochs))
     # Checkpointing rides the existing `on_update` hook, so the training loop is untouched.
     # Both callbacks fire; a checkpointing failure is swallowed inside the writer so it can
     # never take down a run that has already spent hours of compute.
