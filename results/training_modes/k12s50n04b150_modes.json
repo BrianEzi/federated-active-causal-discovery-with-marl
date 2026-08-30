@@ -1,0 +1,204 @@
+{
+ "cell": {
+  "name": "k12s50n04b150",
+  "axis": "baseline",
+  "k": 12,
+  "sigma": 0.5,
+  "n": 4,
+  "beta": 1.5,
+  "private": 6,
+  "shared": 6,
+  "budget": 50
+ },
+ "arms": {
+  "pooled": [
+   {
+    "seed": 0,
+    "success": 0.99,
+    "entropy": 0.9763695839122076,
+    "mi": 0.5978788488017708,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 1.0,
+    "entropy": 0.7447030248383841,
+    "mi": 0.6553923604342914,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.95,
+    "entropy": 1.2296173042603387,
+    "mi": 0.5433188482581939,
+    "greedy": 0.915,
+    "ceiling": 1.0
+   }
+  ],
+  "fedavg": [
+   {
+    "seed": 0,
+    "success": 0.965,
+    "entropy": 1.373763354443558,
+    "mi": 0.40480881739986935,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.99,
+    "entropy": 1.2873222818682561,
+    "mi": 0.41979120148874627,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.975,
+    "entropy": 1.8239131627623568,
+    "mi": 0.20053686195751513,
+    "greedy": 0.915,
+    "ceiling": 1.0
+   }
+  ],
+  "fedyogi10": [
+   {
+    "seed": 0,
+    "success": 0.995,
+    "entropy": 0.39810989329967555,
+    "mi": 0.8346968225805934,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.0,
+    "entropy": 0.5916894336335826,
+    "mi": 0.6902497663497984,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.0,
+    "entropy": 1.531373598575592,
+    "mi": 0.5932523798257148,
+    "greedy": 0.915,
+    "ceiling": 1.0
+   }
+  ],
+  "fedadam10": [
+   {
+    "seed": 0,
+    "success": 0.865,
+    "entropy": 0.49632826482276465,
+    "mi": 0.7492911478211175,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 1.0,
+    "entropy": 0.627957307356641,
+    "mi": 0.7621265189565124,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.13,
+    "entropy": 0.6942600824115377,
+    "mi": 0.6623939947979725,
+    "greedy": 0.915,
+    "ceiling": 1.0
+   }
+  ],
+  "solo": [
+   {
+    "seed": 0,
+    "success": 0.965,
+    "entropy": 1.1554949199780822,
+    "mi": 0.46421511606879073,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.92,
+    "entropy": 1.3867889494099308,
+    "mi": 0.37485424790252775,
+    "greedy": 0.92,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.925,
+    "entropy": 1.3171790318586203,
+    "mi": 0.42174799401103663,
+    "greedy": 0.915,
+    "ceiling": 1.0
+   }
+  ]
+ },
+ "arm_flags": {
+  "pooled": [],
+  "fedavg": [
+   "--local_epochs",
+   "4"
+  ],
+  "fedadam": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.03"
+  ],
+  "fedadam10": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.01"
+  ],
+  "fedadam03": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.003"
+  ],
+  "fedyogi10": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "yogi",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.01"
+  ],
+  "solo": [
+   "--policy_arch",
+   "gnn_solo"
+  ]
+ }
+}

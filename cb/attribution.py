@@ -553,11 +553,20 @@ def score_groups(belief, true_groups: Sequence[LatentGroup], bar: float = 1.0):
     being laundered into the score.
     """
     exhausted = not getattr(belief, "group_frequency", None) or not getattr(belief, "total", 0)
+    # OUT OF SCOPE IS UNSURE, NOT WRONG. A belief whose candidates are enumerated over only
+    # part of the window -- `cb.factored_attribution`, which enumerates over the pairs its
+    # structure belief has SETTLED -- has no opinion about a group naming a pair it has not
+    # reached yet. Absent from `group_frequency` then means "not asked", not "refuted", and
+    # scoring it WRONG reports an incomplete belief as a confident misattribution. `scope`
+    # is absent on the enumerated backend, where every pair is always in scope, so this is
+    # inert there.
+    scope = getattr(belief, "scope", None)
     right = wrong = unsure = 0
     detail = []
     for group in true_groups:
+        in_scope = scope is None or set(group.pairs()) <= set(scope)
         freq = belief.group_frequency.get(group, 0.0) if not exhausted else 0.0
-        if exhausted:
+        if exhausted or not in_scope:
             outcome, unsure = "unsure", unsure + 1
         elif freq >= bar:
             outcome, right = "right", right + 1
