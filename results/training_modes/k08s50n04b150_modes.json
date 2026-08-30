@@ -1,0 +1,37 @@
+{
+ "cell": {
+  "name": "k08s50n04b150",
+  "axis": "k",
+  "k": 8,
+  "sigma": 0.5,
+  "n": 4,
+  "beta": 1.5,
+  "private": 4,
+  "shared": 4,
+  "budget": 35
+ },
+ "arms": {},
+ "arm_flags": {
+  "pooled": [],
+  "fedavg": [
+   "--local_epochs",
+   "4"
+  ],
+  "fedadam": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.03"
+  ],
+  "solo": [
+   "--policy_arch",
+   "gnn_solo"
+  ]
+ }
+}

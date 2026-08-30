@@ -52,6 +52,27 @@ class PPOConfig:
     # (it should reproduce pooled closely); E>1 is the experiment, because cutting
     # communication by a factor of E is what FedAvg is for. See `_fedavg_update`.
     local_epochs: int = 0
+    # SERVER-SIDE ADAPTIVITY (Reddi et al., Adaptive Federated Optimization, ICLR 2021).
+    # Measured 30 Aug 2026: one FedAvg update matches one pooled update to 0.9971 cosine and
+    # 0.99x displacement, so the update RULE is not where the gap is. The only thing FedAvg
+    # discards that pooling keeps is the optimiser state -- local Adam moments are rebuilt
+    # from zero every round, so curvature adaptation never accumulates, while pooled carries
+    # it across every step. That is exactly the problem FedAdam/FedYogi solve: keep the
+    # adaptivity on the SERVER, applied to the averaged client delta, where it persists
+    # across rounds without ever being computed across a weight average it does not belong to.
+    #   "none"  -- plain FedAvg: the server takes the mean and nothing else.
+    #   "adam"  -- FedAdam: v <- b2*v + (1-b2)*delta^2
+    #   "yogi"  -- FedYogi: v <- v - (1-b2)*delta^2*sign(v - delta^2), which resists the
+    #              abrupt variance inflation Adam shows on sparse, noisy deltas.
+    server_optimiser: str = "none"
+    server_lr: float = 1.0
+    server_beta1: float = 0.9
+    server_beta2: float = 0.99
+    server_tau: float = 1e-3
+    # Clients use SGD in the FedAdam paper; local Adam on top of an adaptive server is
+    # doubly adaptive and is not what the method specifies. Kept switchable so the two
+    # factors can be separated rather than changed together.
+    client_optimiser: str = "adam"
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip: float = 0.2
@@ -871,7 +892,9 @@ class IndependentPPO:
         accumulated = {key: torch.zeros_like(value) for key, value in server.items()}
         for agent in agents:
             self.shared_net.load_state_dict(server)          # every site starts from the
-            local = torch.optim.Adam(self.shared_net.parameters(), lr=cfg.lr)  # same weights
+            local = (torch.optim.SGD(self.shared_net.parameters(), lr=cfg.lr)  # same weights
+                     if cfg.client_optimiser == "sgd"
+                     else torch.optim.Adam(self.shared_net.parameters(), lr=cfg.lr))
             buf = buffers[agent]
             advantages, returns = self._advantages(buf)
             std = advantages.std()
@@ -900,8 +923,41 @@ class IndependentPPO:
             for key, value in self.shared_net.state_dict().items():
                 accumulated[key] += value.detach() * share
 
-        self.shared_net.load_state_dict(accumulated)
+        if cfg.server_optimiser == "none":
+            self.shared_net.load_state_dict(accumulated)
+        else:
+            self.shared_net.load_state_dict(self._server_step(server, accumulated))
         self.communication_rounds += 1
+
+    def _server_step(self, server, averaged):
+        """Apply an adaptive optimiser to the AVERAGED CLIENT DELTA, server-side.
+
+        The delta -- mean of the clients' weights minus the weights they all started from --
+        is treated as a pseudo-gradient, exactly as in Reddi et al. (2021). Its moments live
+        on the server and persist across rounds, which is the point: they are never computed
+        across a weight average they do not belong to, so the objection that rules out
+        carrying a client optimiser across rounds does not apply here.
+        """
+        cfg = self.config
+        if not hasattr(self, "_server_m"):
+            self._server_m = {k: torch.zeros_like(v) for k, v in server.items()}
+            self._server_v = {k: torch.zeros_like(v) for k, v in server.items()}
+        out = {}
+        for key, start in server.items():
+            if not torch.is_floating_point(start):
+                out[key] = averaged[key]                # counters and the like: pass through
+                continue
+            delta = averaged[key] - start
+            m = self._server_m[key].mul_(cfg.server_beta1).add_(delta, alpha=1 - cfg.server_beta1)
+            square = delta * delta
+            if cfg.server_optimiser == "yogi":
+                v = self._server_v[key].sub_(
+                    (1 - cfg.server_beta2) * square * torch.sign(self._server_v[key] - square))
+            else:                                        # adam
+                v = self._server_v[key].mul_(cfg.server_beta2).add_(
+                    square, alpha=1 - cfg.server_beta2)
+            out[key] = start + cfg.server_lr * m / (v.sqrt() + cfg.server_tau)
+        return out
 
     def update(self, buffers: Dict[int, dict]) -> None:
         cfg = self.config
@@ -1022,7 +1078,10 @@ class IndependentPPO:
     # the trainer is a decision about whether it belongs to the trajectory, not an
     # accident either way.
     RESUME_FIELDS = ("_return_mean", "_return_var", "_return_count",
-                     "communication_rounds", "first_success_episode")
+                     "communication_rounds", "first_success_episode",
+                     # Server-side moments persist ACROSS rounds by design, so they are part
+                     # of the trajectory in exactly the way the return statistics are.
+                     "_server_m", "_server_v")
 
     def resume_state(self) -> dict:
         return {field: getattr(self, field) for field in self.RESUME_FIELDS

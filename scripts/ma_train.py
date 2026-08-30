@@ -392,7 +392,9 @@ def main(argv=None) -> dict:
         turn_aware_credit=args.turn_aware_credit,
         normalise_returns=args.normalise_returns,
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers,
-        local_epochs=args.local_epochs))
+        local_epochs=args.local_epochs, lr=args.lr,
+        server_optimiser=args.server_optimiser, server_lr=args.server_lr,
+        client_optimiser=args.client_optimiser))
     # Checkpointing rides the existing `on_update` hook, so the training loop is untouched.
     # Both callbacks fire; a checkpointing failure is swallowed inside the writer so it can
     # never take down a run that has already spent hours of compute.
