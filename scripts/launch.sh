@@ -35,6 +35,11 @@ SEED_ARGS="--seeds $SEEDS"
 mkdir -p "$OUT_DIR/logs"
 
 echo "=== gates ==="
+# HEALTH FIRST, because it is the one that invalidates the others. A sweep launched into a
+# thrashing machine runs 2-5x slow and misreports its own cost, which is how an entire run
+# plan got built on inflated numbers on 30 Aug. Set MAX_SWAPINS high to override.
+.venv/bin/python scripts/preflight_runs.py health --max_swapins "${MAX_SWAPINS:-200}" \
+  || { echo "MACHINE HEALTH GATE FAILED -- fix the memory pressure before launching"; exit 1; }
 .venv/bin/python scripts/preflight_metrics.py || { echo "METRIC PREFLIGHT FAILED"; exit 1; }
 # Gate only the cells THIS launch will run. Checking all twenty costs ten minutes, most
 # of it on cells another machine is running, and a gate nobody waits for is a gate nobody

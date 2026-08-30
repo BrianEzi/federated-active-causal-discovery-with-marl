@@ -114,6 +114,58 @@ def feasibility(args) -> int:
     return 0
 
 
+def health(args) -> int:
+    """Is the MACHINE fit to be measured on? Ask before trusting any timing.
+
+    WHY THIS EXISTS. On 30 Aug 2026 this machine spent most of a session swap-thrashing --
+    37.5 GB of swap against 24 GB of RAM, twelve thousand swapins per second, processes
+    getting 25-70% of a core. Every timing taken during it was inflated 2 to 5x, and an
+    entire run plan was built on those numbers: the tier split, which machine got what, a
+    decision to drop the largest agent-count cell, and a conclusion that the sampled sweep
+    could not run locally. All of it wrong, and none of it visibly wrong.
+
+    THE METRIC IS SWAPINS PER SECOND, NOT SWAP USED. macOS writes pages out and leaves them
+    there; five gigabytes sitting in swap costs nothing. Reading them back is what destroys
+    throughput. Right now this machine reports 5 GB used and 1 swapin/sec, which is healthy.
+
+    Exits non-zero when the machine is in no state to be measured on, so a launcher can
+    refuse rather than produce a sweep of numbers nobody can trust.
+    """
+    def counter(name):
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            if name in line:
+                return int(line.split(":")[1].strip().rstrip("."))
+        return 0
+
+    if sys.platform != "darwin":
+        print("health gate is macOS-only (vm_stat); skipping")
+        return 0
+
+    before = counter("Swapins")
+    free_before = counter("Pages free") * 16384 / 1024**3
+    time.sleep(args.seconds)
+    rate = (counter("Swapins") - before) / args.seconds
+    swap = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True,
+                          text=True).stdout.strip()
+
+    print(f"  swapins/sec   {rate:8.0f}   (0-10 fine, 100+ degrading, 1000+ hopeless)")
+    print(f"  free memory   {free_before:8.2f} GB")
+    print(f"  {swap}")
+
+    if rate > args.max_swapins:
+        print()
+        print(f"FAIL: the machine is thrashing at {rate:.0f} swapins/sec. Any timing")
+        print("taken now is inflated -- measured at 2-5x on 30 Aug -- and any sweep")
+        print("launched now will be slow AND will misreport how slow it was.")
+        print("Close whatever is holding memory (a local server and a VM were the")
+        print("culprits last time), or reboot: macOS does not reclaim swap without one.")
+        return 1
+    print("")
+    print("ok: the machine is fit to be measured on.")
+    return 0
+
+
 def determinism(args) -> int:
     """Two identical commands must produce two identical files."""
     cell = next(c for c in build_cells() if c.name == args.cell)
@@ -205,6 +257,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="gate", required=True)
+
+    h = sub.add_parser("health", help="is the machine fit to be measured on?")
+    h.add_argument("--seconds", type=int, default=5)
+    h.add_argument("--max_swapins", type=float, default=200.0)
+    h.set_defaults(fn=health)
 
     f = sub.add_parser("feasibility", help="is every cell's budget sufficient?")
     f.add_argument("--episodes", type=int, default=40)
