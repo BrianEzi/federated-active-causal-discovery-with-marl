@@ -49,6 +49,7 @@ import itertools
 import json
 import math
 import pathlib
+import sys
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
@@ -169,10 +170,29 @@ def command(cell: Cell, seed: int, out_dir: str, *, evidence: str = "oracle",
             "--no_wandb", "--force", "--out", out, *extra]
 
 
+# THE COST IS EXTREMELY CONCENTRATED, which is what makes a split across machines clean
+# rather than arbitrary. Measured 30 Aug 2026: twelve of the twenty cells cost 14% of the
+# whole sweep and none of them takes an hour, while two cells (k=30 and n=15) cost 52%.
+# So the boundaries are not round numbers picked for tidiness -- they sit in the two large
+# gaps in the measured distribution.
+#
+#   cheap   < 60 min/run    12 cells, ~16 core-h at 3 seeds. Runs beside interactive work.
+#   medium  1-6 h/run        5 cells, ~37 core-h. Too slow to want on a working machine,
+#                            too small to be worth a cluster queue.
+#   heavy   > 6 h/run        2 cells, ~60 core-h. k=30 exceeds any single cluster job's
+#                            walltime, so it must be chunked -- see --resume_from.
+TIERS = {"cheap": (0.0, 60.0), "medium": (60.0, 360.0), "heavy": (360.0, float("inf"))}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, default=3)
+    ap.add_argument("--seed_list", default=None,
+                    help="comma-separated seeds, overriding --seeds. The heavy cells are "
+                         "split across machines by SEED (seed 0 on the fallback machine, "
+                         "1 and 2 on the cluster), so a partition needs this rather than "
+                         "a count.")
     ap.add_argument("--out_dir", default="results/sweep")
     ap.add_argument("--evidence", default="oracle", choices=["oracle", "sampled"])
     ap.add_argument("--arch", default="gnn_portable")
@@ -182,11 +202,36 @@ def main(argv=None) -> int:
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--calibration", default=None,
                     help="a scripts/calibrate_sweep.py manifest, used to order the job "
-                         "list longest-first")
+                         "list longest-first and to resolve --tier")
+    ap.add_argument("--tier", default=None, choices=["cheap", "medium", "heavy"],
+                    help="split the sweep by MEASURED cost, for running it across several "
+                         "machines. Requires --calibration. See TIERS for the boundaries "
+                         "and why they sit where they do.")
     ap.add_argument("--manifest", default=None)
     args = ap.parse_args(argv)
 
     cells = build_cells(interaction=not args.no_interaction)
+    if args.tier:
+        if not args.calibration:
+            print("--tier needs --calibration: the tiers are defined on MEASURED cost, "
+                  "and guessing which cell is expensive is what the calibration exists "
+                  "to stop.", file=sys.stderr)
+            return 2
+        try:
+            measured = json.loads(pathlib.Path(args.calibration).read_text())
+        except (OSError, ValueError) as error:
+            print(f"cannot read {args.calibration}: {error}", file=sys.stderr)
+            return 2
+        minutes = {row["name"]: row["run_seconds"] / 60.0 for row in measured["cells"]}
+        missing = [c.name for c in cells if c.name not in minutes]
+        if missing:
+            print(f"# warning: {len(missing)} cell(s) absent from the calibration and so "
+                  f"in no tier: {', '.join(missing)}", file=sys.stderr)
+        low, high = TIERS[args.tier]
+        cells = [c for c in cells if low <= minutes.get(c.name, -1.0) < high]
+
+    seeds = ([int(x) for x in args.seed_list.split(",") if x.strip()]
+             if args.seed_list else list(range(args.seeds)))
     if args.emit == "table":
         print(f"{'cell':22s} {'axis':10s} {'k':>3s} {'sigma':>6s} {'n':>3s} {'beta':>5s} "
               f"{'priv':>5s} {'shared':>6s} {'budget':>7s}")
@@ -194,11 +239,12 @@ def main(argv=None) -> int:
             print(f"{cell.name:22s} {cell.axis:10s} {cell.k:3d} {cell.sigma:6.2f} "
                   f"{cell.n:3d} {cell.beta:5.2f} {cell.private:5d} {cell.shared:6d} "
                   f"{cell.budget:7d}")
-        print(f"\n{len(cells)} cells x {args.seeds} seeds = {len(cells) * args.seeds} runs")
+        print(f"\n{len(cells)} cells x {len(seeds)} seeds = "
+              f"{len(cells) * len(seeds)} runs  (seeds {seeds})")
     elif args.emit in ("sh", "jobs"):
         jobs = []
         for cell in cells:
-            for seed in range(args.seeds):
+            for seed in seeds:
                 argv_ = command(cell, seed, args.out_dir, evidence=args.evidence,
                                 arch=args.arch, episodes=args.episodes)
                 out = argv_[argv_.index("--out") + 1]
@@ -235,7 +281,7 @@ def main(argv=None) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(
             {"baseline": BASELINE, "axes": {k: list(v) for k, v in AXES.items()},
-             "seeds": args.seeds, "evidence": args.evidence,
+             "seeds": seeds, "tier": args.tier, "evidence": args.evidence,
              "cells": [c.as_dict() for c in cells]}, indent=1))
         print(f"\nwrote {path}")
     return 0

@@ -120,6 +120,28 @@ def main(argv=None) -> int:
 
     print(f"{'cell':16s} {'k':>3s} {'n':>3s} {'budget':>7s} {'s/ep':>7s} "
           f"{'train':>8s} {'eval':>7s} {'per run':>9s}")
+    manifest_path = pathlib.Path(args.manifest)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write_manifest(rows, failed, complete):
+        """Written after EVERY cell, not once at the end.
+
+        The full calibration takes over an hour because two cells take twenty minutes each,
+        and a manifest that only appears on completion means nothing downstream can be set
+        up until it does -- and a kill halfway through loses every measurement taken. The
+        `complete` flag says whether the file describes the whole grid or a prefix of it,
+        so a consumer can tell a partial calibration from a finished one.
+        """
+        durations = [row["run_seconds"] for row in rows for _ in range(args.seeds)]
+        manifest_path.write_text(json.dumps(
+            {"evidence": args.evidence, "arch": args.arch, "probe_episodes": args.probe,
+             "episodes": args.episodes, "eval_episodes": args.eval_episodes,
+             "seeds": args.seeds, "workers": args.workers, "complete": complete,
+             "core_hours": sum(durations) / 3600.0,
+             "wall_hours": schedule(durations, args.workers) / 3600.0 if durations else 0.0,
+             "failed": [name for name, _ in failed],
+             "cells": rows}, indent=1))
+
     rows, failed = [], []
     for cell in cells:
         result = probe(cell, probe_episodes=args.probe, evidence=args.evidence,
@@ -137,6 +159,7 @@ def main(argv=None) -> int:
         print(f"{cell.name:16s} {cell.k:3d} {cell.n:3d} {cell.budget:7d} "
               f"{result['per_episode']:7.3f} {train/60:7.1f}m {evaluation/60:6.1f}m "
               f"{total/60:8.1f}m")
+        write_manifest(rows, failed, complete=False)
 
     if failed:
         print("\nCELLS THAT DID NOT RUN -- fix before launching anything:")
@@ -154,15 +177,8 @@ def main(argv=None) -> int:
     print("  NOTE: measured on an UNTRAINED policy, so episodes run to the budget. A "
           "policy that learns ends episodes early, so this over-estimates.")
 
-    path = pathlib.Path(args.manifest)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(
-        {"evidence": args.evidence, "arch": args.arch, "probe_episodes": args.probe,
-         "episodes": args.episodes, "eval_episodes": args.eval_episodes,
-         "seeds": args.seeds, "workers": args.workers, "core_hours": core_hours,
-         "wall_hours": makespan, "failed": [name for name, _ in failed],
-         "cells": rows}, indent=1))
-    print(f"\nwrote {path}")
+    write_manifest(rows, failed, complete=True)
+    print(f"\nwrote {manifest_path}")
     return 1 if failed else 0
 
 
