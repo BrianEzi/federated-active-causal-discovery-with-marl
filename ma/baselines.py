@@ -465,6 +465,89 @@ class PartitionedGreedyAgent(UncertaintyGreedyAgent):
         return window.pass_index                         # nothing open anywhere
 
 
+class OracleCoverAgent:
+    """The OPTIMAL arm under oracle evidence: intervene on exactly the forced set.
+
+    WHY THIS EXISTS. Above k=5 there was no optimal reference at all. The enumerated greedy
+    oracle caps at `MAX_ENUMERATED_K`, and `scripts/vs_evaluate.py` returns an exact optimum
+    only on an enumerable belief -- on the factored path it degrades to a bound. So every
+    comparison at the sizes this project actually reports was learned-vs-heuristic, with no
+    ceiling: "beats greedy by X" and never "closes Y% of the achievable headroom".
+
+    WHAT MAKES AN OPTIMAL ARM POSSIBLE AT ANY k. Under oracle evidence the belief is a
+    deterministic function of the SET of intervened nodes, and the required set is FORCED
+    rather than chosen: a directed edge is settled by its TAIL, a confounded pair needs BOTH
+    endpoints. So the optimum is closed-form at every window size -- measured at 0.757k for
+    k=4 falling to 0.542k at k=30 -- and this agent simply executes it.
+
+    IT IS A CEILING, NOT A POLICY, and the distinction matters. It reads `env._true_mag`,
+    which no agent may do. It is the reference a learned policy is measured against, exactly
+    as `GreedyAgent` reads the exact DP score tables, and it must never be presented as a
+    method. It also cannot exist under sampled evidence: there the belief is not a function
+    of the intervened set alone, no set is sufficient with certainty, and `required_cover`
+    refuses rather than returning a meaningless number. This class refuses for the same
+    reason.
+
+    WHAT IT DOES NOT SOLVE. The forced set is per WINDOW, and each agent computes only its
+    own -- so on the shared surface two agents can both target the same forced node and
+    duplicate. That is deliberate: the ceiling this arm reports is "every window's required
+    cover, bought without waste WITHIN an agent", which is the right reference for a
+    coordination result. An arm that also divided the shared surface optimally would be
+    measuring a different, easier problem, and would need a central planner to compute.
+    """
+
+    def __init__(self, agent: int, env: TwoAgentEnv, seed: int = 0):
+        if getattr(env.config, "vs_evidence", "oracle") != "oracle":
+            raise ValueError(
+                "OracleCoverAgent is defined only under oracle evidence: under sampling the "
+                "belief is not a function of the intervened SET alone, so no set is "
+                "sufficient with certainty and 'the required cover' does not exist. See "
+                "scripts/required_cover.py, which refuses for the same reason.")
+        self.agent = int(agent)
+        self._seed = _agent_seed(seed, self.agent)
+        self.rng = np.random.default_rng(self._seed)
+        self._plan: Optional[List[int]] = None
+        self._episode_key = None
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.agent))
+        self._plan, self._episode_key = None, None
+
+    def _build_plan(self, env: TwoAgentEnv) -> List[int]:
+        """The forced positions this agent may actually act on, cheapest first.
+
+        Derived by REPLAY through the belief mechanism rather than by applying the closed
+        form, for the same reason `scripts/required_cover.py` does it that way: the closed
+        form is an assertion ABOUT the mechanism, and an arm that assumed it would report a
+        ceiling that agrees with the theory by construction.
+        """
+        from scripts.required_cover import forced_positions
+
+        window = env.windows[self.agent]
+        needed, _complaints = forced_positions(env._true_mag(self.agent), window.k)
+        authority = {window.pos[node]: node for node in window.authority}
+        # PRIVATE FIRST. A private node is reachable by nobody else, so spending a round on
+        # a shared node that a partner may also cover is the move to defer -- the same
+        # ordering the measured winning behaviour uses.
+        mine = [authority[p] for p in sorted(needed) if p in authority]
+        private = [n for n in mine if n in window.private]
+        shared = [n for n in mine if n not in window.private]
+        return private + shared
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        key = id(env.true_adjacency), env.episode_index if hasattr(env, "episode_index") else None
+        if self._plan is None or self._episode_key != key:
+            self._plan = self._build_plan(env)
+            self._episode_key = key
+        counts = np.asarray(env.own_counts[self.agent])
+        for node in self._plan:
+            if counts[window.pos[node]] == 0:
+                return window.action_index(node, prefer=VARY)
+        return window.pass_index          # cover complete: further rounds buy nothing
+
+
 class GreedyAgent:
     """Myopic expected information gain over the agent's own window.
 
@@ -640,4 +723,8 @@ def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, obj
             agent, env.topology.n_agents, seed,
             bar=float(getattr(env.config, "claim_bar", 0.7))),
         "probe_then_work": lambda: ProbeThenWorkAgent(agent, seed),
+        # The CEILING. Reads the true MAG, so it is a reference and never a method, and it
+        # exists only under oracle evidence. Registered lazily so a sampled-evidence env
+        # never constructs it.
+        "oracle_cover": lambda: OracleCoverAgent(agent, env, seed),
     })
