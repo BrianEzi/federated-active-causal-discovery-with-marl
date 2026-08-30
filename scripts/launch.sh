@@ -54,16 +54,34 @@ JOBS=$(mktemp)
 echo "$(wc -l < "$JOBS") jobs, longest first"
 
 export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+
+# ONE SCRIPT PER JOB, then xargs over the PATHS. This looks indirect and is not:
+# `xargs -I` caps the replacement string at 255 bytes on macOS, and a job line here is
+# about 600 characters, so the obvious `xargs -P N -I CMD sh -c CMD` dies instantly with
+# "command line cannot be assembled, too long" -- after the gates have passed, which is
+# the worst possible place to fail. Paths are short, so this has no such limit, and each
+# script keeps its own `[ -f "$out" ] ||` guard so restart-safety is unchanged.
+JOB_DIR="$OUT_DIR/jobs"
+rm -rf "$JOB_DIR"; mkdir -p "$JOB_DIR"
+n=0
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  n=$((n + 1))
+  printf '#!/usr/bin/env bash\nexport PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1\ncd %s\n%s\n' \
+    "$(pwd)" "$line" > "$JOB_DIR/$(printf '%03d' $n).sh"
+done < "$JOBS"
+chmod +x "$JOB_DIR"/*.sh
+echo "wrote $n job scripts to $JOB_DIR"
+
 # `caffeinate -i -s` holds off idle AND system sleep, which is what an overnight run wants.
 # It is macOS-only, so fall back rather than failing on Linux -- this script runs on three
 # machines and a hard dependency on one platform's power tool would strand two of them.
-# (A closed lid still suspends on macOS whatever caffeinate says; nothing is lost, the run
-# just resumes, but it turns an overnight plan into a two-day one.)
+RUNNER="xargs -P $WORKERS -n 1 bash"
 if command -v caffeinate > /dev/null 2>&1; then
-  caffeinate -i -s xargs -P "$WORKERS" -I CMD sh -c 'CMD' < "$JOBS"
+  ls "$JOB_DIR"/*.sh | caffeinate -i -s $RUNNER
 else
   echo "(no caffeinate -- not macOS. Disable sleep yourself if this is a laptop.)"
-  xargs -P "$WORKERS" -I CMD sh -c 'CMD' < "$JOBS"
+  ls "$JOB_DIR"/*.sh | $RUNNER
 fi
 status=$?
 rm -f "$JOBS"
