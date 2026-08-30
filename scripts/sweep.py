@@ -119,7 +119,16 @@ BASELINE = dict(k=12, sigma=0.5, n=4, beta=1.5)
 AXES: Dict[str, Sequence] = {
     "k": (4, 8, 12, 20, 30),
     "sigma": (0.25, 0.5, 0.75),
-    "n": (2, 3, 5, 8, 15),
+    # n=15 WAS HERE AND WAS REMOVED, 30 Aug 2026, on a measurement rather than a guess.
+    # Calibrated at 29.9 h per run: 89.7 core-hours at three seeds, 47.6% of the entire
+    # sweep for ONE point on this axis. Worse, a single 29.9 h job is a hard FLOOR on the
+    # sweep's wall clock at any worker count, because no schedule finishes before its
+    # longest job -- and it exceeds any cluster walltime even chunked across resumes.
+    # The cost compounds three ways at once: budget 187, fifteen agents forwarding and
+    # being scored every round, and d = 96 nodes making the projection and the SCM
+    # sampling expensive too -- 55x the baseline per episode.
+    # n=10 keeps a point above n=8 and the axis still spans 5x across five points.
+    "n": (2, 3, 5, 8, 10),
     "beta": (1.0, 1.2, 1.5, 2.0, 5.0),
 }
 
