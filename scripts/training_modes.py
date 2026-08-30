@@ -40,8 +40,21 @@ ENV = {"PYTHONPATH": ".", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
 ARMS = {
     "pooled":   [],
     "fedavg":   ["--local_epochs", "4"],
+    # server_lr 0.03 was picked by matching the FIRST update's displacement to pooled, and
+    # that is the wrong criterion for an adaptive method: it matches step one and ignores
+    # that Adam's effective step grows as the moments warm up. Measured consequence -- both
+    # seeds reached MI ~0.87 against pooled's 0.700, and both OSCILLATED, entropy hitting
+    # exactly 0.00 (policy saturated into determinism) then recovering, so the final
+    # evaluation samples a random phase: 1.000 on one seed, 0.000 on the other. Reddi et al.
+    # use 1e-2 to 1e-3.
     "fedadam":  ["--local_epochs", "4", "--server_optimiser", "adam",
                  "--client_optimiser", "sgd", "--lr", "0.1", "--server_lr", "0.03"],
+    "fedadam10": ["--local_epochs", "4", "--server_optimiser", "adam",
+                  "--client_optimiser", "sgd", "--lr", "0.1", "--server_lr", "0.01"],
+    "fedadam03": ["--local_epochs", "4", "--server_optimiser", "adam",
+                  "--client_optimiser", "sgd", "--lr", "0.1", "--server_lr", "0.003"],
+    "fedyogi10": ["--local_epochs", "4", "--server_optimiser", "yogi",
+                  "--client_optimiser", "sgd", "--lr", "0.1", "--server_lr", "0.01"],
     "solo":     ["--policy_arch", "gnn_solo"],
 }
 

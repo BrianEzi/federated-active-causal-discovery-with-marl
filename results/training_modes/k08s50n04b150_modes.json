@@ -10,7 +10,86 @@
   "shared": 4,
   "budget": 35
  },
- "arms": {},
+ "arms": {
+  "fedadam10": [
+   {
+    "seed": 0,
+    "success": 0.995,
+    "entropy": 0.27930864924026766,
+    "mi": 0.8757211135888068,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.96,
+    "entropy": 0.5469435361969502,
+    "mi": 0.7287489398972624,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.935,
+    "entropy": 0.5372799473193312,
+    "mi": 0.7709711029650138,
+    "greedy": 0.94,
+    "ceiling": 1.0
+   }
+  ],
+  "fedadam03": [
+   {
+    "seed": 0,
+    "success": 0.61,
+    "entropy": 0.7181917136295995,
+    "mi": 0.6247348824237103,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.995,
+    "entropy": 0.9547475643989974,
+    "mi": 0.5527977890307739,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.99,
+    "entropy": 1.2049231648345455,
+    "mi": 0.4131136788750191,
+    "greedy": 0.94,
+    "ceiling": 1.0
+   }
+  ],
+  "fedyogi10": [
+   {
+    "seed": 0,
+    "success": 1.0,
+    "entropy": 0.44185640830592926,
+    "mi": 0.7565720355888927,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 1,
+    "success": 0.985,
+    "entropy": 0.37469819998839365,
+    "mi": 0.8586097384913776,
+    "greedy": 0.95,
+    "ceiling": 1.0
+   },
+   {
+    "seed": 2,
+    "success": 0.995,
+    "entropy": 0.3129810361951002,
+    "mi": 0.8159743655603058,
+    "greedy": 0.94,
+    "ceiling": 1.0
+   }
+  ]
+ },
  "arm_flags": {
   "pooled": [],
   "fedavg": [
@@ -28,6 +107,42 @@
    "0.1",
    "--server_lr",
    "0.03"
+  ],
+  "fedadam10": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.01"
+  ],
+  "fedadam03": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "adam",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.003"
+  ],
+  "fedyogi10": [
+   "--local_epochs",
+   "4",
+   "--server_optimiser",
+   "yogi",
+   "--client_optimiser",
+   "sgd",
+   "--lr",
+   "0.1",
+   "--server_lr",
+   "0.01"
   ],
   "solo": [
    "--policy_arch",
