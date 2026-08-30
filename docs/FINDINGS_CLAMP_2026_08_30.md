@@ -84,6 +84,58 @@ variance. So on this backend clamp can only hurt, and no sample size rescues it.
 "association vanishes" argument was sound for the confounding channel and was applied to
 the ancestry channel, where it is backwards.
 
+## Finding 3 — attribution survives vary-only, but for an ACCIDENTAL reason
+
+Asked directly: does removing clamp make attribution impossible? Attribution needs a
+partner's private intervention to MOVE a pair it confounds, and clamping is the only move
+that cuts a confounding path — so the concern is well founded. It turns out not to bite,
+and *why* it does not is the interesting part.
+
+`estimated_moved` tests for a **difference of two correlations** (Fisher's z), not for the
+association vanishing. Both modes produce a difference:
+
+| | corr(u,v) | detected as moved |
+|---|---|---|
+| baseline, w free | +0.5014 | — |
+| after do(w) by **clamp** | +0.0021 | 90.5% |
+| after do(w) by **vary** | **+0.8019** | **92.5%** |
+
+Clamping makes the association vanish. Varying at `intervene_scale=2.0` makes it *stronger*,
+because it replaces the confounder's natural variance (~1) with 4 and so raises its share of
+the u–v covariance. Both are changes; the detector sees both.
+
+**But vary's signal is a variance CONTRAST, not a structural one, and it disappears when the
+contrast does.** Detection as a function of the intervention scale, against a confounder
+whose natural noise scale is drawn from U(0.5, 1.5):
+
+| intervene_scale | vary detects |
+|---|---|
+| 0.5 | 63.0% |
+| 0.8 | 35.5% |
+| **1.0 — matches the natural scale** | **22.0%** |
+| 1.2 | 30.5% |
+| 1.5 | 55.5% |
+| **2.0 — our setting** | **92.5%** |
+| 3.0 | 100.0% |
+| **clamp — any scale** | **90.5%** |
+
+A V-shape with its minimum exactly where the intervention scale equals the natural one. Our
+attribution signal exists because `intervene_scale=2.0` happens to sit at roughly twice the
+SCM's noise scale. Clamping is scale-free by construction.
+
+**What this changes.**
+
+- Attribution under vary-only is **viable**, so the limitation is not "attribution is
+  impossible" and the clamp decision does not block that chapter.
+- Any attribution result MUST report `intervene_scale` beside it, and should carry the
+  sensitivity curve above. A reviewer who asks "why 2.0?" currently has no answer, and the
+  honest one is that the signal degrades sharply toward 1.0.
+- It strengthens the case for clamp as a **future-work** item rather than weakening it: clamp
+  reaches the same signal for a structural reason instead of a numerical coincidence.
+- `intervene_scale` is a knob nothing in the sweep varies and no result file emphasises. It
+  now has a measured effect on a headline mechanism, so it belongs in the parameters table
+  rather than in a default.
+
 ## What to say, and what to stop saying
 
 - **Stop quoting 0.233 vs 0.589.** Unreproducible script, two of four arms, and the value
@@ -99,3 +151,7 @@ the ancestry channel, where it is backwards.
   **limitation of the backend**, not a fact about the problem — and it is worth a paragraph
   in the limitations, because a backend that used both channels would have a strictly larger
   action repertoire available to it.
+- **And the sharper version, from Finding 3:** attribution does not need clamp, but the
+  substitute it relies on is a variance contrast that is strong at our chosen intervention
+  scale and weak at the SCM's own. That is a fragility to state, and a sensitivity curve to
+  publish, not a gap to hide.
