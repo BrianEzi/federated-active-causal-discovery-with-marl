@@ -16,8 +16,7 @@ import time
 
 import numpy as np
 
-from ma.baselines import (GreedyAgent, PassAgent, ProbeThenWorkAgent, RandomAgent,
-                          UncertaintyGreedyAgent)
+from ma.baselines import make_baselines
 from ma.density_guard import DensityGuardedEnv
 from ma.env import (CLAMP, MODES, SIMULTANEOUS, TURN_ORDERS, VARY,
                     MAConfig, TwoAgentEnv)
@@ -444,20 +443,28 @@ def main(argv=None) -> dict:
     }
 
     arms = {"learned": ppo.policies(deterministic=False)}
-    # ONE CONSTRUCTOR PER LABEL, and the labels are chosen BEFORE anything is built.
-    # `make_baselines` built all of them eagerly, `GreedyAgent` among them, and that
-    # constructor enumerates the window and REFUSES past size 5. So at --private_size 3
-    # (k=6) a run died before playing a single episode, on a backend where the greedy
-    # oracle arm is not in `labels` at all -- measured 2026-08-27 on the attribution
-    # timing probe. Building only what will be scored removes the whole class of failure.
-    factories = {
-        "pass": lambda agent: PassAgent(agent, args.seed),
-        "random_vary": lambda agent: RandomAgent(agent, args.seed, allow_clamp=False),
-        "random_clamp": lambda agent: RandomAgent(agent, args.seed, allow_clamp=True),
-        "greedy": lambda agent: GreedyAgent(agent, env, args.seed),
-        "greedy_uncertainty": lambda agent: UncertaintyGreedyAgent(agent, args.seed),
-        "probe_then_work": lambda agent: ProbeThenWorkAgent(agent, args.seed),
-    }
+    # ONE REGISTRY, `ma.baselines.make_baselines`, and it is LAZY -- a label is constructed
+    # only when it is indexed, so `GreedyAgent` (which enumerates the window and refuses
+    # past size 5) is never built on a run that does not score it.
+    #
+    # THIS FILE USED TO KEEP ITS OWN COPY OF THE REGISTRY, and the copy had drifted in
+    # three ways, all of them silent, all of them in the path the sweep runs through:
+    #
+    #   1. `UncertaintyGreedyAgent(agent, args.seed)` took the CLASS DEFAULT bar of 0.7
+    #      while the sweep grades at `--claim_bar 1.0`. That is defect 2 of the three
+    #      "Tier 1 correctness" fixes -- worth +0.233 to greedy at four agents, enough to
+    #      invert a headline once -- and it was fixed in `make_baselines` while this file,
+    #      which never called it, kept handing greedy the wrong bar.
+    #   2. `oracle_cover` was absent, so the A5 ceiling would not have been evaluated in a
+    #      single run of the sweep. Every comparison would have been learned-vs-heuristic
+    #      with no ceiling, which is precisely what A5 was built to end.
+    #   3. `greedy_partitioned` was absent, so the coordination headline would have had no
+    #      coordinated control to be measured against.
+    #
+    # Two registries for one thing is how all three happened. There is now one.
+    builders = {agent: make_baselines(env, agent, args.seed)
+                for agent in env.topology.agents}
+
     # A baseline appears only where it has legal moves and a working oracle: the random
     # arms follow the action modes, and `greedy` reads the exact DP's score tables so it
     # exists only on the exact backend (`enumerated_posterior` raises otherwise -- a
@@ -471,12 +478,23 @@ def main(argv=None) -> dict:
         labels.insert(-1, "greedy")
     else:
         labels.insert(-1, "greedy_uncertainty")
+        # The COORDINATED control. Uncoordinated greedy alone cannot separate "the learner
+        # coordinates" from "the learner is simply better at picking targets": the
+        # partitioned arm runs the identical rule with the shared surface divided by a
+        # positional convention, so the gap between the two IS the coordination.
+        if env.topology.n_agents > 1:
+            labels.insert(-1, "greedy_partitioned")
     if args.backend == "attributed":
         # The attribution-aware reference. Without it the learner is compared only against
         # arms that are not scored on the thing it is trained for.
         labels.insert(-1, "probe_then_work")
+    if getattr(config, "vs_evidence", "oracle") == "oracle":
+        # The CEILING, and only where it is defined. Under sampled evidence the belief is
+        # not a function of the intervened set alone, so no set is sufficient with
+        # certainty and the agent refuses rather than returning a meaningless number.
+        labels.insert(-1, "oracle_cover")
     for label in labels:
-        arms[label] = {agent: factories[label](agent) for agent in env.topology.agents}
+        arms[label] = {agent: builders[agent][label] for agent in env.topology.agents}
 
     for label, policies in arms.items():
         t0 = time.time()

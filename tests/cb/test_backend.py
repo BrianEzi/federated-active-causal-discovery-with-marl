@@ -221,3 +221,66 @@ def test_exact_backend_is_refused_on_wide_hidden_topologies():
                                belief_backend="constraint", cb_n_boot=4), seed=0)
     assert ConstraintBackend.can_handle_multi_hidden
     assert env.topology is wide
+
+
+# =======================================================================================
+# WHY `claim_bar` IS INERT ON THE FACTORED BACKEND, and why that is worth a test.
+#
+# The Tier 1 correctness work fixed a real defect: greedy was constructed at the class
+# default bar of 0.7 while the task grades at `claim_bar`, measured worth +0.233 to greedy
+# and enough to invert a headline. On 30 Aug 2026 the same defect was found still live in
+# `scripts/ma_train.py`, which kept its own copy of the baseline registry -- the path the
+# whole sweep runs through.
+#
+# Fixing it changed NOTHING on the factored backend, and this is the reason. A factored
+# belief holds a set of surviving marks per pair and weights them uniformly, so every
+# frequency it can produce is 1/|marks| summed over a subset -- and the skeleton is oracle
+# in BOTH evidence modes, so a pair is known-adjacent or known-absent from reset. The
+# reachable lattice is therefore {0, 1/3, 1/2, 1}, with NOTHING in (1/2, 1). Any bar in
+# that open interval scores identically to a bar of 1.0.
+#
+# Two things follow, and both are load-bearing:
+#   - existing factored numbers do NOT need re-scoring on account of the greedy bar;
+#   - `claim_bar` is not a usable knob here. Anyone sweeping it on this backend would be
+#     sweeping a no-op, and would spend a day finding out.
+# It is asserted rather than argued because it depends on FactoredBelief's uniform
+# weighting, which is an implementation choice that could change.
+# =======================================================================================
+import numpy as np
+import pytest
+
+from ma.baselines import make_baselines
+from ma.env import MAConfig, TwoAgentEnv
+from ma.topology import federated_topology
+
+
+@pytest.mark.parametrize("evidence", ["oracle", "sampled"])
+def test_factored_frequencies_never_land_between_a_half_and_one(evidence):
+    config = MAConfig(topology=federated_topology(3, 4, 4), n_obs=60, n_int=20, budget=24,
+                      turn_order="round_robin", belief_backend="factored",
+                      action_modes=("vary",), claim_bar=1.0, reward_criterion="claims",
+                      policy_arch="gnn_portable", graph_model="sf", sf_m=2,
+                      episode_mix="confounded", vs_evidence=evidence)
+    env = TwoAgentEnv(config)
+    agents = {a: make_baselines(env, a, 0)["greedy_uncertainty"]
+              for a in env.topology.agents}
+
+    seen = set()
+    for episode in range(5):
+        result = env.reset(seed=episode)
+        for agent in agents.values():
+            agent.reset(episode)
+        while not result.done:
+            result = env.step({a: agents[a](env, result) for a in env.topology.agents})
+            for window in env.windows.values():
+                belief = window.belief.last
+                for matrix in (belief.adjacency, belief.directed, belief.bidirected):
+                    seen |= set(np.round(np.asarray(matrix).ravel(), 9).tolist())
+
+    ambiguous = sorted(v for v in seen if 0.5 < v < 1.0)
+    assert not ambiguous, (
+        f"a frequency in (1/2, 1) appeared: {ambiguous}. The bar is no longer inert on "
+        "this backend, so `claim_bar` now changes factored results and every comparison "
+        "must hold it fixed -- see the note above.")
+    assert seen <= {0.0, 1.0 / 3.0, 0.5, 1.0} | {round(1 / 3, 9), round(2 / 3, 9)}, (
+        f"unexpected frequency lattice: {sorted(seen)}")
