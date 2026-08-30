@@ -33,8 +33,15 @@ def _config_record(config, topology, args) -> dict:
     all, so recording the arguments would record neither -- which is what once made result
     files unattributable. One function so the JSON report and the W&B run config cannot
     drift apart.
+
+    EVERY FIELD, NOT A HAND-MAINTAINED LIST. The explicit dict below is kept for ordering
+    and for the derived entries, but every remaining `MAConfig` field is swept in
+    automatically. The list drifted before: 329 of 436 result files on disk record no
+    `vs_evidence` at all, so nobody could tell afterwards whether they were oracle or
+    sampled -- and that is the single field that decides what a number means. A field added
+    to MAConfig now appears here without anyone remembering to add it.
     """
-    return {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
+    record = {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
             "rule": config.score_rule,
             "disclose_regime": config.disclose_regime,
             "turn_order": config.turn_order,
@@ -81,6 +88,34 @@ def _config_record(config, topology, args) -> dict:
             "normalise_returns": args.normalise_returns,
             "mask_pass_updates": args.mask_pass_updates,
             "max_edges": args.max_edges}
+    # EVERY REMAINING MAConfig FIELD, swept in rather than listed. See the docstring.
+    from dataclasses import fields as _fields
+    for field in _fields(config):
+        record.setdefault(field.name, getattr(config, field.name))
+    record["topology"] = {"name": topology.name,
+                          "private": [list(b) for b in topology.private],
+                          "exposed": list(topology.exposed)}
+    # The sweep axes, recorded so a result file can be placed on the (k, sigma, n, beta)
+    # grid without re-deriving them from the topology -- and so that `sigma` is visible at
+    # a glance, which is what would have revealed that w04 sits at 0.75 while every other
+    # window rung sits at 0.50.
+    k = len(topology.private[0]) + len(topology.exposed)
+    record["k"] = k
+    record["sigma_contended"] = len(topology.exposed) / k if k else 0.0
+    record["n_agents"] = topology.n_agents
+    return _jsonable(record)
+
+
+def _jsonable(value):
+    """Config values must survive `json.dumps` -- tuples, sets and numpy scalars do not."""
+    import numpy as _np
+    if isinstance(value, dict):
+        return {key: _jsonable(v) for key, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, _np.generic):
+        return value.item()
+    return value
 
 
 def _wandb_run(args, config_record: dict):

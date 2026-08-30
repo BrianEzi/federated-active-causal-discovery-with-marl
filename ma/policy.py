@@ -523,10 +523,18 @@ def belief_entropy(marginals: np.ndarray) -> float:
 class IndependentPPO:
     """One PPO learner per agent. No shared parameters, gradients, or observations."""
 
-    def __init__(self, env: TwoAgentEnv, config: PPOConfig):
+    def __init__(self, env: TwoAgentEnv, config: PPOConfig, seed_torch: bool = True):
         self.env = env
         self.config = config
-        torch.manual_seed(config.seed)
+        # SEEDING THE GLOBAL TORCH STREAM IS A TRAINING CONCERN, NOT A LOADING ONE.
+        # This ran unconditionally, so every `load()` reseeded torch globally and every
+        # subsequent evaluation of that policy replayed ONE fixed sample path -- which is
+        # why no confidence interval this project has reported included policy
+        # stochasticity. `load` now passes seed_torch=False: the checkpoint overwrites
+        # every weight anyway, so construction randomness is irrelevant there, and the
+        # caller's sample path survives. Training still seeds, so runs stay reproducible.
+        if seed_torch:
+            torch.manual_seed(config.seed)
         self.rng = np.random.default_rng(config.seed)
         # Running discounted-return statistics for `normalise_returns`. Pooled over every
         # batch, shared across agents: the scale is a property of the TASK, and a per-agent
@@ -1005,7 +1013,8 @@ class IndependentPPO:
                              "(pass allow_backend_transfer=True to run this deliberately)"
                              % (blob_backend, env_backend))
         learner = cls(env, config or PPOConfig(hidden=blob["hidden"],
-                                                  seed=blob["seed"]))
+                                                  seed=blob["seed"]),
+                      seed_torch=False)          # see __init__: do not hijack evaluation
         if learner.shared_net is not None:
             # Every agent key holds the same weights; load one and every agent has it.
             first = next(iter(blob["nets"].values()))

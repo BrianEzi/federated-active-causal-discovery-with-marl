@@ -519,6 +519,53 @@ def run_arm(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
     }
 
 
+def run_arm_paths(env: TwoAgentEnv, policies: Dict[int, object], episodes: int,
+                  seed: int = 0, paths: int = 3) -> Dict[str, object]:
+    """`run_arm` over several independent POLICY SAMPLE PATHS, not just several episodes.
+
+    WHY THIS EXISTS. `IndependentPPO.__init__` seeded the global torch stream, and `load`
+    went through it, so every evaluation of a checkpoint replayed ONE fixed sample path.
+    Repeating the evaluation returned the identical number, and every confidence interval
+    this project has reported therefore excluded policy stochasticity entirely -- the one
+    source of variance an evaluation of a stochastic policy is supposed to capture. The
+    reseed is now suppressed on `load`; this is the protocol that exploits the fix.
+
+    THE GRAPHS ARE HELD FIXED ACROSS PATHS, deliberately. `run_arm` replays
+    `seed * 100_000 + episode`, so every path sees the SAME episodes and the spread between
+    paths is policy stochasticity alone. Graph variance is already reported by the paired
+    per-episode vectors; conflating the two would double-count it and inflate every
+    interval.
+
+    Returns the pooled per-path means plus `path_sd` and `path_ci`. Quote the pooled mean
+    with `path_ci`; a single-path number is a point estimate with no error bar at all.
+    """
+    import torch
+    scalar_keys = None
+    per_path: List[Dict[str, float]] = []
+    for path in range(max(1, paths)):
+        # A DISTINCT sample path per repeat. Same episodes, different policy draws.
+        torch.manual_seed(seed * 1_000 + path)
+        for policy in policies.values():
+            if hasattr(policy, "reset"):
+                policy.reset(seed)
+        row = run_arm(env, policies, episodes, seed=seed)
+        if scalar_keys is None:
+            scalar_keys = [k for k, v in row.items()
+                           if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        per_path.append({k: float(row[k]) for k in scalar_keys})
+
+    out: Dict[str, object] = {"paths": len(per_path), "episodes": episodes}
+    for key in scalar_keys or []:
+        values = np.array([row[key] for row in per_path], dtype=float)
+        out[key] = float(np.nanmean(values))
+        if len(values) > 1:
+            sd = float(np.nanstd(values, ddof=1))
+            out[f"{key}__path_sd"] = sd
+            out[f"{key}__path_ci"] = 1.96 * sd / np.sqrt(len(values))
+    out["per_path"] = per_path
+    return out
+
+
 def survival_summary(rounds: Sequence[float], censor: int) -> Dict[str, float]:
     """Summarise time-to-identification WITHOUT averaging across censored observations.
 

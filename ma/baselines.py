@@ -625,11 +625,19 @@ def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, obj
         "random_clamp": lambda: RandomAgent(agent, seed, allow_clamp=True),
         "forced_clamp": lambda: ForcedClampAgent(agent, seed),
         "greedy": lambda: GreedyAgent(agent, env, seed),
-        "greedy_uncertainty": lambda: UncertaintyGreedyAgent(agent, seed),
+        # AT THE BAR THE TASK IS GRADED ON, not the class default of 0.7. The environment
+        # grades every claims backend at `claim_bar`, so a greedy configured at 0.7 stops
+        # scoring claims the task still counts open. Measured 2026-08-27: worth +0.233 to
+        # greedy at four agents, and enough to INVERT the attribution headline.
+        # `scripts/rescore_from_config.py` existed only to correct this after the fact;
+        # reading the env's own bar here removes the whole class of error at source.
+        "greedy_uncertainty": lambda: UncertaintyGreedyAgent(
+            agent, seed, bar=float(getattr(env.config, "claim_bar", 0.7))),
         # The coordinated control: same rule, shared surface divided by a positional
         # convention. See `PartitionedGreedyAgent` for why a comparison against the
         # uncoordinated rule alone is not enough.
         "greedy_partitioned": lambda: PartitionedGreedyAgent(
-            agent, env.topology.n_agents, seed),
+            agent, env.topology.n_agents, seed,
+            bar=float(getattr(env.config, "claim_bar", 0.7))),
         "probe_then_work": lambda: ProbeThenWorkAgent(agent, seed),
     })
