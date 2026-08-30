@@ -80,7 +80,12 @@ def measure(result_path: pathlib.Path, episodes: int, seed: int = None) -> dict:
         marginal = stacked.mean(axis=0)
         h_marginal = _entropy(marginal)
         h_conditional = float(np.mean([_entropy(row) for row in stacked]))
-        ratio = 0.0 if h_marginal <= 0 else (h_marginal - h_conditional) / h_marginal
+        # Clamped: MI is non-negative by definition, and a near-uniform policy makes
+        # h_conditional and h_marginal agree to within float error, which can produce a
+        # spurious -2e-08. Mirrors `ma/checkpoints.py::mi_ratio` -- the two estimators must
+        # not disagree, since one ranks checkpoints and the other certifies them.
+        ratio = (0.0 if h_marginal <= 0
+                 else max(0.0, (h_marginal - h_conditional) / h_marginal))
         out["per_agent"][str(agent)] = {"h_marginal": h_marginal,
                                         "h_conditional": h_conditional,
                                         "mi_ratio": ratio,

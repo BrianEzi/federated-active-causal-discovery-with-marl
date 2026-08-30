@@ -298,6 +298,17 @@ def main(argv=None) -> dict:
                     help="reject draws whose densest window MAG has more than this many "
                          "edges; unset disables the guard")
     ap.add_argument("--out", default=None)
+    # CHECKPOINTING. See `ma/checkpoints.py` for why the schedule is log-spaced rather than
+    # uniform and why the best policy is chosen on the MI gate rather than on reward.
+    ap.add_argument("--checkpoint_updates", default=None,
+                    help="comma-separated update indices for EVAL checkpoints; default is "
+                         "the log-spaced schedule, dense early")
+    ap.add_argument("--resume_every", type=int, default=50,
+                    help="write restartable state this often; 0 disables")
+    ap.add_argument("--keep_resume", type=int, default=2)
+    ap.add_argument("--mi_episodes", type=int, default=8,
+                    help="episodes used to RANK checkpoints by MI. The certifying "
+                         "measurement is scripts/mi_gate.py, run afterwards on the winner")
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out even if it holds a result from a different config")
     # Live telemetry, ON by default since 2026-08-25 and OFFLINE by default: a compute node
@@ -362,7 +373,31 @@ def main(argv=None) -> dict:
         turn_aware_credit=args.turn_aware_credit,
         normalise_returns=args.normalise_returns,
         mask_pass_updates=args.mask_pass_updates, gnn_layers=args.gnn_layers))
-    history = ppo.train(verbose=True, on_update=_wandb_logger(run))
+    # Checkpointing rides the existing `on_update` hook, so the training loop is untouched.
+    # Both callbacks fire; a checkpointing failure is swallowed inside the writer so it can
+    # never take down a run that has already spent hours of compute.
+    from ma.checkpoints import CheckpointWriter, default_schedule
+    # Mirrors IndependentPPO.train's own derivation; there is no n_updates on the config.
+    n_updates = max(1, ppo.config.total_episodes // ppo.config.episodes_per_update)
+    schedule = (default_schedule(n_updates) if args.checkpoint_updates is None
+                else [int(x) for x in args.checkpoint_updates.split(",") if x.strip()])
+    writer = None
+    if args.out:
+        writer = CheckpointWriter(
+            ppo, env, pathlib.Path(args.out), n_updates=n_updates,
+            schedule=schedule, resume_every=args.resume_every,
+            keep_resume=args.keep_resume, mi_episodes=args.mi_episodes, seed=args.seed,
+            log=lambda msg: print(msg, flush=True))
+    wandb_hook = _wandb_logger(run)
+
+    def _on_update(record):
+        # `_wandb_logger` returns None when tracking is off, which is the common case.
+        if wandb_hook is not None:
+            wandb_hook(record)
+        if writer is not None:
+            writer(record)
+
+    history = ppo.train(verbose=True, on_update=_on_update)
     train_seconds = time.time() - started
     # Persist the trained pair. Ten seeds were previously evaluated and discarded because
     # nothing wrote them out, so any question about what an agent LEARNED needed a retrain.
@@ -386,6 +421,11 @@ def main(argv=None) -> dict:
         "final_entropy": history[-1]["entropy"] if history else None,
         # Full trace, so the report can plot learning curves rather than parsing stdout.
         "history": history,
+        # Where every checkpoint went, and which one the MI gate ranked highest. Recorded
+        # so a reader can find and rank them without listing the directory or re-deriving
+        # the schedule -- and so the FINAL policy is never quoted by default when a better
+        # one exists, which measured runs show it often does.
+        "checkpoints": writer.manifest() if writer is not None else None,
         "arms": {},
     }
 
