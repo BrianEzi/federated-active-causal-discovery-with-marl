@@ -103,7 +103,14 @@ def d_separated(adjacency: np.ndarray, u: int, v: int, cond: Sequence[int]) -> b
     return True
 
 
-def _inducing_path_exists(adjacency, anc, observed_set, u: int, v: int) -> bool:
+def _neighbour_lists(adjacency):
+    """For each node, every node adjacent to it in EITHER direction."""
+    d = adjacency.shape[0]
+    return [np.flatnonzero((adjacency[w] > 0) | (adjacency[:, w] > 0)) for w in range(d)]
+
+
+def _inducing_path_exists(adjacency, anc, observed_set, u: int, v: int,
+                          neighbours=None) -> bool:
     """Is there an INDUCING PATH between u and v relative to the hidden nodes?
 
     Verma & Pearl's characterisation, and the reason it matters here is purely
@@ -120,9 +127,13 @@ def _inducing_path_exists(adjacency, anc, observed_set, u: int, v: int) -> bool:
     what makes colliders decidable locally: in a DAG the edge x -> w puts an arrowhead at w,
     so w is a collider on the path exactly when both its edges point into it.
     """
-    d = adjacency.shape[0]
-    neighbours = [np.flatnonzero((adjacency[w] > 0) | (adjacency[:, w] > 0))
-                  for w in range(d)]
+    # `neighbours` depends only on `adjacency`, and the caller runs this once per PAIR --
+    # C(k,2) times over the same graph. Building it here cost d flatnonzero calls per pair
+    # and dominated the whole projection: 683k of the 695k array scans in a profiled
+    # training run came from this one line. Hoisted to `latent_projection`; recomputed here
+    # only when called standalone, so the function still works on its own.
+    if neighbours is None:
+        neighbours = _neighbour_lists(adjacency)
     # state: (node, arrived_by_arrowhead)
     start = [(int(w), bool(adjacency[u, w] > 0)) for w in neighbours[u]]
     seen = set()
@@ -161,9 +172,10 @@ def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndar
     proj = np.zeros((k, k), dtype=np.int8)
 
     observed_set = set(observed)
+    neighbours = _neighbour_lists(adjacency)
     for i, j in combinations(range(k), 2):
         u, v = observed[i], observed[j]
-        if not _inducing_path_exists(adjacency, anc, observed_set, u, v):
+        if not _inducing_path_exists(adjacency, anc, observed_set, u, v, neighbours):
             continue                      # non-adjacent in the MAG
 
         if anc[u, v]:

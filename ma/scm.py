@@ -20,6 +20,7 @@ makes an intervention informative about orientation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Optional
 
 import numpy as np
@@ -64,6 +65,29 @@ def sample_scm_params(
 
     noise_scales = rng.uniform(noise_range[0], noise_range[1], size=d)
     return SCMParams(adjacency=adjacency.astype(np.int8), weights=weights, noise_scales=noise_scales)
+
+
+@lru_cache(maxsize=256)
+def _cached_order(payload: bytes, d: int, dtype: str) -> tuple:
+    return tuple(int(x) for x in topological_order(
+        np.frombuffer(payload, dtype=dtype).reshape(d, d)))
+
+
+def order_for(adjacency: np.ndarray) -> np.ndarray:
+    """`topological_order`, memoised on the adjacency matrix itself.
+
+    The samplers re-derived the order on EVERY draw -- once per environment step, over a
+    graph that does not change within an episode -- and the O(d^2) scan was 0.9 s of a
+    43 s profiled run. Keyed on the raw bytes, so two runs with the same graph share the
+    entry and a different graph cannot collide with it.
+
+    The ORDER, not merely its validity, must be stable: the sampler draws noise node by
+    node in this sequence, so a different (equally valid) ordering would consume the RNG
+    differently and change the data. That is why this memoises the existing function
+    rather than replacing it with a faster algorithm.
+    """
+    a = np.ascontiguousarray(adjacency)
+    return np.array(_cached_order(a.tobytes(), a.shape[0], a.dtype.str), dtype=int)
 
 
 def topological_order(adjacency: np.ndarray) -> np.ndarray:
@@ -127,7 +151,7 @@ def sample(
     samples = np.zeros((n, d))
     intervened = np.zeros((n, d))
 
-    for node in topological_order(params.adjacency):
+    for node in order_for(params.adjacency):
         node = int(node)
         if node == intervene_node:
             # do(X_node): the structural equation is replaced, parents disconnected.
@@ -180,7 +204,7 @@ def sample_multi(
     samples = np.zeros((n, d))
     intervened = np.zeros((n, d))
 
-    for node in topological_order(params.adjacency):
+    for node in order_for(params.adjacency):
         node = int(node)
         if node in targets:
             scale = targets[node]

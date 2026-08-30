@@ -268,7 +268,10 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         batch, k = obs.shape[0], self.d
 
         core, disclosed, regime, signals, counts, channels, partner = self._split(obs)
-        base = self._node_features(core)                    # parent path, verbatim modules
+        # Built once and reused by the extra rounds below; at layers=1 it is not needed
+        # again, so it is not built.
+        pairs = self._neighbour_pairs(core) if self.rounds else None
+        base = self._node_features(core, pairs)                    # parent path, verbatim modules
 
         per_node_disclosed = torch.zeros(batch, k, 1, dtype=obs.dtype, device=obs.device)
         if self.n_shared and self.n_others:
@@ -325,13 +328,12 @@ class RolePerNodeActorCritic(PerNodeActorCritic):
         embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
 
         if self.rounds:                                     # parent's extra rounds, on core
-            pairs = self._neighbour_pairs(core)
             index = self._neighbour_index(obs.device)
             for block in self.rounds:
                 neighbours = embeddings[:, index]
                 messages = block["message"](torch.cat([neighbours, pairs], dim=-1))
                 pooled_messages = torch.cat(
-                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                    [messages.mean(dim=2), torch.amax(messages, dim=2)], dim=-1)
                 embeddings = block["combine"](
                     torch.cat([embeddings, pooled_messages], dim=-1))
 
@@ -428,7 +430,7 @@ class PortableRoleActorCritic(RolePerNodeActorCritic):
         if blocks.shape[1] == 0:
             return torch.zeros(blocks.shape[0], 2 * blocks.shape[2],
                                dtype=blocks.dtype, device=blocks.device)
-        return torch.cat([blocks.mean(dim=1), blocks.max(dim=1).values], dim=-1)
+        return torch.cat([blocks.mean(dim=1), torch.amax(blocks, dim=1)], dim=-1)
 
     def forward(self, obs: torch.Tensor):
         single = obs.dim() == 1
@@ -437,7 +439,10 @@ class PortableRoleActorCritic(RolePerNodeActorCritic):
         batch, k = obs.shape[0], self.d
 
         core, disclosed, regime, signals, counts, channels, partner = self._split(obs)
-        base = self._node_features(core)
+        # Built once and reused by the extra rounds below; at layers=1 it is not needed
+        # again, so it is not built.
+        pairs = self._neighbour_pairs(core) if self.rounds else None
+        base = self._node_features(core, pairs)
 
         # Disclosed shared targets: pooled over partners, then routed to the shared node
         # each column is about. Two per node (mean, max across partners).
@@ -445,7 +450,7 @@ class PortableRoleActorCritic(RolePerNodeActorCritic):
         if self.n_shared and self.n_others:
             table = disclosed.view(batch, self.n_others, self.n_shared)
             mean_block = table.mean(dim=1)                 # [b, n_shared]
-            max_block = table.max(dim=1).values
+            max_block = torch.amax(table, dim=1)
             for s_index, pos in enumerate(self.shared_positions):
                 per_node_disclosed[:, pos, 0] = mean_block[:, s_index]
                 per_node_disclosed[:, pos, 1] = max_block[:, s_index]
@@ -478,7 +483,7 @@ class PortableRoleActorCritic(RolePerNodeActorCritic):
                 per_node_partner[:, pos, 1] = (column > 0).to(obs.dtype).mean(dim=1)
             private = table[:, :, -1]
             partner_global[:, 0] = private.mean(dim=1)
-            partner_global[:, 1] = private.max(dim=1).values
+            partner_global[:, 1] = torch.amax(private, dim=1)
 
         globals_ = torch.cat([regime, pooled_signals, partner_global], dim=-1)
         extras = torch.cat([
@@ -493,13 +498,12 @@ class PortableRoleActorCritic(RolePerNodeActorCritic):
         embeddings = self.node_encoder(torch.cat([base, extras], dim=-1))
 
         if self.rounds:
-            pairs = self._neighbour_pairs(core)
             index = self._neighbour_index(obs.device)
             for block in self.rounds:
                 neighbours = embeddings[:, index]
                 messages = block["message"](torch.cat([neighbours, pairs], dim=-1))
                 pooled_messages = torch.cat(
-                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                    [messages.mean(dim=2), torch.amax(messages, dim=2)], dim=-1)
                 embeddings = block["combine"](
                     torch.cat([embeddings, pooled_messages], dim=-1))
 

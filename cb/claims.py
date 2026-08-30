@@ -177,13 +177,83 @@ def score_window(belief, true_mag: np.ndarray, private_positions: Sequence[int] 
     `require_all_types=False` restores the old grading, for reproducing pre-2026-08-26
     numbers only. Any comparison must hold it fixed across arms.
     """
-    claims = enumerate_claims(belief, true_mag, private_positions, bar,
-                              require_all_types=require_all_types,
-                              confounding_claims=confounding_claims)
-    n_right = sum(c.outcome == "right" for c in claims)
-    n_wrong = sum(c.outcome == "wrong" for c in claims)
-    n_unsure = sum(c.outcome == "unsure" for c in claims)
-    required = [c for c in claims if c.required]
-    return ClaimScore(n_right, n_wrong, n_unsure,
-                      sum(c.outcome == "right" for c in required), len(required),
-                      sum(c.outcome == "wrong" for c in required))
+    return _tally(belief, true_mag, private_positions, bar,
+                  require_all_types=require_all_types,
+                  confounding_claims=confounding_claims)
+
+
+def _tally(belief, true_mag: np.ndarray, private_positions: Sequence[int] = (),
+           bar: float = 0.7, require_all_types: bool = True,
+           confounding_claims: bool = True) -> ClaimScore:
+    """`score_window`'s counts, without materialising the claims.
+
+    WHY THIS EXISTS, AND WHY IT IS NOT A SECOND DEFINITION. The environment scores every
+    agent's window on every step -- four `score_window` calls per step, and in a profiled
+    training run that single call was 13% of the entire wall clock, spent building
+    C(k,2) + |E| frozen dataclasses only to tally them and drop them. This is the same
+    arithmetic done over arrays.
+
+    Two definitions of the same thing is exactly how a metric drifts, so
+    `tests/test_claims.py` asserts this agrees with `enumerate_claims` EXACTLY -- outcome
+    by outcome, over randomised beliefs and MAGs, at every bar and both flag settings.
+    `enumerate_claims` remains the readable definition and the one traces read; this is a
+    tally of it.
+    """
+    mag = np.asarray(true_mag)
+    k = mag.shape[0]
+    if k < 2:
+        return ClaimScore(0, 0, 0, 0, 0, 0)
+    u, v = np.triu_indices(k, 1)                 # exactly combinations(range(k), 2) order
+
+    adjacency = np.asarray(belief.adjacency, dtype=float)
+    directed = np.asarray(belief.directed, dtype=float)
+    bidirected = np.asarray(belief.bidirected, dtype=float)
+
+    f_adj = adjacency[u, v]
+    truly_adjacent = (mag[u, v] != 0) | (mag[v, u] != 0)
+    # Both branches computed rather than one derived from the other: `1 - (1 - x)` is not
+    # `x` in floating point, and the comparison is against a bar these can sit exactly on.
+    adj_correct = np.where(truly_adjacent, f_adj, 1.0 - f_adj)
+    adj_wrong = np.where(truly_adjacent, 1.0 - f_adj, f_adj)
+
+    f_bi = bidirected[u, v]
+    d_uv, d_vu = directed[u, v], directed[v, u]
+    is_bi = mag[u, v] == MAG_BIDIRECTED
+    is_fwd = (~is_bi) & (mag[u, v] == MAG_DIRECTED)
+    # The final branch mirrors the enumerator's bare `else`: everything adjacent that is
+    # neither bidirected nor forward-directed, whatever the encoding.
+    is_back = truly_adjacent & (~is_bi) & (~is_fwd)
+
+    type_present = truly_adjacent & ~(is_bi & (not confounding_claims))
+    type_correct = np.select([is_bi, is_fwd, is_back], [f_bi, d_uv, d_vu], default=0.0)
+    type_wrong = np.select(
+        [is_bi, is_fwd, is_back],
+        [np.maximum(d_uv, d_vu), np.maximum(d_vu, f_bi), np.maximum(d_uv, f_bi)],
+        default=0.0)
+
+    private = set(int(p) for p in private_positions)
+    if require_all_types:
+        type_required = np.ones(u.shape, dtype=bool)
+    else:
+        incident = np.array([a in private or b in private for a, b in zip(u, v)])
+        type_required = incident.copy()
+    type_required = np.where(is_bi, True, type_required)   # confounding is always required
+
+    def outcomes(correct, wrong):
+        right = correct >= bar
+        return right, (~right) & (wrong >= bar)
+
+    adj_right, adj_bad = outcomes(adj_correct, adj_wrong)
+    typ_right, typ_bad = outcomes(type_correct, type_wrong)
+    typ_right &= type_present
+    typ_bad &= type_present
+
+    n_claims = int(u.size + type_present.sum())
+    n_right = int(adj_right.sum() + typ_right.sum())
+    n_wrong = int(adj_bad.sum() + typ_bad.sum())
+
+    req = type_present & type_required
+    return ClaimScore(n_right, n_wrong, n_claims - n_right - n_wrong,
+                      int(adj_right.sum() + (typ_right & req).sum()),
+                      int(u.size + req.sum()),
+                      int(adj_bad.sum() + (typ_bad & req).sum()))

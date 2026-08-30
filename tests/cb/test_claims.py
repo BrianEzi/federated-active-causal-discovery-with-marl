@@ -223,3 +223,90 @@ def test_oracle_warm_start_settles_adjacency_and_only_adjacency():
 def test_oracle_flag_refused_on_exact_backend():
     with pytest.raises(ValueError, match="oracle"):
         TwoAgentEnv(MAConfig(topology=TOPO, oracle_obs_structure=True), seed=0)
+
+
+# =======================================================================================
+# The vectorised tally must be the SAME function as the enumerator, not a second opinion.
+#
+# `score_window` stopped materialising Claim objects on 30 Aug 2026 -- it was 13% of the
+# training wall clock, four calls per environment step. The readable definition stayed
+# (`enumerate_claims`, which traces read); only the tally moved to arrays. Two definitions
+# of one metric is how a metric drifts, so this asserts they agree EXACTLY, over
+# randomised beliefs and MAGs, at every bar and both flag settings.
+# =======================================================================================
+import itertools
+
+import numpy as np
+import pytest
+
+from cb.claims import ClaimScore, _tally, enumerate_claims
+from ma.projection import BIDIRECTED as MAG_BIDIRECTED
+from ma.projection import DIRECTED as MAG_DIRECTED
+
+
+class _FreqBelief:
+    def __init__(self, adjacency, directed, bidirected):
+        self.adjacency, self.directed, self.bidirected = adjacency, directed, bidirected
+
+
+def _reference(belief, mag, private, bar, require_all_types, confounding_claims):
+    """The old body of `score_window`, kept here as the thing the fast path must match."""
+    claims = enumerate_claims(belief, mag, private, bar,
+                              require_all_types=require_all_types,
+                              confounding_claims=confounding_claims)
+    required = [c for c in claims if c.required]
+    return ClaimScore(sum(c.outcome == "right" for c in claims),
+                      sum(c.outcome == "wrong" for c in claims),
+                      sum(c.outcome == "unsure" for c in claims),
+                      sum(c.outcome == "right" for c in required), len(required),
+                      sum(c.outcome == "wrong" for c in required))
+
+
+def _random_case(rng, k):
+    """A MAG and a belief whose frequencies land ON the bars as well as around them.
+
+    Frequencies are drawn from {0, 1/4, 1/3, 1/2, 2/3, 3/4, 1} rather than uniformly:
+    the outcome is a `>=` comparison against the bar, so the cases that separate two
+    implementations are exact ties, and uniform draws never produce one.
+    """
+    levels = np.array([0.0, 0.25, 1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0])
+    mag = np.zeros((k, k), dtype=np.int8)
+    for u, v in itertools.combinations(range(k), 2):
+        roll = rng.integers(0, 4)
+        if roll == 1:
+            mag[u, v] = MAG_DIRECTED
+        elif roll == 2:
+            mag[v, u] = MAG_DIRECTED
+        elif roll == 3:
+            mag[u, v] = mag[v, u] = MAG_BIDIRECTED
+    pick = lambda: rng.choice(levels, size=(k, k))
+    adjacency, directed, bidirected = pick(), pick(), pick()
+    adjacency = np.triu(adjacency, 1); adjacency += adjacency.T
+    bidirected = np.triu(bidirected, 1); bidirected += bidirected.T
+    np.fill_diagonal(directed, 0.0)
+    return mag, _FreqBelief(adjacency, directed, bidirected)
+
+
+@pytest.mark.parametrize("bar", [0.5, 0.7, 1.0])
+@pytest.mark.parametrize("require_all_types", [True, False])
+@pytest.mark.parametrize("confounding_claims", [True, False])
+def test_the_vectorised_tally_equals_the_enumerator(bar, require_all_types,
+                                                    confounding_claims):
+    rng = np.random.default_rng(20260830)
+    for trial in range(40):
+        k = int(rng.integers(2, 9))
+        mag, belief = _random_case(rng, k)
+        private = tuple(int(p) for p in rng.choice(k, size=int(rng.integers(0, k + 1)),
+                                                   replace=False))
+        fast = _tally(belief, mag, private, bar, require_all_types, confounding_claims)
+        slow = _reference(belief, mag, private, bar, require_all_types, confounding_claims)
+        assert fast == slow, (f"trial {trial}: k={k} private={private}\n"
+                              f"  fast {fast}\n  slow {slow}")
+
+
+def test_the_tally_is_defined_on_a_degenerate_one_node_window():
+    """k=1 has no pairs, so no claims -- and `identified` must not read as False."""
+    belief = _FreqBelief(np.zeros((1, 1)), np.zeros((1, 1)), np.zeros((1, 1)))
+    score = _tally(belief, np.zeros((1, 1), dtype=np.int8), (), 1.0)
+    assert score == ClaimScore(0, 0, 0, 0, 0, 0)
+    assert score.identified

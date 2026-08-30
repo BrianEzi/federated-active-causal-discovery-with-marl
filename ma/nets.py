@@ -10,6 +10,8 @@ not by editing this class, for the same reason.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
@@ -109,6 +111,16 @@ class PerNodeActorCritic(nn.Module):
                 "combine": nn.Sequential(nn.Linear(3 * hidden, hidden), nn.Tanh()),
             }))
 
+    def _offdiag_mask(self, device) -> torch.Tensor:
+        """[d, d] boolean, True off the diagonal. Depends only on `d` and the device, and
+        both forward paths rebuild it on every call otherwise -- pure constant work in the
+        inner loop of a rollout that runs millions of forward passes."""
+        cached = getattr(self, "_offdiag_cache", None)
+        if cached is None or cached.shape[0] != self.d or cached.device != device:
+            cached = ~torch.eye(self.d, dtype=torch.bool, device=device)
+            self._offdiag_cache = cached
+        return cached
+
     def _neighbour_pairs(self, obs: torch.Tensor) -> torch.Tensor:
         """[batch, d, d-1, 2] -- for each node i and neighbour j, the pair (i->j, j->i).
 
@@ -117,7 +129,7 @@ class PerNodeActorCritic(nn.Module):
         """
         d = self.d
         batch = obs.shape[0]
-        mask = ~torch.eye(d, dtype=torch.bool, device=obs.device)
+        mask = self._offdiag_mask(obs.device)
 
         matrix = torch.zeros(batch, d, d, dtype=obs.dtype, device=obs.device)
         matrix[:, mask] = obs[:, : d * (d - 1)]
@@ -133,17 +145,28 @@ class PerNodeActorCritic(nn.Module):
         but nothing downstream depends on it: messages are pooled, exactly as in the first
         round, which is what keeps the added depth equivariant.
         """
-        d = self.d
-        mask = ~torch.eye(d, dtype=torch.bool, device=device)
-        return torch.arange(d, device=device).repeat(d, 1)[mask].view(d, d - 1)
+        cached = getattr(self, "_index_cache", None)
+        if cached is None or cached.shape[0] != self.d or cached.device != device:
+            d = self.d
+            mask = self._offdiag_mask(device)
+            cached = torch.arange(d, device=device).repeat(d, 1)[mask].view(d, d - 1)
+            self._index_cache = cached
+        return cached
 
-    def _node_features(self, obs: torch.Tensor) -> torch.Tensor:
-        """[batch, d, per_node_features], pooled over neighbours so node order cannot leak."""
+    def _node_features(self, obs: torch.Tensor, pairs: Optional[torch.Tensor] = None
+                      ) -> torch.Tensor:
+        """[batch, d, per_node_features], pooled over neighbours so node order cannot leak.
+
+        `pairs` lets a caller that already built the [b, d, d-1, 2] neighbour tensor hand
+        it in rather than have it rebuilt; at `layers > 1` the forward pass needs it twice.
+        """
         d = self.d
         batch = obs.shape[0]
 
-        embedded = self.edge_encoder(self._neighbour_pairs(obs))   # [b, d, d-1, edge_hidden]
-        pooled = torch.cat([embedded.mean(dim=2), embedded.max(dim=2).values], dim=-1)
+        if pairs is None:
+            pairs = self._neighbour_pairs(obs)
+        embedded = self.edge_encoder(pairs)                        # [b, d, d-1, edge_hidden]
+        pooled = torch.cat([embedded.mean(dim=2), torch.amax(embedded, dim=2)], dim=-1)
 
         budget = obs[:, d * (d - 1)].view(batch, 1, 1).expand(batch, d, 1)
         parts = [pooled, budget]
@@ -156,19 +179,19 @@ class PerNodeActorCritic(nn.Module):
         if single:
             obs = obs.unsqueeze(0)
 
-        embeddings = self.node_encoder(self._node_features(obs))   # [batch, d, hidden]
+        pairs = self._neighbour_pairs(obs) if self.rounds else None
+        embeddings = self.node_encoder(self._node_features(obs, pairs))   # [batch, d, hidden]
 
         # Rounds 2..k. Empty at layers=1, so this loop does not execute and the forward
         # pass is the original one instruction for instruction.
         if self.rounds:
-            pairs = self._neighbour_pairs(obs)                     # [b, d, d-1, 2]
             index = self._neighbour_index(obs.device)              # [d, d-1]
             for block in self.rounds:
                 neighbours = embeddings[:, index]                  # [b, d, d-1, hidden]
                 messages = block["message"](
                     torch.cat([neighbours, pairs], dim=-1))
                 pooled_messages = torch.cat(
-                    [messages.mean(dim=2), messages.max(dim=2).values], dim=-1)
+                    [messages.mean(dim=2), torch.amax(messages, dim=2)], dim=-1)
                 embeddings = block["combine"](
                     torch.cat([embeddings, pooled_messages], dim=-1))
 

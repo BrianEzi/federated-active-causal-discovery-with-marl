@@ -101,3 +101,54 @@ def test_pernode_parameter_count_does_not_grow_with_d():
 # and test_pernode_rejects_the_posterior_observation both drove `PPOAgent`, the
 # single-agent trainer, which no longer exists. They tested the AGENT's wiring rather
 # than the network, and the network's own shape contract is covered above.
+
+
+# =======================================================================================
+# THE POOLING SUBGRADIENT, pinned deliberately (30 Aug 2026).
+#
+# Max-pooling over neighbours moved from `t.max(dim).values` to `torch.amax(t, dim)`,
+# which is ~7x faster on this build and was 3.3 s of a 43 s profiled training run. The
+# FORWARD is bit-identical. The BACKWARD is not, and only at exact ties:
+#
+#   max   sends the whole gradient to the LOWEST-INDEXED maximum
+#   amax  splits it evenly among all tied maxima
+#
+# Both are valid subgradients of a function that has no derivative there. It is not a
+# correctness fix -- parameter gradients were checked to be permutation-equivariant under
+# either rule, because tied outputs here come from tied inputs. But ties are COMMON in
+# this environment rather than measure-zero: under the uniform prior every neighbour pair
+# carries the same marginals, so every episode starts fully tied. Splitting is the
+# symmetric choice, so it is the one taken; this test stops it being reverted by accident
+# and stops it changing again unnoticed.
+#
+# Measured cost of the switch on a 120-episode probe: training entropy differs in the
+# 10th decimal after one update; every reported arm metric identical.
+# =======================================================================================
+import torch
+
+
+def test_neighbour_pooling_splits_the_gradient_across_tied_maxima():
+    tied = torch.zeros(1, 4, 3, 5, requires_grad=True)
+
+    torch.amax(tied, dim=2).sum().backward()
+    split = tied.grad[0, 0, :, 0]
+    assert torch.allclose(split, torch.full((3,), 1.0 / 3.0)), (
+        f"expected an even split over three tied neighbours, got {split.tolist()}")
+
+    tied.grad = None
+    tied.max(dim=2).values.sum().backward()
+    first_index = tied.grad[0, 0, :, 0]
+    assert first_index.tolist() == [1.0, 0.0, 0.0], (
+        "the rule this replaced should still route everything to the lowest index -- if "
+        "torch changed that, the note above needs rewriting rather than this assertion")
+
+
+def test_the_two_pooling_rules_agree_exactly_on_the_forward_pass():
+    """The values are identical, so no reported number moves; only the gradient rule does."""
+    torch.manual_seed(0)
+    for shape in [(1, 12, 11, 64), (7, 4, 3, 5), (1, 2, 2, 2)]:
+        x = torch.randn(*shape)
+        assert torch.equal(torch.amax(x, dim=2), x.max(dim=2).values)
+        # And with deliberate ties, which is the case that actually arises here.
+        x[..., 0] = x[..., 1]
+        assert torch.equal(torch.amax(x, dim=2), x.max(dim=2).values)
