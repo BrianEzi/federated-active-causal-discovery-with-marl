@@ -178,7 +178,11 @@ def main(argv=None) -> int:
     ap.add_argument("--arch", default="gnn_portable")
     ap.add_argument("--episodes", type=int, default=4000)
     ap.add_argument("--no_interaction", action="store_true")
-    ap.add_argument("--emit", choices=["table", "sh", "json"], default="table")
+    ap.add_argument("--emit", choices=["table", "sh", "jobs", "json"], default="table")
+    ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--calibration", default=None,
+                    help="a scripts/calibrate_sweep.py manifest, used to order the job "
+                         "list longest-first")
     ap.add_argument("--manifest", default=None)
     args = ap.parse_args(argv)
 
@@ -191,16 +195,38 @@ def main(argv=None) -> int:
                   f"{cell.n:3d} {cell.beta:5.2f} {cell.private:5d} {cell.shared:6d} "
                   f"{cell.budget:7d}")
         print(f"\n{len(cells)} cells x {args.seeds} seeds = {len(cells) * args.seeds} runs")
-    elif args.emit == "sh":
-        print("#!/usr/bin/env bash")
-        print("set -u")
-        print("export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1")
+    elif args.emit in ("sh", "jobs"):
+        jobs = []
         for cell in cells:
             for seed in range(args.seeds):
                 argv_ = command(cell, seed, args.out_dir, evidence=args.evidence,
                                 arch=args.arch, episodes=args.episodes)
                 out = argv_[argv_.index("--out") + 1]
-                print(f'[ -f "{out}" ] || {" ".join(argv_)}')
+                jobs.append((cell, seed, out, argv_))
+
+        # LONGEST FIRST. The runs differ by more than 4x in length, and a list schedule
+        # that starts the long ones last leaves seven workers idle while one finishes --
+        # the classic greedy-scheduling tail. Ordered by the CALIBRATION where one exists,
+        # since that is measured, and by budget otherwise, which is what cost tracks.
+        estimates = {}
+        if args.calibration:
+            try:
+                measured = json.loads(pathlib.Path(args.calibration).read_text())
+                estimates = {row["name"]: row["run_seconds"] for row in measured["cells"]}
+            except (OSError, ValueError, KeyError):
+                print("# warning: calibration unreadable; ordering by budget instead")
+        jobs.sort(key=lambda job: estimates.get(job[0].name, float(job[0].budget)),
+                  reverse=True)
+
+        if args.emit == "sh":
+            print("#!/usr/bin/env bash")
+            print("set -u")
+            print("export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1")
+        for cell, seed, out, argv_ in jobs:
+            # The skip is inside the line, so the list is restart-safe however it is run:
+            # sequentially as a script, or fed to xargs -P for the parallel launch.
+            print(f'[ -f "{out}" ] || {" ".join(argv_)}')
+
     else:
         print(json.dumps([c.as_dict() for c in cells], indent=1))
 

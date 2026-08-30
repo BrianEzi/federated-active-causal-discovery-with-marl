@@ -983,13 +983,43 @@ class IndependentPPO:
                 nn.utils.clip_grad_norm_(self.nets[agent].parameters(), 0.5)
                 self.opts[agent].step()
 
-    def train(self, verbose: bool = False, on_update=None) -> List[dict]:
+    def load_resume(self, path) -> int:
+        """Restore a run mid-flight and return the update it should CONTINUE FROM.
+
+        Weights alone do not restart a run. The optimiser moments are part of the
+        trajectory, and so are both random streams -- the numpy generator that draws each
+        episode's seed and torch's global stream that the policy samples from. Restoring
+        three of the four gives a run that looks resumed and is not.
+
+        `CheckpointWriter` writes this state AFTER update `u` has completed and after its
+        own MI evaluation has consumed whatever randomness it consumes, so the correct
+        continuation point is `u + 1` -- which is what this returns.
+        """
+        import torch
+
+        state = torch.load(pathlib.Path(path), weights_only=False)
+        for agent, weights in state["nets"].items():
+            self.nets[int(agent)].load_state_dict(weights)
+        for agent, moments in state["opts"].items():
+            self.opts[int(agent)].load_state_dict(moments)
+        torch.set_rng_state(state["torch_rng"])
+        self.rng.bit_generator.state = state["numpy_rng"]
+        self.history = list(state.get("history", []))
+        return int(state["update"]) + 1
+
+    def train(self, verbose: bool = False, on_update=None,
+              start_update: int = 0) -> List[dict]:
         """`on_update(record)` is called after every update, if given -- the hook the
         live telemetry hangs off. It is deliberately a plain callback: nothing in `ma/`
-        imports a tracking library, so a broken or absent logger cannot take a run down."""
+        imports a tracking library, so a broken or absent logger cannot take a run down.
+
+        `start_update` continues an interrupted run; see `load_resume`. The episode offset
+        is derived from the update index, so a resumed run draws the same episode seeds it
+        would have drawn had it never stopped.
+        """
         cfg = self.config
         n_updates = max(1, cfg.total_episodes // cfg.episodes_per_update)
-        for update in range(n_updates):
+        for update in range(int(start_update), n_updates):
             mask_pass = update < cfg.mask_pass_updates
             batch = self.collect(cfg.episodes_per_update,
                                  update * cfg.episodes_per_update, mask_pass)

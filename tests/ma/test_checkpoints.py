@@ -129,3 +129,93 @@ def test_mi_ratio_is_a_ratio(tmp_path):
     ppo = IndependentPPO(env, PPOConfig(hidden=16, seed=0))
     value = mi_ratio(ppo, env, episodes=2, seed=0)
     assert 0.0 <= value <= 1.0
+
+
+# =======================================================================================
+# RESUME. Written since the checkpointing work, read since 30 Aug 2026 -- until then the
+# `*_resume_uNNNN.pt` files were dead weight on exactly the long runs they exist for.
+#
+# The property that makes resume worth having is not "it starts again". It is that the
+# resumed run is the SAME run: a 60-run sweep whose interrupted members follow a different
+# trajectory from its uninterrupted ones is a sweep with an uncontrolled variable in it.
+# So this asserts identity of the history, not merely that training continues.
+# =======================================================================================
+import numpy as np
+import torch
+
+from ma.checkpoints import CheckpointWriter
+from ma.env import MAConfig, TwoAgentEnv
+from ma.policy import IndependentPPO, PPOConfig
+from ma.topology import federated_topology
+
+
+def _env():
+    return TwoAgentEnv(MAConfig(
+        topology=federated_topology(2, 2, 2), n_obs=40, n_int=12, budget=8,
+        turn_order="round_robin", belief_backend="factored", action_modes=("vary",),
+        claim_bar=1.0, reward_criterion="claims", policy_arch="gnn_portable",
+        graph_model="sf", sf_m=2, episode_mix="confounded", vs_evidence="oracle"))
+
+
+def _ppo(env, seed):
+    return IndependentPPO(env, PPOConfig(total_episodes=48, episodes_per_update=8,
+                                         epochs=2, hidden=16, seed=seed))
+
+
+def _weights(ppo):
+    return torch.cat([p.detach().flatten()
+                      for agent in sorted(ppo.nets) for p in ppo.nets[agent].parameters()])
+
+
+def test_a_resumed_run_reproduces_the_uninterrupted_one_exactly(tmp_path):
+    torch.manual_seed(0)
+    straight = _ppo(_env(), seed=0)
+    straight.train(verbose=False)
+
+    # The same run, stopped after update 2 and restarted from the state written there.
+    torch.manual_seed(0)
+    interrupted = _ppo(_env(), seed=0)
+    writer = CheckpointWriter(interrupted, interrupted.env, tmp_path / "run.json",
+                              n_updates=6, schedule=[], resume_every=2, keep_resume=4,
+                              mi_episodes=2, seed=0)
+    interrupted.train(verbose=False, on_update=writer, start_update=0)
+
+    resume_state = tmp_path / "run_resume_u0002.pt"
+    assert resume_state.exists(), "no resume state was written at update 2"
+
+    torch.manual_seed(999)                     # deliberately WRONG: the state must win
+    revived = _ppo(_env(), seed=123)           # deliberately a different seed, likewise
+    start = revived.load_resume(resume_state)
+    assert start == 3, f"resume should continue at the update AFTER the one saved, got {start}"
+    revived.train(verbose=False, start_update=start)
+
+    assert [r["update"] for r in revived.history] == [r["update"] for r in straight.history]
+    for got, want in zip(revived.history, straight.history):
+        assert got["entropy"] == want["entropy"], (
+            f"update {want['update']}: resumed entropy {got['entropy']!r} != "
+            f"uninterrupted {want['entropy']!r} -- the resumed run is a DIFFERENT run")
+        assert got["solve_rate"] == want["solve_rate"]
+    assert torch.equal(_weights(revived), _weights(straight)), (
+        "final weights differ, so something outside nets/optimiser/RNG is part of the "
+        "trajectory and is not being restored")
+
+
+def test_resume_restores_the_manifest_so_a_resumed_result_file_is_complete(tmp_path):
+    """The checkpoints written before the interruption are still on disk and `best_path`
+    may still point at one of them. A manifest that starts at the resume point would
+    silently drop them."""
+    torch.manual_seed(0)
+    ppo = _ppo(_env(), seed=0)
+    writer = CheckpointWriter(ppo, ppo.env, tmp_path / "run.json", n_updates=6,
+                              schedule=[1], resume_every=2, keep_resume=4,
+                              mi_episodes=2, seed=0)
+    ppo.train(verbose=False, on_update=writer)
+    assert writer.written, "no scheduled checkpoint was written, so the test proves nothing"
+
+    state = torch.load(tmp_path / "run_resume_u0002.pt", weights_only=False)
+    revived_writer = CheckpointWriter(ppo, ppo.env, tmp_path / "run.json", n_updates=6,
+                                      schedule=[1], resume_every=2, mi_episodes=2, seed=0,
+                                      resumed=state)
+    assert revived_writer.written == writer.written[:len(revived_writer.written)]
+    assert revived_writer.best_update == state["best_update"]
+    assert revived_writer.manifest()["checkpoints"], "manifest lost the earlier checkpoints"

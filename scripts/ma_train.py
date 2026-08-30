@@ -317,6 +317,13 @@ def main(argv=None) -> dict:
     ap.add_argument("--resume_every", type=int, default=50,
                     help="write restartable state this often; 0 disables")
     ap.add_argument("--keep_resume", type=int, default=2)
+    ap.add_argument("--resume_from", default=None,
+                    help="a *_resume_uNNNN.pt written by CheckpointWriter. Restores "
+                         "weights, optimiser moments, both RNG streams and the history, "
+                         "and continues from the update after the one it was written at. "
+                         "The resume state was being WRITTEN and never read until "
+                         "30 Aug 2026, which made it dead weight on exactly the long runs "
+                         "it exists for.")
     ap.add_argument("--mi_episodes", type=int, default=8,
                     help="episodes used to RANK checkpoints by MI. The certifying "
                          "measurement is scripts/mi_gate.py, run afterwards on the winner")
@@ -394,13 +401,22 @@ def main(argv=None) -> dict:
     n_updates = max(1, ppo.config.total_episodes // ppo.config.episodes_per_update)
     schedule = (default_schedule(n_updates) if args.checkpoint_updates is None
                 else [int(x) for x in args.checkpoint_updates.split(",") if x.strip()])
+    # Restored BEFORE the writer is built, so the writer can inherit the manifest.
+    start_update, resumed = 0, None
+    if args.resume_from:
+        import torch as _torch
+        resumed = _torch.load(pathlib.Path(args.resume_from), weights_only=False)
+        start_update = ppo.load_resume(args.resume_from)
+        print(f"  resumed from {args.resume_from} -> continuing at update {start_update}"
+              f" of {n_updates}", flush=True)
+
     writer = None
     if args.out:
         writer = CheckpointWriter(
             ppo, env, pathlib.Path(args.out), n_updates=n_updates,
             schedule=schedule, resume_every=args.resume_every,
             keep_resume=args.keep_resume, mi_episodes=args.mi_episodes, seed=args.seed,
-            log=lambda msg: print(msg, flush=True))
+            log=lambda msg: print(msg, flush=True), resumed=resumed)
     wandb_hook = _wandb_logger(run)
 
     def _on_update(record):
@@ -410,7 +426,8 @@ def main(argv=None) -> dict:
         if writer is not None:
             writer(record)
 
-    history = ppo.train(verbose=True, on_update=_on_update)
+    history = ppo.train(verbose=True, on_update=_on_update,
+                        start_update=start_update)
     train_seconds = time.time() - started
     # Persist the trained pair. Ten seeds were previously evaluated and discarded because
     # nothing wrote them out, so any question about what an agent LEARNED needed a retrain.

@@ -102,7 +102,8 @@ class CheckpointWriter:
     def __init__(self, ppo, env, out: pathlib.Path, n_updates: int,
                  schedule: Optional[Sequence[int]] = None, resume_every: int = 50,
                  keep_resume: int = 2, mi_episodes: int = 8, seed: int = 0,
-                 log: Optional[Callable[[str], None]] = None):
+                 log: Optional[Callable[[str], None]] = None,
+                 resumed: Optional[dict] = None):
         self.ppo, self.env = ppo, env
         self.out = pathlib.Path(out).with_suffix("")
         self.out.parent.mkdir(parents=True, exist_ok=True)
@@ -114,6 +115,14 @@ class CheckpointWriter:
         self.best_mi, self.best_update = -1.0, None
         self.written: List[dict] = []
         self._resume_paths: List[pathlib.Path] = []
+        # A resumed run must not report a manifest that starts at the resume point: the
+        # checkpoints written before the interruption are still on disk and still the ones
+        # `best_path` might be pointing at. Restored from the resume payload so the result
+        # file of a resumed run is indistinguishable from that of an uninterrupted one.
+        if resumed:
+            self.written = list(resumed.get("written", []))
+            self.best_mi = float(resumed.get("best_mi", -1.0))
+            self.best_update = resumed.get("best_update")
 
     # -- the hook ------------------------------------------------------------------------
 
@@ -160,6 +169,10 @@ class CheckpointWriter:
                 "torch_rng": torch.get_rng_state(),
                 "numpy_rng": self.ppo.rng.bit_generator.state,
                 "history": list(self.ppo.history),
+                # This writer's own state, so a resumed run's manifest is complete.
+                "written": list(self.written),
+                "best_mi": self.best_mi,
+                "best_update": self.best_update,
             }, path)
         except Exception as error:
             self.log(f"  resume u{update} FAILED: {error!r}")
