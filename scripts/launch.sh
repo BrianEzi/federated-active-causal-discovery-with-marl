@@ -54,9 +54,17 @@ JOBS=$(mktemp)
 echo "$(wc -l < "$JOBS") jobs, longest first"
 
 export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-# `caffeinate -i` only holds off IDLE sleep; a closed lid still suspends. -s would also
-# hold off system sleep on AC power, which is what an overnight run wants.
-caffeinate -i -s xargs -P "$WORKERS" -I CMD sh -c 'CMD' < "$JOBS"
+# `caffeinate -i -s` holds off idle AND system sleep, which is what an overnight run wants.
+# It is macOS-only, so fall back rather than failing on Linux -- this script runs on three
+# machines and a hard dependency on one platform's power tool would strand two of them.
+# (A closed lid still suspends on macOS whatever caffeinate says; nothing is lost, the run
+# just resumes, but it turns an overnight plan into a two-day one.)
+if command -v caffeinate > /dev/null 2>&1; then
+  caffeinate -i -s xargs -P "$WORKERS" -I CMD sh -c 'CMD' < "$JOBS"
+else
+  echo "(no caffeinate -- not macOS. Disable sleep yourself if this is a laptop.)"
+  xargs -P "$WORKERS" -I CMD sh -c 'CMD' < "$JOBS"
+fi
 status=$?
 rm -f "$JOBS"
 
