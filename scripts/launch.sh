@@ -20,23 +20,36 @@ cd "$(dirname "$0")/.."
 
 EVIDENCE=${1:-oracle}
 WORKERS=${2:-8}
+TIER=${3:-}                       # cheap | medium | heavy | empty for the whole sweep
 SEEDS=${SEEDS:-3}
+SEED_LIST=${SEED_LIST:-}          # e.g. "0" to take only seed 0 of a tier
 EPISODES=${EPISODES:-4000}
 OUT_DIR=${OUT_DIR:-results/sweep/$EVIDENCE}
 CALIBRATION=${CALIBRATION:-results/sweep/calibration_$EVIDENCE.json}
+
+TIER_ARGS=""
+[ -n "$TIER" ] && TIER_ARGS="--tier $TIER"
+SEED_ARGS="--seeds $SEEDS"
+[ -n "$SEED_LIST" ] && SEED_ARGS="--seed_list $SEED_LIST"
 
 mkdir -p "$OUT_DIR/logs"
 
 echo "=== gates ==="
 .venv/bin/python scripts/preflight_metrics.py || { echo "METRIC PREFLIGHT FAILED"; exit 1; }
-.venv/bin/python scripts/preflight_runs.py feasibility --episodes 25 \
+# Gate only the cells THIS launch will run. Checking all twenty costs ten minutes, most
+# of it on cells another machine is running, and a gate nobody waits for is a gate nobody
+# runs. `--only` keeps it under a minute for the cheap tier.
+GATE_CELLS=$(.venv/bin/python scripts/sweep.py --emit json $TIER_ARGS \
+  --calibration "$CALIBRATION" 2>/dev/null \
+  | .venv/bin/python -c 'import json,sys; print(",".join(c["name"] for c in json.load(sys.stdin)))')
+.venv/bin/python scripts/preflight_runs.py feasibility --episodes 20 --only "$GATE_CELLS" \
   || { echo "FEASIBILITY GATE FAILED -- beta is mis-normalised somewhere"; exit 1; }
 
 echo
-echo "=== launching: $EVIDENCE, $SEEDS seeds, $EPISODES episodes, $WORKERS workers ==="
+echo "=== launching: $EVIDENCE ${TIER:-all-tiers}, $EPISODES episodes, $WORKERS workers ==="
 JOBS=$(mktemp)
-.venv/bin/python scripts/sweep.py --emit jobs --seeds "$SEEDS" --episodes "$EPISODES" \
-  --evidence "$EVIDENCE" --out_dir "$OUT_DIR" --calibration "$CALIBRATION" \
+.venv/bin/python scripts/sweep.py --emit jobs $SEED_ARGS --episodes "$EPISODES" \
+  --evidence "$EVIDENCE" --out_dir "$OUT_DIR" --calibration "$CALIBRATION" $TIER_ARGS \
   | grep -v '^#' > "$JOBS"
 echo "$(wc -l < "$JOBS") jobs, longest first"
 
