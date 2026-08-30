@@ -169,6 +169,9 @@ class CheckpointWriter:
                 "torch_rng": torch.get_rng_state(),
                 "numpy_rng": self.ppo.rng.bit_generator.state,
                 "history": list(self.ppo.history),
+                # Running return statistics and friends -- see IndependentPPO.RESUME_FIELDS
+                # for why these are part of the trajectory and what it cost to omit them.
+                "trainer": self.ppo.resume_state(),
                 # This writer's own state, so a resumed run's manifest is complete.
                 "written": list(self.written),
                 "best_mi": self.best_mi,

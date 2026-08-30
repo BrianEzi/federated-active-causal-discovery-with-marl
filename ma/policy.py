@@ -1005,7 +1005,28 @@ class IndependentPPO:
         torch.set_rng_state(state["torch_rng"])
         self.rng.bit_generator.state = state["numpy_rng"]
         self.history = list(state.get("history", []))
+        for key, value in state.get("trainer", {}).items():
+            setattr(self, key, value)
         return int(state["update"]) + 1
+
+    # The trajectory state that is NEITHER weights, NOR optimiser moments, NOR a random
+    # stream. It was missed on the first attempt at resume and the omission was silent:
+    # `_return_mean/_var/_count` are RUNNING statistics accumulated over every update, and
+    # `--normalise_returns` divides the rewards by them. A resumed run restarted them at
+    # zero, so its first update scaled its rewards differently, and from there the two runs
+    # were different runs. It cost nothing visible -- the rollout immediately after the
+    # resume point still reproduced exactly, because the weights were right; the update
+    # that followed it did not. Every sweep run passes --normalise_returns.
+    #
+    # Kept as a NAMED LIST rather than "everything on __dict__" so that adding a field to
+    # the trainer is a decision about whether it belongs to the trajectory, not an
+    # accident either way.
+    RESUME_FIELDS = ("_return_mean", "_return_var", "_return_count",
+                     "communication_rounds", "first_success_episode")
+
+    def resume_state(self) -> dict:
+        return {field: getattr(self, field) for field in self.RESUME_FIELDS
+                if hasattr(self, field)}
 
     def train(self, verbose: bool = False, on_update=None,
               start_update: int = 0) -> List[dict]:
