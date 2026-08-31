@@ -153,6 +153,10 @@ class FactoredAttributedBackend:
         self.truncated = False
         self._log: list = []
         self._settled: Optional[tuple] = None
+        # THE PAIRS THE CANDIDATES ACTUALLY COVER, which is `settled` truncated to the cap.
+        # Held separately because the two differ exactly when truncation bites, and that is
+        # the case the short-circuit below used to get wrong. See `_rebuild`.
+        self._kept: tuple = ()
         self._attributions: tuple = ()
         self.last: Optional[FactoredAttributedBelief] = None
 
@@ -163,6 +167,7 @@ class FactoredAttributedBackend:
         self.truth = self.structure.truth
         self._log = []
         self._settled = None
+        self._kept = ()
         self._attributions = ()
         self.contradictions = 0
         self.assumption_violations = 0
@@ -205,9 +210,19 @@ class FactoredAttributedBackend:
     def _rebuild(self, force: bool = False) -> None:
         settled = self.settled_bidirected()
         if settled == self._settled and not force:
+            # SCOPE IS `_kept`, NOT `_settled`, AND THE DIFFERENCE WAS A REAL DEFECT. This
+            # branch passed `self._settled` -- every pair the structure belief had settled --
+            # while `_attributions` only ever enumerates over the first
+            # `max_attribution_pairs` of them. A true group naming a truncated pair was then
+            # IN scope, absent from `group_frequency`, read as frequency zero, and scored
+            # WRONG: a confident misattribution produced by a belief that had never been
+            # asked about that pair. Measured 31 Aug at k=20, 4 agents: 26 of 63 settled
+            # attributions were "wrong" this way, and disappear once scope is truncated to
+            # match the candidates. It is the same failure `scope` was introduced to fix,
+            # surviving in the branch that runs on nearly every call.
             self.last = FactoredAttributedBelief(
                 self.structure.last or self._empty_structure(),
-                self._attributions, self.k, scope=self._settled or ())
+                self._attributions, self.k, scope=self._kept)
             return
         kept = settled
         self.truncated = len(settled) > self.max_attribution_pairs
@@ -233,6 +248,7 @@ class FactoredAttributedBackend:
                 continue
             candidates = survivors
         self._settled = settled
+        self._kept = tuple(kept)
         self._attributions = candidates
         self.last = FactoredAttributedBelief(self.structure.last or self._empty_structure(),
                                              candidates, self.k, scope=kept)
