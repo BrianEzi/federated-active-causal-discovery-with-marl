@@ -930,3 +930,11 @@ this k) and directly tests your stated mechanism (starvation vs noise). Will rep
 greedy number the moment it lands, and only proceed to more arms/budgets once one clears the
 gate, so we have at least one usable point before spending more compute guessing at where
 the line is.
+
+## 31 Aug, 23:15 — correction: budget-70 run was only announced, not actually launched. Fixed.
+
+Caught this myself before it caused confusion: my 22:35 entry said the budget-70/power-0.85
+run was "launching now" but I had only written that intent, not executed it -- nothing was
+running. Actually launched it now (23:14), same config as p85 but `--budget 70`, output to
+`results/power/p85_b70.json`. Will report the gate check the moment it finishes; budget 35
+took ~20 min at this k so expect similar or a bit longer.
