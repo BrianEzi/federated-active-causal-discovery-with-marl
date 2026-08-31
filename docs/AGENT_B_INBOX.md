@@ -44,6 +44,71 @@ mechanism as a hypothesis for THOSE two specific runs, not as a general claim ab
 
 ---
 
+## 31 Aug, ~18:00 — the strategic picture, so you can prioritise without asking
+
+Read this before the two entries below it. They are the tasks; this is why.
+
+### The deadline is 7 Sep and the real freeze is 3 Sep
+
+Brian is writing background and methodology **now**, in parallel with everything we run. His
+schedule is: results and discussion on the 3rd–4th, future work / limitations / conclusion on
+the 5th, whole-thesis flow on the 6th, finishing touches on the 7th.
+
+**Therefore all compute must be finished AND analysed by end of 3 Sep.** Anything still
+running after that is abandoned rather than waited for. Plan backwards from that date, not
+from the 7th. If a job cannot plausibly finish and be analysed by the 3rd, it should not be
+started.
+
+Target is a grade of 80+, so **robustness beats novelty** where the two compete. Concretely:
+another seed on a headline cell is worth more than another axis, and a result quoted with its
+MI gate, evidence mode and evaluation policy is worth more than a bigger number without them.
+
+### Attribution is back IN scope, and it is the novelty
+
+It was cut on the belief that it caps at k~5. That was wrong — the cap belongs to the
+STRUCTURE enumeration, not to attribution, and the two are independent. `factored_attribution`
+now works to **k=12**, which is 18 of the 20 sweep cells, crosschecked against the enumerated
+backend (7/7) with zero wrong attributions.
+
+A **per-pair factored** version that scales past k=12 is being built on the primary machine
+right now. Do not start one. If it lands, attribution covers the whole grid and becomes a
+genuine headline rather than a bounded section.
+
+### The three-way split, and why your machines get what they get
+
+The principle is `time_to_result = queue_wait + runtime / effective_parallelism`, not CPU
+speed. On that basis:
+
+| machine | gets | because |
+|---|---|---|
+| primary laptop | short, urgent, iterative work | no queue, fastest measured throughput |
+| **Myriad** | **the sampled sweep, 66 tasks** | high parallelism, and a queue wait amortises across 66 long tasks |
+| second laptop | lower-priority, non-intensive runs | no queue, but slower; latency does not matter for these |
+
+This is Brian's ranking and it is probably right, but it is currently a guess — hence the
+profiling request. Two performance predictions made on this project today were wrong by 3–5x
+(throughput at eight workers, and an entire calibration taken on a swap-thrashing machine), so
+the ten minutes is worth spending.
+
+### What is already bankable — do not re-derive any of this
+
+Ten findings are settled and independent of everything still running: the forced-cover
+characterisation; budget starvation (the ladder gave k=30 a SMALLER budget than k=20, and
+greedy goes 0.000 → 0.760 when normalised); the credit finding (75% of rows were discarded
+actions, MI 0.425 → 0.700); FedAvg equalling pooling per update at 0.9971 cosine; rescue not
+existing on this backend; the skeleton assumption measured both ways; attribution to k=12;
+the graph-distribution confounds; n_int rather than n_obs being the binding sampled axis; and
+decentralisation costing exactly the learned advantage (solo matches greedy, sharing beats
+it). See `GAME_PLAN_TO_SUBMISSION.md` for the full list and the cut line.
+
+**The cut list is as important as the do list.** Cut: per-pair attribution on your side,
+attribution under sampled evidence, training on the attributed backend, Rung 1 exact, the ER
+arm, C3, E4, C1. If something is not in the game plan, it does not get built — the repeated
+pattern here has been that an interesting question gets chased and returns a finding that
+improves the work while costing a day. There is no longer a day to spend.
+
+---
+
 ## 31 Aug, ~17:40 — also: profile both machines, so allocation stops being a guess
 
 Ranking machines by CPU is the wrong metric. What decides where a job should go is
