@@ -26,6 +26,36 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from scripts.sweep import build_cells                                # noqa: E402
 
 MI_FLOOR = 0.15
+# THE GATE IS COMPETENCE, NOT ENTROPY, and this replaced the MI floor on 31 Aug 2026.
+#
+# `best_mi_ratio` is I(S;A)/H -- how much the action depends on the state -- and it was used
+# to detect a policy that never learned. It does not measure that. It tracks final ENTROPY
+# almost perfectly (every run it failed ended at 2.0-3.2, every run it passed at 1.2-1.9),
+# and entropy is convergence, not competence. Where the budget is generous or the shared
+# surface is large the task is easy enough that a near-uniform policy succeeds, so LOW MI IS
+# CORRECT BEHAVIOUR there.
+#
+# Measured over 37 runs: the MI floor discarded 14 of them, including
+#
+#     k12s50n04b500 seed 1   MI 0.040   window rate 1.000
+#     k12s50n04b500 seed 0   MI 0.064   window rate 0.956
+#     k12s75n08b150 seed 0   MI 0.137   window rate 0.994
+#     k12s75n08b150 seed 1   MI 0.113   window rate 0.991
+#
+# -- two entire cells in which every seed solves 95-100% of windows. Those are among the best
+# runs in the sweep and the headline was computed without them.
+#
+# WINDOW_FLOOR asks the question the gate was always meant to ask: over the last ten
+# checkpoints, did this policy actually solve windows? It excludes 5 runs rather than 14, and
+# the five have window rates of 0.04 to 0.66 -- genuinely broken, and visibly so.
+WINDOW_FLOOR = 0.70
+WINDOW_TAIL = 10
+
+
+def window_rate(row) -> float:
+    """Mean per-window solve rate over the last `WINDOW_TAIL` checkpoints."""
+    tail = row.get("window_tail") or []
+    return sum(tail) / len(tail) if tail else float("nan")
 
 
 def load(directory: pathlib.Path):
@@ -69,6 +99,9 @@ def load(directory: pathlib.Path):
             "resolved": arms["learned"].get("global_resolved_fraction"),
             "shd": arms["learned"].get("global_soft_shd"),
             "mi": checkpoints.get("best_mi_ratio"),
+            # Kept per row so the gate can be applied without re-reading the file.
+            "window_tail": [h.get("window_rate", 0.0)
+                            for h in (d.get("history") or [])[-WINDOW_TAIL:]],
             "entropy": (d.get("history") or [{}])[-1].get("entropy"),
         })
     return rows
@@ -105,8 +138,13 @@ def table(rows, axis_cells, title, key):
         sl, _ = _agg([r["steps"] for r in got])
         sg, _ = _agg([r["greedy_steps"] for r in got])
         sc, _ = _agg([r["ceiling_steps"] for r in got])
-        below = [r["seed"] for r in got if (r["mi"] or 0) < MI_FLOOR]
-        flag = f"MI<{MI_FLOOR} seeds {below}" if below else "ok"
+        below = [r["seed"] for r in got if window_rate(r) < WINDOW_FLOOR]
+        quiet = [r["seed"] for r in got if (r["mi"] or 0) < MI_FLOOR]
+        flag = f"window<{WINDOW_FLOOR} seeds {below}" if below else "ok"
+        # Reported, never acted on: a low-MI run that solves its windows is a policy that
+        # did not need to condition on state, not one that failed to learn.
+        if quiet:
+            flag += f"  [low MI, kept: {quiet}]"
         print(f"{cell:22s} {axis_cells[cell]:6} {len(got):5d} "
               f"{lm:7.3f}+-{ls:5.3f} {gm:7.3f} {gm2:+7.3f}+-{gs2:5.3f} {cm:8.3f} "
               f"{mim:6.3f} {sl:5.2f}/{sg:5.2f}/{sc:5.2f}  {flag}")
@@ -134,9 +172,20 @@ def shd_table(rows, axis_cells, title, key):
         return
     print(f"\n### {title} — hard SHD of the pooled global graph (LOWER IS BETTER)")
     print(f"{'cell':22s} {key:>6s} {'seeds':>5s} {'learned':>17s} {'greedy':>8s} "
-          f"{'random':>8s} {'L/G':>7s} {'resolved':>9s}")
+          f"{'random':>8s} {'L/G':>7s} {'resolved':>9s}  excluded")
     for cell in sorted(by_cell, key=lambda c: axis_cells[c]):
-        got = sorted(by_cell[cell], key=lambda r: r["seed"] or 0)
+        every = sorted(by_cell[cell], key=lambda r: r["seed"] or 0)
+        # GATED, NOT MERELY FLAGGED. A run that never learned is not a weak data point, it
+        # is a different experiment, and averaging it in moves the mean by two orders of
+        # magnitude: k30 seeds 1 and 2 end at window rates 0.145 and 0.042 and drag that
+        # cell's learned SHD from 0.00006 to 0.0069, reversing its verdict against greedy.
+        # The excluded seeds are named on every row so nothing is hidden.
+        got = [r for r in every if window_rate(r) >= WINDOW_FLOOR]
+        dropped = [r["seed"] for r in every if window_rate(r) < WINDOW_FLOOR]
+        if not got:
+            print(f"{cell:22s} {axis_cells[cell]:6} {0:5d}   -- every seed below the "
+                  f"competence gate: {dropped} --")
+            continue
         lm, ls = _agg([r["hard_shd"] for r in got])
         gm, _ = _agg([r["greedy_hard_shd"] for r in got])
         rm, _ = _agg([r["random_hard_shd"] for r in got])
@@ -145,7 +194,8 @@ def shd_table(rows, axis_cells, title, key):
         # is unreadable, while "learned is 5x better than greedy" is not.
         ratio = (lm / gm) if gm else float("nan")
         print(f"{cell:22s} {axis_cells[cell]:6} {len(got):5d} "
-              f"{lm:8.4f}+-{ls:7.4f} {gm:8.4f} {rm:8.4f} {ratio:7.2f} {res:9.3f}")
+              f"{lm:8.4f}+-{ls:7.4f} {gm:8.4f} {rm:8.4f} {ratio:7.2f} {res:9.3f}  "
+              f"{dropped if dropped else ''}")
 
 
 def main(argv=None) -> int:
@@ -177,8 +227,13 @@ def main(argv=None) -> int:
     print(f"\nCONFIG (constant across cells): evidence={sample['evidence']}, "
           f"turn_aware_credit={sample['credit']}, local_epochs={sample['local_epochs']}, "
           f"n_int={sample['n_int']}, evaluation=sampled policy over 200 episodes.")
-    print(f"MI floor {MI_FLOOR}; a cell below it is an untrained policy and its score says "
+    print(f"GATE: mean window rate over the last {WINDOW_TAIL} checkpoints must be >= "
+          f"{WINDOW_FLOOR}. A run below it never learned to solve windows and its score says "
           f"nothing about the task.")
+    print(f"The MI ratio is still shown per cell but NO LONGER GATES: it tracks final "
+          f"entropy, and a policy can solve 100% of windows without conditioning on state "
+          f"where the budget is generous. The old MI floor of {MI_FLOOR} discarded two "
+          f"entire cells in which every seed solved 95-100% of windows.")
 
     for axis, key in (("k", "k"), ("sigma", "sigma"), ("n", "n"), ("beta", "beta"),
                       ("n_int", "n_int"), ("sigma_x_n", "sigma")):
@@ -192,12 +247,13 @@ def main(argv=None) -> int:
             shd_table(rows, members, f"{axis} axis", key)
             table(rows, members, f"{axis} axis — episode success (conjunction)", key)
 
-    trained = [r for r in rows if (r["mi"] or 0) >= MI_FLOOR and r["greedy"] is not None]
+    trained = [r for r in rows
+               if window_rate(r) >= WINDOW_FLOOR and r["greedy"] is not None]
     if trained:
         gaps = [r["learned"] - r["greedy"] for r in trained]
         m, sd = _agg(gaps)
         beats = sum(1 for g in gaps if g > 0)
-        print(f"\n### Headline, over the {len(trained)} runs that clear the MI gate")
+        print(f"\n### Headline, over the {len(trained)} runs that clear the competence gate")
         print(f"  learned - greedy   {m:+.3f} +- {sd:.3f}   (beats greedy in "
               f"{beats}/{len(trained)} runs)")
         ceil = [r["ceiling"] - r["learned"] for r in trained if r["ceiling"] is not None]
@@ -207,7 +263,7 @@ def main(argv=None) -> int:
                   f"(headroom left to the optimal arm)")
         excluded = len(rows) - len(trained)
         if excluded:
-            print(f"  EXCLUDED: {excluded} run(s) below the MI floor, listed per-axis above.")
+            print(f"  EXCLUDED: {excluded} run(s) below the competence gate, listed per-axis above.")
 
     if args.figures:
         import matplotlib
