@@ -9,6 +9,46 @@ not already built and tested.** Every new thing built today has cost more than i
 
 ---
 
+## ADDED 31 Aug evening — a first draft for the supervisor by EOD 1 Sep
+
+This moves the near-term critical path. The draft does **not** need everything; it needs a
+spine the supervisor can react to, with the rest labelled as running.
+
+### What the draft contains
+
+| chapter | source | status |
+|---|---|---|
+| Background, related work | `WRITING_HANDOVER_BACKGROUND_METHOD.md` §2 | Brian, in progress — depends on nothing |
+| Methodology | same, §3 | Brian — every parameter now has a measured justification |
+| **Results: the oracle sweep** | `scripts/sweep_report.py` | **the one thing that must land** |
+| Discussion / limitations | the ten bankable findings, §"already bankable" | writable now |
+| Attribution | works to k=12, crosschecked | **label as RUNNING**, do not hold the draft for it |
+| Sampled / Rung 3 | on Myriad | label as RUNNING |
+
+### What must happen tonight for that to work
+
+1. **The oracle sweep must finish.** The six learned-sampled jobs were killed at 18:15 to
+   give it the machine — it had been getting 40%. Four workers, no contention now.
+2. **`scripts/sweep_report.py` is built and working** against partial results, so the moment
+   the sweep lands the tables and figures exist without further work. It degrades gracefully:
+   run it at any time and it reports what is on disk.
+3. Nothing else. No new experiments tonight.
+
+### The honest framing for the supervisor
+
+Two cells will look bad and both have a known, measured cause worth stating rather than
+hiding:
+
+- **k=30 is UNDER-TRAINED, not failed.** Seed 0's window rate goes 0.27 → 0.91 → 1.00 across
+  the last fifty updates, so training stops mid-ascent. Re-running at 12,000 episodes is
+  queued. Two of three seeds fall below the MI gate and are excluded rather than averaged in.
+- **n=10 loses to greedy** (0.923 vs 0.980) and clears the MI gate, so that one is real and
+  is a result rather than an artefact.
+
+Reporting both, with the MI gate beside them, is stronger than reporting neither.
+
+---
+
 ## The cut line
 
 | | verdict |
