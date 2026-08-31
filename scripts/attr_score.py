@@ -126,6 +126,15 @@ def play(env: TwoAgentEnv, policies, episodes: int, seed: int) -> List[Dict[str,
         # denominator is the agent count times too large -- it is the query-counting error,
         # measured rather than asserted.
         submitted_private, submitted = [0], [0]
+        # WHICH private nodes, not just how many. The partner channel fires when an agent
+        # acts on a private node, and the message it produces is informative only if it
+        # disturbs a latent the partner has not already seen move. So what should matter is
+        # the DIVERSITY of an agent's private probes, not their count -- and `private_share`
+        # cannot tell the two apart. Measured 31 Aug: the learned policy and random_vary have
+        # the same private share (0.50 against 0.51) and indistinguishable attribution, while
+        # both probing baselines beat them by more than six standard errors. If diversity is
+        # the mechanism, it shows up here and nowhere else in this file.
+        touched = {a: set() for a in env.topology.agents}
         while not result.done:
             actions = {a: policies[a](env, result) for a in env.topology.agents}
             _tally(env, actions, submitted_private, submitted)
@@ -134,10 +143,19 @@ def play(env: TwoAgentEnv, policies, episodes: int, seed: int) -> List[Dict[str,
                 if node == PASS_ACTION:
                     continue
                 moves += 1
-                private_moves += node not in env.windows[agent].shared
+                if node not in env.windows[agent].shared:
+                    private_moves += 1
+                    touched[agent].add(node)
         row = _episode_row(env, private_moves, moves)
         row["submitted_private"] = float(submitted_private[0])
         row["submitted"] = float(submitted[0])
+        # Distinct private nodes touched, and the number available. Reported as a RATIO so
+        # it is comparable across agent counts and private-block sizes, and the raw counts
+        # are kept so a reader can see the denominator rather than trust the ratio.
+        row["distinct_private"] = float(sum(len(v) for v in touched.values()))
+        row["available_private"] = float(sum(len(env.topology.private[a])
+                                             for a in env.topology.agents))
+        row["repeat_private"] = float(private_moves - sum(len(v) for v in touched.values()))
         rows.append(row)
     return rows
 
@@ -153,6 +171,13 @@ def summarise(rows: List[Dict[str, float]]) -> Dict[str, float]:
         "structure": _ratio(rows, "req_right", "req_total"),
         "private_share": float(sum(r["private_moves"] for r in rows) / moves) if moves else float("nan"),
         "submitted_private_share": _ratio(rows, "submitted_private", "submitted"),
+        # THE DIVERSITY COLUMNS. `private_coverage` is the share of all private nodes an
+        # episode touched at least once; `private_repeat_rate` is the share of private moves
+        # spent on a node already probed this episode. A structure-optimal policy is expected
+        # to be high on the second and low on the first -- it returns to the interventions
+        # that resolve its own window -- while random spreads.
+        "private_coverage": _ratio(rows, "distinct_private", "available_private"),
+        "private_repeat_rate": _ratio(rows, "repeat_private", "private_moves"),
         "moves": float(moves),
     }
 
@@ -287,7 +312,7 @@ def main(argv=None) -> dict:
         row = report["arms"][label]
         print(f"  {label:19s} identified {row['identified']:.3f} +/- {row['identified_se']:.3f}"
               f"  attribution {row['attribution']:.3f}  structure {row['structure']:.3f}"
-              f"  private_share {row['private_share']:.3f}"
+              f"  private_share {row['private_share']:.3f}  cover {row['private_coverage']:.2f}  repeat {row['private_repeat_rate']:.2f}"
               f"  (submitted {row['submitted_private_share']:.3f})", flush=True)
 
     reference = "learned" if "learned" in report["rows"] else "probe_then_work"
