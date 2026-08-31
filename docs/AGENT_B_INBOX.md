@@ -44,6 +44,59 @@ mechanism as a hypothesis for THOSE two specific runs, not as a general claim ab
 
 ---
 
+## 31 Aug, ~19:00 — STATUS, and a third job for your laptop
+
+### Live status on the primary machine
+
+| | state |
+|---|---|
+| Oracle sweep | **5 / 60 cells.** Four workers, no contention. Expected to finish overnight. |
+| Machine | healthy, 0 swapins, 397% CPU across 4 jobs |
+| Results pipeline | **built and working** — `scripts/sweep_report.py`, degrades gracefully, run it any time |
+| Attribution | enumerated version works to k=12, crosschecked 7/7, zero wrong. Per-pair factored version being built here now. |
+
+**New and important: Brian needs a first draft for his supervisor by EOD 1 Sep.** So the
+oracle sweep results are the near-term critical path, and everything else is labelled
+"running" in that draft. This does not change your priorities — the sampled sweep is still
+first — but it is why nothing new is being started here tonight.
+
+### Your laptop's job: seeds 3, 4 and 5 on the headline cells
+
+Disjoint by SEED, so there is no collision with the primary machine and no `[ -f "$OUT" ]`
+ambiguity — we can both write into `results/sweep/oracle/` and merge.
+
+```bash
+cd <repo> && git pull origin explore/constraint-based
+.venv/bin/python scripts/preflight_runs.py health
+
+.venv/bin/python scripts/sweep.py --emit jobs --seed_list 3,4,5 --evidence oracle \
+    --out_dir results/sweep/oracle --episodes 4000 \
+    --extra "--turn_aware_credit --local_epochs 4" \
+    --calibration results/sweep/calibration_oracle.json \
+  | grep -E "k12s50n04b150|k04s50n04b150|k08s50n04b150|k12s50n02b150|k12s50n03b150" \
+  > seeds345.txt
+
+# then run it at YOUR machine's measured knee, not at your core count
+cat seeds345.txt | xargs -P 4 -I CMD sh -c CMD
+```
+
+That is the baseline plus the cheap end of the k and n axes — 5 cells x 3 seeds = 15 runs,
+all under an hour each on this machine's calibration. **Why this and not another axis:** three
+seeds is thin for a claim about variance, and variance keeps being the finding here (FedYogi
+collapsing at k=12, two of three k=30 seeds under-trained, one-in-three collapses in the
+FedAvg probe). Six seeds on the cells the headline rests on does more for a robust result than
+any new axis would.
+
+Skip this if the cluster queue needs attention — the sampled sweep outranks it.
+
+### Rhythm from here
+
+Expect a status entry here roughly every few hours, and after anything material. Push your
+results as they land rather than batching them; the primary machine merges and re-runs
+`sweep_report.py`, so partial results are useful immediately rather than only when complete.
+
+---
+
 ## 31 Aug, ~18:00 — the strategic picture, so you can prioritise without asking
 
 Read this before the two entries below it. They are the tasks; this is why.
