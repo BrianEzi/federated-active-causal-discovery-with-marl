@@ -60,7 +60,8 @@ def build_env(args) -> TwoAgentEnv:
                       belief_backend=args.backend, policy_arch=args.policy_arch,
                       episode_mix="confounded", reward_criterion="claims",
                       claim_bar=1.0, per_agent_reward=args.per_agent_reward,
-                      observe_belief_channels=True, observe_partner_counts=True,
+                      observe_belief_channels=args.observe_belief_channels,
+                      observe_partner_counts=args.observe_partner_counts,
                       graph_model=args.graph_model, sf_m=args.sf_m)
     return DensityGuardedEnv(config, max_edges=args.max_edges, seed=args.seed)
 
@@ -229,6 +230,23 @@ def main(argv=None) -> dict:
     # components -- the only one usable past k=12, and the only one that does not apply rule
     # 1 where it cannot be made exact. Default stays `attributed` so existing invocations
     # keep meaning what they meant.
+    # THESE TWO CHANGE THE OBSERVATION LAYOUT, so they must match the run that produced the
+    # checkpoint or `IndependentPPO.load` refuses it. Hard-coded True until 31 Aug 2026,
+    # which silently excluded every cell of the oracle sweep -- it trains with both False.
+    # Defaults kept at True so existing invocations keep meaning what they meant.
+    ap.add_argument("--no_belief_channels", dest="observe_belief_channels",
+                    action="store_false", default=True)
+    ap.add_argument("--no_partner_counts", dest="observe_partner_counts",
+                    action="store_false", default=True)
+    # A DELIBERATE TRANSFER, AND IT MUST BE LABELLED AS ONE. The sweep trains on `factored`
+    # -- structure only -- so a policy evaluated here under an attribution backend was never
+    # trained to see an owner channel and never rewarded for attribution. That measures
+    # "does a policy trained to recover STRUCTURE also produce good attribution", which is a
+    # real question and NOT the same as "the learned attribution agent". `IndependentPPO.load`
+    # refuses the transfer unless it is asked for, and the flag is recorded in the output so
+    # a downstream reader cannot mistake one for the other.
+    ap.add_argument("--allow_backend_transfer", action="store_true",
+                    help="evaluate a checkpoint trained on a different belief backend")
     ap.add_argument("--backend", default=ATTRIBUTED,
                     choices=[ATTRIBUTED, FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED])
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py")
@@ -242,7 +260,8 @@ def main(argv=None) -> dict:
 
     arms = {}
     if args.policy:
-        ppo = IndependentPPO.load(args.policy, env)
+        ppo = IndependentPPO.load(args.policy, env,
+                                  allow_backend_transfer=args.allow_backend_transfer)
         if args.temperature is not None:
             arms["learned"] = {a: _tempered(ppo, a, args.temperature) for a in agents}
         else:
