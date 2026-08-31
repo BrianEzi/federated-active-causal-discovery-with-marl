@@ -784,3 +784,40 @@ I'll rerun locally — but as submitted, it looks correct.
 Continuing with the power-limited-evidence control+transfer pass (training phase done, all
 three arms: p10/p07/p05 finished locally). D7 seeds 1/2 noted as next-if-spare-capacity, will
 pick up after the transfer pass and after confirming oracle_long isn't stuck.
+
+## 31 Aug, 22:05 — power-limited-evidence: control + transfer done, all 3 arms
+
+Training (4000 episodes, corrected recipe) finished all three arms locally: p10 learned=0.91
+window rate, p07 and p05 also converged (not window-rate gated here, SHD-gated below).
+
+**CONTROL** (same policies, eval at full oracle power p=1.0, 60 episodes, paired):
+
+| trained at power | learned - greedy hard SHD |
+|---|---|
+| 1.0 | +0.0011 +/- 0.0009  (tied) |
+| 0.7 | +0.0140 +/- 0.0024 |
+| 0.5 | +0.0356 +/- 0.0044 |
+
+Gap WIDENS monotonically as training power drops. Stating plainly per the stated bar: this is
+a real, monotonic oracle-time cost from power-limited training, not noise.
+
+**TRANSFER** (genuine sampled evidence at eval, 40 episodes, paired) -- the actual test:
+
+| trained at power | learned - greedy hard SHD |
+|---|---|
+| 1.0 | +0.0269 +/- 0.0081  (learned clearly WORSE) |
+| 0.7 | -0.0040 +/- 0.0044  (tied) |
+| 0.5 | +0.0029 +/- 0.0050  (tied) |
+
+**Reading:** the primary effect is real but plateaus. p=1.0 -> p=0.7 closes the sampled gap
+from clearly-losing to tied. p=0.7 -> p=0.5 does not improve further -- also tied, not
+better. Combined with the control: p=0.7 looks like the useful point on this curve (closes
+most of the transfer gap for a fraction of p=0.5's oracle-time cost). NOT claiming "learned
+beats greedy under sampled" -- it stops losing, at p=0.7 and beyond, per the bar set in the
+handover.
+
+All 6 files pushed: `results/power/{p10,p07,p05}.json` (training),
+`results/power/{oracle,transfer}_p{10,07,05}.json` (control/transfer eval).
+
+Also pushed above: rescue-seeds handover is already covered by `oracle_long` on Myriad
+(21:56 entry) -- not duplicating locally.
