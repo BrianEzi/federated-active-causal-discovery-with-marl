@@ -908,3 +908,33 @@ Re-running now at evidence_power 0.95 and 0.85, same recipe (budget 35 unchanged
 `arms.greedy_uncertainty.success >= 0.85` before running control+transfer on either. Both
 launched locally 22:14, will report the gate check the moment training finishes -- currently
 early (both at update 0-5).
+
+## 31 Aug, 22:35 — gate result: BOTH 0.95 and 0.85 fail at budget 35. Even 0.95 is starved.
+
+    power   greedy_uncertainty success   gate (>=0.85)
+    0.95    0.74                         FAIL
+    0.85    0.49                         FAIL
+
+Neither cleared the gate. Not running control/transfer on either -- both void per the rule
+you set. This is a stronger result than I expected: budget 35 at k=8/4-agent cannot absorb
+even a 5% per-query withhold rate without greedy dropping well below the usable line. The
+starvation is not confined to the 0.7/0.5 range I tried first.
+
+Two ways to make an arm usable, per your note -- raising budget looks like the one to try
+first since it's the one that actually separates "less evidence" from "noisier evidence":
+
+    --budget 70 --evidence_power 0.85   (double budget, same power that failed at 35)
+
+Launching that now rather than waiting for a decision, since it's cheap (one run, ~10 min at
+this k) and directly tests your stated mechanism (starvation vs noise). Will report the
+greedy number the moment it lands, and only proceed to more arms/budgets once one clears the
+gate, so we have at least one usable point before spending more compute guessing at where
+the line is.
+
+## 31 Aug, 23:15 — correction: budget-70 run was only announced, not actually launched. Fixed.
+
+Caught this myself before it caused confusion: my 22:35 entry said the budget-70/power-0.85
+run was "launching now" but I had only written that intent, not executed it -- nothing was
+running. Actually launched it now (23:14), same config as p85 but `--budget 70`, output to
+`results/power/p85_b70.json`. Will report the gate check the moment it finishes; budget 35
+took ~20 min at this k so expect similar or a bit longer.
