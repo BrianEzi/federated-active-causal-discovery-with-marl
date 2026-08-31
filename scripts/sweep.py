@@ -79,6 +79,13 @@ class Cell:
     n: int
     beta: float
     axis: str                       # which axis this cell varies, for grouping in reports
+    # INTERVENTIONAL ROWS PER ROUND. Inert under oracle evidence -- the belief prunes by true
+    # ancestry from the intervened SET and never reads the data matrix, so 20/100/400 give an
+    # identical 0.967 success and 0.0004 soft SHD. Under SAMPLED evidence it is the dominant
+    # axis: greedy runs 0.000 / 0.167 / 0.400 and soft SHD 0.0574 / 0.0222 / 0.0147 across
+    # the same three values. Twenty times the data is the difference between no signal and a
+    # working regime, where sixteen times the OBSERVATIONAL data moved soft SHD by 8%.
+    n_int: int = 20
 
     @property
     def private(self) -> int:
@@ -103,8 +110,11 @@ class Cell:
 
     @property
     def name(self) -> str:
-        return (f"k{self.k:02d}s{int(round(self.sigma * 100)):02d}"
+        # The n_int suffix appears only when it is off the default, so every existing cell
+        # name -- and every result file already on disk under it -- stays exactly as it was.
+        base = (f"k{self.k:02d}s{int(round(self.sigma * 100)):02d}"
                 f"n{self.n:02d}b{int(round(self.beta * 100)):03d}")
+        return base if self.n_int == 20 else f"{base}i{self.n_int:04d}"
 
     def as_dict(self) -> dict:
         return {"name": self.name, "axis": self.axis, "k": self.k, "sigma": self.sigma,
@@ -132,11 +142,30 @@ AXES: Dict[str, Sequence] = {
     "beta": (1.0, 1.2, 1.5, 2.0, 5.0),
 }
 
+# SAMPLED ONLY, and the reason is the whole point of the axis. Under oracle evidence n_int is
+# inert, so sweeping it there would spend three seeds per value reproducing identical numbers.
+# Under sampling it decides whether the regime has any signal at all, and the CONVERGENCE it
+# traces is the result: as n_int grows the ancestry test approaches always-correct and sampled
+# approaches oracle. That is not a threat to the realism claim, it is the confirmation of it --
+# the two regimes are the same problem at different data budgets. 1000 is included to find
+# where they meet, and the interesting quantity is whether the LEARNED policy reaches oracle
+# performance at a lower n_int than greedy does, which would be a data-efficiency result
+# rather than merely a performance one.
+SAMPLED_ONLY_AXES: Dict[str, Sequence] = {
+    "n_int": (20, 100, 400, 1000),
+}
+
 
 def build_cells(interaction: bool = True, axes: Optional[Dict[str, Sequence]] = None,
-                baseline: Optional[dict] = None) -> List[Cell]:
-    """One factor at a time from the baseline, plus the sigma x n interaction block."""
-    axes = axes or AXES
+                baseline: Optional[dict] = None, evidence: str = "oracle") -> List[Cell]:
+    """One factor at a time from the baseline, plus the sigma x n interaction block.
+
+    `evidence="sampled"` additionally sweeps `SAMPLED_ONLY_AXES`, which are the axes that are
+    inert under oracle evidence and would otherwise buy identical numbers three seeds at a time.
+    """
+    axes = dict(axes or AXES)
+    if evidence == "sampled":
+        axes.update(SAMPLED_ONLY_AXES)
     base = dict(baseline or BASELINE)
     seen: Dict[str, Cell] = {}
 
@@ -167,7 +196,7 @@ def command(cell: Cell, seed: int, out_dir: str, *, evidence: str = "oracle",
             "--n_agents", str(cell.n),
             "--private_size", str(cell.private), "--n_shared", str(cell.shared),
             "--budget", str(cell.budget),
-            "--n_obs", "60", "--n_int", "20",
+            "--n_obs", "60", "--n_int", str(cell.n_int),
             "--turn_order", "round_robin", "--backend", "factored",
             "--policy_arch", arch, "--vary_only",
             "--graph_model", "sf", "--sf_m", "2",
@@ -226,7 +255,7 @@ def main(argv=None) -> int:
     ap.add_argument("--manifest", default=None)
     args = ap.parse_args(argv)
 
-    cells = build_cells(interaction=not args.no_interaction)
+    cells = build_cells(interaction=not args.no_interaction, evidence=args.evidence)
     if args.tier:
         if not args.calibration:
             print("--tier needs --calibration: the tiers are defined on MEASURED cost, "
