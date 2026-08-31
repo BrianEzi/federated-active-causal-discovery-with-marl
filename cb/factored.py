@@ -147,7 +147,8 @@ class FactoredBackend:
 
     def __init__(self, k: int, shared_positions: Sequence[int] = (),
                  evidence: str = "oracle", evidence_alpha: float = 0.001,
-                 assume_skeleton: bool = True, **_ignored):
+                 assume_skeleton: bool = True, evidence_power: float = 1.0,
+                 power_seed: int = 0, **_ignored):
         self.k = int(k)
         self.shared_positions = tuple(shared_positions)
         if evidence not in ("oracle", "sampled"):
@@ -170,6 +171,34 @@ class FactoredBackend:
         # the true MAG, which under an estimated skeleton would hand back the very
         # assumption the ablation exists to remove.
         self._seeded_absent: dict = {}
+        # POWER-LIMITED ORACLE EVIDENCE. `evidence_power` is the probability that a given
+        # ancestry question yields a usable answer at all; the rest of the time the pair is
+        # left untouched, exactly as if the test had run and been under-powered.
+        #
+        # WHY THIS SHAPE AND NOT NOISE ON THE ANSWER. Sampled evidence is SOUND BUT NOT
+        # COMPLETE -- it never asserts a false ancestry, it only fails to detect weak and
+        # distant ones, which is why the belief carries intermediate frequencies instead of
+        # all-or-nothing marks. Corrupting the answer would break soundness and produce a
+        # belief the truth can leave; declining to answer reproduces the real failure mode
+        # and keeps the version-space guarantee intact. `evidence_power=1.0` is the
+        # untouched oracle, so this is inert unless asked for.
+        #
+        # WHAT IT IS FOR. Measured 31 Aug: oracle training costs 0.085 s/episode and sampled
+        # training 6.3-9.4, a factor of 74-110, which is why the sampled sweep needs a
+        # cluster. Policies trained under oracle evidence do NOT transfer to sampled
+        # (`FINDINGS_2026_08_27` section 3: 0.171 against random's 0.208) because they have
+        # never seen a half-settled belief. This gives that input distribution at oracle
+        # speed, so "train with the noise you will be tested under" becomes affordable.
+        self.evidence_power = float(evidence_power)
+        if not 0.0 < self.evidence_power <= 1.0:
+            raise ValueError(f"evidence_power must be in (0, 1], got {evidence_power!r}")
+        # NOT reseeded per episode, deliberately: the point is that the policy meets a
+        # DIFFERENT pattern of missing evidence every episode, which is what domain
+        # randomisation means here. Deterministic given `power_seed` for the run as a whole.
+        self._power_rng = np.random.default_rng(int(power_seed))
+        # Rows seen per node at the last update. A rising count means another experiment on
+        # that node, which earns another draw against `evidence_power`.
+        self._attempts: dict = {}
 
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None,
               skeleton: Optional[np.ndarray] = None) -> None:
@@ -199,6 +228,7 @@ class FactoredBackend:
                 self._possible[(u, v)] = (frozenset({NONE}) if absent
                                           else frozenset({FWD, BACK, BI}))
             self._applied = frozenset()
+            self._attempts = {}
             self._detected = {}
             self.last = FactoredBelief(self._possible, self.k)
             return
@@ -213,12 +243,13 @@ class FactoredBackend:
                 # pairwise interventional evidence alone can prove.
                 self._possible[(u, v)] = frozenset({FWD, BACK, BI})
         self._applied = frozenset()
+        self._attempts = {}
         self._detected = {}
         self.last = FactoredBelief(self._possible, self.k)
 
     # -- the update ----------------------------------------------------------------------
 
-    def _apply_ancestry(self, x: int, ancestry, powered=None) -> None:
+    def _apply_ancestry(self, x: int, ancestry, powered=None, blind=None) -> None:
         """`ancestry[i]` -- is x an ancestor of the i-th other node? Prune each pair on x.
 
         EXACT AND LOCAL, for the reason in the module docstring: on an adjacent pair,
@@ -229,9 +260,16 @@ class FactoredBackend:
         refutes `x -> y` only where the test had the power to have seen it; otherwise silence
         carries no information and the pair is left alone. That is what stops a distant,
         attenuated effect from being read as absent.
+
+        `blind` gates BOTH directions and is what `evidence_power` uses: the question was
+        asked and the test returned nothing usable, so neither the positive nor the negative
+        conclusion is available. See `FactoredBackend.__init__` for why that is the right
+        shape for simulating a weak test rather than adding noise to the answer.
         """
         others = [y for y in range(self.k) if y != x]
         for position, y in enumerate(others):
+            if blind is not None and blind[position]:
+                continue                      # no power here: the pair learns nothing
             key = (x, y) if x < y else (y, x)
             marks = self._possible[key]
             if marks == frozenset({NONE}) or len(marks) == 1:
@@ -260,13 +298,43 @@ class FactoredBackend:
 
         if self.evidence == "oracle":
             fresh = intervened - self._applied
-            if not fresh:
+            # Under power limiting a repeat is informative, so "nothing new was intervened
+            # on" is no longer a reason to skip the update -- the row count may still have
+            # risen. See the block below.
+            if not fresh and (self.evidence_power >= 1.0
+                              or all(int(mask[:, x].sum()) == self._attempts.get(x, 0)
+                                     for x in range(self.k))):
                 if self.last is None:
                     self.last = FactoredBelief(self._possible, self.k)
                 return self.last.directed
             from cb.versionspace import reveal
-            for x in fresh:
-                self._apply_ancestry(x, reveal(self.truth, self.k, x))
+            if self.evidence_power < 1.0:
+                # A REPEAT MUST BUY ANOTHER DRAW, or this reproduces the wrong thing. Under
+                # plain oracle evidence a second intervention on the same node reveals
+                # nothing -- ancestry is already known -- so `fresh` correctly skips it, and
+                # the learner correctly learns never to repeat. Under SAMPLED evidence a
+                # repeat is exactly how you buy statistical power, and that inverted rule is
+                # the mechanism the transfer failure was traced to (repeat rate: greedy
+                # 0.247/0.331 against the learner's 0.110/0.138,
+                # HANDOVER_CLUSTER_SAMPLED_2026_08_29 section 1).
+                #
+                # So withheld questions have to become ASKABLE AGAIN when the node is
+                # intervened on again. Rows are the currency: `known_intervened` accumulates,
+                # so a rising row count for x means another experiment on x, and each one
+                # gets a fresh draw against `evidence_power`. Without this the prototype
+                # makes evidence scarcer without making repetition worth anything -- it
+                # would teach a policy the same "never repeat" rule, and fail transfer for
+                # the same reason.
+                attempts = {x: int(mask[:, x].sum()) for x in range(self.k)}
+                for x in range(self.k):
+                    if attempts[x] == 0 or attempts[x] == self._attempts.get(x, 0):
+                        continue
+                    blind = self._power_rng.random(self.k - 1) >= self.evidence_power
+                    self._apply_ancestry(x, reveal(self.truth, self.k, x), blind=blind)
+                self._attempts = attempts
+            else:
+                for x in fresh:
+                    self._apply_ancestry(x, reveal(self.truth, self.k, x))
             self._applied = intervened
         else:
             if not intervened:

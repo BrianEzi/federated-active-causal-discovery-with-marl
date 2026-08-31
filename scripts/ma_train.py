@@ -231,6 +231,10 @@ def main(argv=None) -> dict:
     ap.add_argument("--backend", default="exact",
                     choices=["exact", "constraint", "version_space", "attributed", "factored",
                              "factored_attributed", "component_attributed"])
+    ap.add_argument("--evidence_power", type=float, default=1.0,
+                    help="probability an ORACLE ancestry question yields a usable answer; "
+                         "the rest are withheld, simulating an under-powered test at oracle "
+                         "speed. 1.0 is the untouched oracle")
     ap.add_argument("--claim_bar", type=float, default=None,
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
@@ -387,6 +391,7 @@ def main(argv=None) -> dict:
                        prior_p=args.prior_p, graph_model=args.graph_model,
                        sf_m=args.sf_m, vs_evidence=args.vs_evidence,
                        vs_evidence_alpha=args.vs_evidence_alpha,
+                       vs_evidence_power=args.evidence_power,
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
                        policy_arch=args.policy_arch, episode_mix=args.episode_mix,
                        oracle_obs_structure=args.oracle_obs,

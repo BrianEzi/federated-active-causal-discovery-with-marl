@@ -79,6 +79,15 @@ def main(argv=None) -> int:
                     help="_best.pt (highest MI during training) or .pt (final)")
     ap.add_argument("--sample", action="store_true",
                     help="evaluate the learned arm by SAMPLING rather than argmax")
+    # THE TRANSFER TEST. Rebuild the environment with DIFFERENT evidence from the one the
+    # policy trained in, which is the only way to ask "does this policy still choose good
+    # experiments when the measurements get noisy". `IndependentPPO.load` checks the belief
+    # BACKEND, not the evidence regime, so `factored` trained under oracle loads into
+    # `factored` under sampled with an identical observation layout.
+    ap.add_argument("--override_evidence", default=None, choices=["oracle", "sampled"],
+                    help="evaluate in this evidence regime instead of the trained one")
+    ap.add_argument("--override_power", type=float, default=None,
+                    help="evaluate at this vs_evidence_power instead of the trained one")
     ap.add_argument("--out", default="results/global_shd_paired.json")
     args = ap.parse_args(argv)
 
@@ -88,6 +97,10 @@ def main(argv=None) -> int:
         report = json.loads(path.read_text())
         config = report["config"]
         use_seed = args.seed if args.seed is not None else report.get("seed", 0)
+        if args.override_evidence:
+            config = dict(config, vs_evidence=args.override_evidence)
+        if args.override_power is not None:
+            config = dict(config, vs_evidence_power=args.override_power)
         env = env_from_config(config, seed=use_seed)
 
         suffix = "_best.pt" if args.checkpoint == "best" else ".pt"
@@ -117,6 +130,8 @@ def main(argv=None) -> int:
                   f"{np.mean(r['resolved']):9.3f}")
         entry = {"source": str(path), "seed": use_seed, "episodes": args.episodes,
                  "checkpoint": args.checkpoint, "sampled": bool(args.sample),
+                 "eval_evidence": args.override_evidence or config.get("vs_evidence"),
+                 "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},
                  "paired": {}}

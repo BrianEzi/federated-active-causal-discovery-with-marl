@@ -238,6 +238,15 @@ class MAConfig:
     skeleton_max_cond: int = 2
     vs_evidence: str = "oracle"
     vs_evidence_alpha: float = 0.001
+    # POWER-LIMITED ORACLE EVIDENCE, and the reason it exists is a cost, not a preference.
+    # Oracle training costs 0.085 s/episode and sampled training 6.3-9.4 -- 74-110x -- so a
+    # sampled sweep needs a cluster. But policies trained under oracle evidence do not
+    # transfer to sampled (FINDINGS_2026_08_27 section 3: 0.171 against random's 0.208),
+    # because a belief that is always all-or-nothing never teaches them what a half-settled
+    # one means. `vs_evidence_power` withholds a fraction of ancestry answers at ORACLE
+    # SPEED, reproducing the one thing that matters -- an unsettled belief -- without paying
+    # for the tests. 1.0 is the untouched oracle.
+    vs_evidence_power: float = 1.0
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
     score_rule: str = JOINT_CONF
     # One bit per round: "I clamped something you cannot see". OFF by default -- the no-bit
@@ -425,6 +434,7 @@ class AgentWindow:
                  skeleton_source: str = "true", skeleton_alpha: float = 0.05,
                  skeleton_max_cond: int = 2,
                  vs_evidence: str = "oracle", vs_evidence_alpha: float = 0.001,
+                 vs_evidence_power: float = 1.0,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
         self.topology: Topology = topology
@@ -473,7 +483,12 @@ class AgentWindow:
             from cb.factored import FactoredBackend
             self.belief = FactoredBackend(self.k, shared_positions,
                                           evidence=vs_evidence,
-                                          evidence_alpha=vs_evidence_alpha)
+                                          evidence_alpha=vs_evidence_alpha,
+                                          evidence_power=vs_evidence_power,
+                                          # Per agent, so two windows do not miss the same
+                                          # questions in lockstep -- that would be a shared
+                                          # blind spot rather than independent weak tests.
+                                          power_seed=1000 + int(agent))
         elif backend == COMPONENT_ATTRIBUTED:
             from cb.component_attribution import ComponentAttributedBackend
             self.belief = ComponentAttributedBackend(
@@ -631,6 +646,7 @@ class TwoAgentEnv:
                                mode_by_role=config.mode_by_role,
                                vs_evidence=config.vs_evidence,
                                vs_evidence_alpha=config.vs_evidence_alpha,
+                               vs_evidence_power=config.vs_evidence_power,
                                cb_n_jobs=config.cb_n_jobs)
             for agent in self.topology.agents}
         self._rng = np.random.default_rng(seed)

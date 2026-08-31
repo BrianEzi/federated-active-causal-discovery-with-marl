@@ -57,7 +57,7 @@ def env_from_config(config: dict, seed: int = 0) -> TwoAgentEnv:
     )
     # Only pass the sampled-evidence knobs when the saved run recorded them, so this stays
     # loadable against results written before those fields existed.
-    for key in ("vs_evidence", "vs_evidence_alpha"):
+    for key in ("vs_evidence", "vs_evidence_alpha", "vs_evidence_power"):
         if key in config:
             kwargs[key] = config[key]
     return TwoAgentEnv(MAConfig(**kwargs), seed=seed)
