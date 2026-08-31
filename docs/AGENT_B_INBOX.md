@@ -938,3 +938,112 @@ run was "launching now" but I had only written that intent, not executed it -- n
 running. Actually launched it now (23:14), same config as p85 but `--budget 70`, output to
 `results/power/p85_b70.json`. Will report the gate check the moment it finishes; budget 35
 took ~20 min at this k so expect similar or a bit longer.
+
+---
+
+# 1 Sep, 00:40 — ALL-NIGHT TASK: make power-limited evidence transfer to the sampled regime
+
+This is your only priority until 08:00. Everything else waits.
+
+## The goal
+
+**A policy trained under power-limited ORACLE evidence that performs under SAMPLED evidence as
+well as one trained under sampled evidence — at ~1/100th the cost.**
+
+Measured today: oracle training 0.085 s/episode, sampled 6.3-9.4. If this works, thesis
+result 2 stops depending on a cluster job that was 3% done after five hours, and every future
+sampled-regime experiment becomes affordable. That is why it is worth a night.
+
+## Why it should be possible
+
+Sampled evidence differs from oracle in exactly two documented ways:
+
+1. **Incomplete** -- weak and distant effects fail to prune, so beliefs carry intermediate
+   frequencies rather than all-or-nothing marks. `FINDINGS_2026_08_27` section 3: blurring
+   only the INPUTS reproduces the transfer-failure profile almost exactly (private share
+   0.727 against transfer's 0.691, shared coverage 0.53 against 0.55).
+2. **Repeats buy statistical power** -- and under oracle a repeat is strictly wasted, so the
+   learner correctly learns NEVER to repeat. `HANDOVER_CLUSTER_SAMPLED_2026_08_29` section 1:
+   repeat rate greedy 0.247/0.331 against the learner's 0.110/0.138. **That inverted rule is
+   the transfer failure.**
+
+`evidence_power` reproduces both: withheld answers give intermediate beliefs, and re-probing
+a node earns another draw.
+
+## STEP 0 — establish the behavioural TARGET first. Do this before any more training.
+
+`results/sampled_learned/` holds partially-trained SAMPLED policies (killed at update ~200
+today). Measure their **repeat rate and private coverage** using the diversity columns now in
+`scripts/attr_score.py` (`private_coverage`, `private_repeat_rate`).
+
+That gives the target behaviour a power-limited policy must reproduce. Without it you are
+testing "does it transfer" with no idea what success looks like behaviourally. **~10 minutes,
+and it makes every later result interpretable.**
+
+## STEP 1 — the gate, on every arm, always
+
+    arms.greedy_uncertainty.success >= 0.85
+
+Greedy is ORACLE-INFORMED, not learned. If greedy collapses the environment is STARVED, not
+noisy, and the arm is void. This is exactly what turned last night's apparent success into a
+non-result (greedy 0.95 -> 0.25 -> 0.03 at power 1.0 / 0.7 / 0.5).
+
+## STEP 2 — the ladder
+
+Training is cheap (~6 min per 4000-episode run at oracle speed). The SAMPLED EVALUATION is
+the expensive part (~6 s/episode). **So train broadly and evaluate selectively.**
+
+| # | variant | rationale |
+|---|---|---|
+| 1 | power 0.95 / 0.85 | already running |
+| 2 | **budget 70 at power 0.85** | separates "noisy evidence" from "less evidence" -- the distinction the whole idea rests on |
+| 3 | **mixed power**, drawn per episode from U[0.8, 1.0] | proper domain randomisation; a policy meeting a different noise level each episode should generalise better than one tuned to a fixed level |
+| 4 | **curriculum**, anneal 1.0 -> 0.85 across training | learn the task first, then adapt. Addresses "the harder environment prevented learning" |
+| 5 | **distance-weighted missingness** | the principled version -- real failures are SYSTEMATIC in effect size, not uniform |
+
+**Rung 5 is the one most likely to be right and most likely to be needed.** It is the
+objection `ma/env.py:220` raises against artificial noise ("sampled evidence produces the
+right distribution FOR THE RIGHT REASON rather than by adding artificial noise"), and rungs
+1-4 do not answer it. Implementation is a small change to the `blind` mask in
+`cb/factored.py::_apply_ancestry` -- make the withholding probability rise with the number of
+hops between the pair, using `ma.projection.ancestor_matrix` or a BFS depth, instead of a flat
+draw. Mixed power (rung 3) needs the RNG re-drawn per episode in `reset` rather than once per
+run.
+
+## STEP 3 — what counts as PROOF. All four, or it is not proven.
+
+1. **Gate passes** -- greedy >= 0.85 on every arm you quote.
+2. **Mechanism confirmed** -- repeat rate rises toward the Step 0 target. *If it does not,
+   nothing else matters: the intended behaviour was not learned and any gain is coincidence.*
+3. **Control intact** -- oracle-regime performance has not collapsed. A BLUNT policy also
+   "closes the gap"; the disambiguation is that a real improvement moves AWAY from random
+   under sampled, not toward it. Check that explicitly.
+4. **Replicates** -- 3 seeds x 2 cells (k=8 and k=12), paired standard errors. One seed at
+   one cell is not a result. That error has been made twice on this project in 24 hours.
+
+## STEP 4 — stopping
+
+**Stop at 08:00, or when Step 3 is satisfied in full.** Report either way. A well-diagnosed
+NEGATIVE is worth as much as a positive here, because it tells us the sampled sweep is
+genuinely required and we stop hoping for a shortcut. Say which rungs you climbed, what each
+one showed, and where it broke.
+
+## STEP 5 — on success ONLY
+
+1. **Replicate first** -- 3 seeds x 2 cells at the winning setting.
+2. Then the full power sweep at that setting.
+3. **Then** cancel Myriad `246859` (sampled sweep). **KEEP `247268` (oracle_long)** -- it
+   rescues the k=20/k=30 seeds that carry the headline result, and cancelling the other frees
+   fair-share for it.
+
+**DO NOT CANCEL BEFORE STEP 1 REPLICATES.** Queue position is not recoverable, and the
+sampled sweep is our only data for thesis result 2 until power-limited training has actually
+replaced it.
+
+## Scepticism, since this is the result we most want to be true
+
+Every failure tonight came from wanting a result: a transfer table read before checking
+whether training succeeded, a precision collapse that was two engine bugs, a mechanism
+proposed and instrumented and refuted. Assume the same is waiting here. **The gate and the
+control arm exist specifically to catch you, so run them before you look at the headline
+number, not after.**
