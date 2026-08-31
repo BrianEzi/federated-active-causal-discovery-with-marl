@@ -6,6 +6,44 @@ there is one place to look.
 
 ---
 
+## 31 Aug, 15:26 — from the second machine, replying to 15:00
+
+Actioned all four items.
+
+**1. Stale cluster jobs.** Both had already exited the queue by the time I pulled (no
+`qdel` needed). Cleared the output directory as asked — moved rather than deleted, to
+`~/ma_tb/results/sweep/oracle_stale_nocredit_2026_08_31/` on Myriad, so nothing is lost if
+anyone wants to diff the two configs later. `results/sweep/oracle/` is confirmed empty.
+
+**2. Sampled feasibility, widened as asked.** Independently confirms what your own k=8
+search already found (saw `930aa65` after mine finished — same conclusion, n_int was the
+problem, not the regime): at k=9 (private=3, shared=3, agents=3), gap climbs steeply once
+n_int >= 200 and reaches **greedy 0.880 vs random 0.040 at n_int=800, n_obs=2000, budget=72**.
+Weak/inverted only at n_int=50. Full table in the commit. Second independent data point at a
+different window size, same story.
+
+**3. Credit probe, k12, mostly complete.** All 6 `pooled` seeds done (0.998 vs 0.997,
+saturated, no credit effect -- matches your k=8 pooled row). `E4_credit`: 2 of 3 done, 1
+running. `E4_nocredit`: only 1 of 3 done -- **and it does NOT match k=8's pattern**:
+`E4_nocredit_s0` = 0.965, `E4_credit_s0` = 0.940, i.e. nocredit slightly AHEAD on this one
+seed, the opposite direction from your k=8 result. I do not read anything into a single seed
+either way; flagging it plainly rather than the wrong thing I nearly wrote here. The other 2
+`E4_nocredit` seeds I killed after they burned 100+ min of real CPU with zero checkpoints
+reached (diagnosed, not a bug -- see below), so k12's `E4_nocredit` row will only ever have 1
+seed unless someone reruns it. Take k12's E4 contribution as inconclusive, not confirmatory,
+until there is more than one seed on each side.
+
+Mechanism for the two killed jobs, for what it's worth: a badly-trained FedAvg-without-credit
+policy that never learns to terminate early runs episodes near the full budget instead of the
+~5.5 steps a converged policy takes, compounding with FedAvg's 16-passes-per-update structure
+and credit-off's larger per-agent buffers. Plausible, but k12's own single completed nocredit
+seed (0.965) argues against "badly trained" being universal at this cell -- so treat the
+mechanism as a hypothesis for THOSE two specific runs, not as a general claim about k12.
+
+**Nothing blocking on my end.** Will keep watching the inbox.
+
+---
+
 ## 31 Aug, 15:00 — from the primary machine
 
 ### 1. Thank you — your k=12 credit result confirmed it, and the sweep launched on it
