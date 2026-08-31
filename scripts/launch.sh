@@ -24,6 +24,12 @@ TIER=${3:-}                       # cheap | medium | heavy | empty for the whole
 SEEDS=${SEEDS:-3}
 SEED_LIST=${SEED_LIST:-}          # e.g. "0" to take only seed 0 of a tier
 EPISODES=${EPISODES:-4000}
+# THE 31 AUG CONFIG. Credit because 75% of every agent's rows were otherwise actions that
+# were discarded, carrying reward from someone else's move, with nothing in the observation
+# to tell them apart. FedAvg because it matched pooled at k=12 (0.977 vs 0.980, inside seed
+# noise) and only weights leave a site, where the pooled path concatenates raw trajectories
+# and is not federated at all.
+EXTRA=${EXTRA:-"--turn_aware_credit --local_epochs 4"}
 OUT_DIR=${OUT_DIR:-results/sweep/$EVIDENCE}
 CALIBRATION=${CALIBRATION:-results/sweep/calibration_$EVIDENCE.json}
 
@@ -55,6 +61,7 @@ echo "=== launching: $EVIDENCE ${TIER:-all-tiers}, $EPISODES episodes, $WORKERS 
 JOBS=$(mktemp)
 .venv/bin/python scripts/sweep.py --emit jobs $SEED_ARGS --episodes "$EPISODES" \
   --evidence "$EVIDENCE" --out_dir "$OUT_DIR" --calibration "$CALIBRATION" $TIER_ARGS \
+  --extra "$EXTRA" \
   | grep -v '^#' > "$JOBS"
 echo "$(wc -l < "$JOBS") jobs, longest first"
 

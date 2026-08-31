@@ -206,6 +206,13 @@ def main(argv=None) -> int:
     ap.add_argument("--evidence", default="oracle", choices=["oracle", "sampled"])
     ap.add_argument("--arch", default="gnn_portable")
     ap.add_argument("--episodes", type=int, default=4000)
+    ap.add_argument("--extra", default="",
+                    help="flags appended to every emitted command, space separated. The "
+                         "31 Aug sweep uses '--turn_aware_credit --local_epochs 4': credit "
+                         "because 75%% of rows were otherwise discarded actions, and "
+                         "local_epochs because plain FedAvg matched pooled at k=12 (0.977 "
+                         "vs 0.980) and is genuinely federated, where pooling concatenates "
+                         "raw trajectories.")
     ap.add_argument("--no_interaction", action="store_true")
     ap.add_argument("--emit", choices=["table", "sh", "jobs", "json"], default="table")
     ap.add_argument("--workers", type=int, default=8)
@@ -255,7 +262,8 @@ def main(argv=None) -> int:
         for cell in cells:
             for seed in seeds:
                 argv_ = command(cell, seed, args.out_dir, evidence=args.evidence,
-                                arch=args.arch, episodes=args.episodes)
+                                arch=args.arch, episodes=args.episodes,
+                                extra=tuple(args.extra.split()) if args.extra else ())
                 out = argv_[argv_.index("--out") + 1]
                 jobs.append((cell, seed, out, argv_))
 
