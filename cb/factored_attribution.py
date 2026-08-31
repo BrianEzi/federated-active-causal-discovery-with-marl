@@ -247,5 +247,12 @@ class FactoredAttributedBackend:
     def n_candidates(self) -> int:
         return len(self._attributions)
 
-    def credit_fraction(self, true_mag: np.ndarray, required_positions=()) -> float:
-        return self.structure.credit_fraction(true_mag, required_positions)
+    def credit_fraction(self, true_mag: np.ndarray, required_positions=(), **kwargs) -> float:
+        """Delegated to the structure half, keyword arguments included.
+
+        `**kwargs` rather than a fixed signature because the callers pass different things --
+        `ma/evaluate.py` uses `strict=True` — and a backend that is call-compatible with the
+        others has to accept whatever they accept. Dropping the argument silently would be
+        worse than forwarding it, so it is forwarded.
+        """
+        return self.structure.credit_fraction(true_mag, required_positions, **kwargs)

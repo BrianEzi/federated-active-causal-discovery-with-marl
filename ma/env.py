@@ -67,15 +67,24 @@ VERSION_SPACE = "version_space"
 # See cb/attribution.py. Deterministic, like VERSION_SPACE, and it adds the
 # only channel through which one agent can help another in that environment.
 ATTRIBUTED = "attributed"
+# FACTORED STRUCTURE + ENUMERATED OWNERSHIP. `attributed` couples two enumerations that are
+# independent: the structure space (3^edges) and the attribution space over owner assignments.
+# Measured 31 Aug 2026, only the first is expensive -- at k=12 the structure space is 5.0e10
+# against 482 attribution hypotheses -- so attribution was chained to a structure belief it
+# never needed and was cut from the thesis on that basis. This backend keeps the enumerated
+# attribution exactly as it was and swaps the structure half for `factored`.
+FACTORED_ATTRIBUTED = "factored_attributed"
 # Pairwise belief: one small version space PER PAIR, O(k^2) state and update,
 # so it carries to window sizes the enumerated belief cannot reach. See
 # cb/factored.py for what it gives up -- joint constraints, and with them the
 # exact ceiling and exact optimum.
 FACTORED = "factored"
-BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED)
+BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED,
+            FACTORED_ATTRIBUTED)
 # Backends whose belief exposes bootstrap-shaped claim frequencies, so `cb.claims` and the
 # constraint-side greedy read them the same way.
-CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED)
+CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED,
+                  FACTORED_ATTRIBUTED)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -454,6 +463,12 @@ class AgentWindow:
             self.belief = FactoredBackend(self.k, shared_positions,
                                           evidence=vs_evidence,
                                           evidence_alpha=vs_evidence_alpha)
+        elif backend == FACTORED_ATTRIBUTED:
+            from cb.factored_attribution import FactoredAttributedBackend
+            self.belief = FactoredAttributedBackend(
+                self.k, shared_positions, n_agents=topology.n_agents, agent=self.agent,
+                evidence=vs_evidence, evidence_alpha=vs_evidence_alpha,
+                local_disturbance=attribution_local_disturbance)
         elif backend == ATTRIBUTED:
             from cb.attribution import AttributedVersionSpaceBackend
             self.belief = AttributedVersionSpaceBackend(
@@ -674,6 +689,13 @@ class TwoAgentEnv:
             for agent, window in self.windows.items():
                 window.belief.reset(self._true_mag(agent),
                                     skeleton=self._episode_skeleton(agent))
+        elif cfg.belief_backend == FACTORED_ATTRIBUTED:
+            # Needs the GLOBAL graph for the same reason ATTRIBUTED does: the true latent
+            # groups are a property of the whole system, not of one window. Truth is used
+            # only to prune and to score, never in the observation.
+            for agent, window in self.windows.items():
+                window.belief.reset(self._true_mag(agent), adjacency=self.true_adjacency,
+                                    topology=self.topology)
         elif cfg.belief_backend == ATTRIBUTED:
             # Needs the GLOBAL graph, not only the window's MAG: the true latent groups and
             # the response of each to a partner's action are properties of the whole system.
@@ -1290,7 +1312,7 @@ class TwoAgentEnv:
             from cb.claims import score_window
             cfg = self.config
             scores = {}
-            attributed = cfg.belief_backend == ATTRIBUTED
+            attributed = cfg.belief_backend in (ATTRIBUTED, FACTORED_ATTRIBUTED)
             attribution = {}
             for agent, window in self.windows.items():
                 scores[agent] = score_window(
