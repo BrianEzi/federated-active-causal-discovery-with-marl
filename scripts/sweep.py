@@ -125,6 +125,11 @@ class Cell:
 # The baseline every one-factor sweep departs from. Chosen mid-range on every axis so a
 # move in either direction is measurable rather than clipped at an edge.
 BASELINE = dict(k=12, sigma=0.5, n=4, beta=1.5)
+# THE SAMPLED BASELINE IS NOT THE ORACLE ONE. n_int is inert under oracle and decisive under
+# sampling: at n_int=20 the gate found NO separation between greedy and random on either
+# machine, so a sampled sweep on the oracle baseline would run 20 of 23 cells in a regime
+# with no signal and measure nothing. 200 is the working point on both machines' data.
+SAMPLED_BASELINE_N_INT = 200
 
 AXES: Dict[str, Sequence] = {
     "k": (4, 8, 12, 20, 30),
@@ -152,7 +157,14 @@ AXES: Dict[str, Sequence] = {
 # performance at a lower n_int than greedy does, which would be a data-efficiency result
 # rather than merely a performance one.
 SAMPLED_ONLY_AXES: Dict[str, Sequence] = {
-    "n_int": (20, 100, 400, 1000),
+    # Values chosen from TWO machines' feasibility measurements rather than round numbers.
+    # At k=8 (this machine): greedy 0.000 / 0.167 / 0.400 at n_int 20 / 100 / 400.
+    # At k=6 (second machine): greedy 0.160 / 0.600 / 0.560 and gaps over random of
+    # +0.160 / +0.560 / +0.560 at n_int 50 / 200 / 800.
+    # 50 is inside the signal floor, 200 is the working point on both, and 800 is where the
+    # second machine reaches 0.88 -- approaching saturation, which is where the sampled
+    # regime starts converging on oracle. That convergence is the point of the axis.
+    "n_int": (50, 200, 800),
 }
 
 
@@ -167,6 +179,8 @@ def build_cells(interaction: bool = True, axes: Optional[Dict[str, Sequence]] = 
     if evidence == "sampled":
         axes.update(SAMPLED_ONLY_AXES)
     base = dict(baseline or BASELINE)
+    if evidence == "sampled":
+        base.setdefault("n_int", SAMPLED_BASELINE_N_INT)
     seen: Dict[str, Cell] = {}
 
     def add(axis: str, **overrides):

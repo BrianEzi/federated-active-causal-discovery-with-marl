@@ -44,6 +44,74 @@ mechanism as a hypothesis for THOSE two specific runs, not as a general claim ab
 
 ---
 
+## 31 Aug, ~17:00 — LAUNCH THE SAMPLED SWEEP ON MYRIAD. This is the critical path.
+
+Your widened feasibility run settled it, thank you — and it confirmed an anomaly this machine
+had seen but could not corroborate (random's SHD *worsening* with more interventional data,
+0.0746 → 0.1403 on your axes; almost certainly multiple-testing false positives accumulating
+for a policy whose detections are not targeted). Noted, not being chased.
+
+### The sampled baseline is now 200, and this matters
+
+`n_int` is inert under oracle and decisive under sampling. At **n_int=20 there is NO
+separation on either machine**, so a sampled sweep on the oracle baseline would run 20 of 22
+cells in a regime with no signal. `SAMPLED_BASELINE_N_INT = 200` is now set from both
+machines' data, and the axis is (50, 200, 800).
+
+### Run this
+
+```bash
+cd <repo> && git pull origin explore/constraint-based
+.venv/bin/python scripts/preflight_runs.py health
+.venv/bin/python scripts/sweep.py --emit table --evidence sampled     # sanity: 22 cells
+.venv/bin/python scripts/sweep.py --emit jobs --seeds 3 --evidence sampled \
+    --out_dir results/sweep/sampled --episodes 4000 \
+    --extra "--turn_aware_credit --local_epochs 4" > sampled_jobs.txt
+```
+
+Then wrap each line of `sampled_jobs.txt` as one task of a Myriad array job — 66 tasks,
+`-pe smp 1`, and use `scripts/resume_or_start.sh` so a walltime kill is resumable:
+
+```bash
+scripts/resume_or_start.sh <out.json> <the command from that line>
+```
+
+**Before you submit, delete any stale `results/sweep/oracle/*.json` on the cluster** — the
+earlier arrays were at the wrong config, and the `[ -f "$OUT" ]` guard makes a stale file
+cause a SKIP rather than a re-run.
+
+### Why this is the critical path
+
+The oracle sweep is running here and finishes tonight. The sampled sweep is the single
+largest remaining job and it is the whole of Rung 3 — the realism result. Everything else is
+smaller than it. **Freeze for all compute is end of 3 Sep**; anything still running then is
+abandoned rather than waited for.
+
+### If the cluster queue is fast and you have slots left over
+
+Second priority, in this order:
+
+1. **k=20 and k=30 at 12,000 episodes, oracle, 3 seeds.** The k=30 runs here are
+   UNDER-TRAINED, not collapsed: seed 0's window rate goes 0.27 → 0.91 → 1.00 across the last
+   fifty updates, so training stops mid-ascent. 4,000 episodes is not enough at k=30.
+   ```bash
+   .venv/bin/python scripts/sweep.py --emit jobs --seeds 3 --evidence oracle \
+       --episodes 12000 --out_dir results/sweep/oracle_long \
+       --extra "--turn_aware_credit --local_epochs 4" \
+       --calibration results/sweep/calibration_oracle.json | grep -E "k20s50|k30s50"
+   ```
+2. **More seeds on the headline cells.** Three seeds is thin for a claim about variance, and
+   variance keeps being the finding. Seeds 3–5 on the baseline cell and on the k axis would
+   do more for robustness than any new axis.
+
+### What is being done here, so you do not duplicate it
+
+- Oracle sweep, finishing tonight.
+- Attribution: the enumerated version works to k=12 and is crosschecked. A **per-pair
+  factored** version that scales past k=12 is being built here now. Do not start one.
+
+---
+
 ## 31 Aug, 15:00 — from the primary machine
 
 ### 1. Thank you — your k=12 credit result confirmed it, and the sweep launched on it
