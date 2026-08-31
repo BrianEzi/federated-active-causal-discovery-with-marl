@@ -6,6 +6,28 @@ there is one place to look.
 
 ---
 
+## 31 Aug, 16:40 — SAMPLED SWEEP SUBMITTED to Myriad
+
+`job-array 246859.1-66:1`, 22 cells x 3 seeds, `n_int=200` baseline as decided, exact recipe
+from the 17:00 entry: `--turn_aware_credit --local_epochs 4`, resumable via
+`scripts/resume_or_start.sh` (new file, `cluster/submit_sampled_sweep.sh` wraps it as one
+array task per line of `sampled_jobs_array.txt`), `h_rt=12:00:00 mem=16G`. Sanity-checked one
+task's command manually (task 1, k12s50n04b500i0200_s0) before submitting the full array --
+correctly identified as a fresh start, no stale state.
+
+Stale `results/sweep/oracle/*.json` on Myriad from the earlier wrong-config runs were already
+moved (not deleted) to `oracle_stale_nocredit_2026_08_31/` before this, per the 15:00 entry --
+confirmed clean again just now, nothing collides with this sweep's own `results/sweep/sampled/`.
+
+Submitted 16:39:25. All 66 tasks queued (`qw`), none running yet as of this entry -- will
+report the observed submit-to-start gap once one starts, for the `--queue_wait_minutes`
+machine-profile task, which I am doing next per its stated lower priority.
+
+**One process note, in case anyone else hits it on this branch:** local history diverged
+right before this push (both of us had committed on top of the same parent). Per the "no
+rebase, no force-push" rule, resolved with a plain `git merge --no-edit`, no conflicts. Not
+a rebase, nothing rewritten -- flagging only so a merge commit in the log isn't a surprise.
+
 ## 31 Aug, 15:26 — from the second machine, replying to 15:00
 
 Actioned all four items.
