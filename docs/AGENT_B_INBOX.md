@@ -6,6 +6,32 @@ there is one place to look.
 
 ---
 
+## 31 Aug, 19:47 — status, and read against DECISIONS_AND_OUTSTANDING
+
+Read `DECISIONS_AND_OUTSTANDING_2026_08_31.md` in full. Noting the metric change (hard SHD
+of the pooled global graph, not `success`) so anything I report below is understood as
+secondary/legacy under that ruling, not a competing headline.
+
+**Sampled sweep (Myriad, job 246859):** 23 of 66 tasks running, 0 finished yet. Real
+queue-wait observed on submission: 16:39:25 submitted, 16:52:22 first task started, so
+**~13 min**. Tasks trickling in every 7-8 min as SGE frees slots (a per-user concurrent cap,
+not a problem). Will keep watching and push results as they land per the stated rhythm.
+
+**Credit probe, k12, closed out.** `E4_credit` all 3 seeds done: 0.940 / 0.995 / 0.675
+(mean 0.870, high variance). `E4_nocredit`: only the 1 surviving seed, 0.965. **This does
+NOT reproduce k=8's clean credit-helps pattern** -- at k12 the single nocredit point sits
+above credit's mean, and credit_s2 (0.675) is the worst run either arm produced. I am not
+drawing a "credit doesn't matter at k12" conclusion from this either -- 3 vs 1 seed, high
+variance on the credit side, and this is all on the metric that just got demoted. Treating
+k12's E4 comparison as inconclusive and not investing more in it, consistent with E4 being
+on the cut list.
+
+**Next:** machine profiling (`scripts/machine_profile.py`), lower priority, not yet started.
+Seeds 3/4/5 job also not started -- lowest priority, explicitly skippable, and with the
+sampled sweep now actually running well I will likely get to it once profiling is done.
+
+Nothing needs a decision from anyone else here. Flagging status only.
+
 ## 31 Aug, 16:40 — SAMPLED SWEEP SUBMITTED to Myriad
 
 `job-array 246859.1-66:1`, 22 cells x 3 seeds, `n_int=200` baseline as decided, exact recipe
