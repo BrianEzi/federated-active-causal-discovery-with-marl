@@ -448,15 +448,34 @@ def consistent_with_partner(groups: Sequence[LatentGroup], owner: int,
     """
     if not moved:
         return True                        # nothing observed, nothing to contradict
+    # PAIRS EXPLAINED BY MORE THAN ONE GROUP CARRY NO EVIDENCE ABOUT EITHER, and getting this
+    # wrong made atomicity UNSOUND. Two agents may independently confound the same pair --
+    # `groups_from_dag` reports one group per latent and lets them overlap, deliberately. So
+    # `uv` can move because agent 2's latent was disturbed while agent 1's group {u,v,w},
+    # which also explains `uv`, was not. Under the old test agent 1's group then looked
+    # PARTIALLY moved and the candidate was refuted -- including when that candidate was the
+    # TRUTH. Measured 31 Aug at k=12, 4 agents, over every possible partner private action:
+    # atomicity alone refuted the true attribution in 27 of 85 oracle messages, 31.8%, and 16
+    # agent-episodes had two true groups sharing a pair. That is the source of the residual
+    # `wrong` verdicts under ORACLE evidence in BOTH backends, and of the non-zero
+    # `assumption_violations` even with rule 1 switched off.
+    #
+    # THE REPAIR. A latent moving implies EVERY pair it explains moves. So a group is refuted
+    # only when a pair it explains EXCLUSIVELY moved while the rest of its pairs did not: an
+    # exclusive pair can move for no other reason. Shared pairs are unconstrained. This is
+    # strictly weaker, and it is sound.
+    exclusive_count: Dict[Tuple[int, int], int] = {}
+    for group in groups:
+        for pair in group.pairs():
+            exclusive_count[pair] = exclusive_count.get(pair, 0) + 1
     covered = set()
     for group in groups:
         pairs = set(group.pairs())
-        hit = pairs & moved
-        if hit and hit != pairs:
-            # ATOMICITY, and it holds for EVERY owner: one latent moves as a unit, so a
-            # candidate that assigns a clique to a latent and then sees part of it move is
-            # refuted whoever it named. This rule is sound unconditionally.
-            return False
+        if not pairs <= moved:
+            exclusive = {p for p in pairs if exclusive_count[p] == 1}
+            if exclusive & moved:
+                # A pair only this group explains moved, but the group did not move whole.
+                return False
         if group.owner == owner:
             covered |= pairs
     if not local_disturbance:
