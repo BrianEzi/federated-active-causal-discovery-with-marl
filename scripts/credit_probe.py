@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -38,8 +39,11 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from scripts.sweep import build_cells, command                       # noqa: E402
 
-ENV = {"PYTHONPATH": ".", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
-       "PATH": "/usr/bin:/bin"}
+# COPY the real environment rather than replacing it. `PATH: "/usr/bin:/bin"` assumed a
+# POSIX host; on Windows it deletes SystemRoot, TEMP and everything else CreateProcess
+# needs to load a DLL, and the child fails before it can even print an error. Overriding
+# only the three variables this probe actually cares about is portable either way.
+ENV = {**os.environ, "PYTHONPATH": ".", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
 
 
 def run(cell, seed, local_epochs, credit, out_dir, episodes, eval_episodes):
@@ -48,6 +52,12 @@ def run(cell, seed, local_epochs, credit, out_dir, episodes, eval_episodes):
     if pathlib.Path(out).exists():
         return label, seed, json.loads(pathlib.Path(out).read_text())
     argv = command(cell, seed, out_dir, episodes=episodes)
+    # `command()` hardcodes ".venv/bin/python" -- correct when a POSIX shell resolves the
+    # shebang for it (launch.sh's xargs+sh), wrong here: `subprocess.run` without a shell
+    # calls CreateProcess/execve directly on argv[0], which cannot run a shim script or a
+    # relative path missing a platform extension. `sys.executable` is the interpreter this
+    # probe is ALREADY running under, which is what should be training the child anyway.
+    argv[0] = sys.executable
     argv[argv.index("--out") + 1] = out
     argv[argv.index("--eval_episodes") + 1] = str(eval_episodes)
     if local_epochs:
