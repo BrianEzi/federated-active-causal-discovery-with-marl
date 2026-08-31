@@ -6,6 +6,23 @@ there is one place to look.
 
 ---
 
+## 31 Aug, 21:00 — k=20/k=30 at 12,000 episodes submitted, and the sampled sweep is expensive
+
+**`job-array 247268.1-6:1`** on Myriad, per `DECISIONS_AND_OUTSTANDING` section 5: k30
+seeds 0-2 and k20 seeds 0-2, `--train_episodes 12000`, separate output dir
+(`results/sweep/oracle_long/`) so it can never collide with the 4,000-episode sweep. Same
+resume wrapper as the sampled sweep. It is queued behind the sampled sweep's remaining tasks
+(`hqw`), not competing with them for the same slots -- fine, expected, not a problem.
+
+**Confirmed on request: sampled evidence runs use `--backend factored`** -- the constraint/
+pairwise-propagation engine, in its sampled-evidence mode (pruning from what the data shows
+rather than the true ancestry). Checked the actual job commands rather than assumed.
+
+**Sampled sweep status: 32 of 66 running, 0 finished after ~4.5h.** Not a concern -- sampled
+evidence needs real statistical inference per episode where oracle reads a deterministic
+ancestry, so this is expected to be slower per run, not stuck. Will flag if any task
+approaches its 12h walltime with nothing to show.
+
 ## 31 Aug, 19:47 — status, and read against DECISIONS_AND_OUTSTANDING
 
 Read `DECISIONS_AND_OUTSTANDING_2026_08_31.md` in full. Noting the metric change (hard SHD
