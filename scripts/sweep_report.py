@@ -57,6 +57,16 @@ def load(directory: pathlib.Path):
             "steps": arms["learned"]["mean_steps"],
             "greedy_steps": arms.get("greedy_uncertainty", {}).get("mean_steps"),
             "ceiling_steps": arms.get("oracle_cover", {}).get("mean_steps"),
+            # THE PRIMARY METRIC. `success` is the ALL-AGENTS CONJUNCTION, so at 8-10
+            # agents a per-window rate of 0.98 against 0.90 becomes an episode rate of
+            # 0.94 against 0.61 -- it amplifies seed variance into what reads as a
+            # collapse. Measured 31 Aug: k12s25n08b150 seed 2 scores success 0.035 while
+            # recovering the graph to hard SHD 0.0143 against random's 0.0537. The graph
+            # is the object this thesis claims to recover, so the graph is what leads.
+            "hard_shd": arms["learned"].get("global_hard_shd"),
+            "greedy_hard_shd": arms.get("greedy_uncertainty", {}).get("global_hard_shd"),
+            "random_hard_shd": arms.get("random_vary", {}).get("global_hard_shd"),
+            "resolved": arms["learned"].get("global_resolved_fraction"),
             "shd": arms["learned"].get("global_soft_shd"),
             "mi": checkpoints.get("best_mi_ratio"),
             "entropy": (d.get("history") or [{}])[-1].get("entropy"),
@@ -102,6 +112,42 @@ def table(rows, axis_cells, title, key):
               f"{mim:6.3f} {sl:5.2f}/{sg:5.2f}/{sc:5.2f}  {flag}")
 
 
+def shd_table(rows, axis_cells, title, key):
+    """THE PRIMARY TABLE. Hard SHD on the pooled global graph, learned / greedy / random.
+
+    Why this leads and `success` does not. `success` is the all-agents conjunction, so it
+    both saturates (every k=12 cell sits at 0.88-0.99 for two arms at once) and amplifies:
+    a per-window rate of 0.98 against 0.90 becomes 0.94 against 0.61 at 8 agents. SHD does
+    neither. Measured 31 Aug: k12s25n08b150 seed 2 scores success 0.035 while recovering the
+    graph to hard SHD 0.0143 -- against random's 0.0537 -- so the conjunction reported a
+    near-total failure for a run that recovered 98.6% of the graph correctly.
+
+    HARD rather than soft: a pair counts as wrong unless the pooled belief has settled on
+    exactly the true mark. Soft SHD gives partial credit for an unresolved pair, which is
+    the more forgiving number and not the one to claim.
+    """
+    by_cell = collections.defaultdict(list)
+    for r in rows:
+        if r["cell"] in axis_cells:
+            by_cell[r["cell"]].append(r)
+    if not by_cell:
+        return
+    print(f"\n### {title} — hard SHD of the pooled global graph (LOWER IS BETTER)")
+    print(f"{'cell':22s} {key:>6s} {'seeds':>5s} {'learned':>17s} {'greedy':>8s} "
+          f"{'random':>8s} {'L/G':>7s} {'resolved':>9s}")
+    for cell in sorted(by_cell, key=lambda c: axis_cells[c]):
+        got = sorted(by_cell[cell], key=lambda r: r["seed"] or 0)
+        lm, ls = _agg([r["hard_shd"] for r in got])
+        gm, _ = _agg([r["greedy_hard_shd"] for r in got])
+        rm, _ = _agg([r["random_hard_shd"] for r in got])
+        res, _ = _agg([r["resolved"] for r in got])
+        # Ratio rather than difference: these are small numbers and a difference of 0.0003
+        # is unreadable, while "learned is 5x better than greedy" is not.
+        ratio = (lm / gm) if gm else float("nan")
+        print(f"{cell:22s} {axis_cells[cell]:6} {len(got):5d} "
+              f"{lm:8.4f}+-{ls:7.4f} {gm:8.4f} {rm:8.4f} {ratio:7.2f} {res:9.3f}")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -141,7 +187,10 @@ def main(argv=None) -> int:
         if axis == "sigma_x_n":
             members = {c.name: c.sigma for c in cells if c.axis == "sigma_x_n"}
         if members:
-            table(rows, members, f"{axis} axis", key)
+            # SHD FIRST, deliberately. See `shd_table`: the conjunction saturates and
+            # amplifies, and the graph is the object the thesis claims to recover.
+            shd_table(rows, members, f"{axis} axis", key)
+            table(rows, members, f"{axis} axis — episode success (conjunction)", key)
 
     trained = [r for r in rows if (r["mi"] or 0) >= MI_FLOOR and r["greedy"] is not None]
     if trained:
