@@ -336,3 +336,55 @@ Report the table it prints, especially any row where `gap` is meaningfully posit
 - **The skeleton assumption is now measured**, and it is load-bearing: with the true skeleton
   full coverage identifies 100% of windows; with one estimated at n_obs=60 it identifies
   **none**, and claim accuracy falls 100% → 57%. See `FINDINGS_SKELETON_2026_08_31.md`.
+
+---
+
+## Update — 31 Aug, 17:10. Attribution scales, and the backend you have is unsound at k>=20
+
+### What changed in the code you will pull
+
+`cb/component_attribution.py` — a THIRD attribution backend, `--backend component_attributed`.
+The existing two are untouched; the enumerated one is still the crosscheck reference.
+
+The idea, in one line: **the attribution candidate set factors exactly over the connected
+components of the bidirected graph**, so ownership no longer has to be enumerated jointly.
+
+    attributions_for(pairs, owners) == PRODUCT over components of attributions_for(c, owners)
+
+pinned as set equality on 240 random pair sets at 2-4 owners
+(`tests/crosscheck/test_component_attribution.py`). Cost falls from `(2^(n-1)-1)^P` in the
+total settled-pair count to a SUM over components. Rule 1 (local disturbance) is the only
+constraint that spans components; it is applied by unit propagation to a fixpoint, so the
+belief is a SUPERSET of the enumerated one -- less decided, never differently decided.
+
+Per-pair factoring, which is what was planned, does NOT work: atomicity needs to know which
+pairs share a latent, which is the joint fact a per-pair belief cannot hold.
+
+### The finding that matters more than the speed
+
+At k=20, 4 agents, matched scope, the ENUMERATED-ownership backend settles **7 attributions
+right and 7 WRONG**. Under oracle evidence. The component backend settles 6 and 0.
+
+`wrong` here is not a bug: it is rule 1's local-disturbance assumption failing, and the
+backends now report `assumption_violations` beside it so the two cannot be confused. At k=8
+over 30 episodes both backends show 2 wrong out of 82 against **16 assumption violations**,
+so the assumption fails often and only sometimes reaches a verdict. The component backend
+applies rule 1 only where unit propagation makes it exact -- strictly less often -- which is
+why the k=20 misattributions disappear. It does NOT eliminate them in general.
+
+**If you have any attribution results at k>=12, they need re-reading with this in mind.**
+
+### A defect you should know about
+
+`ma/env.py::_disclose_partner_responses` gated the partner channel on `!= ATTRIBUTED`, so
+**every `factored_attributed` run inside the env received no partner messages at all** and its
+attribution could never be settled by evidence. Fixed (gated on the family). It survived
+because every factored-attribution number to date came from a driver calling
+`observe_partner` directly, never through the env. Any env-path attribution number from
+before today is measuring a dead channel.
+
+### What would help from you
+
+Nothing new is being asked of you on attribution -- it is CPU-cheap and finishing here. Keep
+going with the sampled sweep and the k=20/k=30 re-runs at 12,000 episodes. If the sampled
+feasibility search in section 4 is done, that answer is still the blocking one.
