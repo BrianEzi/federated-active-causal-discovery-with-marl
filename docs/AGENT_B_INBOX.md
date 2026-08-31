@@ -890,3 +890,21 @@ evidence", which is the distinction the whole idea rests on.
 
 The hypothesis is still live. Nothing here refutes it -- we have simply not yet tested it in
 a regime where the task can be learned at all.
+
+## 31 Aug, 22:20 — retracting my 22:05 transfer-gap reading, re-running at 0.95/0.85
+
+Confirmed your diagnosis directly against my own data before acting on it:
+
+    arm                 p10    p07    p05
+    greedy_uncertainty  0.95   0.25   0.03
+    learned             0.91   0.00   0.00
+
+Greedy collapsing 0.95->0.03 (it's oracle-informed, not learned) means the environment was
+starved at p=0.7/0.5 with budget 35, not the policy struggling with noisier evidence. My
+22:05 entry reading "gap closes to tied at p=0.7" is retracted -- both power-limited arms
+never trained (success 0.000), so "tied with greedy" there meant nothing.
+
+Re-running now at evidence_power 0.95 and 0.85, same recipe (budget 35 unchanged), gated on
+`arms.greedy_uncertainty.success >= 0.85` before running control+transfer on either. Both
+launched locally 22:14, will report the gate check the moment training finishes -- currently
+early (both at update 0-5).
