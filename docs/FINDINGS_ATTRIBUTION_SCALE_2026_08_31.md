@@ -1,5 +1,43 @@
 # Attribution at scale: it factors over components, and the enumerated engine gets WRONG
 
+> ## SUPERSEDED, 31 Aug 22:10 — DO NOT QUOTE THE NUMBERS BELOW
+>
+> Three claims in this document are wrong. All three were artefacts of defects in my own
+> engine, each found by a measurement queued to test the claim above it. A corrected table is
+> being produced from a single build and this file will be rewritten when it lands.
+>
+> **1. "Precision collapses from 98% to 59% as k grows" — FALSE.** Caused by two bugs:
+>    * `FactoredAttributedBackend` advertised scope over pairs it had truncated away, so
+>      groups it had never been asked about scored WRONG instead of UNSURE. Fixed.
+>    * `consistent_with_partner`'s atomicity rule was UNSOUND. Two agents may independently
+>      confound the same pair, so a pair can move because agent 2's latent moved while agent
+>      1's group containing it did not — and the old test refuted the TRUTH for it. Measured:
+>      atomicity alone refuted the true attribution in **27 of 85** oracle messages. Repaired
+>      to apply all-or-none only over pairs a group explains EXCLUSIVELY: **27/85 -> 0/85**.
+>
+>    With both fixed, both engines settle **zero attributions incorrectly** at every size
+>    measured. There is no precision collapse.
+>
+> **2. "The component engine is more precise because it declines to apply rule 1 across
+>    components" — FALSE.** The D6 probe found **zero** cross-component messages at k=12, 20
+>    and 30. The mechanism I proposed does not occur.
+>
+> **3. "The component engine gives up 10-25% of decisions" — FALSE.** A one-ulp bug:
+>    `frequency_tables` accumulated `+= 1/n`, so a group present in EVERY candidate reached
+>    0.9999999999999998 and failed `freq >= 1.0`. It was discarding every claim it was
+>    CERTAIN of. Fixed by counting integers and dividing once. The two engines now agree
+>    exactly (k=6: 57/57, k=8: 38/38, k=12: 44/44) with the component engine 1.5-2x faster.
+>
+> **What survives unchanged:** the component factoring is exact (set equality on 240 random
+> pair sets); the 11.7x speedup; the reach to k=30; and the finding that rule 1's
+> local-disturbance assumption fails measurably often (violations counted per run) while the
+> engine degrades to UNSURE rather than to WRONG.
+>
+> **A process failure worth recording:** the table this file reported mixed rows from
+> different builds, because the driving script invoked Python three times and I edited the
+> engine between stages. Definitive numbers now come from one process, one build.
+
+
 31 Aug 2026. Supersedes the "attribution caps at k=12" reading in
 `RESUME_PER_PAIR_ATTRIBUTION.md`, and corrects a number I reported from too few episodes.
 
