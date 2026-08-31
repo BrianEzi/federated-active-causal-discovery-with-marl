@@ -192,8 +192,14 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         # asked -- and kept apart from `contradictions` so the two cannot be confused.
         self.out_of_scope = 0
         self._components: Tuple[Tuple[Tuple[Pair, ...], Tuple[tuple, ...]], ...] = ()
+        self._masks: Dict[tuple, Tuple[set, set]] = {}
 
     # -- the candidate set ---------------------------------------------------------------
+
+    def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
+        self._masks = {}
+        self._components = ()
+        super().reset(true_mag, adjacency=adjacency, topology=topology)
 
     def _rebuild(self, force: bool = False) -> None:
         settled = self.settled_bidirected()
@@ -205,7 +211,7 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
                 scope=self._scope_of(self._components))
             return
 
-        kept: List[List] = []
+        blocks: List[Tuple[Tuple[Pair, ...], tuple]] = []
         self.truncated = False
         for pairs in connected_components(settled):
             # A component too dense to enumerate is TRUNCATED, not dropped. Dropping it takes
@@ -219,7 +225,7 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
             if len(pairs) > budget:
                 self.truncated = True
                 pairs = pairs[:budget]
-            kept.append([pairs, list(attributions_for(pairs, self.owners))])
+            blocks.append((pairs, attributions_for(pairs, self.owners)))
 
         # COUNTED PER REPLAY, NOT ACCUMULATED ACROSS REPLAYS. The log is replayed in full
         # every time the settled set changes, so incrementing a running total would count the
@@ -227,9 +233,11 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         # broken than it is. These are counts of MESSAGES.
         self.contradictions = 0
         self.out_of_scope = 0
-        self._prune(kept)
+        live = self._prune(blocks)
 
-        self._components = tuple((tuple(pairs), tuple(candidates)) for pairs, candidates in kept)
+        self._components = tuple(
+            (pairs, tuple(candidates[i] for i in sorted(alive)))
+            for (pairs, candidates), alive in zip(blocks, live))
         self._settled = settled
         self.last = ComponentAttributedBelief(
             self.structure.last or self._empty_structure(), self._components, self.k,
@@ -249,7 +257,8 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         if span <= 1:
             return self.max_component_pairs
         allowed, size = 0, 1
-        while allowed < self.max_component_pairs and size * span <= self.max_component_candidates:
+        while (allowed < self.max_component_pairs
+               and size * span <= self.max_component_candidates):
             size *= span
             allowed += 1
         return max(1, allowed)
@@ -258,8 +267,38 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
     def _scope_of(components) -> frozenset:
         return frozenset(pair for pairs, _ in components for pair in pairs)
 
-    def _prune(self, components: List[List]) -> None:
-        """Replay the whole message log to a FIXPOINT. Mutates `components` in place.
+    def _masks_for(self, pairs, candidates, owner, moved):
+        """(atomicity survivors, atomicity-and-rule-1 survivors) as INDEX SETS, memoised.
+
+        WHY THIS IS THE OBJECT TO CACHE AND THE PRUNED LIST IS NOT. Whether a message may be
+        applied depends on the whole scope -- a clause that is unit today can stop being unit
+        when a pair settles somewhere else -- so carrying a component's PRUNED list across
+        rebuilds is unsound: it would keep a rule-1 prune that the enlarged scope no longer
+        licenses. Caught before it shipped, and it is exactly the failure the replay log was
+        introduced to prevent.
+
+        These two sets have no such dependence. Both are a function of (this component's
+        candidate list, this message) alone, and the candidate list is a function of the
+        component's pairs alone. So they survive any change of scope, and the fixpoint below
+        becomes intersections of small integer sets instead of rescans of every candidate.
+        """
+        key = (pairs, owner, moved)
+        hit = self._masks.get(key)
+        if hit is None:
+            atomic, satisfying = set(), set()
+            for index, candidate in enumerate(candidates):
+                if not consistent_with_partner(candidate, owner, moved,
+                                               local_disturbance=False):
+                    continue
+                atomic.add(index)
+                if consistent_with_partner(candidate, owner, moved, local_disturbance=True):
+                    satisfying.add(index)
+            hit = (atomic, satisfying)
+            self._masks[key] = hit
+        return hit
+
+    def _prune(self, blocks) -> List[set]:
+        """Replay the whole message log to a FIXPOINT. Returns one live index set per block.
 
         A fixpoint rather than one pass in log order, because a clause that spans components
         can become unit only after some other message has pruned one of them, and a single
@@ -271,33 +310,35 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         order messages ARRIVED in relative to structure updates, which is the property that
         was actually at risk. The pass order here is log order, so it is deterministic.
         """
-        scope = frozenset(pair for pairs, _ in components for pair in pairs)
+        live = [set(range(len(candidates))) for _, candidates in blocks]
+        scope = frozenset(pair for pairs, _ in blocks for pair in pairs)
         dropped: set = set()
+        # A message need only be re-examined when some block has CHANGED since it was last
+        # examined; otherwise it re-derives the filtering it already performed. Without this
+        # the fixpoint costs (passes x messages x blocks) set operations on every rebuild.
+        version = [0] * len(blocks)
+        seen: Dict[int, tuple] = {}
         changed = True
         while changed:
             changed = False
             for index, (owner, moved) in enumerate(self._log):
-                if index in dropped:
+                if index in dropped or seen.get(index) == tuple(version):
                     continue
-                # ATOMICITY first: unary per group, sound unconditionally, and it applies to
-                # every owner rather than only to the actor.
-                atomic = [[a for a in candidates
-                           if consistent_with_partner(a, owner, moved,
-                                                      local_disturbance=False)]
-                          for _, candidates in components]
+                seen[index] = tuple(version)
+                masks = [self._masks_for(pairs, candidates, owner, moved)
+                         for pairs, candidates in blocks]
+                atomic = [live[i] & masks[i][0] for i in range(len(blocks))]
                 if any(not survivors for survivors in atomic):
-                    # Some component has no candidate left at all, so no global assignment
-                    # survives. Refuse the message rather than the belief, exactly as the
+                    # Some block has no candidate left at all, so no global assignment
+                    # survives. Refuse the MESSAGE rather than the belief, exactly as the
                     # enumerated backend does -- the truth is in the set, so the evidence is
                     # what is at fault.
                     dropped.add(index)
                     self.contradictions += 1
                     continue
                 if self.local_disturbance:
-                    support = [i for i, survivors in enumerate(atomic)
-                               if any(consistent_with_partner(a, owner, moved,
-                                                              local_disturbance=True)
-                                      for a in survivors)]
+                    support = [i for i in range(len(blocks))
+                               if atomic[i] & masks[i][1]]
                     if not support:
                         dropped.add(index)
                         if set(moved) <= scope:
@@ -307,13 +348,13 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
                         continue
                     if len(support) == 1:
                         only = support[0]
-                        atomic[only] = [a for a in atomic[only]
-                                        if consistent_with_partner(
-                                            a, owner, moved, local_disturbance=True)]
-                for i, (_, candidates) in enumerate(components):
-                    if len(atomic[i]) != len(candidates):
-                        components[i][1] = atomic[i]
+                        atomic[only] = atomic[only] & masks[only][1]
+                for i in range(len(blocks)):
+                    if atomic[i] != live[i]:
+                        live[i] = atomic[i]
+                        version[i] += 1
                         changed = True
+        return live
 
     # -- reporting -----------------------------------------------------------------------
 

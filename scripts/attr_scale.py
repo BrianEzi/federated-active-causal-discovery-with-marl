@@ -105,7 +105,8 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
         agents = list(env.topology.agents)
         kwargs = dict(n_agents=len(agents), evidence="oracle")
         tally = {"right": 0, "wrong": 0, "unsure": 0, "total": 0}
-        scope_share, pairs, comps, largest, cands, contradictions = [], [], [], [], [], 0
+        scope_share, pairs, comps, largest, cands = [], [], [], [], []
+        contradictions = out_of_scope = violations = 0
         start = time.time()
         for episode in range(episodes):
             if label == "component":
@@ -126,6 +127,13 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
                 pairs.append(len(settled))
                 scope_share.append(len(backend.last.scope) / max(len(settled), 1))
                 contradictions += backend.contradictions
+                out_of_scope += getattr(backend, "out_of_scope", 0)
+                # WHERE A `wrong` COMES FROM. Under oracle evidence the truth cannot leave a
+                # sound candidate set, so a confident misattribution can only mean a message
+                # refuted the TRUE attribution -- which is the local-disturbance assumption
+                # of rule 1 failing, counted here rather than inferred. Reporting `wrong`
+                # without it invites reading engine error as attribution error.
+                violations += backend.assumption_violations
                 if label == "component":
                     comps.append(backend.n_components)
                     largest.append(backend.largest_component)
@@ -137,6 +145,8 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
         rows.append({"cell": name, "backend": label, "k": k, "sigma": sigma,
                      "n_agents": n_agents, "budget": budget, "episodes": episodes,
                      "seconds_per_episode": seconds, "contradictions": contradictions,
+                     "out_of_scope": out_of_scope,
+                     "assumption_violations": violations,
                      "scope_share": float(np.mean(scope_share)),
                      "settled_pairs": float(np.mean(pairs)),
                      "components": float(np.mean(comps)),
@@ -174,7 +184,7 @@ def main() -> None:
     rows: List[Dict] = []
     header = (f"{'cell':>16s} {'backend':>10s} {'right':>6s} {'wrong':>6s} {'unsure':>7s} "
               f"{'total':>6s} {'scope':>6s} {'pairs':>6s} {'comp':>5s} {'max':>4s} "
-              f"{'cands':>10s} {'s/ep':>7s}")
+              f"{'cands':>10s} {'viol':>5s} {'s/ep':>7s}")
     print(header)
     print("-" * len(header))
     for spec in args.cells.split(","):
@@ -188,7 +198,8 @@ def main() -> None:
                   f"{row['wrong']:6d} {row['unsure']:7d} {row['total']:6d} "
                   f"{row['scope_share']:6.2f} {row['settled_pairs']:6.1f} "
                   f"{row['components']:5.1f} {row['largest_component']:4.1f} "
-                  f"{row['candidates']:10.2e} {row['seconds_per_episode']:7.2f}",
+                  f"{row['candidates']:10.2e} {row['assumption_violations']:5d} "
+                  f"{row['seconds_per_episode']:7.2f}",
                   flush=True)
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
