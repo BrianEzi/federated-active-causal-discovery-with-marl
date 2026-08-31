@@ -101,6 +101,28 @@ def connected_components(pairs: Sequence[Pair]) -> Tuple[Tuple[Pair, ...], ...]:
                  sorted(buckets.values(), key=lambda g: sorted(g)))
 
 
+def frequency_tables(components):
+    """(total, group_frequency, owner_frequency) for a set of per-component candidate lists.
+
+    EXACT for the product this belief represents: a group lives in exactly one component and
+    the components are independent, so a group's global frequency equals its frequency within
+    its own component. No sampling, no bound, no approximation on this side.
+    """
+    groups: Counter = Counter()
+    owners: Counter = Counter()
+    total = 1
+    for _, candidates in components:
+        total *= len(candidates)
+        share = 1.0 / max(len(candidates), 1)
+        for hypothesis in candidates:
+            for group in hypothesis:
+                groups[group] += share
+                owner = group.owner
+                for u, v in group.pairs():
+                    owners[(u, v, owner)] += share
+    return (total if components else 0), dict(groups), dict(owners)
+
+
 class ComponentAttributedBelief:
     """Per-component candidate lists, read as one belief.
 
@@ -109,31 +131,23 @@ class ComponentAttributedBelief:
     frequency within its own component. No sampling, no bound, no approximation on this side.
     """
 
-    def __init__(self, structure, components, k: int, scope=()):
+    def __init__(self, structure, components, k: int, scope=(), tables=None):
         self.k = int(k)
         self.adjacency = structure.adjacency
         self.directed = structure.directed
         self.bidirected = structure.bidirected
         # components: ((pairs, candidates), ...) -- candidates is a tuple of attributions,
         # each a tuple of LatentGroup whose pairs lie inside that component.
-        self.components = tuple((tuple(pairs), tuple(candidates))
-                                for pairs, candidates in components)
-        total = 1
-        for _, candidates in self.components:
-            total *= len(candidates)
-        self.total = total if self.components else 0
-
-        groups: Counter = Counter()
-        owners: Counter = Counter()
-        for _, candidates in self.components:
-            denominator = max(len(candidates), 1)
-            for hypothesis in candidates:
-                for group in hypothesis:
-                    groups[group] += 1.0 / denominator
-                    for pair in group.pairs():
-                        owners[(pair[0], pair[1], group.owner)] += 1.0 / denominator
-        self.group_frequency = dict(groups)
-        self.owner_frequency = dict(owners)
+        self.components = tuple(components)
+        # THE FREQUENCY TABLES ARE PASSED IN, NOT RECOMPUTED. They are a function of the
+        # CANDIDATES alone, and the candidates change only when the settled set does --
+        # perhaps a dozen times an episode. The structure matrices above change every round,
+        # so this object is rebuilt roughly (rounds x agents) times: profiled at 578 rebuilds
+        # over two episodes at k=12, of which this constructor was 64 s out of 77. The
+        # backend now computes the tables once per candidate change and hands them over.
+        if tables is None:
+            tables = frequency_tables(self.components)
+        self.total, self.group_frequency, self.owner_frequency = tables
         # OUT OF SCOPE IS UNSURE, NOT WRONG -- see `cb/factored_attribution.py`. Scope here is
         # the union of the components kept, so a component too dense to enumerate takes its
         # own pairs out of scope and leaves every other component fully attributable.
@@ -193,6 +207,7 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         self.out_of_scope = 0
         self._components: Tuple[Tuple[Tuple[Pair, ...], Tuple[tuple, ...]], ...] = ()
         self._masks: Dict[tuple, Tuple[set, set]] = {}
+        self._tables = None
         # THE MECHANISM COUNTERS. The claim this backend makes is that its precision comes
         # from declining to apply rule 1 where it spans components -- and that those are
         # disproportionately the clauses on which rule 1 is WRONG. That is a claim about
@@ -211,6 +226,7 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
         self._masks = {}
         self._components = ()
+        self._tables = None
         self.messages_single = self.messages_cross = 0
         self.violations_single = self.violations_cross = 0
         super().reset(true_mag, adjacency=adjacency, topology=topology)
@@ -244,7 +260,7 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
             # frequencies move on every own intervention, so the belief object is rebuilt.
             self.last = ComponentAttributedBelief(
                 self.structure.last or self._empty_structure(), self._components, self.k,
-                scope=self._scope_of(self._components))
+                scope=self._scope_of(self._components), tables=self._tables)
             return
 
         blocks: List[Tuple[Tuple[Pair, ...], tuple]] = []
@@ -275,9 +291,10 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
             (pairs, tuple(candidates[i] for i in sorted(alive)))
             for (pairs, candidates), alive in zip(blocks, live))
         self._settled = settled
+        self._tables = frequency_tables(self._components)
         self.last = ComponentAttributedBelief(
             self.structure.last or self._empty_structure(), self._components, self.k,
-            scope=self._scope_of(self._components))
+            scope=self._scope_of(self._components), tables=self._tables)
 
     def _pair_budget(self) -> int:
         """How many pairs one component may hold, from the enumeration cost it implies.

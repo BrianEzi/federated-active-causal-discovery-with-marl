@@ -57,8 +57,17 @@ class LatentGroup:
     owner: int
     children: FrozenSet[int]
 
+    @lru_cache(maxsize=None)
     def pairs(self) -> Tuple[Tuple[int, int], ...]:
-        """The bidirected edges this group accounts for."""
+        """The bidirected edges this group accounts for.
+
+        MEMOISED, and it matters more than it looks. This is a pure function of a FROZEN
+        dataclass, so the answer can never change, and it sits inside every belief-frequency
+        loop and every consistency test. Profiled 31 Aug on two episodes at k=12: 26.3
+        MILLION calls, 16.5 s of a 77 s episode pair, recomputing `combinations(sorted(...))`
+        for the same few dozen groups over and over. The cache is keyed on `self` and is
+        therefore bounded by the number of distinct (owner, children) pairs, which is small.
+        """
         return tuple(combinations(sorted(self.children), 2))
 
     def __repr__(self) -> str:
@@ -271,7 +280,18 @@ def maximal_cliques(pairs: Sequence[Tuple[int, int]]) -> Tuple[FrozenSet[int], .
     Collapsing to maximal cliques removes exactly those undecidable refinements and nothing
     else. Where a partial response IS possible the cliques stay separate: {u,v} and {v,w}
     with u-w NOT confounded do not merge, and an action moving only {u,v} tells them apart.
+
+    MEMOISED on the normalised pair set. `_attributions` calls this once per owner per
+    owner-set assignment, so the call count is (2^owners - 1)^pairs x owners while the number
+    of DISTINCT arguments is at most the number of subsets of the pair set. Profiled 31 Aug at
+    k=12: 272,424 calls over three episodes against a few dozen distinct inputs.
     """
+    return _maximal_cliques(tuple(sorted((min(u, v), max(u, v)) for u, v in pairs)))
+
+
+@lru_cache(maxsize=65536)
+def _maximal_cliques(pairs: Tuple[Tuple[int, int], ...]) -> Tuple[FrozenSet[int], ...]:
+    """The body of `maximal_cliques`, keyed on a hashable normalised pair tuple."""
     nodes = sorted({n for pair in pairs for n in pair})
     edges = {(min(u, v), max(u, v)) for u, v in pairs}
     found = []
