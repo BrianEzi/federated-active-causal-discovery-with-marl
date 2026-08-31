@@ -98,7 +98,8 @@ def drive(env, backends, episode: int) -> None:
 
 
 def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episodes: int,
-             n_obs: int, n_int: int, which: List[str], cap: int, ref_cap: int) -> List[Dict]:
+             n_obs: int, n_int: int, which: List[str], cap: int, ref_cap: int,
+             max_candidates: int, local_disturbance: bool) -> List[Dict]:
     rows = []
     for label in which:
         env = build_env(k, sigma, n_agents, budget, n_obs, n_int)
@@ -107,16 +108,19 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
         tally = {"right": 0, "wrong": 0, "unsure": 0, "total": 0}
         scope_share, pairs, comps, largest, cands = [], [], [], [], []
         contradictions = out_of_scope = violations = 0
+        msg_single = msg_cross = vio_single = vio_cross = 0
         start = time.time()
         for episode in range(episodes):
             if label == "component":
-                backends = {a: ComponentAttributedBackend(env.windows[a].k, agent=a,
-                                                          max_component_pairs=cap, **kwargs)
+                backends = {a: ComponentAttributedBackend(
+                                env.windows[a].k, agent=a, max_component_pairs=cap,
+                                max_component_candidates=max_candidates,
+                                local_disturbance=local_disturbance, **kwargs)
                             for a in agents}
             else:
-                backends = {a: FactoredAttributedBackend(env.windows[a].k, agent=a,
-                                                         max_attribution_pairs=ref_cap,
-                                                         **kwargs)
+                backends = {a: FactoredAttributedBackend(
+                                env.windows[a].k, agent=a, max_attribution_pairs=ref_cap,
+                                local_disturbance=local_disturbance, **kwargs)
                             for a in agents}
             drive(env, backends, episode)
             for agent, backend in backends.items():
@@ -134,6 +138,10 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
                 # of rule 1 failing, counted here rather than inferred. Reporting `wrong`
                 # without it invites reading engine error as attribution error.
                 violations += backend.assumption_violations
+                msg_single += getattr(backend, "messages_single", 0)
+                msg_cross += getattr(backend, "messages_cross", 0)
+                vio_single += getattr(backend, "violations_single", 0)
+                vio_cross += getattr(backend, "violations_cross", 0)
                 if label == "component":
                     comps.append(backend.n_components)
                     largest.append(backend.largest_component)
@@ -147,12 +155,24 @@ def run_cell(name: str, k: int, sigma: float, n_agents: int, budget: int, episod
                      "seconds_per_episode": seconds, "contradictions": contradictions,
                      "out_of_scope": out_of_scope,
                      "assumption_violations": violations,
+                     "messages_single": msg_single, "messages_cross": msg_cross,
+                     "violations_single": vio_single, "violations_cross": vio_cross,
+                     "max_component_candidates": max_candidates,
+                     "local_disturbance": local_disturbance,
                      "scope_share": float(np.mean(scope_share)),
                      "settled_pairs": float(np.mean(pairs)),
                      "components": float(np.mean(comps)),
                      "largest_component": float(np.mean(largest)),
                      "candidates": float(np.mean(cands)), **tally})
     return rows
+
+
+def _rate(bad: int, total: int) -> str:
+    """`bad/total (pct)` -- the raw counts stay visible because a rate over five messages is
+    not a rate, and a reader must be able to see that for themselves."""
+    if not total:
+        return "-"
+    return f"{bad}/{total} {100.0 * bad / total:.0f}%"
 
 
 def main() -> None:
@@ -172,6 +192,15 @@ def main() -> None:
                     help="max_component_pairs, the component backend's per-component cap")
     ap.add_argument("--ref_cap", type=int, default=5,
                     help="max_attribution_pairs, the enumerated-ownership global cap")
+    # THE SENSITIVITY ARM. Rule 1 is a modelling assumption, not a theorem; this switches it
+    # off and keeps only atomicity, which is sound unconditionally. The gap between the two
+    # runs IS what the assumption buys, measured rather than argued.
+    ap.add_argument("--no_local_disturbance", dest="local_disturbance",
+                    action="store_false", default=True)
+    # Raising this lets a dense component be enumerated rather than truncated, buying SCOPE
+    # back at the cost of enumeration time. At 3 partners the ladder is 7^p, so 50k admits a
+    # 5-pair component and 400k admits 6.
+    ap.add_argument("--max_component_candidates", type=int, default=50_000)
     ap.add_argument("--backends", default="factored,component")
     ap.add_argument("--out", default="results/attr_scale.json")
     args = ap.parse_args()
@@ -184,7 +213,7 @@ def main() -> None:
     rows: List[Dict] = []
     header = (f"{'cell':>16s} {'backend':>10s} {'right':>6s} {'wrong':>6s} {'unsure':>7s} "
               f"{'total':>6s} {'scope':>6s} {'pairs':>6s} {'comp':>5s} {'max':>4s} "
-              f"{'cands':>10s} {'viol':>5s} {'s/ep':>7s}")
+              f"{'cands':>10s} {'viol':>5s} {'1comp':>12s} {'xcomp':>12s} {'s/ep':>7s}")
     print(header)
     print("-" * len(header))
     for spec in args.cells.split(","):
@@ -192,13 +221,16 @@ def main() -> None:
         name = f"k{int(k)}s{int(float(sigma) * 100):02d}n{int(n_agents):02d}"
         for row in run_cell(name, int(k), float(sigma), int(n_agents), int(budget),
                             args.episodes, args.n_obs, args.n_int, which, args.cap,
-                            args.ref_cap):
+                            args.ref_cap, args.max_component_candidates,
+                            args.local_disturbance):
             rows.append(row)
             print(f"{row['cell']:>16s} {row['backend']:>10s} {row['right']:6d} "
                   f"{row['wrong']:6d} {row['unsure']:7d} {row['total']:6d} "
                   f"{row['scope_share']:6.2f} {row['settled_pairs']:6.1f} "
                   f"{row['components']:5.1f} {row['largest_component']:4.1f} "
                   f"{row['candidates']:10.2e} {row['assumption_violations']:5d} "
+                  f"{_rate(row['violations_single'], row['messages_single']):>12s} "
+                  f"{_rate(row['violations_cross'], row['messages_cross']):>12s} "
                   f"{row['seconds_per_episode']:7.2f}",
                   flush=True)
     out = pathlib.Path(args.out)

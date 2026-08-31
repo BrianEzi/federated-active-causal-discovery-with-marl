@@ -193,13 +193,49 @@ class ComponentAttributedBackend(FactoredAttributedBackend):
         self.out_of_scope = 0
         self._components: Tuple[Tuple[Tuple[Pair, ...], Tuple[tuple, ...]], ...] = ()
         self._masks: Dict[tuple, Tuple[set, set]] = {}
+        # THE MECHANISM COUNTERS. The claim this backend makes is that its precision comes
+        # from declining to apply rule 1 where it spans components -- and that those are
+        # disproportionately the clauses on which rule 1 is WRONG. That is a claim about
+        # where violations land, so it is counted rather than inferred: a message is
+        # `cross` when its moved pairs touch two or more of the belief's components, and
+        # `violation` when it refutes the TRUE attribution. If the violation RATE is higher
+        # among cross messages, the mechanism is real; if it is flat, the precision gain is
+        # a coincidence and must be reported as one.
+        self.messages_single = 0
+        self.messages_cross = 0
+        self.violations_single = 0
+        self.violations_cross = 0
 
     # -- the candidate set ---------------------------------------------------------------
 
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
         self._masks = {}
         self._components = ()
+        self.messages_single = self.messages_cross = 0
+        self.violations_single = self.violations_cross = 0
         super().reset(true_mag, adjacency=adjacency, topology=topology)
+
+    def observe_partner(self, owner: int, moved) -> None:
+        """Instrumented, then delegated. Counts WHERE each message lands before applying it.
+
+        Measured against the components as they stand WHEN THE MESSAGE ARRIVES, which is the
+        state the propagation will actually face -- not against the final component structure,
+        which the message itself may go on to change.
+        """
+        if moved:
+            touched = sum(1 for pairs, _ in self._components
+                          if any(pair in moved for pair in pairs))
+            cross = touched >= 2
+            violated = bool(self.true_groups) and not consistent_with_partner(
+                self.true_groups, owner, moved,
+                local_disturbance=self.local_disturbance)
+            if cross:
+                self.messages_cross += 1
+                self.violations_cross += int(violated)
+            else:
+                self.messages_single += 1
+                self.violations_single += int(violated)
+        super().observe_partner(owner, moved)
 
     def _rebuild(self, force: bool = False) -> None:
         settled = self.settled_bidirected()
