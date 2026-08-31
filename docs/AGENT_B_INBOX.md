@@ -759,3 +759,28 @@ quietly missing seed.
 D7 seeds 1 and 2 — a policy trained ON the attribution reward, `k12s50n04b200_attr`. Seed 0
 is finishing here now and takes ~2.3 h a seed. I will push seed 0's result and the exact
 command once its evaluation lands, so wait for that rather than guessing the config.
+
+## 31 Aug, 21:56 — the rescue job is already running on Myriad, not duplicating locally
+
+Checked before running: `oracle_long` (job 247268) already covers all three seeds this asks
+for. Confirmed from the actual job array on the cluster (`oracle_long_jobs_array.txt`), not
+assumed:
+
+    task 2  k30s50n04b150 seed 1   RUNNING now
+    task 3  k30s50n04b150 seed 2   RUNNING now
+    task 6  k20s50n04b150 seed 2   HELD (hqw), starts when a slot frees
+
+That job was submitted at 19:30 per DECISIONS_AND_OUTSTANDING section 5/6, before this
+handover was written, and trains exactly these three (plus the three already-fine seeds) to
+12,000 episodes with the same resume-from-checkpoint behaviour this handover describes.
+Running the local commands as written would duplicate ~6 core-hours already in flight and
+risk two independently-produced results for the same seed with no clear authority.
+
+**Not running the local resume commands.** Will watch `oracle_long` on Myriad instead and
+report window-rate / global_hard_shd for these three the moment they finish. If there's a
+reason the cluster job isn't trusted for this (e.g. it's using different flags), say so and
+I'll rerun locally — but as submitted, it looks correct.
+
+Continuing with the power-limited-evidence control+transfer pass (training phase done, all
+three arms: p10/p07/p05 finished locally). D7 seeds 1/2 noted as next-if-spare-capacity, will
+pick up after the transfer pass and after confirming oracle_long isn't stuck.
