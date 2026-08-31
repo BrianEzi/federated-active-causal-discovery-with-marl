@@ -165,11 +165,45 @@ class FactoredBackend:
         self._possible: dict = {}
         self._applied: frozenset = frozenset()
         self._detected: dict = {}
+        # Which pairs the SKELETON declared absent. Kept separately from `truth` so that
+        # `reset_marks` can re-open the belief without silently re-deriving adjacency from
+        # the true MAG, which under an estimated skeleton would hand back the very
+        # assumption the ablation exists to remove.
+        self._seeded_absent: dict = {}
 
-    def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
+    def reset(self, true_mag: np.ndarray, adjacency=None, topology=None,
+              skeleton: Optional[np.ndarray] = None) -> None:
+        """`skeleton` overrides which pairs are treated as adjacent.
+
+        WHY THE OVERRIDE EXISTS. The default seeds absence from `self.truth`, which reads as
+        oracle knowledge and is not: a MAG's adjacencies are exactly the pairs no OBSERVED
+        conditioning set can separate, so the skeleton is recoverable from observational data
+        alone -- measured at 100% agreement over 4,710 pairs (see
+        docs/FINDINGS_SKELETON_2026_08_31.md). What the default supplies is the INFINITE-DATA
+        answer. Passing an estimated skeleton here is how the finite-sample cost of that
+        supply gets measured instead of assumed away.
+
+        A [k, k] boolean, True where the pair is taken to be adjacent. A pair the skeleton
+        calls absent is closed to NONE; a pair it calls present is opened to
+        {FWD, BACK, BI} -- INCLUDING a pair that is truly absent, which is exactly the
+        damage a spurious adjacency does: it can never be settled, so it caps identification.
+        """
         self.truth = marks_from_mag(true_mag)
         self._possible = {}
+        self._seeded_absent = {}
+        if skeleton is not None:
+            skeleton = np.asarray(skeleton, dtype=bool)
+            for index, (u, v) in enumerate(pairs(self.k)):
+                absent = not bool(skeleton[u, v])
+                self._seeded_absent[(u, v)] = absent
+                self._possible[(u, v)] = (frozenset({NONE}) if absent
+                                          else frozenset({FWD, BACK, BI}))
+            self._applied = frozenset()
+            self._detected = {}
+            self.last = FactoredBelief(self._possible, self.k)
+            return
         for index, (u, v) in enumerate(pairs(self.k)):
+            self._seeded_absent[(u, v)] = self.truth[index] == NONE
             if self.truth[index] == NONE:
                 # Correctly absent, and known to be: this is the observational half.
                 self._possible[(u, v)] = frozenset({NONE})
@@ -256,8 +290,16 @@ class FactoredBackend:
         return self.last.directed
 
     def reset_marks(self) -> None:
+        """Re-open every adjacent pair, keeping whatever skeleton `reset` established.
+
+        The skeleton is NOT re-derived from truth here: under an estimated skeleton the
+        sampled path rebuilds marks from scratch every round, and re-deriving would silently
+        restore the true adjacencies partway through the episode -- handing back exactly the
+        assumption the ablation exists to remove.
+        """
         for index, (u, v) in enumerate(pairs(self.k)):
-            self._possible[(u, v)] = (frozenset({NONE}) if self.truth[index] == NONE
+            absent = self._seeded_absent.get((u, v), self.truth[index] == NONE)
+            self._possible[(u, v)] = (frozenset({NONE}) if absent
                                       else frozenset({FWD, BACK, BI}))
 
     # -- reporting -----------------------------------------------------------------------
