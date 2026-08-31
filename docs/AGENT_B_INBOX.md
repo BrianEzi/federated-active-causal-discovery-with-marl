@@ -500,3 +500,114 @@ Sweep 20/60. Attribution: component-factored engine committed, 11.7x faster afte
 training ON the attribution reward to compare against the transfer baseline, which currently
 shows a hand-written probing rule BEATING the learned policy at attribution (0.30-0.34
 against 0.21-0.32) -- expected, since sweep policies were never rewarded for it.
+
+---
+
+## 31 Aug, 21:20 — TOP PRIORITY FOR YOU: power-limited oracle evidence. Pull first.
+
+This supersedes everything else on your list, including the machine profiling. It is cheap,
+it is fast, and it may make the entire sampled sweep unnecessary — which matters now that
+the cluster array is at 3% after five hours.
+
+### Why this exists
+
+Thesis result 2 needs the RL policy to work under sampled inference. Two things block it:
+
+1. **Sampled training is 74-110x slower than oracle.** Measured here today, k=12/4 agents:
+   oracle 0.085 s/episode, sampled n_int=20 6.26, sampled n_int=200 9.41. That is why the
+   sweep is 66 cluster tasks.
+2. **Oracle-trained policies do NOT transfer.** `FINDINGS_2026_08_27` §3: transferred policy
+   0.171 against RANDOM's 0.208. `HANDOVER_CLUSTER_SAMPLED_2026_08_29` §1: greedy wins at
+   w08 and w12, both SIG. The mechanism is the REPEAT RULE — under oracle a repeat is
+   strictly wasted so the learner correctly learns never to repeat; under sampled a repeat is
+   how you buy statistical power. The trained rule is actively wrong in the new regime.
+
+### What was built here (already pushed — `git pull` before you start)
+
+`--evidence_power P` on `scripts/ma_train.py` (config `vs_evidence_power`, default 1.0 =
+untouched oracle, so it is inert unless asked for). With P < 1, each ancestry question has
+probability P of yielding a usable answer; otherwise the pair is left UNTOUCHED.
+
+Withheld, not corrupted — sampled evidence is sound but not complete, so this reproduces the
+real failure mode and keeps the version-space guarantee.
+
+**A repeat buys another draw**, which is the part that makes it a test of the hypothesis
+rather than just scarcer evidence. Row counts per node are the currency:
+
+    share of a node's open pairs resolved, repeating the SAME node 1..6 times
+    power 1.0   0.31 0.31 0.31 0.31 0.31 0.31   one shot, repeats worthless
+    power 0.5   0.11 0.11 0.14 0.31 0.31 0.31   evidence accumulates
+    power 0.3   0.04 0.04 0.14 0.31 0.31 0.31   slower, same ceiling
+
+Same ceiling, slower arrival. That is what statistical power does.
+
+### The runs. About 30 min of training, then the evaluation
+
+```bash
+cd <repo> && git pull origin explore/constraint-based
+export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+mkdir -p results/power
+
+# 1. TRAIN. k=8, 4 agents, budget 35, 2000 episodes. ~8-14 min each, run them in parallel.
+for p in 1.0 0.7 0.5; do
+  tag=$(echo $p | tr -d '.')
+  .venv/bin/python scripts/ma_train.py --arm power$tag --seed 0 \
+    --n_agents 4 --private_size 4 --n_shared 4 --budget 35 \
+    --n_obs 60 --n_int 20 --turn_order round_robin --backend factored \
+    --evidence_power $p \
+    --policy_arch gnn_portable --vary_only --graph_model sf --sf_m 2 \
+    --claim_bar 1.0 --reward_criterion claims --per_agent_reward \
+    --episode_mix confounded --normalise_returns --vs_evidence oracle \
+    --turn_aware_credit --local_epochs 4 \
+    --train_episodes 2000 --eval_episodes 100 \
+    --no_wandb --force --out results/power/p$tag.json &
+done; wait
+
+# 2. CONTROL — each policy in the regime it trained in, at FULL power.
+#    THIS IS NOT OPTIONAL. If a low-power arm is just a WORSE policy, it shows up here,
+#    and without it "better transfer" cannot be told apart from "blunter policy".
+for t in 10 07 05; do
+  .venv/bin/python scripts/global_shd_paired.py results/power/p$t.json \
+    --episodes 60 --sample --override_evidence oracle --override_power 1.0 \
+    --out results/power/oracle_p$t.json
+done
+
+# 3. TRANSFER — each policy under GENUINE sampled evidence. The actual test.
+for t in 10 07 05; do
+  .venv/bin/python scripts/global_shd_paired.py results/power/p$t.json \
+    --episodes 40 --sample --override_evidence sampled \
+    --out results/power/transfer_p$t.json
+done
+```
+
+### What to report back, and the bar
+
+Push the three `transfer_p*.json` and three `oracle_p*.json` plus the printed tables.
+
+**THE BAR IS BEATING GREEDY UNDER SAMPLED.** It is NOT beating the power-1.0 policy.
+The oracle-trained policy scored BELOW random in the 27 Aug test, so anything that makes a
+policy less decisive climbs toward random and looks like progress without being progress.
+
+Read it as:
+
+* **Real signal** — low-power arms hold their ORACLE performance *and* close some of the
+  greedy gap under sampled.
+* **False positive** — oracle performance degrades in step with the transfer "gain". That is
+  a blunter policy, not a transferable one. Say so if you see it.
+
+### Known weakness, recorded before any result so it cannot be retrofitted
+
+Missingness here is **uniform**. Real sampled missingness is **systematic** in effect size and
+distance — Fisher-z fails on weak and distant effects specifically. A policy trained on
+uniform dropout may learn "repeat everything", which is still wrong under sampled evidence
+where repeating a strong effect is wasted. If uniform shows promise, the next step is
+distance-weighted missingness. If it shows nothing, try that before abandoning the idea.
+
+One seed, one cell, 40 evaluation episodes. The most this can earn is the right to spend real
+compute on it.
+
+### Also please report
+
+The cluster array at 3% after 5 hours — is it queue wait, per-user concurrency, or are tasks
+failing? If tasks are dying rather than queuing, that changes what we do with Rung 3 entirely
+and we need to know tonight, not tomorrow.
