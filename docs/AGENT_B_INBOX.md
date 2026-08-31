@@ -664,3 +664,98 @@ Two consequences:
 
 Everything else in the block above stands. Sorry for the churn — better now than after you
 have run it.
+
+---
+
+## 31 Aug, 21:50 — SECOND JOB, after the power runs: rescue the three under-trained large-k seeds
+
+Glad the power runs are going well. Here is the next thing, and it is the highest-value
+compute available anywhere on this project right now.
+
+### Why
+
+After replacing the MI gate with a competence gate (see the commit — the MI gate was
+discarding runs that solved 95-100% of windows), the corrected headline is:
+
+    k axis, hard SHD of the pooled global graph
+    k=12   learned 0.0001   greedy 0.0008   L/G 0.10   3 usable seeds
+    k=20   learned 0.0000   greedy 0.0006   L/G 0.08   2 usable seeds
+    k=30   learned 0.0001   greedy 0.0005   L/G 0.10   1 usable seed
+
+**The single strongest claim in the thesis — the learned policy beats greedy by ~10x as the
+window grows — rests on one seed at k=30 and two at k=20.** That is not enough for a viva.
+
+The three missing seeds are not bad luck. They are UNDER-TRAINED at 4000 episodes:
+
+    k30s50n04b150 seed 1   final window rate 0.145   still climbing
+    k30s50n04b150 seed 2   final window rate 0.042   never reached first success
+    k20s50n04b150 seed 2   final window rate 0.455
+
+k30 seed 0 reached 0.992 on the same config, so the cell is learnable; those two just needed
+longer. `first_success_episode` was 2503 for seed 0 and 2685 for seed 1 — over half the
+budget gone before the first solve.
+
+### The runs — RESUME, do not restart
+
+`scripts/ma_train.py --resume_from` exists and the checkpoints are already in the repo, so
+this costs 8000 more episodes rather than 12000 from scratch. Roughly 4.5 h per k=30 run and
+1.5 h per k=20 run, and all three are independent so run them in parallel.
+
+```bash
+cd <repo> && git pull origin explore/constraint-based
+export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+
+# k=30, 4 agents, 15 private each, 15 shared, budget 150 -- the exact sweep config.
+# NOTE --train_episodes 12000 with --resume_from: it continues to 12000 TOTAL, it does not
+# add 12000. Verify the "continuing at update N" line says 250 before you walk away.
+for seed in 1 2; do
+  .venv/bin/python scripts/ma_train.py --arm k30s50n04b150 --seed $seed \
+    --n_agents 4 --private_size 15 --n_shared 15 --budget 150 \
+    --n_obs 60 --n_int 20 --turn_order round_robin --backend factored \
+    --policy_arch gnn_portable --vary_only --graph_model sf --sf_m 2 \
+    --claim_bar 1.0 --reward_criterion claims --per_agent_reward \
+    --episode_mix confounded --normalise_returns --vs_evidence oracle \
+    --turn_aware_credit --local_epochs 4 \
+    --resume_from results/sweep/oracle/k30s50n04b150_s${seed}_resume_u0200.pt \
+    --train_episodes 12000 --eval_episodes 200 \
+    --no_wandb --force --out results/sweep/oracle/k30s50n04b150_s${seed}.json &
+done
+
+# k=20, 4 agents, 10 private each, 10 shared, budget 150
+.venv/bin/python scripts/ma_train.py --arm k20s50n04b150 --seed 2 \
+  --n_agents 4 --private_size 10 --n_shared 10 --budget 150 \
+  --n_obs 60 --n_int 20 --turn_order round_robin --backend factored \
+  --policy_arch gnn_portable --vary_only --graph_model sf --sf_m 2 \
+  --claim_bar 1.0 --reward_criterion claims --per_agent_reward \
+  --episode_mix confounded --normalise_returns --vs_evidence oracle \
+  --turn_aware_credit --local_epochs 4 \
+  --resume_from results/sweep/oracle/k20s50n04b150_s2_resume_u0200.pt \
+  --train_episodes 12000 --eval_episodes 200 \
+  --no_wandb --force --out results/sweep/oracle/k20s50n04b150_s2.json &
+wait
+```
+
+**CHECK THE CONFIGS AGAINST THE EXISTING RESULT FILES BEFORE RUNNING.** I have written them
+from the cell definition, and retyping a config from memory has burned this project twice:
+
+```bash
+.venv/bin/python -c "
+import json
+for f in ('k30s50n04b150_s0','k20s50n04b150_s0'):
+    c=json.load(open(f'results/sweep/oracle/{f}.json'))['config']
+    print(f, {k:c[k] for k in ('n_agents','budget','n_obs','n_int','graph_model','sf_m')})"
+```
+
+### What success looks like
+
+Window rate over the last ten checkpoints >= 0.70 — that is the gate now, not MI. Report the
+final window rate and the learned/greedy `global_hard_shd` per run. If a seed is still under
+0.70 at 12000 episodes, say so: "k=30 needs more than 12000 episodes and two of three seeds
+do not converge in budget" is a legitimate and reportable limitation, and better than a
+quietly missing seed.
+
+### If you have spare capacity after that
+
+D7 seeds 1 and 2 — a policy trained ON the attribution reward, `k12s50n04b200_attr`. Seed 0
+is finishing here now and takes ~2.3 h a seed. I will push seed 0's result and the exact
+command once its evaluation lands, so wait for that rather than guessing the config.
