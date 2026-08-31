@@ -74,17 +74,28 @@ ATTRIBUTED = "attributed"
 # never needed and was cut from the thesis on that basis. This backend keeps the enumerated
 # attribution exactly as it was and swaps the structure half for `factored`.
 FACTORED_ATTRIBUTED = "factored_attributed"
+# FACTORED STRUCTURE + COMPONENT-FACTORED OWNERSHIP. `factored_attributed` still enumerates
+# every owner assignment jointly, so it is bounded by the attribution space itself -- 482
+# hypotheses at k=12 and 8.4e10 at k=20 -- and holds a GLOBAL cap on how many settled pairs
+# it will attribute at all. See cb/component_attribution.py: the candidate set factors
+# exactly over connected components of the bidirected graph, so the cap becomes per component
+# and the cost becomes a sum rather than a product.
+COMPONENT_ATTRIBUTED = "component_attributed"
 # Pairwise belief: one small version space PER PAIR, O(k^2) state and update,
 # so it carries to window sizes the enumerated belief cannot reach. See
 # cb/factored.py for what it gives up -- joint constraints, and with them the
 # exact ceiling and exact optimum.
 FACTORED = "factored"
 BACKENDS = (EXACT, CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED,
-            FACTORED_ATTRIBUTED)
+            FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED)
+# Backends whose belief carries an ATTRIBUTION as well as a structure. They replace the
+# bidirected claim with the attribution claim, and they are the only ones for which the
+# partner-disclosure channel carries anything -- see `_disclose_partner_responses`.
+ATTRIBUTION_BACKENDS = (ATTRIBUTED, FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED)
 # Backends whose belief exposes bootstrap-shaped claim frequencies, so `cb.claims` and the
 # constraint-side greedy read them the same way.
 CLAIM_BACKENDS = (CONSTRAINT, VERSION_SPACE, ATTRIBUTED, FACTORED,
-                  FACTORED_ATTRIBUTED)
+                  FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED)
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -463,6 +474,12 @@ class AgentWindow:
             self.belief = FactoredBackend(self.k, shared_positions,
                                           evidence=vs_evidence,
                                           evidence_alpha=vs_evidence_alpha)
+        elif backend == COMPONENT_ATTRIBUTED:
+            from cb.component_attribution import ComponentAttributedBackend
+            self.belief = ComponentAttributedBackend(
+                self.k, shared_positions, n_agents=topology.n_agents, agent=self.agent,
+                evidence=vs_evidence, evidence_alpha=vs_evidence_alpha,
+                local_disturbance=attribution_local_disturbance)
         elif backend == FACTORED_ATTRIBUTED:
             from cb.factored_attribution import FactoredAttributedBackend
             self.belief = FactoredAttributedBackend(
@@ -689,7 +706,7 @@ class TwoAgentEnv:
             for agent, window in self.windows.items():
                 window.belief.reset(self._true_mag(agent),
                                     skeleton=self._episode_skeleton(agent))
-        elif cfg.belief_backend == FACTORED_ATTRIBUTED:
+        elif cfg.belief_backend in (FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED):
             # Needs the GLOBAL graph for the same reason ATTRIBUTED does: the true latent
             # groups are a property of the whole system, not of one window. Truth is used
             # only to prune and to score, never in the observation.
@@ -958,7 +975,14 @@ class TwoAgentEnv:
         what makes the recovered object an attribution to an AGENT rather than to a variable.
         """
         from cb.attribution import estimated_moved, response_signature
-        if self.config.belief_backend != ATTRIBUTED or not self.config.disclose_signals:
+        # GATED ON THE FAMILY, NOT ON ONE MEMBER. This read `!= ATTRIBUTED` until 31 Aug
+        # 2026, so an environment running `factored_attributed` -- the backend that exists
+        # precisely to carry attribution past k=5 -- received no partner messages at all and
+        # its attribution could never be settled by evidence. It went unnoticed because every
+        # factored-attribution number to date came from a driver that calls `observe_partner`
+        # directly (`tests/crosscheck/`, `scripts/attr_scale.py`), never through the env.
+        if (self.config.belief_backend not in ATTRIBUTION_BACKENDS
+                or not self.config.disclose_signals):
             return
         sampled = self.config.vs_evidence == "sampled"
         if sampled:
@@ -1312,7 +1336,7 @@ class TwoAgentEnv:
             from cb.claims import score_window
             cfg = self.config
             scores = {}
-            attributed = cfg.belief_backend in (ATTRIBUTED, FACTORED_ATTRIBUTED)
+            attributed = cfg.belief_backend in ATTRIBUTION_BACKENDS
             attribution = {}
             for agent, window in self.windows.items():
                 scores[agent] = score_window(

@@ -230,7 +230,7 @@ def main(argv=None) -> dict:
     # (policy, backend, arch) triple.
     ap.add_argument("--backend", default="exact",
                     choices=["exact", "constraint", "version_space", "attributed", "factored",
-                             "factored_attributed"])
+                             "factored_attributed", "component_attributed"])
     ap.add_argument("--claim_bar", type=float, default=None,
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
