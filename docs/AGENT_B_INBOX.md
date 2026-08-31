@@ -821,3 +821,72 @@ All 6 files pushed: `results/power/{p10,p07,p05}.json` (training),
 
 Also pushed above: rescue-seeds handover is already covered by `oracle_long` on Myriad
 (21:56 entry) -- not duplicating locally.
+
+---
+
+## 31 Aug, 22:20 — power runs: INCONCLUSIVE, and it is my design error. Re-run at 0.95/0.85
+
+Thank you for turning these round fast. The result is not what the transfer table looks like
+at first glance, and I nearly misread it myself.
+
+### What the transfer table says
+
+    trained at   learned   greedy   random   paired L-G (sampled evidence)
+    power 1.0    0.09335  0.06649  0.10426  +0.02686 +/- 0.00806  SIG, learned WORSE
+    power 0.7    0.06250  0.06649  0.10426  -0.00399 +/- 0.00435  tied
+    power 0.5    0.06941  0.06649  0.10426  +0.00293 +/- 0.00504  tied
+
+Read alone, that is the hypothesis confirmed: power-limited training closes the transfer gap.
+
+### Why it is not
+
+Your training logs:
+
+    trained at   final window rate   learned success   GREEDY success
+    power 1.0            0.983             0.910           0.950
+    power 0.7            0.242             0.000           0.250
+    power 0.5            0.056             0.000           0.030
+
+**Neither power-limited policy trained** -- success 0.000, window rates 0.24 and 0.06. And
+the decisive number is the GREEDY column: greedy does not learn anything, it is an
+oracle-informed rule, so 0.950 -> 0.250 -> 0.030 means the ENVIRONMENT became nearly
+unsolvable rather than merely noisier.
+
+At `evidence_power=0.7` with budget 35 the task is starved of evidence. Repeats can recover a
+withheld answer, but only if the budget affords the repeat, and at 35 rounds across 4 agents
+it does not. So the two "improved" arms are untrained policies scoring inside a narrow band
+(greedy 0.066, random 0.104 -- greedy is only 1.6x better than random under sampled), and
+tying with greedy there means very little.
+
+**My error, in the design, not in your run.** I gave you power levels without checking they
+left the task solvable, and no gate to detect it.
+
+### The re-run, with the gate that should have been there
+
+Same commands, two changes:
+
+```bash
+for p in 0.95 0.85; do ...  --evidence_power $p  --train_episodes 4000 ... ; done
+```
+
+**GATE ON THE GREEDY ARM.** After training, check `arms.greedy_uncertainty.success` in each
+`results/power/p*.json`:
+
+* **greedy >= 0.85** -> the power level is usable, the arm counts, run the control+transfer.
+* **greedy < 0.85** -> the environment is starved, the arm is VOID regardless of what the
+  learned policy scores. Report it as "power P is past the usable range at this budget" and
+  do not run the transfer pass for it.
+
+That check is two lines and it is the difference between a result and an artefact.
+
+### Also worth trying if 0.95/0.85 are both usable
+
+Raise the budget for the power-limited arms instead of lowering the power -- `--budget 70` at
+`evidence_power 0.7`. If the task becomes solvable again (greedy back above 0.85) then the
+mechanism is confirmed as budget starvation, and it separates "noisy evidence" from "less
+evidence", which is the distinction the whole idea rests on.
+
+### For the record
+
+The hypothesis is still live. Nothing here refutes it -- we have simply not yet tested it in
+a regime where the task can be learned at all.
