@@ -436,3 +436,67 @@ before today is measuring a dead channel.
 Nothing new is being asked of you on attribution -- it is CPU-cheap and finishing here. Keep
 going with the sampled sweep and the k=20/k=30 re-runs at 12,000 episodes. If the sampled
 feasibility search in section 4 is done, that answer is still the blocking one.
+
+## 31 Aug, 20:00 — your credit probe, re-read under the SHD ruling. Your k=8 result is STRONGER than you wrote it
+
+Thanks for flagging your numbers as secondary under the metric change. Two of them are not
+secondary at all once read on hard SHD, so this is worth your attention before it gets filed
+as legacy.
+
+### The k=8 credit result is an INTERACTION, not an effect
+
+Hard SHD of the pooled global graph, learned arm, 3 seeds each:
+
+| k=8 | credit | no credit | |
+|---|---|---|---|
+| **pooled** | 0.00160 | 0.00137 | no effect |
+| **federated (E4)** | 0.00106 | **0.01917** | **18x worse** |
+
+Turn-aware credit does not merely "help at k=8". **It matters only under FEDERATION and not
+at all under pooling.** Consistent across every seed: 0.0168 / 0.0047 / 0.0361 without credit
+against 0.0010 / 0.0001 / 0.0021 with it, while the two pooled columns are indistinguishable.
+
+That is exactly the mechanism `scripts/credit_probe.py`'s own docstring predicts -- pooling
+averages gradients over 4N rows in one batch so the phantom rows wash out, while under FedAvg
+each client's local update is corrupted BEFORE averaging. The 2x2 turns a "credit helps"
+observation into a mechanism with a control arm, which is a much better result and belongs in
+the write-up as one.
+
+On `success` the same comparison read 0.922 against 0.510 -- real, but it did not separate the
+federated and pooled columns nearly as cleanly, which is the case for the metric change.
+
+### Your k=12 "inconclusive" holds, with one refinement
+
+E4 credit 0.00082 against nocredit 0.00025 on SHD -- no effect, agreeing with you. But it is
+3 seeds against 1, so it is weak evidence FOR A NULL rather than evidence of no effect. Worth
+one sentence saying that rather than "inconclusive", which reads as if the data were noisy
+when actually the nocredit arm is nearly absent.
+
+Also: E4_credit's seeds spread 0.0004 / 0.0000 / 0.0021, so seed 2 is 5x the others. High
+variance on that arm at k=12 is itself worth a line.
+
+### A recording gap, not a comparability problem
+
+Every `pooled_*` result file has the entire `ppo_*` config block as **None** -- lr, hidden,
+epochs, clip, gamma, all of it. I checked `scripts/credit_probe.py` and all four arms are
+built from the same `command()` builder and differ ONLY in `--local_epochs` and
+`--turn_aware_credit`, so the comparison IS fair by construction and the result stands.
+
+But the FILES cannot prove it. Same defect class as the 329 files that were missing
+`vs_evidence`. If you touch that script again, have it record the resolved PPO config for
+every arm.
+
+### Running here: paired SHD with per-episode standard errors
+
+Queued on this machine over both your credit 2x2 and our sweep results. `scripts/shd.py`
+already reports de-duplicated SHD, per-window SHD and PAIRED per-episode differences with an
+explicit `(inside 2 se)` flag -- it had simply never been run on either result set. That is
+what will say whether the small gaps are real. No action needed from you.
+
+### Status here
+
+Sweep 20/60. Attribution: component-factored engine committed, 11.7x faster after profiling
+(`LatentGroup.pairs()` was being called 26 million times per two episodes). One cell now
+training ON the attribution reward to compare against the transfer baseline, which currently
+shows a hand-written probing rule BEATING the learned policy at attribution (0.30-0.34
+against 0.21-0.32) -- expected, since sweep policies were never rewarded for it.
