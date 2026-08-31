@@ -44,6 +44,40 @@ mechanism as a hypothesis for THOSE two specific runs, not as a general claim ab
 
 ---
 
+## 31 Aug, ~17:40 — also: profile both machines, so allocation stops being a guess
+
+Ranking machines by CPU is the wrong metric. What decides where a job should go is
+
+    time_to_result  =  queue_wait  +  runtime / effective_parallelism
+
+A cluster with a two-hour queue is the worst place for a twenty-minute job and the best place
+for sixty three-hour jobs; a laptop with no queue is the opposite. Neither fact shows up in a
+CPU benchmark, and effective parallelism is not the core count — on this laptop it plateaus
+at **2.8x and eight workers is WORSE than six**, so dividing core-hours by cores overstated
+throughput roughly threefold until it was measured.
+
+**Run this on your laptop, and separately on a cluster node**, after the sampled sweep is
+submitted (it is lower priority than getting that queued):
+
+```bash
+# your laptop
+.venv/bin/python scripts/machine_profile.py --label laptop-b --workers 1,2,4,6
+
+# a cluster node, inside an interactive or short batch job
+.venv/bin/python scripts/machine_profile.py --label myriad --workers 1,2,4,8 \
+    --queue_wait_minutes <observed wait from qstat, submit to start>
+```
+
+`--queue_wait_minutes` is the one term that cannot be measured from inside a job, so it has
+to come from a real observation of submit-to-start on the array you just queued. An estimate
+from watching your own submission is fine; say which it is.
+
+Then `scripts/machine_profile.py --compare results/machines/*.json` prints the table, and the
+three-way split gets decided on numbers instead of on my ranking — which was a guess, and the
+guesses have not been doing well today.
+
+---
+
 ## 31 Aug, ~17:00 — LAUNCH THE SAMPLED SWEEP ON MYRIAD. This is the critical path.
 
 Your widened feasibility run settled it, thank you — and it confirmed an anomaly this machine
