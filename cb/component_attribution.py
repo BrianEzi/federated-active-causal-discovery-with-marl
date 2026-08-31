@@ -108,18 +108,32 @@ def frequency_tables(components):
     the components are independent, so a group's global frequency equals its frequency within
     its own component. No sampling, no bound, no approximation on this side.
     """
+    # COUNT IN INTEGERS, DIVIDE ONCE. Accumulating `+= 1/n` per candidate loses exactness:
+    # adding 1/1120 to itself 1120 times gives 0.9999999999999998, so a group present in
+    # EVERY candidate fails `freq >= 1.0` by one ulp and `score_groups` refuses to settle it
+    # at bar 1.0. Measured 31 Aug: that alone was the entire gap against the enumerated
+    # backend, which counts integers and divides once -- 36 right against 49 at k=12, every
+    # missing claim one the belief was fully certain of. A single division of int by int is
+    # exact where the count equals the denominator.
     groups: Counter = Counter()
     owners: Counter = Counter()
     total = 1
     for _, candidates in components:
-        total *= len(candidates)
-        share = 1.0 / max(len(candidates), 1)
+        n = len(candidates)
+        total *= n
+        local_groups: Counter = Counter()
+        local_owners: Counter = Counter()
         for hypothesis in candidates:
             for group in hypothesis:
-                groups[group] += share
+                local_groups[group] += 1
                 owner = group.owner
                 for u, v in group.pairs():
-                    owners[(u, v, owner)] += share
+                    local_owners[(u, v, owner)] += 1
+        denominator = max(n, 1)
+        for group, count in local_groups.items():
+            groups[group] += count / denominator
+        for key, count in local_owners.items():
+            owners[key] += count / denominator
     return (total if components else 0), dict(groups), dict(owners)
 
 
