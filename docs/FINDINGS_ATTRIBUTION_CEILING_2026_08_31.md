@@ -115,10 +115,17 @@ Both engines, one build, one process (`results/attr_scale_final.json`):
 | 12 | component | 44 | 0 | **1.46** |
 | 20 | enumerated | 36 | 0 | 12.64 |
 | 20 | component | **38** | 0 | **5.97** |
+| 30 | enumerated | 20 | 0 | 10.23 |
+| 30 | component | **21** | 0 | **5.28** |
 
-Identical decisions, **zero misattributions at every size**, component 1.5-2x faster and
-slightly wider in scope at k=20 because it keeps whole components rather than a global
-prefix. The version-space guarantee -- settled implies settled correctly -- holds.
+Identical decisions to k=12 and slightly MORE at k=20 and k=30, **zero misattributions at
+every size**, component 1.5-2x faster throughout. The extra decisions come from scope: the
+component engine keeps whole components where the enumerated one truncates to a global
+five-pair prefix, so it reaches 0.57 against 0.55 at k=20 and 0.60 against 0.58 at k=30. The
+version-space guarantee -- settled implies settled correctly -- holds at every size.
+
+These numbers are the third independent run to reproduce each other, and unlike the table
+they replace, every row comes from ONE process and ONE build.
 
 Three defects were fixed today to reach this, each found by a measurement queued to test the
 claim above it: a scope bug advertising authority over truncated pairs; an UNSOUND atomicity
