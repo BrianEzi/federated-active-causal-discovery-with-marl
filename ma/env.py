@@ -202,6 +202,20 @@ class MAConfig:
     # against transfer's 0.691, shared coverage 0.53 against 0.55), so the input
     # distribution is the mechanism -- and sampled evidence produces the right distribution
     # for the right reason rather than by adding artificial noise.
+    # WHERE THE SKELETON COMES FROM. "true" seeds adjacency from the window's true MAG,
+    # which is the default and is NOT the oracle knowledge it looks like: a MAG's adjacencies
+    # are exactly the pairs no OBSERVED conditioning set can separate, and
+    # `observational_skeleton` reproduces them at 100% over 4,710 pairs. What the default
+    # supplies is the INFINITE-DATA answer.
+    #
+    # "estimated" runs a bounded PC-style adjacency search on this episode's OBSERVATIONAL
+    # rows instead, so the belief starts from a skeleton with real finite-sample errors.
+    # That is what makes "is the policy robust to a wrong skeleton?" a question that can be
+    # asked of a trained policy rather than only of full coverage. See
+    # docs/FINDINGS_SKELETON_2026_08_31.md.
+    skeleton_source: str = "true"
+    skeleton_alpha: float = 0.05
+    skeleton_max_cond: int = 2
     vs_evidence: str = "oracle"
     vs_evidence_alpha: float = 0.001
     intervene_scale: float = 2.0       # VARY draws N(0, scale^2); CLAMP always uses 0.0
@@ -388,6 +402,8 @@ class AgentWindow:
                  observe_partner_counts: bool = False,
                  attribution_local_disturbance: bool = True,
                  mode_by_role: bool = False,
+                 skeleton_source: str = "true", skeleton_alpha: float = 0.05,
+                 skeleton_max_cond: int = 2,
                  vs_evidence: str = "oracle", vs_evidence_alpha: float = 0.001,
                  cb_n_boot: int = 50, cb_alpha: float = 0.01, cb_n_jobs: int = 1):
         self.agent: int = int(agent)
@@ -646,6 +662,7 @@ class TwoAgentEnv:
 
         self._credit_cache: Dict[int, np.ndarray] = {}
         self._mag_cache: Dict[int, np.ndarray] = {}
+        self._skeleton_cache: Dict[int, np.ndarray] = {}
         self._last_claim_fraction: Optional[float] = None
         self._last_agent_fraction: Optional[Dict[int, float]] = None
         self._agent_rewards: Optional[Dict[int, float]] = None
@@ -655,7 +672,8 @@ class TwoAgentEnv:
                 window.belief.set_episode(seed if seed is not None else 0)
         if cfg.belief_backend == FACTORED:
             for agent, window in self.windows.items():
-                window.belief.reset(self._true_mag(agent))
+                window.belief.reset(self._true_mag(agent),
+                                    skeleton=self._episode_skeleton(agent))
         elif cfg.belief_backend == ATTRIBUTED:
             # Needs the GLOBAL graph, not only the window's MAG: the true latent groups and
             # the response of each to a partner's action are properties of the whole system.
@@ -711,6 +729,25 @@ class TwoAgentEnv:
             a: (PASS_ACTION, None) for a in self.topology.agents}
         self._refresh()
         return self._result(reward=0.0)
+
+    def _episode_skeleton(self, agent: int):
+        """The skeleton the belief starts from, or None to seed it from the true MAG.
+
+        Estimated from the OBSERVATIONAL rows only -- `self.samples` before any intervention
+        has been applied this episode -- so nothing an observational method could not know
+        leaks in. Cached per episode because the adjacency search is the expensive half.
+        """
+        if self.config.skeleton_source != "estimated":
+            return None
+        cached = self._skeleton_cache.get(agent)
+        if cached is None:
+            from scripts.skeleton_ablation import estimate_skeleton
+            window = self.windows[agent]
+            cached = estimate_skeleton(self.samples[:, window.nodes], window.k,
+                                       self.config.skeleton_alpha,
+                                       self.config.skeleton_max_cond)
+            self._skeleton_cache[agent] = cached
+        return cached
 
     def _draw(self, cfg) -> np.ndarray:
         """One graph from the configured generator. One call site for both models."""
