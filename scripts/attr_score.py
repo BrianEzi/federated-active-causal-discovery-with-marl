@@ -36,7 +36,8 @@ from cb.claims import score_window
 from ma.attribution_greedy import AttributionGreedyAgent
 from ma.baselines import ProbeThenWorkAgent, RandomAgent, UncertaintyGreedyAgent
 from ma.density_guard import DensityGuardedEnv
-from ma.env import ATTRIBUTED, PASS_ACTION, ROUND_ROBIN, VARY, MAConfig, TwoAgentEnv
+from ma.env import (ATTRIBUTED, COMPONENT_ATTRIBUTED, FACTORED_ATTRIBUTED, PASS_ACTION,
+                    ROUND_ROBIN, VARY, MAConfig, TwoAgentEnv)
 from ma.policy import IndependentPPO
 from ma.topology import federated_topology
 
@@ -56,7 +57,7 @@ def build_env(args) -> TwoAgentEnv:
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
                       budget=args.budget, disclose_regime=True,
                       turn_order=ROUND_ROBIN, action_modes=(VARY,),
-                      belief_backend=ATTRIBUTED, policy_arch=args.policy_arch,
+                      belief_backend=args.backend, policy_arch=args.policy_arch,
                       episode_mix="confounded", reward_criterion="claims",
                       claim_bar=1.0, per_agent_reward=args.per_agent_reward,
                       observe_belief_channels=True, observe_partner_counts=True,
@@ -221,6 +222,15 @@ def main(argv=None) -> dict:
                     help="divide logits by this before sampling; overrides --deterministic")
     ap.add_argument("--deterministic", action="store_true",
                     help="evaluate the learned policy at its argmax, like the baselines")
+    # WHICH ATTRIBUTION ENGINE. All three hold the same claim and are scored identically;
+    # they differ in how the candidate set is held, and therefore in how far they reach.
+    # `attributed` enumerates structure AND ownership and caps near k=5. `factored_attributed`
+    # enumerates ownership only. `component_attributed` factors ownership over connected
+    # components -- the only one usable past k=12, and the only one that does not apply rule
+    # 1 where it cannot be made exact. Default stays `attributed` so existing invocations
+    # keep meaning what they meant.
+    ap.add_argument("--backend", default=ATTRIBUTED,
+                    choices=[ATTRIBUTED, FACTORED_ATTRIBUTED, COMPONENT_ATTRIBUTED])
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py")
     ap.add_argument("--episodes", type=int, default=150)
     ap.add_argument("--seed", type=int, default=0)
