@@ -65,7 +65,13 @@ JOBS=$(mktemp)
   | grep -v '^#' > "$JOBS"
 echo "$(wc -l < "$JOBS") jobs, longest first"
 
-export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+# ALL FIVE, not just OMP and MKL. Measured 31 Aug 2026 on macOS: with only
+# OMP_NUM_THREADS and MKL_NUM_THREADS set, a worker still ran 10-11 threads, because
+# numpy here links Accelerate/vecLib and OpenBLAS, which read their OWN variables. Four
+# workers were therefore contending as if they were forty, and load hit 23 on ten cores.
+# With all five, a worker runs 3 threads.
+export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+       VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1
 
 # ONE SCRIPT PER JOB, then xargs over the PATHS. This looks indirect and is not:
 # `xargs -I` caps the replacement string at 255 bytes on macOS, and a job line here is
@@ -79,7 +85,7 @@ n=0
 while IFS= read -r line; do
   [ -z "$line" ] && continue
   n=$((n + 1))
-  printf '#!/usr/bin/env bash\nexport PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1\ncd %s\n%s\n' \
+  printf '#!/usr/bin/env bash\nexport PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 NUMEXPR_NUM_THREADS=1\ncd %s\n%s\n' \
     "$(pwd)" "$line" > "$JOB_DIR/$(printf '%03d' $n).sh"
 done < "$JOBS"
 chmod +x "$JOB_DIR"/*.sh
