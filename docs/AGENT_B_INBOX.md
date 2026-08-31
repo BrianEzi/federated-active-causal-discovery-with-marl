@@ -628,3 +628,39 @@ compute on it.
 The cluster array at 3% after 5 hours — is it queue wait, per-user concurrency, or are tasks
 failing? If tasks are dying rather than queuing, that changes what we do with Rung 3 entirely
 and we need to know tonight, not tomorrow.
+
+### 21:25 — CORRECTION to the run above, read before launching
+
+The power=1.0 arm finished here before I moved the job to you, and it changes the design:
+
+```
+2000 episodes, k=8, 4 agents, budget 35, evidence_power 1.0, ORACLE eval
+  learned              success 0.380   CI 0.290-0.470
+  greedy_uncertainty   success 0.950
+  greedy_partitioned   success 0.820
+  random_vary          success 0.130
+```
+
+**At 2000 episodes the policy is badly undertrained** — 0.380 against greedy's 0.950, where
+the sweep's comparable cells reach 0.9+ at 4000. I chose 2000 for speed and that was wrong.
+
+Two consequences:
+
+1. **Use `--train_episodes 4000`, not 2000.** It roughly doubles the training stage to
+   ~20-30 min per arm, still cheap, and the arms run in parallel. Without it every arm is
+   undertrained and the test measures training length rather than evidence regime.
+
+2. **The bar I gave you is unreachable as stated and I am revising it.** "Beat greedy under
+   sampled" cannot happen when the policy does not beat greedy under ORACLE. Read the result
+   this way instead:
+
+   * **Primary**: does the gap to greedy UNDER SAMPLED shrink as power falls? That is the
+     paired `learned - greedy` number from step 3, compared across the three arms.
+   * **Control**: does the ORACLE gap to greedy stay roughly constant across arms (step 2)?
+     If the oracle gap widens as power falls, the arm is simply worse and any sampled
+     "improvement" is degradation, not transfer.
+   * The absolute "beats greedy" claim needs the full 4000-episode, 3-seed version, and only
+     if this cheap version points the right way.
+
+Everything else in the block above stands. Sorry for the churn — better now than after you
+have run it.
