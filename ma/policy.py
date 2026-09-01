@@ -715,6 +715,45 @@ class IndependentPPO:
             return (int(action), float(dist.log_prob(action)), float(value),
                     float(dist.entropy()))
 
+    # BATCH THE ROUND'S FORWARD PASSES, NOT THE SAMPLING. Measured 2026-09-01: rollout
+    # collection spends 40.5s of an 89.05s training run inside `forward`, over 22,156
+    # individual calls on tensors far too small to amortise per-call dispatch. Under
+    # `gnn_portable` every agent holds THE SAME module object (see `__init__`: `self.nets =
+    # {agent: shared ...}`), and every window is the same size, so one round's observations
+    # stack into a single [n_agents, obs] forward.
+    #
+    # WHY THE SAMPLING STAYS IN A PER-AGENT LOOP, in agent order. `Categorical.sample()` on
+    # a batch of N draws through one `torch.multinomial` call, which does NOT consume the
+    # global RNG the way N sequential single-row calls do. Batching the sampling too would
+    # silently reseed every rollout and make new runs incomparable with every number already
+    # recorded. Only the matmuls move; the RNG stream is untouched.
+    #
+    # Amdahl, so nobody expects too much: `env.step` (22.28s, the belief engine) and
+    # `update` (24.18s, already batched) are unaffected, so the ceiling on the whole run is
+    # 1.83x however perfectly this is done, and 4 agents per round realistically gives ~1.5x.
+    def _act_many(self, agents, obs, mask_pass: bool):
+        nets = [self.nets[a] for a in agents]
+        sizes = {len(obs[a]) for a in agents}
+        if (self.shared_net is None or len(agents) < 2 or len(sizes) != 1
+                or any(net is not self.shared_net for net in nets)):
+            # Per-agent networks, ragged observations, or a single agent: nothing to batch.
+            return {a: self._act(a, obs[a], mask_pass) for a in agents}
+        with torch.no_grad():
+            stacked = torch.as_tensor(np.asarray([obs[a] for a in agents]),
+                                      dtype=torch.float32)
+            all_logits, all_values = self.shared_net(stacked)
+            picks = {}
+            for index, agent in enumerate(agents):
+                logits = all_logits[index]
+                if mask_pass:
+                    logits = logits.clone()
+                    logits[self.env.windows[agent].pass_index] = -1e9
+                dist = torch.distributions.Categorical(logits=logits)
+                action = dist.sample()
+                picks[agent] = (int(action), float(dist.log_prob(action)),
+                                float(all_values[index]), float(dist.entropy()))
+            return picks
+
     def collect(self, episodes: int, episode_offset: int, mask_pass: bool) -> Dict[str, dict]:
         cfg = self.config
         buffers = {agent: {k: [] for k in
@@ -735,7 +774,7 @@ class IndependentPPO:
             open_at = {a: None for a in self.env.topology.agents}
             while not result.done:
                 obs = {a: self.env.observation(a) for a in self.env.topology.agents}
-                picks = {a: self._act(a, obs[a], mask_pass) for a in self.env.topology.agents}
+                picks = self._act_many(self.env.topology.agents, obs, mask_pass)
                 result = self.env.step({a: picks[a][0] for a in self.env.topology.agents})
                 new_potential = {a: -belief_entropy(result.beliefs[a]) for a in self.env.topology.agents}
                 per_agent = result.info.get("agent_rewards")
