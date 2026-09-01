@@ -45,7 +45,11 @@ def build_env(cfg: dict) -> TwoAgentEnv:
                       per_agent_reward=True, graph_model=cfg.get("graph_model", "sf"),
                       sf_m=cfg.get("sf_m", 2), vs_evidence=cfg.get("vs_evidence", "oracle"),
                       vs_evidence_power=cfg.get("evidence_power", cfg.get("vs_evidence_power", 1.0)),
-                      distance_weighted_power=cfg.get("distance_weighted_power", False))
+                      distance_weighted_power=cfg.get("distance_weighted_power", False),
+                      observe_belief_channels=cfg.get("observe_belief_channels", False),
+                      observe_owner_channel=cfg.get("observe_owner_channel", False),
+                      observe_partner_counts=cfg.get("observe_partner_counts", False),
+                      observe_reprobe_signal=cfg.get("observe_reprobe_signal", False))
     return TwoAgentEnv(config)
 
 
