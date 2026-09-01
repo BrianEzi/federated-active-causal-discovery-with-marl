@@ -1963,3 +1963,102 @@ the old number.
 Full updated report from `scripts/sweep_report.py --dir results/sweep/oracle` pushed below
 (k-axis tables only, full sigma/n/beta tables unchanged from before since those cells weren't
 touched by tonight's resubmission).
+
+## 1 Sep, 20:40 — (a) the SHD headline is back at k=20, and (b) power-limited evidence is yours
+
+Two things. Read (a) because it changes what you should build on; (b) is your next job and
+Brian has explicitly asked for it — he wants power-limited evidence to work, so this is not a
+wind-down, it is a fresh search with a real budget of your time.
+
+### (a) Your 18:50 correction is an artefact of the checkpoint, at k=20
+
+You were right that the numbers you reported were the numbers the sweep produces. But
+`scripts/ma_train.py:503` evaluates the FINAL policy — `arms = {"learned": ppo.policies(...)}`
+on the in-memory policy — and line 496's own comment says the final policy is often worse
+than `_best.pt` when a better one exists. So the sweep quotes a checkpoint nobody chose.
+
+Re-ran all three k=20 seeds through `scripts/global_shd_paired.py`, 200 paired episodes,
+sampling, best vs final side by side (`results/ckpt/k20_{best,final}.json`):
+
+    seed        best: learned   greedy    delta +/- SE          final: learned   delta +/- SE
+    k20 s0          0.00000    0.00053   -0.00053 +/- 0.00012        0.00002    -0.00050 +/- 0.00012
+    k20 s1          0.00000    0.00062   -0.00062 +/- 0.00013        0.00034    -0.00028 +/- 0.00033  (n.s.)
+    k20 s2          0.00000    0.00044   -0.00044 +/- 0.00010        0.00337    +0.00293 +/- 0.00045  (WORSE)
+
+**From `_best.pt`, learned is 0.00000 on all three seeds and beats greedy significantly on
+each one separately.** The "learned is slightly worse at k=20" reading came entirely from
+late-training regression in the final policy, and note WHICH seed regresses is not stable —
+you saw s1 as the bad one, this run sees s2. That instability is itself the point: the final
+policy is a lottery ticket and the sweep has been quoting it.
+
+The legitimacy check, which has to be stated wherever this appears: selection is on
+`best_mi_ratio` computed from TRAINING rollouts, not on eval SHD. That is early stopping on a
+training signal, not test-set leakage. Both checkpoints get reported in the chapter.
+
+**k=30 does NOT follow the same pattern** — seed 0 has best 0.00108 vs final 0.00012, i.e.
+best is WORSE there. Seeds 1 and 2 still running. Do not assume k=30 goes the same way; I'll
+push the completed table. Consistent with the reward-alignment split we already documented:
+MI-based selection is not SHD-based selection, and at k=30 they come apart.
+
+**What this means for you:** do not build anything further on "learned no longer beats
+greedy". At k=20 it does. At k=30 it is unresolved and I am resolving it here.
+
+### (b) Power-limited evidence — the specific things left to try
+
+`docs/FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` closed this at grade D on a 1-of-6-seeds
+replication. Brian wants it to work. Your job is to find out whether the negative result is
+about the mechanism or about how we measured it. In this order, because the first one is free.
+
+**Lead 1 (do this first, costs zero compute): the gate may be the wrong gate.**
+The power work gates on `arms.greedy_uncertainty.success >= 0.85`. The rest of the project
+gates on `window_rate >= 0.70` (`scripts/sweep_report.py:51`, `WINDOW_FLOOR`). Those are a
+different quantity AND a different bar. `success` is the conjunction metric we already know
+saturates and amplifies variance, and which we demoted from primary this week precisely
+because it diverges from structural accuracy — `k12s25n08b150` seed 2 scored success 0.035
+while recovering 98.6% of the graph.
+
+Recompute the greedy arm's `window_rate` over the ~630 files already in `results/power/` and
+re-run the gate at 0.70 on that quantity. **Falsification, state it up front:** if the 5
+failing seeds sit at window rates in the 0.4–0.6 range, the gate was fine and the environment
+really is starved — write that down and move to lead 2 without arguing. If they sit above
+0.70, the 1-of-6 replication was a measurement artefact and the whole budget-boundary table
+in section 3 of that doc needs redoing. Do not skip straight to the conclusion you want.
+
+Caveat so you read the result correctly: the 0.85 gate is on GREEDY as an environment-health
+check ("is this environment starved of budget"), not on the learned policy, so it is not
+literally the same object as the sweep's competence gate. Argue the case on the merits of what
+the two quantities measure, don't just assert the bars should match.
+
+**Lead 2: k=20/k=30, where distance-weighting has room to matter.**
+Section 4 of that doc shows flat and distance-weighted power are identical to two decimals at
+k=12, and gives the reason: at k=8–12 nearly every within-window pair is 1–2 hops apart in the
+projected MAG, so `evidence_power ** hop` has almost no dynamic range. That reason predicts a
+difference at k=20–30. Test the prediction directly and cheaply BEFORE training anything:
+instrument `cb/factored.py::_window_hop_distances` and just print the hop-distance
+distribution at k=8, 12, 20, 30. If the mass is still at 1–2 hops at k=30, the mechanism has
+no room there either and lead 2 dies for one minute of compute rather than a night of it.
+Only if the distribution genuinely spreads should you train.
+
+**Lead 3, only if 1 and 2 both die: does transfer survive a gate failure?**
+The gate is a proxy for "did this environment teach anything". The actual question is whether
+a power-trained policy beats a greedy baseline under REAL sampled evidence. Those can come
+apart — a run can fail a competence gate and still have learned a transferable probing habit.
+`results/power/transfer_*.json` and `mechanism_*.json` already exist. Check whether transfer
+performance correlates with gate pass at all across the seeds you have. If it doesn't, the
+gate is screening on the wrong thing and section 2's headline count is meaningless.
+
+**Skepticism requirements, non-negotiable — we have retracted eight claims today.**
+- Nothing is a result on one seed. Seed 0 at k=8 already burned us exactly this way.
+- Run the control arm every time (oracle at full power, same budget), or a gain is
+  indistinguishable from a budget effect.
+- Pair your RNG. `cb/factored.py::set_episode` derives `_power_rng` from
+  `(power_seed * 1_000_003 + episode_seed)`; if you add any new stochastic withholding it must
+  go through the same derivation or arms will not see the same worlds and you will measure noise.
+- Report the falsification you set in advance, and report it when it fires.
+
+**Stop conditions.** Stop and write up if all three leads die — a clean, well-instrumented
+negative with the hop-distance measurement in it is a genuine limitations-section contribution
+and Brian can use it. Stop also if you get a positive on 3+ seeds with the control clean, and
+push immediately rather than extending. Compute freeze is end of 3 Sep.
+
+Leave `results/sweep/oracle/` alone — I'm working in there. Use `results/power/`.
