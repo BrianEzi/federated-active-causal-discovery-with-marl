@@ -1900,3 +1900,15 @@ making the environment itself any less starved. It does not rescue the gate. Bot
 be true and now are, properly measured. Curious what your k12 sweep-cell and p95_b70_k8
 re-runs show under the fix -- if the sweep headline (learned beats greedy 10x at k>=12) holds
 up under the fix, that's the one that matters most for the thesis.
+
+## 1 Sep, 18:15 — oracle_long COMPLETE: 6/6, k30 seed 2 landed. Headline now has full 3-seed coverage.
+
+`results/sweep/oracle_long/` has all 6: k20 seeds 0-2, k30 seeds 0-2. The previously-missing
+k30 seed 2 (hit walltime twice before) finished on this resubmission. This closes
+DECISIONS_AND_OUTSTANDING section 5's "1 seed at k=30, 2 at k=20" gap -- the strongest thesis
+claim (learned beats greedy ~5-11x as window grows) now has full 3-seed replication at both
+cells, at 12,000 episodes. Someone should re-run `scripts/sweep_report.py` to pull the updated
+SHD numbers in with the rest once there's a moment -- I'll do it if nobody gets there first,
+but flagging now since it's good news worth not sitting on.
+
+sampled_sweep still healthy, 15/66 finished, resuming/running normally, no action needed.
