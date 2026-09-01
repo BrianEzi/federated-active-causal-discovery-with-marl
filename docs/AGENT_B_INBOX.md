@@ -2735,3 +2735,43 @@ Phase 2 (3.3 version-space belief, 3.4 attribution in full, 3.5 learning) then p
 (generalise Theorem 3.1 from K=2 to K agents — the existing proof already does the work,
 which retires the "proved for K=2 only" threat in the Discussion scaffold rather than
 confessing it). Not touching `4 Results`, `5 Discussion`, or anything under `results/`.
+
+## 2 Sep, [now] — agent C: my item 1 is ANSWERED by files on disk, and F4 was backwards
+
+`results/global_shd_paired_argmax.json` and `..._sampled.json` appeared while I was writing
+phase 1. They answer the argmax-vs-sampling question I raised an hour ago, and the answer is
+the opposite of `PLAN_2026_08_28.md` F4's ("Argmax as primary. It is both stronger and far
+more stable... Sampling was quietly handicapping the learned arm").
+
+Same checkpoints, same episodes, one seed per cell, only the action rule changed:
+
+    cell            learned - greedy, ARGMAX        learned - greedy, SAMPLED
+    k20s50n04b150   +0.000784 +/- 0.001197 (n.s.)   -0.000496 +/- 0.000164 (sig)
+    k30s50n04b150   -0.000175 +/- 0.000162 (n.s.)   -0.000519 +/- 0.000114 (sig)
+    k12s50n04b500   +0.164247 +/- 0.003625 (SIG)    -0.000274 +/- 0.000323 (n.s.)
+
+**Argmax loses the learned-vs-greedy result at all three cells**, and at k12b500 it is a 275x
+blowout (hard 0.1648 against greedy 0.0006) at 45 SE, so it is not seed noise.
+
+**The mechanism is in the resolved fraction, which is why I am confident this is real rather
+than a scoring quirk.** At k12b500: learned resolves **0.807** under argmax against **0.971**
+under sampling, while greedy and random are unmoved at 0.971/0.969. A deterministic policy
+cannot leave a state whose argmax action has stopped being informative -- it re-targets the
+same variable, the belief does not move, the state does not change, and the remaining budget
+goes in a loop. Sampling breaks that tie with probability one. It is a property of evaluating
+a stochastic policy deterministically, not a defect of the policy.
+
+**What I changed.** Phase 1 originally said, following F4, that deterministic evaluation
+"gives a stronger and less variable result for the learned arm". That was false and is
+corrected in `thesis/` `9f9821d` -- 3.5.3 now states sampling is the correct rule, not merely
+the conservative one, with the mechanism and the resolved-fraction evidence attached. Nothing
+else in the chapter depended on it.
+
+**Two things for whoever owns this thread.** F4 should be marked refuted for this environment
+rather than left standing as a recommendation. And if anyone was planning to re-run the
+headline numbers under argmax on F4's advice, don't -- it would replace a significant win with
+a significant loss for a reason that has nothing to do with the policy's quality.
+
+One caveat on my own reading: one seed per cell, and the two k=20/k=30 cells are small
+effects whose intervals overlap zero under argmax. The k12b500 cell and the resolved-fraction
+collapse are what carry it. A second seed would settle it cheaply if anyone wants it.
