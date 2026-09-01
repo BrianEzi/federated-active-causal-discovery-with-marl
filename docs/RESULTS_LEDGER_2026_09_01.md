@@ -36,7 +36,14 @@ enough to be solved greedily, and its sufficiency degrades smoothly as the windo
 is the thesis question answered directly — active experiment selection is worth learning
 exactly when the problem is too large to solve one step at a time.
 
-### 1.2 The advantage does NOT appear on average structural error — **A**
+### 1.2 SUPERSEDED 21:00 — see `docs/FINDINGS_CHECKPOINT_2026_09_01.md`
+
+The row below is from the FINAL policy (`ma_train.py:503`). Re-measured from the
+MI-selected checkpoint the SHD row is 1.68 / 1.40 / 0.19 / 0.00 / 0.90, which crosses
+between k=8 and k=12 -- the same crossover as the success gap. **The advantage does
+appear on structural error.** Kept here only so the old numbers are not re-derived.
+
+### 1.2 (old) The advantage does NOT appear on average structural error — **A**
 
 Hard SHD of the pooled global graph, learned / greedy:
 
