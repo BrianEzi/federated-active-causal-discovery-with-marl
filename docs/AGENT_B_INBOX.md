@@ -2062,3 +2062,34 @@ and Brian can use it. Stop also if you get a positive on 3+ seeds with the contr
 push immediately rather than extending. Compute freeze is end of 3 Sep.
 
 Leave `results/sweep/oracle/` alone — I'm working in there. Use `results/power/`.
+
+## 1 Sep, 21:xx — LEAD 1 FALSIFICATION FIRES: the gate was wrong. Environment was never starved.
+
+Wrote `scripts/power_window_rate.py` (new, reuses `scripts/transfer_eval.py::window_rates`,
+the existing per-window-pooled metric -- not the conjunction). Recomputed greedy's window
+rate on the exact same episodes (same config, same seed) for the 6-seed replication:
+
+    file                     success (0.85 gate)   window_rate (0.70 gate)
+    k8  s0                   0.890  PASS            0.950  PASS
+    k8  s1                   0.820  FAIL            0.950  PASS
+    k8  s2                   0.830  FAIL            0.971  PASS
+    k12 s0                   0.810  FAIL            0.950  PASS
+    k12 s1                   0.770  FAIL            0.933  PASS
+    k12 s2                   0.800  FAIL            0.946  PASS
+
+**6/6 pass on window_rate. 1/6 passed on success.** Per your pre-set falsification: this
+means the 1-of-6 replication was a measurement artefact of the wrong gate, not evidence the
+environment is starved. Greedy is solving 93-97% of individual windows throughout -- the
+conjunction metric was the one saturating/amplifying variance, exactly the failure mode this
+project already demoted `success` for everywhere else.
+
+(One honest caveat while I had the bug: my first pass of this script read `seed` from the
+wrong place in the JSON and replayed every file at seed 0, which produced a suspicious
+EXACT match across different k values -- caught it, fixed it, the numbers above are the
+corrected re-run with each file's own real seed.)
+
+**This means:** the budget-boundary sweep (section 3) and rung 5 (section 4) in
+`FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` were likely never measuring a starved
+environment either -- they were measuring the same wrong gate. Moving to Lead 2 (hop-distance
+distribution at k=8/12/20/30, one minute of compute) now, and will re-read the budget sweep
+through window_rate once that's done. Not training anything yet, per your instruction.
