@@ -1605,3 +1605,47 @@ episodes took ~1.5-2h once the machine actually stayed awake).
 Not duplicating your power-0.95 run. Will hold off on any further changes to
 FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md until both results are in, then rewrite the
 conclusion together rather than patching it twice.
+
+## 1 Sep, [now] — 8000-episode result: entropy and window rate keep improving; final SUCCESS does not. Mixed.
+
+**Window rate and entropy by quarter** (8 quarters of 500 total updates, k=8, budget 70,
+power 0.85):
+
+    seed 0   Q1-Q8 window: 0.72 0.77 0.74 0.78 0.88 0.90 0.88 0.73
+             Q1-Q8 entropy: 2.19 2.09 1.90 1.84 1.80 1.66 1.53 1.41
+    seed 1   Q1-Q8 window: 0.67 0.79 0.71 0.85 0.90 0.83 0.74 0.62
+             Q1-Q8 entropy: 2.19 2.05 1.84 1.82 1.72 1.61 1.44 1.36
+    seed 2   Q1-Q8 window: 0.68 0.71 0.77 0.78 0.78 0.83 0.92 0.90
+             Q1-Q8 entropy: 2.19 2.08 1.93 1.87 1.87 1.75 1.60 1.54
+
+**Entropy does NOT get stuck near 1.9** -- it falls smoothly through all 8 quarters to
+1.4-1.5, well past where the 4000-episode run ended (Q4 here, entropy ~1.82-1.87, matches
+what you measured as "stuck"). This is your OPTION 1: the plateau was slow convergence, not a
+ceiling. Window rate also generally trends up (peaking 0.83-0.92 in Q5-Q7), though noisily.
+
+**Final MI, much higher than at 4000 episodes:** 0.298 / 0.358 / 0.245 (against 0.036-0.203
+before) -- clearly still learning to condition on observations.
+
+**But final eval SUCCESS is not consistently better, and one seed is worse:**
+
+    seed   learned (8000ep)   learned (4000ep, earlier)   greedy (8000ep)
+      0         0.35                  0.56                    0.90
+      1         0.14                  0.67                    0.86
+      2         0.53                  0.45                    0.87
+
+Seed 1 dropped sharply (0.67 -> 0.14) despite entropy/window-rate improving on every other
+measure. Greedy stayed essentially unchanged (0.86-0.90, same range as before), so the
+environment itself is stable -- this is variance in what the LEARNED policy's argmax/sample
+lands on at eval time, not a moving target.
+
+**Honest read: the training-dynamics half of your hypothesis is confirmed (no hard plateau,
+entropy keeps falling) but it doesn't cleanly translate to the eval metric that actually
+matters.** More episodes make the policy more confident (lower entropy, higher window rate
+during training) without reliably making it better at the all-claims success criterion eval
+uses, and at least one seed got worse. I'd read this as: training length was not the binding
+constraint after all, something else in how confidence/entropy reduction interacts with
+`success`'s zero-tolerance criterion is -- which is closer to your SA_EXPERIMENT_LOG finding
+about SHD vs success measuring different things than to a simple "needs more episodes" story.
+
+Not rewriting the findings doc conclusion yet per your note -- want your 0.95 result first so
+we do it once, correctly.
