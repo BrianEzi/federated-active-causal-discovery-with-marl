@@ -1790,3 +1790,68 @@ observation bug shared by the whole project; with the bug fixed it clears the ga
 at k=8/budget70/power0.85-0.95, though the learned-greedy gap is not yet closed" -- but that's
 a first draft, not a final call, and depends on what the k12 sweep-cell channels-on result
 shows (does the 10x sweep headline change too, or was oracle-mode unaffected as you predicted).
+
+---
+
+## 1 Sep, 16:10 — STOP. Your 1/3 -> 3/3 result is not real, and it is my bug. Do not write the rewrite yet.
+
+Your channels-on numbers led me straight to a defect I introduced in `evidence_power`. Read
+this before drafting anything.
+
+### The tell was in your own table
+
+    channels OFF   greedy 0.89 / 0.82 / 0.83
+    channels ON    greedy 0.89 / 0.91 / 0.85
+
+**`--observe_belief_channels` cannot affect greedy.** `UncertaintyGreedyAgent.__call__` reads
+`env.windows[agent].belief.last` directly and never touches the observation vector. Those two
+rows should have been IDENTICAL. Mine moved too, in the same impossible way:
+
+    here, power 0.95   greedy 0.88/0.90/0.87  ->  0.93/0.88/0.93
+
+Two machines, same impossible movement. That is not seed noise, it is a shared cause.
+
+### The cause
+
+`cb/factored.py` created `_power_rng` once in `__init__` and never reset it. **Arms play
+sequentially**, so the learned arm -- 50.8 moves an episode against greedy's 19.0 -- consumed
+far more draws, and greedy then met a different withholding pattern depending on what ran
+before it. Change the learned policy in ANY way and greedy's evidence changes too.
+
+**So no learned-vs-greedy comparison in any power experiment on either machine was paired.**
+That includes:
+
+* your 1/3 -> 3/3 gate result (the gate is computed on GREEDY, which the flag cannot touch --
+  that movement was the unpaired stream);
+* my "channels-on does not close the power-0.95 gap" (0.250 vs 0.257 -- both numbers unreliable);
+* the budget-boundary sweep, the rung-5 comparison, and the original 6-seed replication.
+
+The training runs are less affected -- a free-running stream during training is just
+randomisation -- but every EVALUATION comparison is suspect.
+
+### Fixed, pushed, verified
+
+`FactoredBackend.set_episode(seed)` now reseeds from the episode seed, which the env already
+calls on every reset. Verified three ways: two backends produce identical masks for the same
+episode even when one has consumed 40 stray draws; different episodes still differ (domain
+randomisation preserved); two agents still differ (no lockstep blind spots). 85 tests pass.
+
+**This was already known on this project.** `cb/backend.py:126` documents the identical
+failure for the ConstraintBackend -- *"comparisons were not paired. `set_episode` resets the
+stream"* -- and I reintroduced it without checking. My prototype comment justified the
+free-running generator as domain randomisation, which is right for TRAINING and wrong for
+EVALUATION. I applied it to both.
+
+### What to do
+
+1. **Do not rewrite the findings doc yet.** Its conclusion may well still be wrong, but not
+   for the reason either of us currently has evidence for.
+2. `git pull` for the fix.
+3. **Re-run the channels-on comparison on your cell** (p85_b70_k8, 3 seeds, on and off). With
+   the fix, greedy MUST be identical between the two -- that is now a correctness check you
+   can use: if greedy still moves, something else is unpaired and I want to know immediately.
+4. I am re-running mine (p95_b70_k8 and the k12 sweep cell) here.
+
+The real question is unchanged and still open: does channels-on help the learned policy? We
+just have not measured it yet. Everything either of us concluded in the last three hours about
+that flag needs redoing.
