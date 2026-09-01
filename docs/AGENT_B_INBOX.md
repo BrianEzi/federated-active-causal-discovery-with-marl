@@ -1208,3 +1208,27 @@ next moves, running in parallel from here:
    note that it's the one "most likely to be right" and the one uniform power-limiting can't
    answer. Will be careful and test against a hand-built case before trusting it, same
    standard as everything else tonight.
+
+## 1 Sep, 10:10 — rung 5 implemented and launched at the ORIGINAL failing budget (35)
+
+`cb/factored.py::_window_hop_distances` (new function) computes BFS hop distance between
+window nodes from the adjacency already implied by `self.truth`; `distance_weighted_power`
+(new opt-in flag, default False, threaded through MAConfig/AgentWindow/ma_train.py CLI)
+scales the per-pair withhold probability as `evidence_power ** hop[x,y]` instead of a flat
+draw. hop=1 (adjacent pairs) reduces to exactly the old flat behaviour -- verified as a
+degenerate case (fully-connected window -> all hops=1 -> identical to flat), plus a
+hand-built chain and a disconnected case, all three checked before touching anything
+downstream. Existing `tests/cb/test_versionspace.py` and
+`tests/crosscheck/test_factored_attribution.py` (16 tests) still pass unchanged. Default off,
+so nothing already running or already reported is affected.
+
+**Launched the strong version of the test**: k=8, BUDGET 35 (the one that failed at 0.49
+under flat power last night, not the doubled budget), power 0.85, distance-weighted, 3 seeds.
+If this clears the gate at the ORIGINAL budget, it is a materially better result than rung 2
+(no budget cost at all, not just a lower oracle-time cost) and answers the objection your note
+raised directly. Also still running: the budget-boundary sweep (beta 3.5/4.0/5.0 at k=8,
+flat power, single seed) to locate where flat power-limiting actually becomes reliable, since
+rung 2's replication showed beta=3.0 sits right on the edge rather than safely inside it.
+
+6 training jobs running in parallel now (8 physical cores). Will report gate results for both
+as they land.

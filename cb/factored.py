@@ -135,6 +135,36 @@ def credit_for_set(true_mag, k: int, positions) -> float:
     return hits / max(len(backend._possible), 1)
 
 
+def _window_hop_distances(truth, k: int) -> np.ndarray:
+    """`[k, k]` int, shortest-path hop count between window nodes on the ADJACENCY implied by
+    `truth` (any non-NONE mark counts as one edge, direction irrelevant -- BFS distance does
+    not care which way an edge points). Disconnected pairs get `k` (a safe finite ceiling:
+    every real distance in a k-node graph is < k, so this always reads as "farther than any
+    real pair" without needing an inf/NaN special case downstream).
+    """
+    adjacency = np.zeros((k, k), dtype=bool)
+    for (u, v), mark in zip(pairs(k), truth):
+        if mark != NONE:
+            adjacency[u, v] = adjacency[v, u] = True
+    hop = np.full((k, k), k, dtype=np.int64)
+    for start in range(k):
+        hop[start, start] = 0
+        frontier = [start]
+        seen = {start}
+        dist = 0
+        while frontier:
+            dist += 1
+            nxt = []
+            for u in frontier:
+                for v in range(k):
+                    if adjacency[u, v] and v not in seen:
+                        seen.add(v)
+                        hop[start, v] = dist
+                        nxt.append(v)
+            frontier = nxt
+    return hop
+
+
 class FactoredBackend:
     """Pairwise belief, updated by ancestry. O(k^2) state, O(k^2) per update.
 
@@ -148,7 +178,7 @@ class FactoredBackend:
     def __init__(self, k: int, shared_positions: Sequence[int] = (),
                  evidence: str = "oracle", evidence_alpha: float = 0.001,
                  assume_skeleton: bool = True, evidence_power: float = 1.0,
-                 power_seed: int = 0, **_ignored):
+                 power_seed: int = 0, distance_weighted_power: bool = False, **_ignored):
         self.k = int(k)
         self.shared_positions = tuple(shared_positions)
         if evidence not in ("oracle", "sampled"):
@@ -199,6 +229,13 @@ class FactoredBackend:
         # Rows seen per node at the last update. A rising count means another experiment on
         # that node, which earns another draw against `evidence_power`.
         self._attempts: dict = {}
+        # RUNG 5 (docs/AGENT_B_INBOX.md, 1 Sep 00:40): flat `evidence_power` treats a
+        # one-hop and a five-hop pair identically, which is not what sampled evidence does
+        # -- `ma/env.py:220`'s own objection is that sampled evidence fails for a REASON
+        # (weak, distant effects don't reach significance), not uniformly at random. Opt-in
+        # and OFF by default so it changes nothing unless asked for.
+        self.distance_weighted_power = bool(distance_weighted_power)
+        self._hop: Optional[np.ndarray] = None
 
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None,
               skeleton: Optional[np.ndarray] = None) -> None:
@@ -220,6 +257,8 @@ class FactoredBackend:
         self.truth = marks_from_mag(true_mag)
         self._possible = {}
         self._seeded_absent = {}
+        if self.distance_weighted_power:
+            self._hop = _window_hop_distances(self.truth, self.k)
         if skeleton is not None:
             skeleton = np.asarray(skeleton, dtype=bool)
             for index, (u, v) in enumerate(pairs(self.k)):
@@ -329,7 +368,17 @@ class FactoredBackend:
                 for x in range(self.k):
                     if attempts[x] == 0 or attempts[x] == self._attempts.get(x, 0):
                         continue
-                    blind = self._power_rng.random(self.k - 1) >= self.evidence_power
+                    if self.distance_weighted_power and self._hop is not None:
+                        # RUNG 5: power decays with hop distance from x instead of being
+                        # flat across every other node. hop=1 (adjacent) reduces to exactly
+                        # `evidence_power`, matching the flat behaviour exactly at distance
+                        # one -- this is a strict generalisation, not a different mechanism.
+                        others = [y for y in range(self.k) if y != x]
+                        per_pair_power = np.array(
+                            [self.evidence_power ** self._hop[x, y] for y in others])
+                        blind = self._power_rng.random(self.k - 1) >= per_pair_power
+                    else:
+                        blind = self._power_rng.random(self.k - 1) >= self.evidence_power
                     self._apply_ancestry(x, reveal(self.truth, self.k, x), blind=blind)
                 self._attempts = attempts
             else:
