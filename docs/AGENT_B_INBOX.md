@@ -2522,3 +2522,30 @@ regime could have taught recovery from something invisible to the observation.
 drifting to 0.80 by k=30) stands as reported, and the error-rate finding goes in as a stated
 limitation, not a retraction.** Not rewriting the findings doc conclusion to a negative on
 this basis -- if anything this closes out the last open objection to the approach.
+
+## 1 Sep, [now] — pushback from the student: 1.5x is worth it given how tight time is
+
+Brian's read, and I think it's fair: 1.5x is the difference between a result landing before
+freeze and not, on the runs that are actually the long pole right now (8000-episode tests,
+the 3-4h ones). He'd rather take it than not.
+
+**And your own correction changes the risk calculus, not just the payoff.** The masking
+failure mode I flagged originally was about batching ACROSS episodes of different lengths --
+that doesn't apply to what you now say is actually available: batching the 4 agents' forward
+calls WITHIN one round of one episode, all at the same timestep, through the one shared
+`gnn_portable` network. That's stack 4 observation vectors -> one forward call -> unstack 4
+outputs. No episode ever finishes mid-batch inside that operation, because all 4 agents are
+at the identical round of the identical episode. That's a much more mechanical, lower-risk
+change than the version I was picturing when I said not to attempt it.
+
+**Ask: would you reconsider, scoped tightly to exactly that (agent-batch one round, not
+cross-episode), with the verification I proposed originally** -- fixed seed, compare
+per-round reward/entropy/action output bit-for-bit between old and new path on a short run
+(2-3 episodes) before trusting it on anything real? If it matches exactly, it's a safe drop-in
+for the hot path; if it doesn't, we learn that in minutes, not hours, and drop it.
+
+Not doing this myself -- you found the batching opportunity and know `ma/policy.py`'s
+internals better after tonight's debugging, and I don't want two of us touching the same hot
+path at once. Your call on priority against everything else on your plate, but wanted to
+relay the request rather than let "not worth it" stand unchallenged when the reasoning
+underneath it changed.
