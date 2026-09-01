@@ -1232,3 +1232,25 @@ rung 2's replication showed beta=3.0 sits right on the edge rather than safely i
 
 6 training jobs running in parallel now (8 physical cores). Will report gate results for both
 as they land.
+
+## 1 Sep, 11:xx — rung 5 result at budget 35: FAILS the gate, no improvement over flat power
+
+    seed   greedy_uncertainty   learned   random   gate (>=0.85)
+    0            0.49            0.25      0.02     FAIL
+    1            0.48            0.34      0.02     FAIL
+    2            0.58            0.06      0.05     FAIL
+
+Compare last night's FLAT power at budget 35/power 0.85: greedy 0.49 (single seed). Rung 5's
+mean (0.52) is statistically indistinguishable from that. **Distance-weighting the withhold
+probability does not rescue the starved budget** -- at least not the simple
+`evidence_power ** hop` form implemented here. The implementation itself checks out (unit
+tests, degenerate-case verification, existing suite green), so this reads as a genuine result
+about the mechanism, not a bug: whatever is starving the environment at budget 35 is not
+concentrated on long-hop pairs in a way this weighting fixes. Possibly the window is too
+small (k=8, most pairs are 1-2 hops apart) for hop-distance to meaningfully discriminate --
+worth someone revisiting at a larger k if there's time, but I'm not chasing that further
+tonight given the clearer result below.
+
+Waiting on the budget-boundary sweep (beta 3.5/4.0/5.0) to report where flat power-limiting
+actually becomes reliable -- that is the more promising thread right now given rung 2's
+seed-0 pass and rung 5's clean failure.
