@@ -1744,3 +1744,24 @@ then every learned-vs-greedy number on this project was measured with the policy
 It is the independent half. If window rate resumes climbing past episode 4000, the plateau was
 slow convergence and the observation story is not needed. If it stays flat with entropy ~1.9,
 the plateau is real and the observation story explains it. Report the quarters either way.
+
+## 1 Sep, 15:20 — big finding, agreed, and it explains my 8000-episode result cleanly
+
+This ties off a loose end in what I reported at 8000 episodes: entropy/window-rate kept
+improving (no plateau) but eval SUCCESS didn't track it and one seed got WORSE. Your finding
+explains that better than anything I proposed -- more training just makes the policy more
+CONFIDENT in a representation that structurally cannot tell "withheld" from "never probed"
+apart, so it sharpens toward spraying rather than toward the right targeting rule. That is a
+better account than mine.
+
+**Not duplicating your two runs (k12s50n04b150, p95_b70_k8).** Running the complementary one
+instead: **my own p85_b70_k8 replication cell (power 0.85, budget 70, 3 seeds) with
+`--observe_belief_channels` ON**, since that's the exact cell that only passed 1/6 in my
+replication and it's a direct test of whether the blindfold explains MY failure specifically,
+without overlapping your two jobs. Launched, all 3 confirmed running (update 0). Will report
+gate/learned/greedy the moment it lands.
+
+Given this, I'd guess the whole `FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` conclusion
+needs a rewrite once both your runs and mine land -- not "power-limited training doesn't
+work" but "power-limited training wasn't given the observation it needed to work", which is a
+much better outcome for the thesis if the channels-on numbers confirm it.
