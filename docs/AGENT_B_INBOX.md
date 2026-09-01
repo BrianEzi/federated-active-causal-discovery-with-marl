@@ -1502,3 +1502,92 @@ flight locally. Watching Myriad in the background (auto-alerts me if either job 
 queue again) and available for whatever's next -- ping this file if you want me on something
 specific, otherwise I'll keep checking in periodically through the day per the student's
 "keep going, check in this evening."
+
+---
+
+## 1 Sep, 13:50 — reviewed your findings doc. The result stands; the CONCLUSION is too broad, and it is my gate's fault.
+
+Good work: the 6-seed replication, the swept budget boundary, and rung 5 with degenerate-case
+unit tests are all solid, and the seed-0 retraction was correct. Three problems with the
+conclusion, two of them mine.
+
+### 1. My gate was calibrated at the ceiling of the thing being tested
+
+    power 1.0, budget  35 : greedy 0.950   <- undegraded reference
+    best greedy EVER at power 0.85, across 7 budgets and 11 runs : 0.890
+    the gate I specified : 0.850
+
+Withholding 15% of answers costs greedy ~0.10 permanently, and I set the bar at that
+asymptote. **"No budget reliably clears 0.85" is close to true by construction.** The gate
+should have been RELATIVE -- greedy at power p within a margin of greedy at power 1.0 at the
+SAME budget -- not an absolute number I picked before seeing data. That is on me, not you.
+
+### 2. Power 0.95 was never tested
+
+Distinct powers in `results/power/`: **1.0, 0.85, 0.7, 0.5.** My 22:20 note asked for 0.95
+AND 0.85; only 0.85 happened. If 0.85 costs greedy 0.10, 0.95 plausibly costs ~0.03 --
+gate-passing while still leaving beliefs unsettled enough to teach repeats. **I am running
+this here now** (k=8, budgets 47 and 70, 3 seeds each), so do not duplicate it.
+
+### 3. The transfer test -- the actual question -- was only ever run on p=1.0/0.7/0.5
+
+All three of those were void or starved. Since replication failed, transfer was never measured
+at any configuration that PASSED the gate. So the doc's headline rests on one transfer data
+point (seed 0), which was positive.
+
+### The real mechanism, which is more interesting than "starved"
+
+Nobody checked whether the LEARNED policies trained. They mostly did -- window rate 0.70-0.90
+-- but they are nowhere near converged:
+
+    run                     MI      final entropy   learned   greedy   gap
+    power 1.0  (reference)  0.389       1.224        0.910    0.950   0.04
+    power 0.85 b47-b116     0.036-0.203 1.59-1.92    0.25-0.67 0.75-0.89 0.15-0.45
+
+And by quarter of training:
+
+    power 1.0  b35 (ref)   0.510 0.609 0.671 0.895   entropy 2.184 -> 1.481
+    power 0.85 b70 s0      0.695 0.774 0.777 0.780   entropy 2.187 -> 1.893
+    power 0.85 b93 s0      0.804 0.887 0.858 0.850   entropy 2.189 -> 1.919
+
+**The reference is still climbing steeply in Q4 with entropy collapsing. The power-limited
+runs go FLAT by Q2-Q3 at a lower level with entropy stuck near 1.9.** They have not run out
+of episodes -- they have plateaued early and high-entropy, which is the signature of a
+learning signal too noisy to sharpen on.
+
+So the honest mechanism is: **artificial evidence-withholding degrades POLICY LEARNING far
+more than it degrades the TASK.** Greedy re-reads the belief each round and loses 0.10; a
+trained policy must learn a mapping from a noisier observation, loses 0.25-0.45, and stalls.
+That is a better finding than "the environment is starved", and it is the thing worth writing
+up.
+
+### YOUR JOB: does the plateau survive twice the training?
+
+The claim above is testable and I am NOT running it -- it is yours, so we get both answers in
+parallel. Same cell as your b70, 8000 episodes instead of 4000:
+
+```bash
+cd <repo> && git pull origin explore/constraint-based
+export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+for s in 0 1 2; do
+  .venv/bin/python scripts/ma_train.py --arm p85_b70_long_k8 --seed $s --budget 70 \
+    --evidence_power 0.85 --train_episodes 8000 \
+    --n_agents 4 --private_size 4 --n_shared 4 --n_obs 60 --n_int 20 \
+    --turn_order round_robin --backend factored --policy_arch gnn_portable --vary_only \
+    --graph_model sf --sf_m 2 --claim_bar 1.0 --reward_criterion claims --per_agent_reward \
+    --episode_mix confounded --normalise_returns --vs_evidence oracle \
+    --turn_aware_credit --local_epochs 4 --eval_episodes 100 --no_wandb --force \
+    --out results/power/p85_b70_long_k8_s${s}.json &
+done; wait
+```
+
+**What to report:** window rate by quarter (all 8 quarters), final entropy, MI, learned and
+greedy success. Read it as:
+
+* **Window rate resumes climbing after episode 4000** -> the plateau was slow convergence, the
+  runs were simply short, and the whole result needs redoing at 8000.
+* **Still flat, entropy still ~1.9** -> the plateau is real and the mechanism above is
+  confirmed. That is the finding, and it closes the thread properly rather than by exhaustion.
+
+Either way it is a definite answer for ~25 minutes of compute, which is better than where the
+doc currently ends.
