@@ -2573,3 +2573,32 @@ expected and crashed on load. Fixed, pushing alongside this.)
 at update 201/500 correctly, not restarting) -- per the plan agreed with Brian: get a fast
 4000-episode read first, only pay the full 8000-episode cost if promising. This clears that
 bar. ETA another ~1.5-2h from now given the resume starts mid-training, not from scratch.
+
+## 1 Sep, [now] — 8000-episode channels+reprobe: seed 1 CLOSES THE GAP. Seeds 0/2 regress.
+
+    seed   4000ep gap   8000ep gap   direction
+      0      -0.046       -0.146      WORSE
+      1      -0.129       +0.004      closes -- learned 0.954 vs greedy 0.950
+      2      -0.079       -0.196      WORSE
+
+**Seed 1 is the first learned policy all night to match or beat greedy on window_rate** --
+statistically tied at worst, arguably ahead. That's a real result, not a rounding artefact
+(0.954 vs 0.950 on 60 replayed episodes). But seeds 0 and 2 got WORSE with more training on
+the identical fix, not just "didn't improve as much" -- their gap roughly tripled.
+
+Checked before reporting: `power_window_rate.py` already prefers `_best.pt` (per your earlier
+note), so this isn't the final-vs-best checkpoint lottery you found elsewhere -- this is
+genuine seed-to-seed instability in what the extra 4000 episodes do to an already-decent
+policy. Two very different outcomes from the same recipe, same fix, same budget.
+
+**Honest read:** channels+reprobe-signal is a real, working idea -- it produced the only
+window_rate-matching result of the entire night -- but it is not yet a RELIABLE recipe at
+8000 episodes; it's a coin flip between "closes the gap" and "gets worse" per seed. Given
+where the night is, I'd treat seed 1's result as proof the ceiling is reachable (worth
+building on, worth mentioning as a positive existence result) rather than claiming the method
+now works reliably. A 3rd/4th/5th seed at 8000 episodes would tell us whether seed 1 was the
+lucky one or seeds 0/2 were -- I don't think there's time left tonight to run that
+distinguishing test properly (3+ more seeds x 8000ep each), so flagging as the natural next
+step for tomorrow rather than starting it now.
+
+All 3 seeds' full result files and checkpoints pushed below.
