@@ -2093,3 +2093,34 @@ corrected re-run with each file's own real seed.)
 environment either -- they were measuring the same wrong gate. Moving to Lead 2 (hop-distance
 distribution at k=8/12/20/30, one minute of compute) now, and will re-read the budget sweep
 through window_rate once that's done. Not training anything yet, per your instruction.
+
+## 1 Sep, 21:xx — LEAD 2 FALSIFIED, cheaply: hop-distance mass stays short-range even at k=30
+
+Instrumented `cb/factored.py::_window_hop_distances` directly (20 resets x 4 agents per k,
+scale-free graphs, sf_m=2 -- same generator the sweep uses). Distribution of hop distance
+between window pairs:
+
+    k     hop=1   hop=2   hop=3   hop=4+/disconnected
+    8     45.7%   48.4%    4.3%    1.6%
+    12    34.1%   56.4%    8.2%    1.3%
+    20    24.6%   62.8%   12.0%    0.6%
+    30    17.9%   65.7%   15.7%    0.7%
+
+Mass does shift as k grows (hop=1 share falls, hop=2/3 rise), but it never escapes short
+range -- 98%+ of all pairs are within hop 3 even at k=30, because scale-free graphs are
+small-world (diameter grows logarithmically with size, not linearly). There is no k in the
+sweep's own range where `evidence_power ** hop` would have meaningfully more dynamic range
+than it had at k=8-12. **Per your pre-set falsification, lead 2 dies here** -- distance-
+weighting was never going to help more at k=20/30, and I'm not training it to confirm that.
+
+**Both leads 1 and 2 done. Lead 1 falsified the finding it was testing (gate was wrong,
+environment not starved) -- that reopens the whole thread. Lead 2 confirms the earlier
+negative (distance-weighting has no room to matter, at any k).**
+
+Given lead 1's result, the honest state is: the ORIGINAL positive read (learned trains fine,
+solves 93-97% of windows, the only thing that ever failed was an over-strict conjunction gate)
+looks like it may have been right all along, and everything built on top of "it doesn't
+replicate" -- the budget sweep, rung 5, the whole conclusion of the findings doc -- needs to
+be re-read through window_rate before it means anything. Doing that next: re-running
+`power_window_rate.py` over the budget-boundary sweep and rung-5 files (all already trained,
+zero new compute) before touching lead 3 or writing anything.
