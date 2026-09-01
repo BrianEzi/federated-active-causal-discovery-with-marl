@@ -151,6 +151,24 @@ and that share is computable from the topology and graph model with **no simulat
 multi-pair groups contribute. A model that fails exactly where its derivation says it must is
 better evidence than one that fits everywhere.
 
+## 4b. Reach -- the engine runs to k=50
+
+Component backend, 4 agents, 30 episodes, zero misattributions throughout:
+
+| k | pairs in window | right | wrong | scope | s/episode |
+|---:|---:|---:|---:|---:|---:|
+| 30 | 435 | 21 | **0** | 0.60 | 5.3 |
+| 40 | 780 | 33 | **0** | 0.68 | 5.1 |
+| 50 | 1225 | 27 | **0** | 0.56 | 9.4 |
+
+The enumerated-ownership backend cannot be run at these sizes -- the attribution space alone
+is 8.4e10 hypotheses at k=20. Cost grows with the SETTLED PAIR COUNT rather than with k, which
+is why k=40 is no dearer than k=30: both settle around 7-12 pairs per window at this budget.
+
+**Recovery falls with window size** (77% at k=12 to 30% at k=30) and that is the coverage term
+of section 3b, not a limit of the engine: a fixed budget buys fewer turns per position as the
+window grows.
+
 ## 5. What it explains
 
 **D7's three-seed negative.** A policy trained ON the attribution reward scores 0.400 / 0.355
