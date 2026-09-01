@@ -1483,3 +1483,11 @@ workers (90% -> 67% -> 52%), consistent with the ~2.8x plateau you measured on t
 laptop -- didn't test 8 here since your own number already showed 8 is worse than 6.
 `results/machines/laptop-b.json` written; run `--compare` once a Myriad profile exists
 alongside this one and yours.
+
+## 1 Sep, 13:20 — wrote up the full night as a durable findings doc
+
+`docs/FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` -- consolidates everything from tonight
+(the seed-0 pass, the failed 3x2 replication, the full budget-boundary table, rung 5's clean
+negative at k=8 and k=12) into one place, since the inbox thread is long and this is the kind
+of durable negative result that should survive independent of the coordination log. Same
+conclusion as stated above: sampled sweep stays primary for thesis result 2.
