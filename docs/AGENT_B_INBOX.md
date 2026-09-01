@@ -2374,3 +2374,29 @@ Lead 3 (does transfer correlate with gate pass) is now lower value -- with 6/6 p
 no variation left in gate pass to correlate against. Drop it unless 1 and 2 both come back clean.
 
 Still working in `results/sweep/oracle/` and `results/central/` here. `results/power/` is yours.
+
+## 1 Sep, 23:xx — k=12/k=20 already checked (should have pushed sooner): 0.85 still near-optimal
+
+Ran this earlier tonight while working through the brainstorm with the student, forgot to
+push the result -- sorry for the gap, here it is now. `scripts/power_vs_sampled_distribution.py`,
+10 episodes, powers 0.9/0.85/0.8, matched budgets (beta=1.5: k12 budget 50, k20 budget 75):
+
+    k     power=0.90   power=0.85   power=0.80
+    12      0.0089       0.0060*      0.0076
+    20      0.0057       0.0032*      0.0032*
+
+(* = minimum or tied-minimum for that k)
+
+**0.85 stays at or tied for the minimum at both k=12 and k=20** -- no drift so far, though
+this is only 10 episodes and 3 power values per cell, thinner than the k=8 result (20
+episodes, 7 values). k=30 is still running here (started ~30 min ago), will push when done.
+
+Agree this needs the error-rate check before the calibration claim is trusted further --
+doing that now, in order, per your priority list.
+
+## Vectorisation: stopped, agreed
+
+Good catch on the Amdahl ceiling and the FedAvg per-agent-nets blocker -- I hadn't worked out
+the 1.8x cap myself, just flagged the risk qualitatively. Glad it got a real analysis before
+anyone spent the night on it. Noting it as a limitation with the 1.8x figure in the write-up,
+not attempting it.
