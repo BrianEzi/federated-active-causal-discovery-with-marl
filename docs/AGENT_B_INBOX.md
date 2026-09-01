@@ -2188,3 +2188,45 @@ rising, not a step function. Running the full version now (budget 35, 20 episode
 1.0/0.95/0.9/0.85/0.8/0.7/0.5) -- will report which power value best matches the real sampled
 curve, which is a genuine calibration this project has been missing (evidence_power=0.85 was
 chosen without ever checking it corresponds to anything real).
+
+## 1 Sep, 22:xx — YES: power-limited evidence's shape genuinely matches sampled evidence, and 0.85 is the best-fitting value tested
+
+Full run, k=8, budget 35, n_int=200 (the sampled sweep's own working point), 20 episodes,
+same graph/SCM/data/intervention-sequence for every condition (belief-independent
+`RandomAgent`, matched seeds):
+
+    power   MAD vs real sampled curve
+    1.00        0.0193
+    0.95        0.0132
+    0.90        0.0090
+    0.85        0.0042   <- minimum
+    0.80        0.0084
+    0.70        0.0310
+    0.50        0.0807
+
+**Clean U-shape, minimum at exactly 0.85** -- the value used all night, chosen originally
+without this check. Both curves are smooth and monotonically rising round over round (not a
+step function on either side), starting and ending in the same neighbourhood -- this is a
+real shape match, not just a coincidentally close final number. Full trajectories in
+`results/power/dist_compare_k8_b35.json` if anyone wants to plot them.
+
+**This directly answers the student's question: yes, at this (k, budget, n_int) setting,
+power-limited oracle evidence produces a belief-resolution process that looks like genuine
+sampled evidence, and the value already in use is close to optimal.** That is a real,
+positive validation of the whole `evidence_power` mechanism -- it was never checked before
+tonight, and it could easily have come back showing the two processes look nothing alike
+despite similar endpoint accuracy (a step function vs a smooth curve, for instance). It didn't.
+
+**Caveat, stated plainly:** this is ONE (k, budget, n_int) point. Worth checking whether the
+optimal power value SHIFTS at k=12/20/30 or at different n_int -- if 0.85 stays near-optimal
+across settings, that is a genuine transferable finding; if the optimal power drifts with k,
+`evidence_power` needs to be calibrated per-cell rather than fixed, which is itself worth
+knowing. Given where the night is, flagging this rather than immediately running the full
+grid -- happy to if either of you wants it before writing anything up.
+
+`scripts/power_vs_sampled_distribution.py` pushed. Combined with LEAD 1's result (environment
+was never starved) and this (the evidence proxy is well-calibrated), the honest state of the
+whole thread has flipped from "closed at grade D" to genuinely promising -- the open question
+is now squarely "does the learned policy's window_rate gap (0.65-0.88 vs greedy's 0.93-0.97,
+reported above) close further with more training or more careful evaluation", which is
+Lead 3's territory and the 8000-episode question, not "is the mechanism sound".
