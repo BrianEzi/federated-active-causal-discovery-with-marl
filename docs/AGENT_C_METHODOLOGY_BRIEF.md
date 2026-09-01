@@ -163,3 +163,85 @@ following are additional, and are reported in `docs/AGENT_B_INBOX.md` with full 
 the mandated full build has NOT been run.** Static checks pass (citations resolve in both bib
 and annotated bibliography, no `\citet`, British spellings, all `\ref`s defined, no duplicate
 labels, environments and braces balanced). The build needs to happen on Overleaf.
+
+---
+
+# APPENDED 2 Sep, 00:2x — Phase 0b: terminology audit
+
+Brian's instruction: the project uses coined words where standard research terms exist, and he
+wants the standard ones. Do this in the SAME pass as Phase 0, because both are factual
+corrections rather than restructuring.
+
+**Rename PROSE ONLY. Do not rename code identifiers.** Renaming `clamp`/`vary`/`oracle` across
+~50 files two days before the compute freeze is pure risk with no marking benefit, and it would
+invalidate every config already written to disk. Instead, put the mapping in `Glossary.tex`
+(it exists, 67 lines) so the gap between paper and repository becomes a stated convention:
+"we write `vary` in configuration listings for the randomised intervention
+$do(V \sim \mathcal{N}(0,\sigma^2))$". An examiner reading the code wants exactly that.
+
+## Do NOT change these — they are already standard, and changing them would be wrong
+
+**`oracle` is standard causal-discovery vocabulary.** PC and FCI correctness is proved with
+respect to a CONDITIONAL-INDEPENDENCE ORACLE -- `spirtes2000causation`, already in the bib. It
+needs a gloss on first use, never a rename:
+
+> *oracle evidence* --- the infinite-sample limit, in which each conditional-independence query
+> is answered exactly, as assumed in the correctness proofs of constraint-based discovery
+> \citep{spirtes2000causation}.
+
+This also makes RQ1's "from finite samples to the infinite-sample limit" land precisely, since
+*oracle* and *infinite-sample* become one axis stated two ways.
+
+Also standard, keep: **edge mark** (PAG vocabulary), **SHD**, **arm**, **budget**,
+**free-riding**, **intervention target**, **latent projection**, **maximal ancestral graph**.
+
+## Replace in prose
+
+| coined | standard | source |
+|---|---|---|
+| \textsc{Clamp} | **atomic intervention**, $do(V=c)$ | `pearl2009causality` §1.3.1 |
+| \textsc{Vary} | **randomised (stochastic) intervention**, $do(V \sim \mathcal{N}(0,\sigma^2))$ | `eberhardt2007interventions` |
+| settled / unsure | **determined / undetermined** (or *invariant*, per `hauser2012gies`) | in bib |
+| claim, `claim_bar` | **commit to a mark**; **decision threshold** $\tau$ | -- |
+| success (the conjunction) | **joint recovery rate** | -- |
+| window rate | **per-window recovery rate** | -- |
+| hard / soft SHD | **SHD on committed marks** / **expected SHD under the posterior** | -- |
+| probe | **intervention** / **experiment** | -- |
+| sovereign | **autonomous**, or delete -- the no-sharing constraint is stated formally already | -- |
+| altruistic, "the altruism gap" | **public-goods problem** -- the de-confounding experiment is a public good, costly to the provider and beneficial to peers | connects to the existing free-rider index |
+
+**Both modes are hard (perfect, structural) interventions** -- parents severed in both cases.
+They differ only in the interventional distribution assigned: a point mass against a Gaussian.
+Stating that once in standard notation is clearer than either coined word, and it sharpens the
+de-confounding argument: setting $V$ to a constant makes the latent's contribution degenerate
+and breaks the covariance path, whereas assigning it an independent distribution substitutes
+one exogenous source for another and preserves the induced dependence among the latent's other
+children. Section 3.2 already argues target-not-value identifiability from `hauser2012gies`;
+that argument reads better in standard notation, not worse.
+
+## Coined and KEPT, but must be formally defined on first use
+
+`attribution` (determining which agent owns a latent), `LatentGroup(owner, children)`,
+`local disturbance`, `component factoring`, `contended fraction` $\sigma$. These name mechanisms
+that have no standard name because they are the contribution. Coining is legitimate; using a
+coined word undefined is not. `children` is already standard (children of the latent); only
+`owner` needs a definition.
+
+**`window`** is borderline -- 65 uses in the thesis, 70 files in code. The standard word for
+what it is, is the **margin**: agent $k$ observes the marginal over $\mathbf{V}_k$ and the
+latent projection is onto $\mathbf{V}_k$. Keep "window" as an explicitly defined shorthand, but
+use "local variable set $\mathbf{V}_k$" in formal statements and in the theorem. Do not attempt
+a global rename.
+
+## The one worth changing urgently
+
+**`evidence_power` / "power-limited evidence" collides with STATISTICAL POWER**, and the
+collision is directly in the line of fire: the entire purpose of the mechanism is to imitate
+finite-sample evidence, where statistical power is the actual technical quantity being
+discussed. A reader meeting "power-limited evidence at power 0.85" has to work out that it has
+nothing to do with $1-\beta$.
+
+What the mechanism is: an oracle that answers only a fraction $\rho$ of queries and returns
+*unknown* otherwise. Name it a **partial oracle** with **answer rate** $\rho$. Rename in prose,
+leave the config flag alone. **Agent B is producing calibration results under the old name right
+now** -- flag it to them in `docs/AGENT_B_INBOX.md` so the write-up does not fork.
