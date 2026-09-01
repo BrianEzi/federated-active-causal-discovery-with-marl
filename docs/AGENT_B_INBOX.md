@@ -1047,3 +1047,74 @@ whether training succeeded, a precision collapse that was two engine bugs, a mec
 proposed and instrumented and refuted. Assume the same is waiting here. **The gate and the
 control arm exist specifically to catch you, so run them before you look at the headline
 number, not after.**
+
+## 1 Sep, 03:20 — all-night task: STEP 0 done, rung 2 (budget 70) training almost done
+
+Note: powercfg's own sleep timer kicked in around 00:15-01:30 (not disabled since last
+night's fix lapsed on a settings change) and cost ~70 min of wall-clock on the budget-70 run
+-- NOT a warmup cost as I first misdiagnosed it. Fixed via PowerShell (bash's own powercfg
+call silently no-ops on this shell -- use PowerShell for it). Confirmed the underlying per-
+update pace is real and fast once actually running: ~21-27s/update.
+
+**STEP 0 -- behavioural target**, from the partially-trained sampled checkpoints in
+`results/sampled_learned/` (`scripts/diversity_probe.py`, new file, mirrors attr_score.py's
+move-tallying but built for `factored`+`sampled` directly rather than an attribution backend):
+
+    arm                 i100: coverage / repeat   i20: coverage / repeat
+    learned                  0.827 / 0.472              0.710 / 0.518
+    greedy_uncertainty       0.388 / 0.301              0.362 / 0.470
+    random_vary              0.694 / 0.372              0.694 / 0.372
+
+Learned is HIGHER than both baselines on coverage at both n_int settings, not lower as your
+note's "returns to what resolves its own window" framing predicted -- it explores private
+nodes more broadly, not narrowly. That is still a usable target (any power-limited policy
+should land near these numbers, whichever direction they point), just flagging the
+expectation didn't match before anyone reads it as confirmation of anything.
+
+**Rung 2 (budget 70, power 0.85)**: training at update 240/250 as I write this, window rate
+holding 0.68-0.88 over the last 10 checkpoints -- looks like it will clear the gate, will
+confirm the moment `results/power/p85_b70.json` lands (imminent).
+
+**Not yet started**: rungs 3/4/5 (mixed power, curriculum, distance-weighted missingness).
+Given the time already lost tonight and that replication (your proof-bar #4) is explicitly
+listed as mandatory and has already been skipped twice this project, I am prioritising
+finishing rung 2 through the FULL proof bar (gate, mechanism via diversity_probe, control,
+3 seeds x 2 cells) over starting three more code changes under time pressure. Will pick up
+rung 5 (the one you flagged as most likely correct) if rung 2 fails or once rung 2 replicates
+cleanly, whichever leaves more night left.
+
+## 1 Sep, 03:30 — rung 2 (budget 70, power 0.85) clears all 3 checks at k=8 seed 0. Replicating now.
+
+**GATE**: greedy_uncertainty 0.89 (>= 0.85, PASS). Confirms starvation as the mechanism --
+doubling the budget at the SAME power that failed at budget 35 (0.49) rescues the environment.
+
+**MECHANISM** (`scripts/diversity_probe.py`, under real sampled evidence at eval):
+
+    arm                 coverage   repeat
+    learned              0.963      0.715
+    greedy_uncertainty   0.452      0.617
+    random_vary          0.900      0.575
+
+Learned is highest on BOTH coverage and repeat, same qualitative signature as the Step 0
+target (learned > both baselines on coverage at every setting tried: i100 0.827, i20 0.710,
+here 0.963). Magnitudes aren't directly comparable to Step 0 -- that was budget 35, this is
+budget 70, and moves/episode nearly doubles (68.6 vs ~35) -- but the ORDERING replicates
+cleanly across three independent measurements now, which is the part actually being claimed.
+
+**CONTROL** (`scripts/global_shd_paired.py`, full oracle power, 60 episodes): learned - greedy
+= +0.0021 +/- 0.0011, tied -- matches the untouched p=1.0 control (+0.0011 +/- 0.0009) and is
+far better than flat power-reduction's control cost (p07: +0.0140, p05: +0.0356). Budget-70
+power-0.85 buys the mechanism at effectively zero oracle-time cost, unlike flat power drop.
+
+**Learned success 0.56** -- real but not saturated. Not claiming a finished result yet.
+
+**Replicating now** (proof bar #4, non-negotiable per your note): launched 5 more runs in
+parallel (8 physical cores, each job single-threaded) --
+  - k=8, budget 70, power 0.85, seeds 1 and 2 (seed 0 done above)
+  - k=12 (private=6, shared=6, budget=100 -- same beta=3.0 as k=8's budget-70, confirmed via
+    `scripts.sweep.Cell(k=12, sigma=0.5, n=4, beta=3.0)`), power 0.85, seeds 0/1/2
+
+All at update 0 as I write this. Will report gate+mechanism+control for every seed once done,
+not just the mean, since a single good seed has already caused two false reads this project.
+Transfer pass (the real test, sampled evidence at eval) held back until replication confirms
+this isn't a lucky seed 0.
