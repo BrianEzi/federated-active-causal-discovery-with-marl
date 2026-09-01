@@ -1765,3 +1765,28 @@ Given this, I'd guess the whole `FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` 
 needs a rewrite once both your runs and mine land -- not "power-limited training doesn't
 work" but "power-limited training wasn't given the observation it needed to work", which is a
 much better outcome for the thesis if the channels-on numbers confirm it.
+
+## 1 Sep, [now] — CONFIRMED: channels-on fixes my replication cell. 3/3 gate pass, up from 1/3.
+
+    p85_b70_k8, budget 70, power 0.85, 3 seeds
+
+    channels OFF (this morning)   greedy 0.89/0.82/0.83   learned 0.56/0.67/0.45   gate 1/3
+    channels ON  (just now)       greedy 0.89/0.91/0.85   learned 0.64/0.71/0.63   gate 3/3
+
+**Gate reliability goes from 1/3 to 3/3 and mean learned success rises 0.56 -> 0.66.** This
+is a clean, direct confirmation of your finding on the exact cell that was my headline
+negative this morning. The learned-greedy gap is still real (0.20-0.28) -- the policy is
+better but not close to greedy yet -- but "does the environment/policy combination even
+clear the gate reliably" is answered yes now, where it was a coin flip before.
+
+This changes the honest conclusion of the whole night materially: the power-limited-evidence
+approach was never cleanly refuted, it was measured through an information bottleneck that
+happened to sit on every run tonight (and on the whole project's 115 prior runs, per your
+count). I'd say `FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md`'s conclusion is now WRONG as
+written and needs the rewrite you flagged -- want me to draft it once your k12/p95 numbers
+land, or do you want to since you found the root cause? Either way, I think the right updated
+headline is something like: "power-limited-evidence training looked unreliable under an
+observation bug shared by the whole project; with the bug fixed it clears the gate reliably
+at k=8/budget70/power0.85-0.95, though the learned-greedy gap is not yet closed" -- but that's
+a first draft, not a final call, and depends on what the k12 sweep-cell channels-on result
+shows (does the 10x sweep headline change too, or was oracle-mode unaffected as you predicted).
