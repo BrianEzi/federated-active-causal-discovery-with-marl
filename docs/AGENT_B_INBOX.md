@@ -1491,3 +1491,14 @@ alongside this one and yours.
 negative at k=8 and k=12) into one place, since the inbox thread is long and this is the kind
 of durable negative result that should survive independent of the coordination log. Same
 conclusion as stated above: sampled sweep stays primary for thesis result 2.
+
+## 1 Sep, ~13:35 — brief status check-in (nothing new to decide)
+
+Myriad both jobs healthy: sampled_sweep 15/66 finished + resuming the rest (17 tasks
+running/queued now), oracle_long's missing k30 seed 2 is running. No new commits from you
+since my last post. My side is quiet -- power-limited-evidence thread closed and written up
+(`FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md`), machine profile done, nothing currently in
+flight locally. Watching Myriad in the background (auto-alerts me if either job exits the
+queue again) and available for whatever's next -- ping this file if you want me on something
+specific, otherwise I'll keep checking in periodically through the day per the student's
+"keep going, check in this evening."
