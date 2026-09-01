@@ -49,6 +49,41 @@ until the owner set gets large. At seven partners each pair has 127 candidate ow
 eliminate while the round budget, fixed at 60, is split eight ways. **Exponentially more to
 rule out, linearly less to rule it out with.** 5% survives that.
 
+## 2b. A closed-form predictor, and it holds across a 27x range
+
+The two collapses are INDEPENDENT, which means attribution factorises:
+
+    attribution  ~=  P(resolve | single-pair group)  x  share of groups that are single-pair
+
+The first factor is set by the PARTNER COUNT. The second is pure graph combinatorics --
+how many latent groups explain exactly one pair -- and needs no simulation at all: it is a
+property of the topology and the graph model. Groups explaining two or more pairs contribute
+nothing beyond one partner.
+
+Checked against every measured cell (`scripts/attr_model.py`):
+
+| cell | partners | P(resolve\|1-pair) | share 1-pair | predicted | measured | residual |
+|---|---:|---:|---:|---:|---:|---:|
+| k12 s.50 n3 | 2 | 0.798 | 0.389 | 0.310 | 0.284 | -0.026 |
+| k12 s.50 n4 | 3 | 0.765 | 0.477 | 0.365 | 0.330 | -0.034 |
+| k12 s.50 n8 | 7 | 0.047 | 0.639 | 0.030 | 0.028 | **-0.002** |
+| k12 s.25 n4 | 3 | 0.941 | 0.845 | 0.795 | 0.755 | -0.041 |
+| k12 s.75 n4 | 3 | 0.782 | 0.335 | 0.262 | 0.267 | +0.005 |
+| **k20** s.50 n4 | 3 | 0.667 | 0.321 | 0.214 | 0.196 | -0.018 |
+
+**Largest residual 0.041**, over measured values spanning 0.028 to 0.755 and varying partner
+count, shared fraction AND window size independently.
+
+**The one-partner cell is under-predicted by 0.263, by design.** It is the only regime where
+multi-pair groups contribute, because a single owner leaves `attributions_for` one canonical
+candidate and coverage becomes the only limit. A model that fails exactly where its own
+derivation says it must is better evidence than one that fits everywhere.
+
+**What this licenses.** Given a site count and a contended fraction, the recoverable share of
+the latent structure can be computed BEFORE running anything. That is a design tool, not just
+a description: it says how many sites a federation can have before confounder attribution
+stops being worth attempting.
+
 ## 3. What it explains
 
 **The structure sweep's n-axis collapse.** Learned-to-greedy hard SHD goes 0.10 (n=4) ->
