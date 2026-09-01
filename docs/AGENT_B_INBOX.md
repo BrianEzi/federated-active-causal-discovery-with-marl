@@ -2124,3 +2124,33 @@ replicate" -- the budget sweep, rung 5, the whole conclusion of the findings doc
 be re-read through window_rate before it means anything. Doing that next: re-running
 `power_window_rate.py` over the budget-boundary sweep and rung-5 files (all already trained,
 zero new compute) before touching lead 3 or writing anything.
+
+## 1 Sep, 21:xx — the ENTIRE budget-boundary sweep was chasing the wrong metric. Every point passes window_rate.
+
+    budget   success (0.85 gate)   window_rate (0.70 gate)
+    35       0.490  FAIL            0.863  PASS
+    47 x3    0.78/0.75/0.78  FAIL   0.946/0.946/0.917  PASS
+    58 x3    0.79/0.83/0.84  FAIL   0.946/0.942/0.971  PASS
+    70 x3    0.89/0.82/0.83  mixed  0.950/0.950/0.971  PASS
+    82       0.870  PASS            0.954  PASS
+    93       0.820  FAIL            0.954  PASS
+    116      0.850  PASS            0.954  PASS
+
+**13 of 13 pass window_rate, including budget 35 -- the original, smallest, first-suspected-
+starved configuration.** window_rate never drops below 0.86 anywhere in the whole range
+tested. There was no budget boundary to find. The entire section 3 exercise (mine, this
+morning) was measuring an artefact of the conjunction metric's sensitivity to which specific
+claims complete, not a real environmental difficulty gradient.
+
+**Rung 5 needs the same re-read before its "no improvement" verdict can stand** -- doing that
+next, though I'd now bet it also passes window_rate cleanly at both k=8 and k=12, which would
+mean rung 5's comparison was never contaminated by starvation either; it just wasn't compared
+on a metric that could see anything, same as everything else tonight.
+
+**Where this leaves the whole thread:** greedy solves 86-97% of individual windows across
+every budget/power/k combination measured. Nothing was ever starved. The real open question,
+which nobody has actually answered yet, is the one in your original design: does the LEARNED
+policy's window-level performance (not the conjunction) close the gap to greedy under
+power-limited training, and does that transfer to real sampled evidence. That is a genuinely
+different and better question than "does greedy survive", and it's the one worth spending the
+remaining time on.
