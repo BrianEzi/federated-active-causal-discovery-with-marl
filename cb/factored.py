@@ -222,10 +222,19 @@ class FactoredBackend:
         self.evidence_power = float(evidence_power)
         if not 0.0 < self.evidence_power <= 1.0:
             raise ValueError(f"evidence_power must be in (0, 1], got {evidence_power!r}")
-        # NOT reseeded per episode, deliberately: the point is that the policy meets a
-        # DIFFERENT pattern of missing evidence every episode, which is what domain
-        # randomisation means here. Deterministic given `power_seed` for the run as a whole.
-        self._power_rng = np.random.default_rng(int(power_seed))
+        # RESEEDED PER EPISODE from the episode seed -- see `set_episode`, which the env
+        # calls on every reset. Each episode still meets a DIFFERENT pattern of missing
+        # evidence, which is what domain randomisation needs, but the pattern is a function
+        # of the EPISODE rather than of how many draws happened to be consumed before it.
+        #
+        # It was a free-running generator until 1 Sep 2026, and that made arm comparisons
+        # invalid: arms play sequentially, so the learned arm (50.8 moves an episode)
+        # consumed far more draws than greedy (19.0), and greedy therefore met a different
+        # withholding pattern depending on what ran before it. Measured symptom -- greedy's
+        # own score moved 0.847 -> 0.883 between two runs that differed ONLY in an
+        # observation flag greedy does not read. Nothing was being compared like for like.
+        self._power_seed = int(power_seed)
+        self._power_rng = np.random.default_rng(self._power_seed)
         # Rows seen per node at the last update. A rising count means another experiment on
         # that node, which earns another draw against `evidence_power`.
         self._attempts: dict = {}
@@ -236,6 +245,16 @@ class FactoredBackend:
         # and OFF by default so it changes nothing unless asked for.
         self.distance_weighted_power = bool(distance_weighted_power)
         self._hop: Optional[np.ndarray] = None
+
+    def set_episode(self, episode_seed: int) -> None:
+        """Reseed the withholding generator so every ARM sees the same evidence.
+
+        The env calls this on each reset. Mixing the episode seed with this backend's own
+        `power_seed` keeps two agents from missing the same questions in lockstep, while
+        making the pattern reproducible for any arm replaying that episode.
+        """
+        self._power_rng = np.random.default_rng(
+            (self._power_seed * 1_000_003 + int(episode_seed)) % (2 ** 63))
 
     def reset(self, true_mag: np.ndarray, adjacency=None, topology=None,
               skeleton: Optional[np.ndarray] = None) -> None:
