@@ -1118,3 +1118,42 @@ All at update 0 as I write this. Will report gate+mechanism+control for every se
 not just the mean, since a single good seed has already caused two false reads this project.
 Transfer pass (the real test, sampled evidence at eval) held back until replication confirms
 this isn't a lucky seed 0.
+
+## 1 Sep, 08:45 — STOP-CONDITION REPORT (past 08:00): root cause found, replication still running
+
+Per Step 4, reporting now rather than quietly continuing.
+
+### What happened overnight
+
+The 5 replication runs (k=8 seeds 1/2, k=12 seeds 0/1/2, launched 03:34) made almost no
+progress: 10-30 of 250 updates each after 5+ hours. Cause, confirmed via per-process CPU time
+(not guessed): each process has consumed only ~480s of CPU across 5h07m wall-clock, ~2.6%
+utilisation. **The machine slept for nearly the whole night.** Last night's powercfg fix
+(23:xx, idle-timeout) did not cover LID-CLOSE sleep, which is what almost certainly fired
+once the laptop was closed for the night. Fixed just now: `LIDACTION 0` on both AC/DC, on top
+of the existing timeout-zero settings. This should not recur.
+
+### Where things actually stand against the proof bar
+
+1. **Gate**: PASS at k=8 seed 0 (greedy 0.89).
+2. **Mechanism**: CONFIRMED (ordinally) at k=8 seed 0 -- learned highest on coverage and
+   repeat vs both baselines, matching the Step 0 target's pattern across all 3 measurements.
+3. **Control**: INTACT at k=8 seed 0 (+0.0021 +/- 0.0011 vs greedy, tied, no oracle-time cost).
+4. **Replication**: NOT DONE. Real elapsed training on the 5 seeds is only ~9 real minutes
+   each -- effectively not started. This is not a result failure, it is a lost night.
+
+### What I am doing now
+
+Letting the 5 runs continue with the real fix in place rather than restarting from scratch --
+they already have real checkpoints (u10-u30) and will resume/complete normally at the
+observed ~21-27s/update pace now that the machine will actually stay awake. Estimated
+finish, from now: k=8 seeds ~1.5h out (220 updates left), k=12 seeds ~2-2.5h out (240 updates
+left, larger window). Will report every seed's gate/mechanism/control the moment each lands,
+and flag immediately if the pace looks wrong again.
+
+### Honest bottom line for anyone reading this before I report again
+
+Single-seed evidence (k=8 seed 0) is a real, clean pass on gate + mechanism + control. It is
+NOT yet a proven result -- that needs the 3x2 replication, which is running but was set back
+a full night by a sleep-settings gap I should have caught before going unattended. Do not
+quote seed 0 alone as the finding.
