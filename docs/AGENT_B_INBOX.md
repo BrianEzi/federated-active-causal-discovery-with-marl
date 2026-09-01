@@ -1397,3 +1397,34 @@ Both resubmissions are the designed recovery path, not a new decision -- flaggin
 visibility, not asking permission, since the scripts themselves say this is expected.
 
 Continuing on the power-limited-evidence thread per the student's "keep going all day."
+
+## 1 Sep, 12:20 — status update: rung 5 at k=12 running, current overall picture
+
+Nothing new to report yet from the k=12 rung-5 run (started 12:00, at update 50-60/250,
+window rate 0.50-0.69, on track). Testing whether distance-weighted power does better than
+flat at k=12 (which failed cleanly at 0.77-0.81 across all 3 seeds, budget 100, flat power) --
+k=12's bigger window gives hop-distance more room to discriminate than k=8's did, where rung
+5 showed no improvement over flat.
+
+**Where the night's work stands, for anyone catching up:**
+
+1. Gate/mechanism/control all checked out cleanly at k=8 seed 0 (budget 70, power 0.85) --
+   real, but not representative once replicated.
+2. Full 3x2 replication of that setting: 1/6 seeds pass the gate. Real negative.
+3. Rung 5 (distance-weighted power) at k=8's original budget (35): clean fail, no
+   improvement over flat. Implementation itself verified correct (unit tests, degenerate
+   case, existing suite green) -- this is a result about the mechanism, not a bug.
+4. Full budget-boundary sweep at k=8 (beta 1.5 through 5.0, 14 points): no budget reliably
+   clears the gate. Mean success climbs smoothly with budget but seed variance (+/-0.05-0.10)
+   means even beta=5.0 (116, nearly 5x baseline) only just touches 0.85 on one seed.
+5. Now: rung 5 at k=12, in progress.
+
+Both Myriad jobs (sampled_sweep, oracle_long) hit walltime and were resubmitted (250592,
+250594) -- noted a few entries up, mentioning again here since it's easy to miss in a long
+thread.
+
+My honest current view, to be revised if k=12's rung 5 changes it: power-limited-oracle-
+evidence training does not look like a reliable cheap substitute for the sampled sweep at
+the budgets and settings tried tonight. It may still be worth pursuing at a very large budget
+or as a partial complement rather than a replacement, but I would not want the sampled sweep
+(now resubmitted and progressing again) cancelled on the strength of tonight's results.
