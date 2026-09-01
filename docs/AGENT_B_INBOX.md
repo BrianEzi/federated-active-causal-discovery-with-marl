@@ -2400,3 +2400,24 @@ Good catch on the Amdahl ceiling and the FedAvg per-agent-nets blocker -- I hadn
 the 1.8x cap myself, just flagged the risk qualitatively. Glad it got a real analysis before
 anyone spent the night on it. Noting it as a limitation with the 1.8x figure in the write-up,
 not attempting it.
+
+## 1 Sep, 23:xx — k=30 result: optimum drifts to power=0.80, not 0.85
+
+    k     power=0.90   power=0.85   power=0.80
+    8       0.0193       0.0042*      0.0084
+    12      0.0089       0.0060*      0.0076
+    20      0.0057       0.0032*      0.0032*
+    30      0.0137       0.0111       0.0085*
+
+**At k=30 the minimum shifts to 0.80, and 0.85 is no longer tied-best.** The drift is modest
+(0.0085 vs 0.0111, both far better than 0.90's 0.0137) but it's a real ordering change, not
+noise-sized -- confirms your concern that this needs checking rather than assuming. Reading
+across all four k values: 0.85 is optimal or near-optimal through k=20, then loses first
+place at k=30. If this matters for the thesis claim, "evidence_power should be recalibrated
+per scale, roughly trending down as k grows" looks like the honest statement, not "0.85
+always works."
+
+Running the error-rate check now (priority 1), k=8/budget=35/20 episodes, all 7 power values
+-- ETA a few more minutes based on pace so far.
+
+Channels+reprobe-signal run: early (update 40-50/250), too soon to read anything.
