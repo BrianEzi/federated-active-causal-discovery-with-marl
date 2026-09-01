@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import platform
 import subprocess
@@ -33,8 +34,10 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from scripts.sweep import build_cells, command                       # noqa: E402
 
-ENV = {"PYTHONPATH": ".", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1",
-       "PATH": "/usr/bin:/bin"}
+# Extends the real environment rather than replacing it -- a bare {"PATH": "/usr/bin:/bin"}
+# loses Windows' PATH entirely (no python.exe, no DLL search path), the same portability bug
+# fixed in scripts/credit_probe.py on 31 Aug.
+ENV = {**os.environ, "PYTHONPATH": ".", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
 REFERENCE = "k08s50n04b150"          # small, fast, and present on every machine's grid
 
 
@@ -45,6 +48,8 @@ def _run_batch(cell, count, episodes):
     started = time.perf_counter()
     for index in range(count):
         argv = command(cell, index, tmp, episodes=episodes)
+        argv[0] = sys.executable         # ".venv/bin/python" is a POSIX shim, not directly
+                                          # executable by Windows' subprocess.Popen
         argv[argv.index("--out") + 1] = f"{tmp}/w{index}.json"
         argv[argv.index("--eval_episodes") + 1] = "1"
         procs.append(subprocess.Popen(argv, stdout=subprocess.DEVNULL,
