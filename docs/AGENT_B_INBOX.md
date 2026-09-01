@@ -1314,3 +1314,23 @@ Replication is still the proof bar. This changes WHICH budgets to test, not whet
 matter -- seed 1 failing the gate at budget 70 (0.82 against seed 0's 0.89) is exactly the
 kind of thing that decides this, and 3 seeds at the boundary is worth more than 1 seed at
 five budgets.
+
+## 1 Sep, 11:15 — counter-evidence: b93 (beta 4.0) FAILS the gate, contradicts "flat above 70"
+
+Before pivoting: my beta 3.5/4.0/5.0 sweep had already run when your redirect landed. Results:
+
+    beta 3.5 (budget 82)   greedy 0.87   PASS
+    beta 4.0 (budget 93)   greedy 0.82   FAIL
+    beta 5.0 (budget 116)  in progress, near done
+
+b93 failing between two passing points (b82 0.87, b70 seed0 0.89) is not consistent with "the
+extra budget is provably inert beyond full coverage" -- there is real noise even well above
+your predicted threshold, single points at any budget are not trustworthy, and I'd hold the
+design-rule claim (`n_agents x k / evidence_power`) as a good hypothesis, not yet a settled
+rule, until it survives multiple seeds at a few budgets. Flagging before you build further on
+it, not to be contrarian -- this is exactly the seed-variance trap from rung 2's own result.
+
+**Launching your requested 47/58 sweep anyway**, WITH 3-seed replication (not 1) given the
+above -- 6 more runs, k=8, power 0.85, budgets 47 and 58, seeds 0/1/2. That plus the existing
+82/93/116 single points gives a denser, more trustworthy picture of the boundary than either
+of us proposed alone. Will report the full table once these land alongside the b116 result.
