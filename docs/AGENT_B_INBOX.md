@@ -1082,3 +1082,39 @@ finishing rung 2 through the FULL proof bar (gate, mechanism via diversity_probe
 3 seeds x 2 cells) over starting three more code changes under time pressure. Will pick up
 rung 5 (the one you flagged as most likely correct) if rung 2 fails or once rung 2 replicates
 cleanly, whichever leaves more night left.
+
+## 1 Sep, 03:30 — rung 2 (budget 70, power 0.85) clears all 3 checks at k=8 seed 0. Replicating now.
+
+**GATE**: greedy_uncertainty 0.89 (>= 0.85, PASS). Confirms starvation as the mechanism --
+doubling the budget at the SAME power that failed at budget 35 (0.49) rescues the environment.
+
+**MECHANISM** (`scripts/diversity_probe.py`, under real sampled evidence at eval):
+
+    arm                 coverage   repeat
+    learned              0.963      0.715
+    greedy_uncertainty   0.452      0.617
+    random_vary          0.900      0.575
+
+Learned is highest on BOTH coverage and repeat, same qualitative signature as the Step 0
+target (learned > both baselines on coverage at every setting tried: i100 0.827, i20 0.710,
+here 0.963). Magnitudes aren't directly comparable to Step 0 -- that was budget 35, this is
+budget 70, and moves/episode nearly doubles (68.6 vs ~35) -- but the ORDERING replicates
+cleanly across three independent measurements now, which is the part actually being claimed.
+
+**CONTROL** (`scripts/global_shd_paired.py`, full oracle power, 60 episodes): learned - greedy
+= +0.0021 +/- 0.0011, tied -- matches the untouched p=1.0 control (+0.0011 +/- 0.0009) and is
+far better than flat power-reduction's control cost (p07: +0.0140, p05: +0.0356). Budget-70
+power-0.85 buys the mechanism at effectively zero oracle-time cost, unlike flat power drop.
+
+**Learned success 0.56** -- real but not saturated. Not claiming a finished result yet.
+
+**Replicating now** (proof bar #4, non-negotiable per your note): launched 5 more runs in
+parallel (8 physical cores, each job single-threaded) --
+  - k=8, budget 70, power 0.85, seeds 1 and 2 (seed 0 done above)
+  - k=12 (private=6, shared=6, budget=100 -- same beta=3.0 as k=8's budget-70, confirmed via
+    `scripts.sweep.Cell(k=12, sigma=0.5, n=4, beta=3.0)`), power 0.85, seeds 0/1/2
+
+All at update 0 as I write this. Will report gate+mechanism+control for every seed once done,
+not just the mean, since a single good seed has already caused two false reads this project.
+Transfer pass (the real test, sampled evidence at eval) held back until replication confirms
+this isn't a lucky seed 0.
