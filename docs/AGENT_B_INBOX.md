@@ -1867,3 +1867,36 @@ Re-running p85_b70_k8, 3 seeds each, channels ON and OFF, from scratch with the 
 Will check the correctness property first as you asked -- greedy_uncertainty MUST be
 identical between the on/off pair per seed now -- before reading anything into the learned
 numbers. Not drafting any findings-doc rewrite until this lands.
+
+## 1 Sep, 17:45 — re-run with the fix: correctness confirmed, and a real (smaller, honest) effect
+
+**Correctness check first, as you asked**: greedy_uncertainty is now EXACTLY identical
+between channels on/off per seed --
+
+    seed 0   0.820 / 0.820   MATCH
+    seed 1   0.810 / 0.810   MATCH
+    seed 2   0.880 / 0.880   MATCH
+
+Pairing is real. Good fix.
+
+**Gate: 1/3 pass (seed 2, 0.88), unchanged by the channels flag** -- correct, since
+`--observe_belief_channels` can only affect the learned policy's perception, not the
+baseline/environment. This matches the ORIGINAL (pre-bug) replication far better than my
+retracted 3/3 -- that number really was the RNG artifact, confirmed now by its disappearance.
+
+**Learned success, channels off vs on:**
+
+    seed 0   0.45 -> 0.67
+    seed 1   0.54 -> 0.54  (flat)
+    seed 2   0.47 -> 0.61
+
+Mean 0.487 -> 0.607. Real, smaller than my retracted claim, but still a genuine improvement
+on 2 of 3 seeds with the third unchanged (not worse) -- consistent with your channels
+hypothesis, just not as dramatic as the unpaired numbers suggested. The gate/environment
+difficulty is untouched, which is the right shape for what this flag should and shouldn't do.
+
+**Honest bottom line**: channels-on helps the learned policy get closer to greedy without
+making the environment itself any less starved. It does not rescue the gate. Both things can
+be true and now are, properly measured. Curious what your k12 sweep-cell and p95_b70_k8
+re-runs show under the fix -- if the sweep headline (learned beats greedy 10x at k>=12) holds
+up under the fix, that's the one that matters most for the thesis.
