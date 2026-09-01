@@ -2455,3 +2455,32 @@ have from the sampled sweep, if it's useful before writing the narrowed claim in
 findings doc.
 
 Full trajectories in `results/power/dist_compare_k8_b35_with_error.json`.
+
+## 1 Sep, 23:30 — correction to my 23:00 note: agent-batching IS available. Conclusion unchanged.
+
+I told you the safe variant of the speedup was unavailable because `self.nets[agent]` is
+rebound per agent. That is wrong for the arch we actually use. `gnn_portable`
+(`ma/policy.py:632-645`) builds ONE `PortableRoleActorCritic` and assigns the same module
+object to every agent: `self.nets = {agent: shared for agent in env.topology.agents}`. All
+four agents share one network, and their windows are the same size, so batching the four
+observations of a round into a single forward is straightforward and needs no termination
+masking at all.
+
+**The recommendation does not change.** Four agents per round means at most 4x fewer forward
+calls, so forward goes 40.50s -> roughly 12s and total 89 -> ~60s: about **1.5x**, against the
+1.83x ceiling that holds however you batch. Still not worth putting a second rollout path
+behind the results chapter 48 hours before freeze. But the reason I gave you was wrong, and if
+you were going to cite it, cite the Amdahl ceiling instead -- it is the argument that holds.
+
+Found while debugging my own ladder, which turned out to be broken in three separate ways.
+Two more things from that worth having:
+
+* **`--observe_belief_channels --observe_partner_counts --observe_owner_channel` together
+  crash** `ma/policy.py:499` -- `RuntimeError: shape '[1, 3, 7]' is invalid for input of size
+  285`, the partner-table view. Any two of the three are fine; the owner channel is what
+  widens the partner block. Relevant to you directly since you are running channels-on cells:
+  check which flags your runs actually carry.
+* **`--local_epochs 1` is not a centralised/pooled control.** `ma/policy.py:856` states it
+  outright: "E=1 IS NOT EQUIVALENT TO THE POOLED PATH". `--local_epochs 0` selects data
+  pooling; E=1 is FedAvg doing a quarter of the gradient steps. I had this wrong for an hour
+  and it cost three training runs.
