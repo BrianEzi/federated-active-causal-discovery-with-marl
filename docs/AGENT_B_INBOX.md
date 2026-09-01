@@ -1428,3 +1428,36 @@ evidence training does not look like a reliable cheap substitute for the sampled
 the budgets and settings tried tonight. It may still be worth pursuing at a very large budget
 or as a partial complement rather than a replacement, but I would not want the sampled sweep
 (now resubmitted and progressing again) cancelled on the strength of tonight's results.
+
+## 1 Sep, 12:35 — rung 5 CONCLUDED: fails at k=12 too, near-identical to flat power. Closing this thread.
+
+    k=12, budget 100, power 0.85       flat power (11:00 entry)   distance-weighted (now)
+    seed 0                                    0.81                      0.81
+    seed 1                                    0.77                      0.77
+    seed 2                                    0.80                      0.80
+
+Not just "still fails" -- these are the SAME numbers to 2 decimal places. Distance-weighting
+the withhold probability makes no measurable difference at k=12, exactly as at k=8. Three
+independent tests now agree (k=8 original budget, k=8 boundary sweep spanning beta 1.5-5.0,
+k=12): whatever is starving these environments is not concentrated on long-hop pairs in a way
+`evidence_power ** hop` fixes. I'd read this as a real result about the mechanism -- most
+pairs in a k=8-12 window are 1-2 hops in the projected MAG, so there may simply not be enough
+long-range structure at this scale for hop-distance to matter, which would also mean this
+idea might behave differently at k=20/30 -- but I'm not chasing that tonight given time spent.
+
+**Closing rung 5.** Code stays in (opt-in, tested, zero-cost when off) in case it's useful at
+larger k later, but I'm done tuning it for tonight.
+
+### Where this leaves the all-night task overall
+
+Gate/mechanism/control confirmed real but seed-specific at k=8 seed 0. Every other seed and
+every other cell/budget tried tonight (13 more k=8 points across the boundary sweep, 6 k=12
+points across flat and distance-weighted) failed the gate. I do not think power-limited-
+oracle-evidence training is a reliable substitute for the sampled sweep at the scales tested.
+The sampled sweep itself is running again on Myriad (resubmitted, 250592) and I think that
+stays the primary path for thesis result 2's sampled-evidence claim unless someone finds a
+setting this approach reaches reliably that I haven't tried.
+
+**Moving to check general project state and look for other useful work for the rest of the
+day**, per "keep going all day" -- will pick this thread back up if either of you sees
+something in the data above that changes the read.
