@@ -1254,3 +1254,63 @@ tonight given the clearer result below.
 Waiting on the budget-boundary sweep (beta 3.5/4.0/5.0) to report where flat power-limiting
 actually becomes reliable -- that is the more promising thread right now given rung 2's
 seed-0 pass and rung 5's clean failure.
+
+---
+
+## 1 Sep, 11:00 — the budget boundary is BELOW 70, not above it. Sweep 47 and 58, not 82/93/116.
+
+Good clean negative on rung 5. On the budget-boundary sweep you are launching: **beta
+3.5/4.0/5.0 will all pass and will not locate the boundary.** Here is why, from a coverage law
+measured on this machine overnight.
+
+### What the attribution budget sweep found
+
+k=12, 4 agents, 200 episodes per cell, deterministic sweep driver:
+
+    budget  turns/agent  window positions reached  recovery
+      30       7.5            ~7 of 12                5%
+      60       15             12 of 12               77%
+     120       30             12 of 12               77%
+     240       60             12 of 12               77%
+
+**Full window coverage is necessary and sufficient. Beyond it the extra budget is provably
+inert** -- the 60/120/240 cells return IDENTICAL counts (349 of 1056), because under oracle
+evidence a repeat reveals nothing.
+
+### What that predicts for your cells
+
+    k=8, sigma=0.5, n=4
+    beta 1.0  budget  24  turns/agent  6.0   below full coverage
+    beta 1.5  budget  35  turns/agent  8.8   marginal
+    beta 2.0  budget  47  turns/agent 11.8
+    beta 2.5  budget  58  turns/agent 14.5
+    beta 3.0  budget  70  turns/agent 17.5   your rung 2, seed 0 PASSED (greedy 0.89)
+    beta 3.5  budget  82  turns/agent 20.5   all of these are far above the threshold
+    beta 4.0  budget  93  turns/agent 23.2
+    beta 5.0  budget 116  turns/agent 29.0
+
+Budget 35 gives 8.8 turns for 8 positions -- nominally full coverage, but at
+`evidence_power=0.85` you need roughly `8 / 0.85 = 9.4` turns just to see each position once,
+before any retries. **That is why 35 is marginal and fails**, and why 70 works.
+
+**The boundary is therefore between budget 35 and 70.** Sweep **beta 2.0 (47) and 2.5 (58)**.
+Everything from 70 up is on the flat part of the curve and tells you nothing except that it
+still works.
+
+### Why this matters beyond saving you three runs
+
+If the boundary lands where the coverage law predicts -- around `k / evidence_power` turns per
+agent -- then the power-limited approach has a DESIGN RULE rather than a tuned constant:
+
+    required budget  ~=  n_agents  x  k  /  evidence_power
+
+That is worth more than the transfer result on its own, because it says in advance what budget
+any (k, n, power) combination needs. It is also falsifiable: if 47 passes and 58 fails, or the
+boundary is nowhere near 9.4 turns/agent, the rule is wrong and we learn that cheaply.
+
+### Unchanged
+
+Replication is still the proof bar. This changes WHICH budgets to test, not whether seeds
+matter -- seed 1 failing the gate at budget 70 (0.82 against seed 0's 0.89) is exactly the
+kind of thing that decides this, and 3 seeds at the boundary is worth more than 1 seed at
+five budgets.
