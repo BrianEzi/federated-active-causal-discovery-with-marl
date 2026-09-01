@@ -68,6 +68,55 @@ separate them. It should have run before the claim was published, not after.
 **What this changes:** the barrier is identifiability, not scale. More partners costs a little
 (80 -> 72% on single-pair groups); needing a partial response costs everything.
 
+## 3b. Coverage is the dominant term, and it is a STEP FUNCTION
+
+The correction in section 3 raised an obvious question it did not answer: if the collapse was
+coverage, how much coverage is enough? Swept at k=12, n=4, 200 episodes per cell:
+
+| budget | turns per agent | window positions reached | single-pair recovery | overall |
+|---:|---:|---:|---:|---:|
+| 30 | 7.5 | ~7 of 12 | **5%** | 0.020 |
+| 60 | 15 | **12 of 12** | **77%** | 0.330 |
+| 120 | 30 | 12 of 12 | 77% | 0.330 |
+| 240 | 60 | 12 of 12 | 77% | 0.330 |
+
+**Attribution requires FULL window coverage and gains nothing whatever beyond it.** The 60,
+120 and 240 cells return not merely similar numbers but IDENTICAL ones -- 349 of 1056 in every
+case -- which is the signature of an experiment that has stopped changing.
+
+That identity is diagnostic rather than suspicious. The driver sweeps window positions
+round-robin, so at k=12 with four agents a budget of 60 gives each agent 15 turns for 12
+positions: full coverage plus three wasted repeats. Budget 240 gives 60 turns -- the same 12
+positions plus 48 repeats -- and **under oracle evidence a repeat reveals nothing**, which is
+the same fact that makes oracle-trained policies fail to transfer to sampled data. The extra
+budget is provably inert.
+
+**This single term explains every earlier observation.** Recovery tracks turns-per-agent
+against window size, and nothing else:
+
+| observation | turns/agent | positions | recovery |
+|---|---:|---:|---:|
+| n=4, budget 60 | 15 | 12 | 77% |
+| n=8, budget 60 | 7.5 | 12 | **5%** |
+| n=8, budget 120 | 15 | 12 | **72%** |
+| n=4, budget 30 | 7.5 | 12 | **5%** |
+| k=30, budget 100 | 25 | 30 | **30%** |
+
+The two 5% cells arrive from opposite directions -- too many partners, and too small a budget
+-- at the same turns-per-agent. The partner count was never the mechanism.
+
+## 3c. The three terms, separated
+
+| term | effect | evidence |
+|---|---|---|
+| **Coverage** | step function: below full window coverage, collapse; above it, nothing | budget sweep, 4 cells |
+| **Partner count** | gentle decline once coverage is matched: 100 / 80 / 77 / **72%** at 1 / 2 / 3 / 7 partners | matched-budget control |
+| **Group size** | absolute: **0%** for any group explaining 2+ pairs, from 2 partners, at any budget | every cell measured |
+
+Only the third is an identifiability barrier. The first is a resource question with a sharp
+threshold, and the second is mild. **The 23% of single-pair groups unresolved at full coverage
+is the genuine ownership-ambiguity floor** -- three partners, and no budget removes it.
+
 ## 4. A closed-form predictor, which survived the correction
 
     attribution  ~=  P(resolve | single-pair group)  x  share of groups that are single-pair
