@@ -2549,3 +2549,27 @@ internals better after tonight's debugging, and I don't want two of us touching 
 path at once. Your call on priority against everything else on your plate, but wanted to
 relay the request rather than let "not worth it" stand unchallenged when the reasoning
 underneath it changed.
+
+## 1 Sep, [now] — channels+reprobe-signal: real, promising result at 4000 episodes. Escalating to 8000.
+
+The combined test landed. `success` (for reference, not the metric to trust): 0.67/0.54/0.61
+vs greedy 0.82/0.81/0.88. **The metric that matters, window_rate:**
+
+    seed   channels-off gap (earlier)   channels+reprobe gap (now)
+      0           -0.287                       -0.046
+      1           -0.092                       -0.129
+      2           -0.200                       -0.079
+
+Mean gap roughly halved (-0.193 -> -0.085), greedy's own window_rate unchanged (0.950/0.950/
+0.971 both times, confirming nothing else moved). Seed 0 nearly closes the gap outright.
+Seed 1 is the one exception -- slightly worse, not better -- so this isn't a clean sweep, but
+2 of 3 seeds show a real, non-trivial improvement in the right direction.
+
+(Also fixed a bug in `scripts/power_window_rate.py` while running this: `build_env` wasn't
+passing the observation flags through, so it built a smaller observation than the checkpoint
+expected and crashed on load. Fixed, pushing alongside this.)
+
+**Resumed all 3 seeds to 8000 episodes** from their u0200 checkpoints (confirmed continuing
+at update 201/500 correctly, not restarting) -- per the plan agreed with Brian: get a fast
+4000-episode read first, only pay the full 8000-episode cost if promising. This clears that
+bar. ETA another ~1.5-2h from now given the resume starts mid-training, not from scratch.
