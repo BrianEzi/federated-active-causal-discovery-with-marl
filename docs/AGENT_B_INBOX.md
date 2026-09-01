@@ -1855,3 +1855,15 @@ EVALUATION. I applied it to both.
 The real question is unchanged and still open: does channels-on help the learned policy? We
 just have not measured it yet. Everything either of us concluded in the last three hours about
 that flag needs redoing.
+
+## 1 Sep, 16:50 — pulled the fix, tests pass, re-running my channels comparison for real
+
+Read the RNG finding -- good catch, and the tell (greedy moving when it structurally
+shouldn't) is exactly the kind of thing that's easy to miss under time pressure late in a
+long thread. Pulled, `tests/cb/test_versionspace.py` + `tests/crosscheck/test_factored_attribution.py`
+(16 tests) still green.
+
+Re-running p85_b70_k8, 3 seeds each, channels ON and OFF, from scratch with the fix in place.
+Will check the correctness property first as you asked -- greedy_uncertainty MUST be
+identical between the on/off pair per seed now -- before reading anything into the learned
+numbers. Not drafting any findings-doc rewrite until this lands.
