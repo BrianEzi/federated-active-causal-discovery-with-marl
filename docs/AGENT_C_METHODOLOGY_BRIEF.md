@@ -126,3 +126,40 @@ Brian is being asked now; the answer will be appended to this file.
 
 Add it to the table above and tell us in `docs/AGENT_B_INBOX.md` rather than resolving it
 silently. Several of tonight's worst hours went into claims that were confidently wrong.
+
+---
+
+# Appended by agent C, 2 Sep — contradictions found beyond the table above
+
+Every one of the eleven rows in the brief's table was verified against
+`k20s50n04b150_s0`'s config and the code before being written up. **All eleven held.** The
+following are additional, and are reported in `docs/AGENT_B_INBOX.md` with full detail.
+
+| found | reality | where it landed |
+|---|---|---|
+| `PLAN_2026_08_28` F4 says argmax is primary | `results/ckpt/*.json` records `"sampled": true` — every reported SHD number is sampling | documented as sampling in `sec:meth_paired`; **needs a decision, may invalidate numbers** |
+| `bNNN` in a cell name reads as the budget | it is `beta * 100`; `k20s50n04b150` has `budget: 75` | budget rule derived from `scripts/sweep.py:105` and verified on 5 cells, in `sec:meth_budget` |
+| guidelines: federated training "explored, not adopted" | `local_epochs: 4` in every job — FedAvg is adopted | split: plain FedAvg adopted, server adaptivity explored (`server_optimiser: 'none'`) |
+| guidelines: numbers trace to `STATE_OF_TRUTH.md` | that file is 22 Aug and predates the current engine | used the ledger + checkpoint doc per this brief |
+| the 5.3x bidirected-triangle figure | measured, in no retraction list, but NOT in the ledger | used in `sec:meth_generator`; keep-or-drop question raised |
+| clamp `+0.021` and turn-order `+0.028` CIs | both from the retired 22 Aug two-agent protocol, absent from the ledger | removed; direction asserted without a number |
+| `--vary_only` justification | rests partly on `mode_at_scale.py`, which `PLAN_2026_08_28` §1 records as cut after 2 of 4 arms | worded as "no measured cost", not "Vary wins" |
+
+## Status against the sequence
+
+* **Phase 0 — done**, `thesis/` commit `c508599`. Factual corrections only, separate commit
+  so the diff is reviewable.
+* **Phase 1 — done**, `thesis/` commit `11f95bb`. Section 3.5 rewritten with six labelled
+  subsections: `sec:meth_shd`, `sec:meth_paired`, `sec:meth_ckpt`, `sec:meth_gate`,
+  `sec:meth_baselines`, `sec:meth_regimes`. Results can cite these now.
+* **Phase 2 — next.** 3.3 version-space belief, 3.4 attribution in full, 3.5 learning.
+  Labelled stubs for `sec:meth_versionspace` and `sec:meth_attribution` are already in place
+  so nothing dangles.
+* **Phase 3 — after that.** Generalise Theorem 3.1 to K agents.
+* **Phase 4 — still blocked** on Brian. Nothing in the Intro's RQs or contributions list has
+  been touched. Its Problem Formulation and Dissertation Structure are fixed.
+
+**Caveat on everything above: `pdflatex` and `bibtex` are not installed on this machine, so
+the mandated full build has NOT been run.** Static checks pass (citations resolve in both bib
+and annotated bibliography, no `\citet`, British spellings, all `\ref`s defined, no duplicate
+labels, environments and braces balanced). The build needs to happen on Overleaf.
