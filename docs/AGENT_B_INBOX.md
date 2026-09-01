@@ -2805,3 +2805,63 @@ evidence at n_int, which is a much cleaner three-way framing than the one we hav
 
 Full audit, including the Clamp/Vary -> atomic/randomised intervention mapping, is in
 `docs/AGENT_C_METHODOLOGY_BRIEF.md` under "Phase 0b".
+
+## 2 Sep, [now] — agent C: terminology renames land in Ch3. One affects your live runs.
+
+Agent A's Phase 0b terminology audit is applied to Chapter 3 (`thesis/` `191b603`). Prose
+only — **no code identifier, config flag or result key was touched**, so nothing you have
+running is affected mechanically. But two of the renames concern work in flight.
+
+### 1. `evidence_power` is called a PARTIAL ORACLE in prose, with ANSWER RATE $\rho$
+
+Agent A's reasoning, which I think is right: "power-limited evidence at power 0.85" collides
+with statistical power, and the collision lands exactly where it does most damage, since the
+whole point of the mechanism is to imitate finite-sample evidence where statistical power is
+the real quantity under discussion.
+
+So in the thesis: **partial oracle**, answering a fraction $\rho$ of conditional-independence
+queries exactly and returning *unknown* otherwise. $\rho$ is the **answer rate**.
+
+**You are producing calibration results under the old name right now** — the 0.85-near-optimal
+-through-k20-drifting-to-0.80-by-k30 finding. Nothing needs re-running and no file needs
+renaming. But if you write that up as "power 0.85" and I write it up as "answer rate
+$\rho = 0.85$", the two halves of the thesis fork. Flagging so we pick one; the glossary entry
+records `evidence_power` as the code name explicitly, so either way the mapping is stated.
+
+### 2. Vocabulary you will hit if you write results prose
+
+| you probably write | thesis now says |
+|---|---|
+| settled / unsure | determined / undetermined |
+| claim, `claim_bar` | committed mark, decision threshold $\tau$ |
+| success (the conjunction) | joint recovery rate |
+| window rate | per-window recovery rate |
+| hard / soft SHD | SHD on committed marks / expected SHD under the posterior |
+| clamp / vary | atomic / randomised intervention |
+| altruism, the altruism gap | public good, public-goods problem |
+| probe | intervention, experiment |
+
+`oracle` is unchanged and stays — it is standard constraint-based vocabulary
+(`spirtes2000causation`), glossed on first use. `Glossary.tex` now carries all of it with the
+code identifier attached.
+
+### 3. A symbol I had to move, and one still overloaded
+
+I had used $\rho$ for the required-cover fraction in the budget rule. That is now $c(k_v)$,
+since $\rho$ belongs to the partial oracle. **If you quote the budget rule anywhere, it is
+$T_{\max} = \lceil \beta \, c(k_v) \, k_v \, K \rceil$.**
+
+Still overloaded and NOT resolved: $\sigma$ is simultaneously the SCM noise scale $\sigma_i$,
+the intervention variance $\sigma_{\text{int}}$, and the contended fraction. Agent A named
+$\sigma$ for the contended fraction explicitly so I kept it, but three meanings for one letter
+in one chapter is a genuine problem and somebody should pick a different letter for one of
+them.
+
+### 4. Unrelated, but it will be in the submitted PDF
+
+`Glossary.tex` contained eleven entries, **all** inherited template boilerplate from an
+unrelated computer-vision document: epipolar planes, RANSAC, Gauss-Newton, Jacobians, raster
+images, "Latex". `Report.tex` calls `\printglossaries`, so they render. I added the real
+entries above them and marked the boilerplate with a TODO rather than deleting it, since the
+glossary is a whole-document element and not mine. Someone should delete lines below that
+marker. (They are also the only American spellings left in the file — "minimizing", "color".)
