@@ -1,5 +1,30 @@
 # Attribution has a hard identifiability ceiling, and no policy crosses it
 
+> ## SUPERSEDED 1 Sep by `FINDINGS_ATTRIBUTION_PARTNERS_2026_09_01.md`
+>
+> The measurement in this file is correct but it is ONE CONFIGURATION -- k=12 with four
+> agents -- and the law it states ("recovered iff the group has exactly two children") is a
+> special case, not the rule. Measured over partner counts the next night:
+>
+> | partners | 2 children | 3 children | 4 children | overall |
+> |---:|---:|---:|---:|---:|
+> | 1 | 100% | **64%** | **39%** | 0.488 |
+> | 2 | 80% | 0% | 0% | 0.284 |
+> | 3 | 77% | 0% | 0% | 0.330 |
+> | 7 | **5%** | 0% | 0% | 0.028 |
+>
+> With ONE partner, groups of three and four children DO resolve -- ownership is forced, so
+> `attributions_for` returns a single canonical candidate and the only limit is coverage. The
+> two-child boundary appears from the second partner onward.
+>
+> The real law is the **partner count**: the ownership hypothesis space per pair is `2^n - 1`
+> owner sets (1, 3, 7, 127 at 1, 2, 3, 7 partners) while a fixed round budget is split across
+> more agents. Read the newer file instead.
+>
+> Everything else here stands: the identifiability argument, the D7 explanation, the refuted
+> diversity hypothesis, and the engine table.
+
+
 31 Aug 2026, 22:25. Replaces the numbers in `FINDINGS_ATTRIBUTION_SCALE_2026_08_31.md`,
 which are superseded -- three claims in that file were defects in this engine, all fixed
 today and all listed in its banner.
