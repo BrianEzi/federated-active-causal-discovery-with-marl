@@ -2602,3 +2602,116 @@ distinguishing test properly (3+ more seeds x 8000ep each), so flagging as the n
 step for tomorrow rather than starting it now.
 
 All 3 seeds' full result files and checkpoints pushed below.
+
+## 2 Sep, [now] — agent C: Ch3 phases 0 and 1 pushed to Overleaf, and eight things for you
+
+`thesis/` at `11f95bb`, pushed. Two commits: phase 0 (factual corrections) and phase 1
+(section 3.5, the evaluation protocol Results is blocked on). Every item in the brief's
+contradiction table was verified against `k20s50n04b150_s0`'s config and the code before
+being written, and all eleven held. Below is only what the brief did NOT already contain.
+
+**I have not run the mandated full build. `pdflatex` and `bibtex` are not installed on this
+machine.** Static checks all pass — citation keys resolve in both `references.bib` and
+`annotated_bibliography.md`, no `\citet`, no American spellings, every `\ref` defined, no
+duplicate labels, environments and braces balanced. The real build has to happen on Overleaf
+or a TeX machine before this is trusted.
+
+### 1. The reported SHD numbers are SAMPLING, not argmax — F4 was never adopted
+
+`docs/PLAN_2026_08_28.md` F4 says "Argmax as primary. It is both stronger and far more
+stable... Sampling was quietly handicapping the learned arm." But
+`results/ckpt/k20_best.json` records `"sampled": true` on every row, so the checkpoint
+finding and Table `tab:meth_ckpt` are sampling numbers.
+
+I have documented sampling, with the honest framing (it matches training and is the more
+conservative choice, and argmax is available as a flag). **Confirm that is intended.** If
+argmax is meant to be primary, every SHD number in the ledger and in
+`FINDINGS_CHECKPOINT_2026_09_01.md` needs re-running, and I should reword 3.5.3. This is the
+one item here that could change numbers Results is about to quote, so it is first.
+
+### 2. `bNNN` in a cell name is beta x 100, NOT the budget
+
+`k20s50n04b150` has `budget: 75`. Anyone reading cell names into prose will write "budget
+150" and be wrong by 2x. The rule is in `scripts/sweep.py:105`, and I verified it against
+five cells rather than inferring it:
+
+    T_max = ceil(beta * rho(k) * k * n),  rho interpolated between (4, 0.757) and
+                                          (30, 0.542), CLAMPED outside that range
+
+    k20 n4 b150 -> 75   k30 n4 b150 -> 98   k12 n8 b150 -> 100   k12 n4 b200 -> 67
+
+All four reproduce exactly. It is in Ch3 as `sec:meth_budget` with the clamping stated,
+since the code comment is explicit that extrapolating the sublinear fit is how a
+normalisation becomes a fudge.
+
+### 3-5. `thesis/WRITING_GUIDELINES.md` is stale in three places
+
+It is described as standing student instructions, so I have not edited it — but it now
+contradicts the configs and the brief. Someone should update it or tell me the guidelines win.
+
+* **FedAvg.** Guidelines: "federated policy training is framed in Methodology as explored,
+  not adopted." Config: `local_epochs: 4` in every sweep job, so FedAvg IS the adopted
+  optimiser. I resolved it by splitting the claim — plain FedAvg described as adopted (it
+  is), server-side adaptivity described as explored and not adopted (`server_optimiser:
+  'none'` confirms that half). I think that satisfies both, but flagging rather than
+  assuming.
+* **Attribution proportionality.** Guidelines: "a single, scoped Results/Methodology section
+  — not the thesis's centrepiece", "evaluated via transfer... not a full separately-trained
+  sweep". Brief: 3.4 "is the novel method". I wrote one scoped section, which fits both
+  readings. Note ledger 2.5 (training on the attribution reward does not help) actively
+  supports the guidelines' transfer framing. **Discussion needs to pick one; whoever writes
+  Ch5 is more affected by this than I am.**
+* **Where numbers come from.** Guidelines: every number must trace to
+  `docs/STATE_OF_TRUTH.md` "Established". That file is dated 22 Aug and predates the
+  constraint engine, the factored belief, attribution, the noise dial and the ladder. The
+  brief supersedes it with the ledger plus `FINDINGS_CHECKPOINT_2026_09_01.md`, which is
+  what I used. Worth fixing the pointer so the next writer does not go to the stale file.
+
+### 6. The 5.3x bidirected-triangle figure is not in the ledger — keep or drop?
+
+I used it in `sec:meth_generator` to justify scale-free over Erdos-Renyi, because without a
+reason that section reads as an arbitrary preference. Provenance:
+`FINDINGS_2026_08_26.md` §12/§16 and `SESSION_STATE_2026_08_27.md` §5, measured on 400
+graphs per generator at matched edge count, in no retraction list. But ground rule 1 says
+numbers come from the ledger and this one is not in it. **Either add it to the ledger or
+tell me to drop the number and keep the qualitative argument.**
+
+### 7. Two superseded CIs removed rather than reworded
+
+`+0.021 [+0.001, +0.042]` (clamp-only vs both modes) and `+0.028 [+0.011, +0.045]`
+(round-robin vs random turn order). Both are from the retired 22 Aug two-agent Bayesian
+turn-taking protocol; neither appears in the ledger. Ch3 now asserts the direction of each
+without a number. If either is wanted quantitatively it needs re-measuring in the current
+environment — cheap for turn order, and it would strengthen 3.4.6.
+
+### 8. The vary-only decision is carrying more weight than its evidence
+
+Ch3 justifies `--vary_only` on (a) identifiability depends on targets not values
+(`hauser2012gies`) and (b) a paired comparison favouring Vary. (b) is `mode_at_scale.py`
+— clamp-only 0.233 against vary-only 0.589 — which `PLAN_2026_08_28.md` §1 records as **cut
+after 2 of 4 arms**. That is a C-grade measurement under a load-bearing design decision. I
+have worded it as "no measured cost, halves the action space" rather than claiming Vary
+wins, which I think is defensible. Flag if you want the other two arms run.
+
+### Still blocked: phase 4
+
+Intro RQs and contributions are untouched, per the brief. Concretely what is broken there:
+RQ2 asks about a Vary/Clamp trade-off that no longer exists in the action space; RQ3 asks
+about the 1-bit regime channel, which is `disclose_regime: False` in every run; and the
+contributions list still claims "82-91% of clamps to private nodes", "3.5x over greedy",
+the two-agent theorem, and "IPPO... without centralised training or parameter sharing" —
+that last one being the exact claim the code contradicts.
+
+The altruism replacement is ready to drop in when Brian decides: ledger 2.6,
+`greedy_attribution` probing privately 7% of the time against 0.38-0.61 for every other
+policy. Same phenomenon, better evidence, and it survives the current engine.
+
+I have fixed the Intro's Problem Formulation and Dissertation Structure, which state
+superseded facts and are not part of the blocked decision.
+
+### Next from me
+
+Phase 2 (3.3 version-space belief, 3.4 attribution in full, 3.5 learning) then phase 3
+(generalise Theorem 3.1 from K=2 to K agents — the existing proof already does the work,
+which retires the "proved for K=2 only" threat in the Discussion scaffold rather than
+confessing it). Not touching `4 Results`, `5 Discussion`, or anything under `results/`.
