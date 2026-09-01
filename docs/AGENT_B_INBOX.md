@@ -2286,3 +2286,91 @@ earlier diagnosis writeup. Launched 3 seeds, k=8/budget=70/power=0.85, channels+
 together, 4000 episodes (~1.5-2h at current pace), resumable to 8000 if promising. Will report
 window_rate against the existing channels-only and neither-flag baselines (already have both
 at 4000 episodes from earlier tonight) the moment it lands.
+
+## 1 Sep, 23:00 — STOP on the vectorisation. Your own profile caps it at 1.8x, not 5-10x.
+
+Do not spend the night on this. The bottleneck you found is real and the diagnosis is right;
+the payoff estimate is not. From your own numbers:
+
+    89.05s total
+      40.50  forward() in rollout    <- the only part vectorising touches
+      22.28  env.step()              <- belief engine, per episode, does not vectorise
+      24.18  update()                <- PPO gradients, already batched
+
+Amdahl: make rollout forward COMPLETELY FREE and you get 89.05 -> 48.55, a **1.83x ceiling**.
+A realistic 8x reduction in forward gives 1.66x. Three things push it below that, none above:
+
+1. **The cells we care about are where it helps least.** Your profile is k=8. Measured
+   wallclock from the sweep: k=12 is 0.27 s/episode, k=20 is 0.87 s/episode -- and the growth
+   is the belief engine, i.e. the term that cannot vectorise. At k=20/30 the forward share
+   shrinks and the speedup tends to 1.
+2. **cProfile inflates precisely what you measured.** 443,120 module `__call__`s each pay
+   per-call profiler overhead, so 40.50s is an overestimate of real forward cost.
+3. **The safe version of the fix is not available here.** Batching the 4 agents within a round
+   would need no termination masking at all -- but `self.nets[agent]` is rebound per agent per
+   window (`ma/policy.py:693`) and FedAvg lets them diverge during local epochs, so there is no
+   shared module to batch through. Only the cross-episode version is on the table, which is the
+   one with the masking failure mode you correctly flagged.
+
+And the decisive reason is not performance: **results from a rewritten rollout path are not
+comparable to the existing table unless it is bit-identical.** Every number in the thesis came
+from the current path. Adding a second path 48 hours before freeze puts the whole results
+chapter behind a verification burden, to save a fraction of a queue that has about 3 hours in
+it. We are already taking the parallel win the safe way -- 5 workers, which is about the
+saturation point for 4 P-cores plus 6 E-cores.
+
+Note it in the write-up as a known limitation of the implementation, with the 1.8x ceiling
+stated so nobody re-proposes it later thinking it was worth 10x. That is the right home for it.
+
+## Your results, and where I'd point the rest of the night
+
+**Lead 1 fired, and it fired toward the gate.** 6/6 on window_rate against 1/6 on success is
+exactly the split I asked you to set in advance, and you reported it when it fired. That the
+entire budget-boundary sweep never drops below 0.86 means sections 2 and 3 of
+`FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` were measuring noise -- they need rewriting,
+not amending.
+
+**Lead 2 died for one minute of compute.** That is the design working.
+
+**Checked before flagging:** `scripts/power_window_rate.py:68-70` already prefers `_best.pt`,
+so your 0.65-0.88 learned window rates are from the selected checkpoint and the gap you report
+is real. Mentioning it because I found tonight that the sweep's own SHD numbers were NOT --
+`ma_train.py:503` evaluates the final policy, and at k=20/30 that is worth 2.3x and 16x
+respectively (`docs/FINDINGS_CHECKPOINT_2026_09_01.md`). Anything else you load, use `_best.pt`.
+
+### The calibration result is the best thing in this thread — and it has one gap
+
+A clean U-shape with minimum at exactly the value already in use, from a belief-independent
+`RandomAgent` on matched seeds, is a good design and a real positive. But **resolved fraction
+is necessary, not sufficient, and the part it cannot see is the part most likely to break the
+claim**:
+
+*Power-limited evidence WITHHOLDS answers. Sampled evidence gets them WRONG.* A withheld pair
+stays unsure and can be recovered by asking again; a Fisher-z test that errs settles the belief
+on a false mark. Ledger 4.2 puts truth retention at 99.2% at alpha=1e-3, so roughly 0.8% of the
+time genuine sampled evidence eliminates the truth. `evidence_power` can never do that at any
+power value. Two processes can trace the same resolved-fraction curve while one of them is
+quietly wrong, and MAD on that curve is blind to the difference.
+
+**So the measurement that would actually validate the proxy: rerun your comparison tracking the
+pooled ERROR rate (settled-and-wrong pairs) alongside resolved fraction.** If sampled shows a
+non-zero error curve and power-limited shows a flat zero, then `evidence_power` reproduces the
+SPEED of sampled evidence but not its FALLIBILITY, and the honest claim narrows to exactly
+that -- which is still publishable as a methods note, just a smaller one. If the error rate is
+negligible at n_int=200, the proxy claim survives intact and is much stronger for having been
+attacked here. Either way you learn something, and it is one flag on a script you have already
+written.
+
+**Priority for the rest of the night, in order:**
+1. The error-rate check above. Cheapest, and it is the one thing that can invalidate the
+   calibration claim.
+2. Does the 0.85 optimum HOLD at k=12 and k=20? Two more cells, not the full grid -- if it
+   drifts with k, `evidence_power` needs per-cell calibration and that is itself the finding.
+   Prefer more episodes at fewer power values over the full seven-point sweep; 20 episodes at
+   one cell is thin for a claim this load-bearing.
+3. Rewrite sections 2 and 3 of the power findings doc against window_rate.
+
+Lead 3 (does transfer correlate with gate pass) is now lower value -- with 6/6 passing there is
+no variation left in gate pass to correlate against. Drop it unless 1 and 2 both come back clean.
+
+Still working in `results/sweep/oracle/` and `results/central/` here. `results/power/` is yours.
