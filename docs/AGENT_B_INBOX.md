@@ -2230,3 +2230,59 @@ whole thread has flipped from "closed at grade D" to genuinely promising -- the 
 is now squarely "does the learned policy's window_rate gap (0.65-0.88 vs greedy's 0.93-0.97,
 reported above) close further with more training or more careful evaluation", which is
 Lead 3's territory and the 8000-episode question, not "is the mechanism sound".
+
+## 1 Sep, 21:20 — SPEEDUP REQUEST from the student: vectorize rollout collection in ma/policy.py::collect
+
+Brian wants training faster and asked you to attempt this specifically -- I found the
+bottleneck but decided NOT to touch it myself given the correctness stakes tonight; sharing
+what I have so you can pick it up with full context.
+
+### What I measured
+
+Profiled a short training run (`cProfile`, 64 episodes, k=8/budget=70/power=0.85):
+
+    89.05s total
+    64.87s in ma/policy.py:718 collect() (rollout collection)
+    22.28s in ma/env.py:856 step() (environment + belief engine -- NOT the bottleneck)
+    40.50s in ma/policy.py:456 forward() -- 22,156 individual calls
+    443,120 individual torch module __call__s underneath those 22,156 forwards
+
+**The belief engine is fine (22s of 89s). The cost is 22,156 individual, unbatched forward
+passes through the policy network** -- one agent, one round, one tiny tensor at a time.
+Confirmed `torch.no_grad()` is already correctly used in `_act` (`ma/policy.py:704`), so
+that's not a missed win -- the overhead is pure per-call dispatch cost on tensors too small
+to amortise it, the classic CPU-RL-on-PyTorch pathology.
+
+### The fix, and why I'm handing it to you rather than doing it
+
+`collect()` currently runs episodes strictly sequentially -- one full episode to completion,
+then the next. The standard fix is running N environments in lockstep and batching all N
+agents' observations into ONE forward call per round instead of N separate ones. Done right
+this could plausibly cut the 3-4h/8000-episode wall time by 5-10x.
+
+**Why I stopped short of doing it myself:** this is a rewrite of the single hottest,
+most-relied-on path in the whole training system, and the standard failure mode is episodes
+finishing at different times within a batch (needs correct masking so a finished env's
+"phantom" steps don't leak reward/gradient into live ones) -- exactly the kind of subtle bug
+class this project has been bitten by tonight already (the free-running RNG, the
+observation-channel gap). I'd rather hand this to a fresh pair of eyes with time to verify it
+than rush it under deadline pressure on top of everything else moving right now.
+
+**If you take this on:**
+- Verify against a SMALL case first: 2-3 episodes, compare per-episode reward/entropy/action
+  sequences between old sequential `collect()` and new batched version at a FIXED seed --
+  they should match bit-for-bit (same RNG draws, same math, only the tensor batching
+  changes). If they don't match exactly, something about episode-length masking is wrong.
+- Watch for exactly this: an episode that finishes early (fewer than `budget` rounds) inside
+  a batch of episodes still running -- its stored transitions after termination must not
+  contribute to loss/advantage computation.
+- `tests/` has a real (if slow -- ~a couple minutes, running in background here now) suite;
+  run it before trusting any output from the new path.
+
+**What I'm doing in parallel:** implemented `--observe_reprobe_signal` (new opt-in
+observation feature, `ma/env.py`) -- hands the policy the non-linear own_counts x belief
+combination it needs to tell "withheld, worth a repeat" apart from "never probed", per my
+earlier diagnosis writeup. Launched 3 seeds, k=8/budget=70/power=0.85, channels+reprobe
+together, 4000 episodes (~1.5-2h at current pace), resumable to 8000 if promising. Will report
+window_rate against the existing channels-only and neither-flag baselines (already have both
+at 4000 episodes from earlier tonight) the moment it lands.

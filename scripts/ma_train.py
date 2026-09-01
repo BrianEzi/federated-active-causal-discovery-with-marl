@@ -265,6 +265,11 @@ def main(argv=None) -> dict:
                     help="cumulative per-partner intervention counts (shared nodes by "
                          "node, private ones as an unnamed total). Converts per-round "
                          "disclosure the feedforward policy cannot retain into memory")
+    ap.add_argument("--observe_reprobe_signal", action="store_true",
+                    help="1.0 per pair still unresolved with an endpoint already probed "
+                         "this episode -- the non-linear own_counts x belief combination "
+                         "a policy needs to target a smart repeat under withheld evidence, "
+                         "which nothing previously handed it directly")
     ap.add_argument("--mode_by_role", action="store_true",
                     help="clamp on own private nodes, vary on shared ones; one action per "
                          "node. Overrides --clamp_only/--vary_only")
@@ -408,6 +413,7 @@ def main(argv=None) -> dict:
                        observe_belief_channels=args.observe_belief_channels,
                        observe_owner_channel=args.observe_owner_channel,
                        observe_partner_counts=args.observe_partner_counts,
+                       observe_reprobe_signal=args.observe_reprobe_signal,
                        mode_by_role=args.mode_by_role,
                        claims_require_all_types=not args.legacy_claim_exemption,
                        **({"reward_criterion": args.reward_criterion}

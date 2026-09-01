@@ -347,6 +347,19 @@ class MAConfig:
     # best, and named as further work rather than claimed.
     # Off by default because it changes obs_size and voids old checkpoints.
     observe_partner_counts: bool = False
+    # WORTH-REPROBING SIGNAL (1 Sep, power-limited-evidence thread). Under withheld
+    # evidence (`vs_evidence_power < 1.0`), a pair that was probed-but-blinded looks
+    # IDENTICAL in the directed-marginals channel to a pair never probed at all -- both sit
+    # at an unresolved value. The information to tell them apart exists (this pair's
+    # endpoints are in `own_counts`), but distinguishing them needs a NON-LINEAR
+    # combination of two already-separate features, which oracle-trained policies were
+    # never pushed to learn (intervening always resolved, so "was this already tried"
+    # never mattered before). This hands the policy that combination directly: 1.0 per
+    # pair that is still unresolved AND has at least one endpoint already intervened on
+    # this episode, else 0.0 -- exactly the "still worth a repeat" pairs a policy needs to
+    # target under power-limited or sampled evidence. Off by default because it changes
+    # obs_size and voids old checkpoints.
+    observe_reprobe_signal: bool = False
     # See `cb.attribution.consistent_with_partner`. True keeps the LOCAL-DISTURBANCE
     # assumption -- a partner's own latents are among the movers when it acts. False keeps
     # only atomicity, which is sound but, measured, refutes almost nothing. The pair is the
@@ -433,6 +446,7 @@ class AgentWindow:
                  observe_belief_channels: bool = False,
                  observe_owner_channel: bool = False,
                  observe_partner_counts: bool = False,
+                 observe_reprobe_signal: bool = False,
                  attribution_local_disturbance: bool = True,
                  mode_by_role: bool = False,
                  skeleton_source: str = "true", skeleton_alpha: float = 0.05,
@@ -470,6 +484,7 @@ class AgentWindow:
         self._observe_channels = bool(observe_belief_channels)
         self._observe_owner_channel = bool(observe_owner_channel)
         self._observe_partner_counts = bool(observe_partner_counts)
+        self._observe_reprobe_signal = bool(observe_reprobe_signal)
         shared_positions = [self.pos[n] for n in self.shared]
         if backend == CONSTRAINT:
             # base_seed separates the agents' resample streams; deterministic in the agent
@@ -559,7 +574,10 @@ class AgentWindow:
                 # SHARED node plus one for "private, node unspecified". See
                 # MAConfig.observe_partner_counts.
                 + (n_others * (len(self.shared) + 1)
-                   if self._observe_partner_counts else 0))
+                   if self._observe_partner_counts else 0)
+                # Worth-reprobing signal (1 Sep): one flag per pair, upper triangle. See
+                # MAConfig.observe_reprobe_signal.
+                + (self.k * (self.k - 1) // 2 if self._observe_reprobe_signal else 0))
 
 
 class TwoAgentEnv:
@@ -647,6 +665,7 @@ class TwoAgentEnv:
                                observe_belief_channels=config.observe_belief_channels,
                                observe_owner_channel=config.observe_owner_channel,
                                observe_partner_counts=config.observe_partner_counts,
+                               observe_reprobe_signal=config.observe_reprobe_signal,
                                attribution_local_disturbance=config.attribution_local_disturbance,
                                mode_by_role=config.mode_by_role,
                                vs_evidence=config.vs_evidence,
@@ -1297,7 +1316,9 @@ class TwoAgentEnv:
                                self._belief_channels(agent),
                                # Cumulative partner counts, same normalisation as own
                                # counts. See `observe_partner_counts`.
-                               self._partner_counts(agent)])
+                               self._partner_counts(agent),
+                               # Worth-reprobing signal. See `observe_reprobe_signal`.
+                               self._reprobe_signal(agent)])
 
     def _partner_counts(self, agent: int) -> np.ndarray:
         """Cumulative per-partner counts, flattened, or an empty array.
@@ -1308,6 +1329,34 @@ class TwoAgentEnv:
         if not self.config.observe_partner_counts:
             return np.zeros(0)
         return (self.partner_counts[agent] / max(self.config.budget, 1)).reshape(-1)
+
+    def _reprobe_signal(self, agent: int) -> np.ndarray:
+        """1.0 per pair that is still UNRESOLVED and has an endpoint already probed this
+        episode, else 0.0. Upper triangle, or an empty array. See
+        `MAConfig.observe_reprobe_signal`.
+
+        "Unresolved" is read off the marginals already in the observation (directed both
+        ways, plus bidirected), generically across belief backends: a settled pair has
+        exactly one of the three at 1.0 and the rest at 0.0, an unresolved one carries a
+        fractional value on at least one. Deliberately NOT read from `belief.last.possible`
+        (factored-only) so this works with any backend that reports the standard marginal
+        fields `FactoredBelief`'s own docstring says every belief carries.
+        """
+        window = self.windows[agent]
+        if not self.config.observe_reprobe_signal:
+            return np.zeros(0)
+        belief = window.belief.last
+        if belief is None:
+            return np.zeros(window.k * (window.k - 1) // 2)
+        rows, cols = np.triu_indices(window.k, k=1)
+        directed = np.asarray(belief.directed)
+        bidirected = np.asarray(belief.bidirected)
+        is_settled = lambda x: np.isclose(x, 0.0) | np.isclose(x, 1.0)
+        settled = (is_settled(directed[rows, cols]) & is_settled(directed[cols, rows])
+                  & is_settled(bidirected[rows, cols]))
+        counts = self.own_counts[agent]
+        probed = (counts[rows] > 0) | (counts[cols] > 0)
+        return (~settled & probed).astype(float)
 
     def _belief_channels(self, agent: int) -> np.ndarray:
         """Bidirected and adjacency frequencies, upper triangle, or an empty array.
