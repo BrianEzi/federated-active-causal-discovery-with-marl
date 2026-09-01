@@ -6,6 +6,34 @@ a special case of this.
 
 ---
 
+## 0. A confound found at 04:15, before this is quoted
+
+**The single-pair decline is not yet separated from plain COVERAGE STARVATION**, and the two
+cells that carry it are exactly the two where the budget cannot cover the window:
+
+| cell | budget / agents | window nodes | coverage | P(resolve \| 1-pair) |
+|---|---:|---:|---|---:|
+| k=12, 3 partners | 60/4 = 15 | 12 | complete | 0.765 |
+| k=20, 3 partners | 80/4 = 20 | 20 | exactly complete | 0.667 |
+| **k=30**, 3 partners | 100/4 = 25 | 30 | **incomplete** | **0.274** |
+| **k=12, 7 partners** | 60/8 = 7.5 | 12 | **incomplete** | **0.047** |
+
+So "the ownership space grows as 2^n - 1" and "the budget no longer covers the window" both
+predict the collapse, and this file cannot yet tell them apart. A matched-budget control
+(rounds per agent held at 15) is running.
+
+**What is NOT affected.** Multi-pair groups score 0% at every partner count above one
+*including the cells where coverage is complete* (k=12 at 2 and 3 partners). That half of the
+law is clean and rests on the identifiability argument, not on budget.
+
+**What is affected.** The single-pair decline 100% -> 80% -> 77% -> 5%, and therefore the
+headline "attribution is bounded by partner count" as an unqualified statement. The first
+three points have complete coverage; only the 5% does not.
+
+Under ORACLE evidence a repeat is worthless once a node is covered, which is why the control's
+low-partner cells reproduce the originals exactly at lower budget -- and why coverage, not
+budget, is the quantity that matters.
+
 ## 1. The result
 
 Recovery rate of a true latent group, by the number of window nodes it explains, against the
