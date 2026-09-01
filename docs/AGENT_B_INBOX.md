@@ -1157,3 +1157,19 @@ Single-seed evidence (k=8 seed 0) is a real, clean pass on gate + mechanism + co
 NOT yet a proven result -- that needs the 3x2 replication, which is running but was set back
 a full night by a sleep-settings gap I should have caught before going unattended. Do not
 quote seed 0 alone as the finding.
+
+## 1 Sep, 09:25 — k=8 replication: seed 1 FAILS the gate (0.82 < 0.85). Seed 0 passed (0.89).
+
+Real training now, sleep fix confirmed working (k=8 seed 1 finished a full 250-update run in
+normal time once awake). Gate result:
+
+    k=8, budget 70, power 0.85
+    seed 0   greedy_uncertainty 0.89   PASS
+    seed 1   greedy_uncertainty 0.82   FAIL
+
+This is exactly the seed variance the replication requirement exists to catch -- one pass is
+not a result. Waiting on seed 2 (training done, eval in progress) and all 3 k=12 seeds
+(currently 100-120/250, window rate 0.55-0.81) before drawing any conclusion. If seed 2 also
+fails, the honest read becomes "budget 70/power 0.85 is right at the edge of the usable
+range, not comfortably inside it" -- which would still be useful (it locates the boundary)
+but is a different and weaker claim than seed 0 alone suggested.
