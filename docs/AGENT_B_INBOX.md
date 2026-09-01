@@ -1334,3 +1334,97 @@ it, not to be contrarian -- this is exactly the seed-variance trap from rung 2's
 above -- 6 more runs, k=8, power 0.85, budgets 47 and 58, seeds 0/1/2. That plus the existing
 82/93/116 single points gives a denser, more trustworthy picture of the boundary than either
 of us proposed alone. Will report the full table once these land alongside the b116 result.
+
+## 1 Sep, 12:xx — full boundary picture: NO clean threshold. Slow, noisy asymptote, not a step.
+
+All 14 points now in (k=8, power 0.85, greedy_uncertainty success, gate >=0.85):
+
+    beta   budget  seeds                    mean    gate
+    1.5     35     0.49, 0.82                0.66    0/2 PASS
+    2.0     47     0.78, 0.75, 0.78          0.77    0/3 PASS
+    2.5     58     0.79, 0.83, 0.84          0.82    0/3 PASS
+    3.0     70     0.89, 0.82, 0.83          0.85    1/3 PASS
+    3.5     82     0.87                      0.87    1/1 PASS
+    4.0     93     0.82                      0.82    0/1 FAIL
+    5.0    116     0.85                      0.85    1/1 PASS (exactly at the line)
+
+**This is not a step function at ~9.4 turns/agent -- it is a slow, noisy climb that never
+cleanly clears 0.85.** The mean rises smoothly with budget (0.66 -> 0.77 -> 0.82 -> 0.85 ->
+0.87 -> ...) which DOES support the general shape of your coverage-law hypothesis, but the
+per-seed spread (roughly +/-0.05-0.10 at every budget from 47 up) means no budget tested
+gives a RELIABLE pass -- even beta=5.0, nearly 5x the sweep's own baseline, only just touches
+the line on its one seed, and beta=4.0 sitting below beta=3.5 and beta=3.0's best seed shows
+this is noisy, not monotonic seed-by-seed.
+
+**Honest read: there is no budget at k=8 tested tonight that reliably clears the 0.85 gate
+across seeds.** The design-rule hypothesis (`n_agents x k / evidence_power`) predicts the
+right SHAPE but not a usable operating point from this data -- you'd need either a much
+higher budget than anything tested (expensive, and unverified whether it ever tightens the
+seed spread) or a softer/probabilistic gate rather than a hard 0.85 line.
+
+### Where this leaves the all-night task, honestly
+
+- Rung 2 (double budget): seed 0 pass was real but not representative -- 3/14 points across
+  the whole budget range pass the gate, scattered, not clustered at any threshold.
+- Rung 5 (distance-weighted): clean fail, no improvement over flat at the original budget.
+- Rungs 3/4 (mixed power, curriculum): not attempted -- given the above, I don't think either
+  would fare better; they don't address the actual problem (noisy, budget-hungry starvation),
+  they'd just add more variance sources.
+
+**My assessment: the power-limited-oracle-evidence approach, as specified, does not cleanly
+substitute for the sampled sweep at k=8/n=4.** It may still work at a much higher budget or a
+different (k, n) combination, but that is a new, larger search, not a finishing touch on
+tonight's work. I'd rather say that plainly now than keep tuning budgets into the evening.
+
+Given the student's "keep going all day, check in this evening" -- next thing I'm doing is
+checking overall Myriad job status (sampled_sweep, oracle_long) since I haven't in ~8 hours,
+then deciding with fresh eyes whether to keep pushing this thread, try rung 5 at k=12 (larger
+window, more hops -- distance-weighting might matter more there), or redirect effort
+elsewhere until you or the student weigh in.
+
+## 1 Sep, 12:15 — Myriad check-in (first in ~8h): both jobs needed resubmission, done
+
+**sampled_sweep (246859)**: 15/66 finished, 47 have resumable checkpoints (ran out of
+walltime, per the script's own design), 4 untouched. No queued or running tasks left --
+resubmitted as **job 250592**, which will skip the 15 done, resume the 47 in-progress, and
+start the remaining 4, per `scripts/resume_or_start.sh`.
+
+**oracle_long (247268)**: 5/6 finished (k20 all 3 seeds, k30 seeds 0/1). `k30s50n04b150_s2`
+missing -- almost certainly hit its own 12h walltime, exactly as the script's own comments
+predicted ("expect to resubmit 2-3 times"). Resubmitted as **job 250594**.
+
+Both resubmissions are the designed recovery path, not a new decision -- flagging for
+visibility, not asking permission, since the scripts themselves say this is expected.
+
+Continuing on the power-limited-evidence thread per the student's "keep going all day."
+
+## 1 Sep, 12:20 — status update: rung 5 at k=12 running, current overall picture
+
+Nothing new to report yet from the k=12 rung-5 run (started 12:00, at update 50-60/250,
+window rate 0.50-0.69, on track). Testing whether distance-weighted power does better than
+flat at k=12 (which failed cleanly at 0.77-0.81 across all 3 seeds, budget 100, flat power) --
+k=12's bigger window gives hop-distance more room to discriminate than k=8's did, where rung
+5 showed no improvement over flat.
+
+**Where the night's work stands, for anyone catching up:**
+
+1. Gate/mechanism/control all checked out cleanly at k=8 seed 0 (budget 70, power 0.85) --
+   real, but not representative once replicated.
+2. Full 3x2 replication of that setting: 1/6 seeds pass the gate. Real negative.
+3. Rung 5 (distance-weighted power) at k=8's original budget (35): clean fail, no
+   improvement over flat. Implementation itself verified correct (unit tests, degenerate
+   case, existing suite green) -- this is a result about the mechanism, not a bug.
+4. Full budget-boundary sweep at k=8 (beta 1.5 through 5.0, 14 points): no budget reliably
+   clears the gate. Mean success climbs smoothly with budget but seed variance (+/-0.05-0.10)
+   means even beta=5.0 (116, nearly 5x baseline) only just touches 0.85 on one seed.
+5. Now: rung 5 at k=12, in progress.
+
+Both Myriad jobs (sampled_sweep, oracle_long) hit walltime and were resubmitted (250592,
+250594) -- noted a few entries up, mentioning again here since it's easy to miss in a long
+thread.
+
+My honest current view, to be revised if k=12's rung 5 changes it: power-limited-oracle-
+evidence training does not look like a reliable cheap substitute for the sampled sweep at
+the budgets and settings tried tonight. It may still be worth pursuing at a very large budget
+or as a partial complement rather than a replacement, but I would not want the sampled sweep
+(now resubmitted and progressing again) cancelled on the strength of tonight's results.
