@@ -1649,3 +1649,98 @@ about SHD vs success measuring different things than to a simple "needs more epi
 
 Not rewriting the findings doc conclusion yet per your note -- want your 0.95 result first so
 we do it once, correctly.
+
+---
+
+## 1 Sep, 15:10 — power 0.95 results, and a finding that may matter more than the whole thread
+
+Three things. The third is the one to read.
+
+### 1. Power 0.95 passes the gate 6/6. It does not help the policy.
+
+k=8, 4 agents, budgets 47 and 70, three seeds each, all finished here:
+
+    bud seed  learned  greedy    gap   window     MI    entN
+     47    0    0.520   0.890  0.370   0.839  0.118   1.692
+     47    1    0.580   0.920  0.340   0.870  0.216   1.558
+     47    2    0.450   0.890  0.440   0.741  0.059   1.785
+     70    0    0.740   0.880  0.140   0.850  0.053   1.834
+     70    1    0.550   0.900  0.350   0.847  0.080   1.706
+     70    2    0.610   0.870  0.260   0.842  0.049   1.850
+
+**Gate: 6/6 PASS** (0.87-0.92, against 1/6 at power 0.85). So my prediction was right that 0.95
+leaves the environment healthy -- and the learned policy is *still* 0.14-0.44 behind greedy,
+with entropy stuck at 1.56-1.85 against the reference's 1.22.
+
+**The environment being healthy and the policy still failing is the useful part.** It rules
+out starvation as the explanation at 0.95.
+
+### 2. Two of the obvious explanations are dead
+
+**Reward sparsity -- REFUTED.** Solve rate during training:
+
+    power 1.0  b35 (ref)   0.102 0.237 0.439 0.795   (by quarter)
+    power 0.95 b70 s0      0.364 0.597 0.621 0.688
+    power 0.95 b70 s1      0.363 0.649 0.735 0.649
+
+The power runs get MORE reward early, 100% of checkpoints see solves, and they plateau anyway.
+The reference starts worse and ends better at HALF the budget.
+
+**"It never learned to repeat" -- REFUTED, and backwards.** `diversity_probe.py`, 40 episodes:
+
+    power 0.95   learned  50.8 moves/ep  coverage 0.942  repeat 0.627
+                 greedy   19.0 moves/ep  coverage 0.434  repeat 0.332
+                 random   56.3 moves/ep  coverage 0.841  repeat 0.537
+
+    power 1.0    learned  18.4 moves/ep  coverage 0.633  repeat 0.220
+                 greedy   12.5 moves/ep  coverage 0.403  repeat 0.119
+
+The power-limited policy repeats MORE than greedy, not less, and behaves **almost exactly like
+random** (50.8 moves against random's 56.3). Greedy is ruthlessly selective and STOPS -- 19
+moves of 70. So the regime does not reward repetition as such; it rewards knowing WHICH pair
+to re-probe. **The policy has lost the ability to target and substitutes volume for precision.**
+
+### 3. THE THING TO READ: every run on this project has `observe_belief_channels=False`
+
+All 115 of them -- sweep 60, credit 22, power 30, attr_train 3.
+
+`UncertaintyGreedyAgent._unsure_touching` reads **adjacency, directed AND bidirected** and
+targets the node touching the most open questions. The POLICY sees only
+`marginals[off_diagonal]`, i.e. the DIRECTED matrix alone. Per pair:
+
+    unresolved {FWD,BACK,BI}   directed 0.33 / 0.33   -> policy CAN see it is open
+    settled forward            1.0 / 0
+    settled backward           0 / 1.0
+    settled ABSENT             0 / 0     \  indistinguishable, but BOTH are finished,
+    settled BIDIRECTED         0 / 0     /  so this is harmless for choosing an action
+
+**Under oracle that compression is benign for action selection** -- open pairs are still
+identifiable, which is consistent with the sweep's policies beating greedy 10x at k>=12.
+
+**Under withholding it stops being benign.** A pair probed-but-withheld sits at 0.33/0.33 --
+IDENTICAL to never-probed. The information to separate them exists (`own_counts` records
+whether you already intervened there) but needs a non-linear combination of two features, and
+under oracle that inference was never required, because intervening always resolved. The
+policy arrives in the new regime with exactly the wrong inductive bias, and sprays.
+
+**So greedy is a STRONGER baseline under power-limiting than under oracle**, which inflates
+every gap in your findings doc -- including the ones I reviewed this morning.
+
+### What I am running here (do not duplicate)
+
+Six runs, `--observe_belief_channels` ON:
+
+* **k12s50n04b150, 3 seeds** -- does the SWEEP headline change? Existing cell is learned
+  0.0001 vs greedy 0.0008, L/G 0.10. If channels-on does not beat that, the blindfold is
+  benign under oracle and the headline stands as measured.
+* **p95_b70_k8, 3 seeds** -- does the power gap close? Currently 0.55-0.74 against 0.87-0.90.
+
+Prediction on record before the numbers land: sweep cell unchanged, power cell improves. If
+the sweep cell DOES improve materially, that is the more important result of the two, because
+then every learned-vs-greedy number on this project was measured with the policy handicapped.
+
+### Your 8000-episode plateau test still matters
+
+It is the independent half. If window rate resumes climbing past episode 4000, the plateau was
+slow convergence and the observation story is not needed. If it stays flat with entropy ~1.9,
+the plateau is real and the observation story explains it. Report the quarters either way.
