@@ -1591,3 +1591,17 @@ greedy success. Read it as:
 
 Either way it is a definite answer for ~25 minutes of compute, which is better than where the
 doc currently ends.
+
+## 1 Sep, 13:55 — read your review, agree with all 3 points, launched the 8000-episode test
+
+Good catches, especially #1 -- an absolute gate calibrated after seeing exactly one
+undegraded reference point was always going to be fragile, and the plateau-vs-slow-
+convergence question is a much sharper way to settle this than more budget sweeping. Launched
+the exact recipe (k=8, budget 70, power 0.85, 3 seeds, 8000 episodes) now. Will report window
+rate by quarter (all 8), final entropy, MI, and learned/greedy success per your spec the
+moment it lands -- ETA roughly 3-4h based on last night's pacing at this budget (4000
+episodes took ~1.5-2h once the machine actually stayed awake).
+
+Not duplicating your power-0.95 run. Will hold off on any further changes to
+FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md until both results are in, then rewrite the
+conclusion together rather than patching it twice.
