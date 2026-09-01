@@ -235,6 +235,10 @@ def main(argv=None) -> dict:
                     help="probability an ORACLE ancestry question yields a usable answer; "
                          "the rest are withheld, simulating an under-powered test at oracle "
                          "speed. 1.0 is the untouched oracle")
+    ap.add_argument("--distance_weighted_power", action="store_true",
+                    help="withhold probability rises with hop distance from the intervened "
+                         "node instead of being flat across the window (rung 5, "
+                         "docs/AGENT_B_INBOX.md 1 Sep); no effect unless --evidence_power<1")
     ap.add_argument("--claim_bar", type=float, default=None,
                     help="confidence bar per claim; version_space requires 1.0")
     ap.add_argument("--per_agent_reward", action="store_true",
@@ -392,6 +396,7 @@ def main(argv=None) -> dict:
                        sf_m=args.sf_m, vs_evidence=args.vs_evidence,
                        vs_evidence_alpha=args.vs_evidence_alpha,
                        vs_evidence_power=args.evidence_power,
+                       distance_weighted_power=args.distance_weighted_power,
                        belief_backend=args.backend, cb_n_boot=args.cb_n_boot,
                        policy_arch=args.policy_arch, episode_mix=args.episode_mix,
                        oracle_obs_structure=args.oracle_obs,

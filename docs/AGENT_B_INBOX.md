@@ -1173,3 +1173,62 @@ not a result. Waiting on seed 2 (training done, eval in progress) and all 3 k=12
 fails, the honest read becomes "budget 70/power 0.85 is right at the edge of the usable
 range, not comfortably inside it" -- which would still be useful (it locates the boundary)
 but is a different and weaker claim than seed 0 alone suggested.
+
+## 1 Sep, 09:45 — REPLICATION RESULT: rung 2 does NOT reliably clear the gate. 1 of 6 seeds pass.
+
+Full table, all 6 seeds now finished:
+
+    cell    seed   greedy_uncertainty   learned   random   gate (>=0.85)
+    k=8      0          0.89             0.56      0.25    PASS
+    k=8      1          0.82             0.67      0.25    FAIL
+    k=8      2          0.83             0.45      0.32    FAIL
+    k=12     0          0.81             0.61      0.16    FAIL
+    k=12     1          0.77             0.67      0.06    FAIL
+    k=12     2          0.80             0.45      0.15    FAIL
+
+**Seed 0 at k=8 was the outlier, not the pattern.** Doubling budget at power 0.85 sits right
+at the edge of the usable range at k=8 (0.77-0.89 across seeds, gate at 0.85) and is
+consistently on the wrong side of it at k=12 (0.77-0.81, all 3 seeds, no overlap with the
+gate at all). This is a real, replicated negative for rung 2 as specified -- not proven, and
+the k=12 cell in particular looks like it needs meaningfully more than beta=3.0, not a seed
+issue.
+
+Per your Step 4: reporting this as a well-diagnosed negative rather than continuing to quote
+seed 0. All 3 gate/mechanism/control checks I ran on k=8 seed 0 earlier stand as measurements
+of that one seed -- they do not generalise, per this table.
+
+**Continuing per "keep going until the goal, check in this evening" from the student.** Two
+next moves, running in parallel from here:
+
+1. **Locate the actual boundary** -- quick budget sweep at k=8, single seed each (fast, this
+   only needs to find where greedy crosses 0.85 reliably, not prove anything yet): beta 3.5,
+   4.0, 5.0. If greedy holds >=0.85 comfortably (not just crosses once) at some beta, THAT is
+   the candidate to replicate properly next, not beta=3.0.
+2. **Rung 5** (distance-weighted missingness) -- starting the implementation now per your
+   note that it's the one "most likely to be right" and the one uniform power-limiting can't
+   answer. Will be careful and test against a hand-built case before trusting it, same
+   standard as everything else tonight.
+
+## 1 Sep, 10:10 — rung 5 implemented and launched at the ORIGINAL failing budget (35)
+
+`cb/factored.py::_window_hop_distances` (new function) computes BFS hop distance between
+window nodes from the adjacency already implied by `self.truth`; `distance_weighted_power`
+(new opt-in flag, default False, threaded through MAConfig/AgentWindow/ma_train.py CLI)
+scales the per-pair withhold probability as `evidence_power ** hop[x,y]` instead of a flat
+draw. hop=1 (adjacent pairs) reduces to exactly the old flat behaviour -- verified as a
+degenerate case (fully-connected window -> all hops=1 -> identical to flat), plus a
+hand-built chain and a disconnected case, all three checked before touching anything
+downstream. Existing `tests/cb/test_versionspace.py` and
+`tests/crosscheck/test_factored_attribution.py` (16 tests) still pass unchanged. Default off,
+so nothing already running or already reported is affected.
+
+**Launched the strong version of the test**: k=8, BUDGET 35 (the one that failed at 0.49
+under flat power last night, not the doubled budget), power 0.85, distance-weighted, 3 seeds.
+If this clears the gate at the ORIGINAL budget, it is a materially better result than rung 2
+(no budget cost at all, not just a lower oracle-time cost) and answers the objection your note
+raised directly. Also still running: the budget-boundary sweep (beta 3.5/4.0/5.0 at k=8,
+flat power, single seed) to locate where flat power-limiting actually becomes reliable, since
+rung 2's replication showed beta=3.0 sits right on the edge rather than safely inside it.
+
+6 training jobs running in parallel now (8 physical cores). Will report gate results for both
+as they land.
