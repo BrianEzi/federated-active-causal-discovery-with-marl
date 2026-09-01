@@ -1,160 +1,146 @@
-# Attribution is bounded by the PARTNER COUNT, and the bound is countable
+# Attribution is bounded by IDENTIFIABILITY, not by scale
 
-1 Sep 2026. Supersedes the "two-child ceiling" framing in
-`FINDINGS_ATTRIBUTION_CEILING_2026_08_31.md`, which was correct at one configuration and is
-a special case of this.
+1 Sep 2026, rewritten 09:20 after the matched-budget control refuted the first version of
+this file. What that version claimed, and what actually holds, are both below -- the
+correction is the substance, so it is not hidden in a footnote.
 
 ---
 
-## 0. A confound found at 04:15, before this is quoted
-
-**The single-pair decline is not yet separated from plain COVERAGE STARVATION**, and the two
-cells that carry it are exactly the two where the budget cannot cover the window:
-
-| cell | budget / agents | window nodes | coverage | P(resolve \| 1-pair) |
-|---|---:|---:|---|---:|
-| k=12, 3 partners | 60/4 = 15 | 12 | complete | 0.765 |
-| k=20, 3 partners | 80/4 = 20 | 20 | exactly complete | 0.667 |
-| **k=30**, 3 partners | 100/4 = 25 | 30 | **incomplete** | **0.274** |
-| **k=12, 7 partners** | 60/8 = 7.5 | 12 | **incomplete** | **0.047** |
-
-So "the ownership space grows as 2^n - 1" and "the budget no longer covers the window" both
-predict the collapse, and this file cannot yet tell them apart. A matched-budget control
-(rounds per agent held at 15) is running.
-
-**What is NOT affected.** Multi-pair groups score 0% at every partner count above one
-*including the cells where coverage is complete* (k=12 at 2 and 3 partners). That half of the
-law is clean and rests on the identifiability argument, not on budget.
-
-**What is affected.** The single-pair decline 100% -> 80% -> 77% -> 5%, and therefore the
-headline "attribution is bounded by partner count" as an unqualified statement. The first
-three points have complete coverage; only the 5% does not.
-
-Under ORACLE evidence a repeat is worthless once a node is covered, which is why the control's
-low-partner cells reproduce the originals exactly at lower budget -- and why coverage, not
-budget, is the quantity that matters.
-
 ## 1. The result
 
-Recovery rate of a true latent group, by the number of window nodes it explains, against the
-number of PARTNERS the agent has. 200 episodes per cell, k=12, sigma=0.50, oracle evidence,
-component backend. **Zero misattributions in every cell.**
+Recovery rate of a true latent group by the number of window nodes it explains, against the
+number of PARTNERS. 200 episodes per cell, k=12, sigma=0.50, oracle evidence, component
+backend, **rounds per agent held constant at 15** so coverage does not confound partner count.
+**Zero misattributions in every cell.**
 
-| partners | group with 2 children | 3 children | 4 children | overall attribution |
+| partners | 2 children (1 pair) | 3 children | 4 children | overall |
 |---:|---:|---:|---:|---:|
-| **1** (2 agents) | **100%** | **64%** | **39%** | **0.488** |
-| **2** (3 agents) | 80% | 0% | 0% | 0.284 |
-| **3** (4 agents) | 77% | 0% | 0% | 0.330 |
-| **7** (8 agents) | **5%** | 0% | 0% | **0.028** |
+| **1** | 100% | **64%** | **39%** | 0.488 |
+| **2** | 80% | **0%** | **0%** | 0.284 |
+| **3** | 77% | **0%** | **0%** | 0.330 |
+| **7** | 72% | **0%** | **0%** | 0.424 |
 
-Sample sizes: 76/59/74 groups at 1 partner, 252/210/146 at 2, 456/312/201 at 3, and
-1344/658/210 at 7.
+**Two facts, and the first is the thesis-relevant one.**
 
-**Two distinct collapses.**
+* **A group explaining two or more pairs is unrecoverable from two partners onward, at ANY
+  budget.** 64% and 39% at one partner, zero at two, and zero at seven even when the budget
+  is doubled to keep coverage matched. This is an identifiability barrier, not a resource one.
+* **Single-pair groups decline only gently** with partner count: 100 -> 80 -> 77 -> 72%.
+  Ownership among more candidates costs something, but not much.
 
-* **Multi-pair groups die at the SECOND partner.** 64% and 39% at one partner, 0% at two,
-  and 0% everywhere after. Not a decline -- a cliff.
-* **Single-pair groups die by the seventh.** 100% -> 80% -> 77% -> **5%**.
+## 2. Why
 
-## 2. Why, and it is countable
+A pair's ownership hypothesis space is the set of non-empty owner subsets, `2^n - 1`. With ONE
+partner it is a singleton -- ownership is forced, `attributions_for` returns exactly one
+canonical candidate for any pair set, and everything the belief has settled resolves. That is
+why the one-partner column is limited only by COVERAGE (100/64/39% is the chance that all 1, 3
+or 6 pairs of the group get settled in budget), not by identifiability.
 
-A pair's ownership hypothesis space is the set of non-empty owner subsets: **2^n - 1** for
-`n` partners. That is **1, 3, 7, 127** at 1, 2, 3 and 7 partners. With ONE partner the set is
-a singleton -- ownership is forced, `attributions_for` returns exactly one canonical candidate
-for any pair set, and everything the belief has settled resolves immediately. That is why the
-one-partner column is limited only by COVERAGE: 100/64/39% is the probability that all 1, 3
-or 6 pairs of the group get settled within budget, not an identifiability limit.
+From two partners onward, separating a clique from several smaller latents requires a PARTIAL
+response -- some of the group's pairs moving while others do not. That requires the owner to
+probe its private variables ONE AT A TIME. No policy here does, so partner responses are
+always total, atomicity never fires, and multi-pair groups go to zero and stay there however
+much budget is spent.
 
-From two partners onward, two ambiguities compound. Ownership is open (3, 7, ... 127 subsets
-per pair) AND clique structure is open, and separating a clique from several smaller latents
-needs a PARTIAL response -- some of the group's pairs moving while others do not. That
-requires the owner to probe its private variables ONE AT A TIME, which no policy here does,
-so responses are always total and atomicity never fires. Multi-pair groups therefore go to
-zero and stay there.
+Single-pair groups have no clique ambiguity, so ownership evidence alone settles them.
 
-Single-pair groups have no clique ambiguity, so they survive on ownership evidence alone --
-until the owner set gets large. At seven partners each pair has 127 candidate owner sets to
-eliminate while the round budget, fixed at 60, is split eight ways. **Exponentially more to
-rule out, linearly less to rule it out with.** 5% survives that.
+## 3. THE CORRECTION, and how it was caught
 
-## 2b. A closed-form predictor, and it holds across a 27x range
+The first version of this file claimed the collapse was **exponential hypothesis-space
+growth** -- `2^n - 1` owner sets (127 at seven partners) against a budget split more ways --
+and reported single-pair recovery falling to **5%** at seven partners.
 
-The two collapses are INDEPENDENT, which means attribution factorises:
+**That was budget starvation, not the hypothesis space.** The partner sweep held the budget
+fixed at 60 rounds for every partner count, so eight agents got 7.5 rounds each against four
+agents' 15. Holding rounds-per-agent constant instead:
+
+| partners | budget | single-pair recovery | overall |
+|---:|---:|---:|---:|
+| 7 | 60 | **5%** | 0.028 |
+| 7 | **120** | **72%** | **0.424** |
+
+Attribution recovers almost completely. The exponential-space story predicted it would not.
+
+The control was queued at 01:00, before the first version was written, precisely because
+"exponential space" and "thin evidence" both predicted the collapse and the sweep could not
+separate them. It should have run before the claim was published, not after.
+
+**What this changes:** the barrier is identifiability, not scale. More partners costs a little
+(80 -> 72% on single-pair groups); needing a partial response costs everything.
+
+## 4. A closed-form predictor, which survived the correction
 
     attribution  ~=  P(resolve | single-pair group)  x  share of groups that are single-pair
 
-The first factor is set by the PARTNER COUNT. The second is pure graph combinatorics --
-how many latent groups explain exactly one pair -- and needs no simulation at all: it is a
-property of the topology and the graph model. Groups explaining two or more pairs contribute
-nothing beyond one partner.
+Groups explaining two or more pairs contribute nothing beyond one partner. Against the
+matched-budget control (`scripts/attr_model.py`):
 
-Checked against every measured cell (`scripts/attr_model.py`):
+| partners | P(resolve\|1-pair) | share 1-pair | predicted | measured | residual |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 0.798 | 0.389 | 0.310 | 0.284 | -0.026 |
+| 3 | 0.765 | 0.477 | 0.365 | 0.330 | -0.034 |
+| 7 | 0.718 | 0.639 | 0.459 | 0.424 | -0.035 |
 
-| cell | partners | P(resolve\|1-pair) | share 1-pair | predicted | measured | residual |
-|---|---:|---:|---:|---:|---:|---:|
-| k12 s.50 n3 | 2 | 0.798 | 0.389 | 0.310 | 0.284 | -0.026 |
-| k12 s.50 n4 | 3 | 0.765 | 0.477 | 0.365 | 0.330 | -0.034 |
-| k12 s.50 n8 | 7 | 0.047 | 0.639 | 0.030 | 0.028 | **-0.002** |
-| k12 s.25 n4 | 3 | 0.941 | 0.845 | 0.795 | 0.755 | -0.041 |
-| k12 s.75 n4 | 3 | 0.782 | 0.335 | 0.262 | 0.267 | +0.005 |
-| **k20** s.50 n4 | 3 | 0.667 | 0.321 | 0.214 | 0.196 | -0.018 |
+and against the fixed-budget sweep, which also varies sigma and window size:
 
-**Largest residual 0.041**, over measured values spanning 0.028 to 0.755 and varying partner
-count, shared fraction AND window size independently.
+| cell | P(resolve\|1-pair) | share | predicted | measured | residual |
+|---|---:|---:|---:|---:|---:|
+| k12 s.25 n4 | 0.941 | 0.845 | 0.795 | 0.755 | -0.041 |
+| k12 s.75 n4 | 0.782 | 0.335 | 0.262 | 0.267 | +0.005 |
+| k20 s.50 n4 | 0.667 | 0.321 | 0.214 | 0.196 | -0.018 |
 
-**The one-partner cell is under-predicted by 0.263, by design.** It is the only regime where
-multi-pair groups contribute, because a single owner leaves `attributions_for` one canonical
-candidate and coverage becomes the only limit. A model that fails exactly where its own
-derivation says it must is better evidence than one that fits everywhere.
+**Largest residual 0.041**, over measured values from 0.196 to 0.755, varying partner count,
+shared fraction, window size and budget.
 
-**What this licenses.** Given a site count and a contended fraction, the recoverable share of
-the latent structure can be computed BEFORE running anything. That is a design tool, not just
-a description: it says how many sites a federation can have before confounder attribution
-stops being worth attempting.
+**With adequate coverage the first factor is nearly constant at ~0.76**, so the law reduces to
 
-## 3. What it explains
+    attribution  ~=  0.76  x  (share of latent groups that explain exactly one pair)
 
-**The structure sweep's n-axis collapse.** Learned-to-greedy hard SHD goes 0.10 (n=4) ->
-1.65 (n=5) -> 4.24 (n=8) -> 6.75 (n=10). Two independent measurements, one cause: more
-partners is where this problem gets hard, and the reason is that per-partner evidence thins
-while the hypothesis space grows.
+and that share is computable from the topology and graph model with **no simulation at all**.
 
-**D7's negative result.** A policy trained ON the attribution reward scores 0.400 and 0.355
-against greedy's 0.945 and 0.955 over two seeds. At three partners only single-pair groups
-are recoverable and those come free with structural coverage, so the attribution term is a
-constant plus noise -- there is no gradient, because no achievable behaviour changes the
-outcome. The reward cannot teach what the evidence cannot support.
+**The one-partner cell is under-predicted by 0.263, by design** -- the only regime where
+multi-pair groups contribute. A model that fails exactly where its derivation says it must is
+better evidence than one that fits everywhere.
+
+## 5. What it explains
+
+**D7's three-seed negative.** A policy trained ON the attribution reward scores 0.400 / 0.355
+/ 0.205 against greedy's 0.945 / 0.955 / 0.935. Only single-pair groups are recoverable and
+they come free with structural coverage, so the attribution term is a constant plus noise --
+no gradient, because no achievable behaviour changes the outcome. **The reward cannot teach
+what the evidence cannot support.**
 
 **`greedy_attribution`'s 7% private-probing rate.** An agent optimising its own attribution
-belief correctly declines to probe privately, because that evidence goes to PARTNERS. The
-same fact from the other side.
+belief correctly declines to probe privately, because that evidence goes to PARTNERS.
 
-## 4. The claim this licenses
+## 6. The claim this licenses
 
-> Federated attribution of latent confounders is feasible at two to four sites and infeasible
-> at eight, and the boundary is not a property of the algorithm. The ownership hypothesis
-> space grows as `2^partners - 1` per confounded pair while the interventional evidence per
-> partner falls with a shared budget, so the identifiable fraction collapses from 49% at one
-> partner to 3% at seven.
+> Federated attribution of latent confounders is limited by identifiability rather than by the
+> number of sites. Groups explaining a single confounded pair are recoverable at ~76%
+> regardless of site count once the budget covers the window; groups explaining a clique are
+> unrecoverable from two sites onward at any budget, because separating them requires a
+> partner to probe its private variables one at a time -- an experiment with no payoff for the
+> partner performing it. The recoverable share is therefore predictable in advance from the
+> topology alone.
 
-That is a scaling law for the federated problem, computable in advance from the site count
-and the budget, and it holds with zero misattributions throughout -- the engine degrades to
-UNSURE, never to WRONG.
+## 7. Caveats
 
-## 5. Caveats, stated
-
-* One window size (k=12) and one shared fraction (sigma=0.50) for the partner sweep. The
-  k=20/k=30 and sigma cells are in `results/attr_ceiling.json`.
-* The budget is fixed at 60 rounds across all partner counts, so "evidence per partner falls"
-  is by construction. **Raising the budget with the partner count is the obvious control and
-  has NOT been run.** Until it is, the exponential-space and thin-evidence explanations are
-  not separated -- both predict the collapse. That experiment is the first thing to run next.
+* Partner sweep at one window size (k=12) and one shared fraction (sigma=0.50); k=20, sigma
+  variants measured separately at fixed budget. **k=30 not measured** -- the control pre-empted
+  it and it is queued.
 * Oracle evidence only.
+* "No policy probes one variable at a time" is measured over the policies in this project, not
+  proved impossible. Whether such an action is even definable under the privacy constraint is
+  open, and is the natural future-work question.
 
-## 6. Reproducing
+## 8. Reproducing
 
 ```bash
-.venv/bin/python scripts/attr_ceiling.py \
-  --cells 12:0.5:2:60,12:0.5:3:60,12:0.5:4:60,12:0.5:8:60 \
+# partner sweep, fixed budget
+.venv/bin/python scripts/attr_ceiling.py --cells 12:0.5:2:60,12:0.5:3:60,12:0.5:4:60,12:0.5:8:60 \
   --episodes 200 --out results/attr_ceiling.json
+# the control -- rounds per agent held at 15
+.venv/bin/python scripts/attr_ceiling.py --cells 12:0.5:2:30,12:0.5:3:45,12:0.5:4:60,12:0.5:8:120 \
+  --episodes 200 --out results/attr_ceiling_matched_budget.json
+.venv/bin/python scripts/attr_model.py --results results/attr_ceiling_matched_budget.json
 ```

@@ -5,10 +5,16 @@ independent factors:
 
     attribution  ~=  P(resolve | single-pair group)  x  share of groups that are single-pair
 
-The FIRST is set by the PARTNER COUNT. A pair's ownership hypothesis space is the set of
-non-empty owner subsets, 2^n - 1 for n partners: 1, 3, 7, 127 at 1, 2, 3, 7. With one partner
-ownership is forced and everything settled resolves; by seven the space cannot be closed
-within a shared budget and the rate falls to 5%.
+The FIRST is set by COVERAGE, and only weakly by the partner count -- a correction made
+1 Sep after the matched-budget control. With one partner ownership is forced (the hypothesis
+space is a singleton) and everything settled resolves. From two partners onward the rate is
+NEARLY CONSTANT at ~0.76 provided the budget covers the window: 0.798, 0.765, 0.718 at 2, 3
+and 7 partners with rounds-per-agent held at 15.
+
+An earlier version of this docstring claimed the rate collapsed to 5% at seven partners
+through exponential hypothesis-space growth. That 5% was budget starvation -- the sweep held
+the budget fixed at 60 rounds however many agents shared it. At budget 120 the same cell
+recovers to 72%.
 
 The SECOND is pure graph combinatorics -- how many latent groups explain exactly one pair --
 and is computable from the topology with NO SIMULATION AT ALL.

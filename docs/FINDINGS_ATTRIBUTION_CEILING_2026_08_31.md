@@ -11,15 +11,18 @@
 > | 1 | 100% | **64%** | **39%** | 0.488 |
 > | 2 | 80% | 0% | 0% | 0.284 |
 > | 3 | 77% | 0% | 0% | 0.330 |
-> | 7 | **5%** | 0% | 0% | 0.028 |
+> | 7 | **72%** | 0% | 0% | 0.424 |
+>
+> (The seven-partner row read 5% when first measured; that was budget starvation at a fixed
+> 60-round budget, corrected by the matched-budget control on 1 Sep.)
 >
 > With ONE partner, groups of three and four children DO resolve -- ownership is forced, so
 > `attributions_for` returns a single canonical candidate and the only limit is coverage. The
 > two-child boundary appears from the second partner onward.
 >
-> The real law is the **partner count**: the ownership hypothesis space per pair is `2^n - 1`
-> owner sets (1, 3, 7, 127 at 1, 2, 3, 7 partners) while a fixed round budget is split across
-> more agents. Read the newer file instead.
+> The real law is **identifiability, not scale**: groups explaining a single pair recover at
+> ~76% at any partner count once the budget covers the window, while groups explaining a
+> clique are unrecoverable from two partners onward at ANY budget. Read the newer file.
 >
 > Everything else here stands: the identifiability argument, the D7 explanation, the refuted
 > diversity hypothesis, and the engine table.
