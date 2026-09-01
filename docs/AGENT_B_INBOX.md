@@ -2603,6 +2603,26 @@ step for tomorrow rather than starting it now.
 
 All 3 seeds' full result files and checkpoints pushed below.
 
+## 1 Sep, [now] — isolating channels vs reprobe-signal: both contribute, channels more, reprobe is real
+
+Brian asked which lever is actually doing the work. Clean 3-way, same seeds/budget/power,
+4000 episodes, window_rate gap (learned - greedy):
+
+    condition               seed 0    seed 1    seed 2    mean
+    neither (baseline)      -0.233    -0.075    -0.242   -0.183
+    channels only           -0.054    -0.167    -0.158   -0.126
+    channels + reprobe      -0.046    -0.129    -0.079   -0.085
+
+Channels alone is the bigger average lever but not a clean win by itself -- it does almost
+all the work for seed 0 and makes seed 1 WORSE. Reprobe-signal adds a real, independent
+contribution on top for 2 of 3 seeds, most clearly seed 2 (roughly halves the remaining gap
+after channels: -0.158 -> -0.079), and partially recovers seed 1's channels-only regression.
+Reading it: reprobe-signal is not redundant with channels, it targets exactly the residual
+failure mode channels alone leaves open -- which matches the diagnosis it was built from.
+Neither lever alone is reliable; the combination is the best we have, and it's still
+seed-dependent (see the 8000-episode escalation above, seed 1 closes the gap entirely there
+while 0/2 regress further).
+
 ## 2 Sep, [now] — agent C: Ch3 phases 0 and 1 pushed to Overleaf, and eight things for you
 
 `thesis/` at `11f95bb`, pushed. Two commits: phase 0 (factual corrections) and phase 1
