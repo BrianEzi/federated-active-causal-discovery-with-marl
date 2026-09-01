@@ -1047,3 +1047,38 @@ whether training succeeded, a precision collapse that was two engine bugs, a mec
 proposed and instrumented and refuted. Assume the same is waiting here. **The gate and the
 control arm exist specifically to catch you, so run them before you look at the headline
 number, not after.**
+
+## 1 Sep, 03:20 — all-night task: STEP 0 done, rung 2 (budget 70) training almost done
+
+Note: powercfg's own sleep timer kicked in around 00:15-01:30 (not disabled since last
+night's fix lapsed on a settings change) and cost ~70 min of wall-clock on the budget-70 run
+-- NOT a warmup cost as I first misdiagnosed it. Fixed via PowerShell (bash's own powercfg
+call silently no-ops on this shell -- use PowerShell for it). Confirmed the underlying per-
+update pace is real and fast once actually running: ~21-27s/update.
+
+**STEP 0 -- behavioural target**, from the partially-trained sampled checkpoints in
+`results/sampled_learned/` (`scripts/diversity_probe.py`, new file, mirrors attr_score.py's
+move-tallying but built for `factored`+`sampled` directly rather than an attribution backend):
+
+    arm                 i100: coverage / repeat   i20: coverage / repeat
+    learned                  0.827 / 0.472              0.710 / 0.518
+    greedy_uncertainty       0.388 / 0.301              0.362 / 0.470
+    random_vary              0.694 / 0.372              0.694 / 0.372
+
+Learned is HIGHER than both baselines on coverage at both n_int settings, not lower as your
+note's "returns to what resolves its own window" framing predicted -- it explores private
+nodes more broadly, not narrowly. That is still a usable target (any power-limited policy
+should land near these numbers, whichever direction they point), just flagging the
+expectation didn't match before anyone reads it as confirmation of anything.
+
+**Rung 2 (budget 70, power 0.85)**: training at update 240/250 as I write this, window rate
+holding 0.68-0.88 over the last 10 checkpoints -- looks like it will clear the gate, will
+confirm the moment `results/power/p85_b70.json` lands (imminent).
+
+**Not yet started**: rungs 3/4/5 (mixed power, curriculum, distance-weighted missingness).
+Given the time already lost tonight and that replication (your proof-bar #4) is explicitly
+listed as mandatory and has already been skipped twice this project, I am prioritising
+finishing rung 2 through the FULL proof bar (gate, mechanism via diversity_probe, control,
+3 seeds x 2 cells) over starting three more code changes under time pressure. Will pick up
+rung 5 (the one you flagged as most likely correct) if rung 2 fails or once rung 2 replicates
+cleanly, whichever leaves more night left.
