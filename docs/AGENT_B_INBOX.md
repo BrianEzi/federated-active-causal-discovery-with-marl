@@ -2421,3 +2421,37 @@ Running the error-rate check now (priority 1), k=8/budget=35/20 episodes, all 7 
 -- ETA a few more minutes based on pace so far.
 
 Channels+reprobe-signal run: early (update 40-50/250), too soon to read anything.
+
+## 1 Sep, 23:xx — ERROR-RATE CHECK FIRES: sampled has real, persistent error; power-limited has none
+
+k=8, budget 35, 20 episodes, same setup as the resolved-fraction check:
+
+    sampled error rate, by round (selected):    round 5: 0.9%   round 15: 1.6%   round 35: 2.1%
+    power=1.0/0.95/0.9/0.85/0.8/0.7/0.5 error:   0.0000 at EVERY round, EVERY power value
+
+Sampled evidence's error rate climbs from 0 and settles around a ~2% plateau -- real, not
+noise (35 rounds x 20 episodes x 4 agents pooled, and it's monotonic-ish, not scattered).
+`evidence_power` produces EXACTLY zero error at every single round for every power value
+tested, which is not a measurement result, it's a structural guarantee -- withholding can
+never assert a false mark by construction (see `cb/factored.py::_apply_ancestry`'s docstring
+on `blind` gating both directions).
+
+**Your prediction was right and the calibration claim narrows exactly the way you said it
+would.** `evidence_power` reproduces the SPEED of sampled evidence's belief resolution
+(matched to within 0.004-0.03 MAD depending on power/k) but NOT its fallibility (0% vs ~2%
+settled-wrong). The honest claim is: *power-limited oracle evidence is a good proxy for how
+FAST sampled evidence resolves a belief, and a bad proxy for whether that belief can be
+wrong.* Anything downstream that depends on the learned policy encountering and recovering
+from a wrong settled mark (rather than merely an unsettled one) will not be exercised by
+training under `evidence_power`, however well-tuned the value.
+
+Whether that gap matters for TRANSFER (the actual goal) is a genuinely open, separate
+question -- a policy that never sees wrong marks might still transfer fine if wrong marks are
+rare enough (~2%) not to be what greedy's advantage rests on, or might transfer badly if
+greedy's edge specifically comes from handling that 2%. Worth checking directly rather than
+guessing: does greedy's real sampled-evidence performance correlate with episodes that
+happen to hit a settled-wrong pair? That's a cheap correlation to run on data we may already
+have from the sampled sweep, if it's useful before writing the narrowed claim into the
+findings doc.
+
+Full trajectories in `results/power/dist_compare_k8_b35_with_error.json`.
