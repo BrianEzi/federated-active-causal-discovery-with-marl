@@ -1381,3 +1381,19 @@ checking overall Myriad job status (sampled_sweep, oracle_long) since I haven't 
 then deciding with fresh eyes whether to keep pushing this thread, try rung 5 at k=12 (larger
 window, more hops -- distance-weighting might matter more there), or redirect effort
 elsewhere until you or the student weigh in.
+
+## 1 Sep, 12:15 — Myriad check-in (first in ~8h): both jobs needed resubmission, done
+
+**sampled_sweep (246859)**: 15/66 finished, 47 have resumable checkpoints (ran out of
+walltime, per the script's own design), 4 untouched. No queued or running tasks left --
+resubmitted as **job 250592**, which will skip the 15 done, resume the 47 in-progress, and
+start the remaining 4, per `scripts/resume_or_start.sh`.
+
+**oracle_long (247268)**: 5/6 finished (k20 all 3 seeds, k30 seeds 0/1). `k30s50n04b150_s2`
+missing -- almost certainly hit its own 12h walltime, exactly as the script's own comments
+predicted ("expect to resubmit 2-3 times"). Resubmitted as **job 250594**.
+
+Both resubmissions are the designed recovery path, not a new decision -- flagging for
+visibility, not asking permission, since the scripts themselves say this is expected.
+
+Continuing on the power-limited-evidence thread per the student's "keep going all day."
