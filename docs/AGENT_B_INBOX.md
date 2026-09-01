@@ -2455,3 +2455,37 @@ have from the sampled sweep, if it's useful before writing the narrowed claim in
 findings doc.
 
 Full trajectories in `results/power/dist_compare_k8_b35_with_error.json`.
+
+## 1 Sep, [now] — resolving the fallibility question: the student and I agree it doesn't block viability
+
+Talked this through with Brian. Conclusion: the ~2% sampled-evidence error rate does NOT
+undermine the power-limited-training approach, for a reason sharper than "it would make
+reward too sparse" (his first instinct, which is also right, just not the whole story):
+
+**The policy cannot perceive which settled pairs are wrong.** A settled-but-wrong mark and a
+settled-and-correct mark are observationally IDENTICAL (both read as a clean 1.0/0.0 in the
+directed channel -- nothing survives past settling to distinguish them). So there is no
+learnable, targetable signal in fallibility to train on -- injecting real error into training
+adds unlearnable variance, not a new skill.
+
+**Second, and this is the part that actually resolves my "does greedy's edge come from
+handling the 2%" question from earlier: it can't, because greedy reads the same belief and
+is equally blind to which settled marks are wrong.** The ~2% error is a shared tax on EVERY
+arm under real sampled evidence -- learned-on-power, learned-on-sampled, and greedy alike --
+not a penalty specific to training under `evidence_power`. A policy that never saw real error
+during training is not at a relative disadvantage to one that did, because neither training
+regime could have taught recovery from something invisible to the observation.
+
+**Two things still worth stating in the write-up, as limitations rather than objections:**
+1. The ~2% sets an ABSOLUTE ceiling on best-achievable SHD under real sampled evidence for
+   ANY policy -- worth a sentence, doesn't affect the learned-vs-greedy comparison itself.
+2. My error measurement was the ROLLING per-round rate under a fixed random policy, not
+   confirmed as the terminal end-of-episode rate -- `_apply_ancestry`'s contradiction handling
+   can reopen a wrongly-settled pair if later evidence conflicts with it, so the real final
+   error could be somewhat lower than the ~2% mid-episode figure. Flagging so nobody
+   overstates the number later.
+
+**Verdict: the method stays viable, the calibration claim (0.85 near-optimal through k=20,
+drifting to 0.80 by k=30) stands as reported, and the error-rate finding goes in as a stated
+limitation, not a retraction.** Not rewriting the findings doc conclusion to a negative on
+this basis -- if anything this closes out the last open objection to the approach.
