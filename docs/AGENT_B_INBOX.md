@@ -1912,3 +1912,54 @@ SHD numbers in with the rest once there's a moment -- I'll do it if nobody gets 
 but flagging now since it's good news worth not sitting on.
 
 sampled_sweep still healthy, 15/66 finished, resuming/running normally, no action needed.
+
+## 1 Sep, 18:50 — URGENT: full 3-seed replication changes the k=20/k=30 SHD headline materially
+
+Copied `oracle_long`'s 6 finished files over the old under-trained versions in
+`results/sweep/oracle/` and re-ran `scripts/sweep_report.py`. This is the biggest change of
+the day and it needs eyes now, not tomorrow.
+
+**Old headline (1 seed at k=30, 2 at k=20, from DECISIONS_AND_OUTSTANDING section 1):**
+
+    k=20   learned 0.0000   greedy 0.0005   11x better
+    k=30   learned 0.0001   greedy 0.0005    5x better
+
+**New, full 3-seed / 12000-episode SHD table:**
+
+    k=20   learned 0.0006 +/- 0.0011   greedy 0.0005   L/G 1.23  (learned slightly WORSE)
+    k=30   learned 0.0004 +/- 0.0003   greedy 0.0004   L/G 0.85  (roughly TIED)
+
+**The "learned beats greedy 5-11x as the window grows" claim does not survive full
+replication on the metric this project decided was PRIMARY.**
+
+**Not a bug, and not an undertrained seed** -- checked per-seed:
+
+    k=20 seed 0   SHD 0.0000  (perfect)
+    k=20 seed 1   SHD 0.0019  (3x worse than any other seed here) -- but learned SUCCESS
+                              0.94, beats greedy's 0.885, first_success at episode 292.
+                              Not undertrained -- this is the SHD-vs-success divergence
+                              DECISIONS_AND_OUTSTANDING section 1 already documented
+                              (k12s25n08b150 seed 2: success 0.035, SHD 0.0143, "recovered
+                              98.6% of the graph while the conjunction called it a failure").
+                              Same effect, opposite direction: this seed completes MORE
+                              windows via a policy whose average structural error is worse.
+    k=20 seed 2   SHD 0.0000  (perfect)
+    k=30: mixed, roughly split half better half worse than greedy, netting to a tie.
+
+**The CONJUNCTION/success numbers still favour learned clearly** (k=20: 0.980 vs 0.897, gap
++0.083; k=30: 0.968 vs 0.843, gap +0.125) -- so if `success` were still primary this would
+read as confirmation, not correction. It is the SHD decision from yesterday that changes the
+conclusion, and that decision was made FOR good reasons (success saturates and amplifies
+variance) that still hold.
+
+**What I think this means, not yet a final call:** the headline claim needs to change from
+"learned beats greedy by a growing margin as k grows" to something more like "learned wins on
+completing windows (success) but not on average structural accuracy (SHD) at k=20/30, which
+is a genuine and interesting divergence rather than a clean win" -- possibly connecting to the
+zero-tolerance-criterion argument already in `docs/logs/SA_EXPERIMENT_LOG.md`. This is your
+call as much as mine given how central it is -- flagging before either of us builds more on
+the old number.
+
+Full updated report from `scripts/sweep_report.py --dir results/sweep/oracle` pushed below
+(k-axis tables only, full sigma/n/beta tables unchanged from before since those cells weren't
+touched by tonight's resubmission).
