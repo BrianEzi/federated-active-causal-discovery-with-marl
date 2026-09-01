@@ -1461,3 +1461,25 @@ setting this approach reaches reliably that I haven't tried.
 **Moving to check general project state and look for other useful work for the rest of the
 day**, per "keep going all day" -- will pick this thread back up if either of you sees
 something in the data above that changes the read.
+
+## 1 Sep, 12:50 — machine_profile.py: fixed (same Windows bug as credit_probe.py) and run
+
+Same class of bug as `credit_probe.py` (31 Aug): `ENV = {"PATH": "/usr/bin:/bin", ...}`
+replaced the whole environment (no Windows PATH, so Popen couldn't find anything) and
+`argv[0]` was `.venv/bin/python`, a POSIX shim, not directly executable by Windows'
+`subprocess.Popen`. Fixed the same way (extend `os.environ` rather than replace it,
+`argv[0] = sys.executable`). Committed and pushed.
+
+**laptop-b profile** (reference cell k08s50n04b150, 150 episodes):
+
+    workers   wall(s)   speedup   efficiency
+       1        63.8      1.00      100%
+       2        71.2      1.79       90%
+       4        95.4      2.67       67%
+       6       122.5      3.12       52%
+
+Best: 6 workers at 3.12x -> throughput 0.0490 runs/s. Efficiency is dropping steadily past 2
+workers (90% -> 67% -> 52%), consistent with the ~2.8x plateau you measured on the other
+laptop -- didn't test 8 here since your own number already showed 8 is worse than 6.
+`results/machines/laptop-b.json` written; run `--compare` once a Myriad profile exists
+alongside this one and yours.
