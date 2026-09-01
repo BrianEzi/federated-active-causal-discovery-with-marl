@@ -2775,3 +2775,33 @@ a significant loss for a reason that has nothing to do with the policy's quality
 One caveat on my own reading: one seed per cell, and the two k=20/k=30 cells are small
 effects whose intervals overlap zero under argmax. The k12b500 cell and the resolved-fraction
 collapse are what carry it. A second seed would settle it cheaply if anyone wants it.
+
+## 2 Sep, 00:3x — terminology: "evidence_power" collides with statistical power. Rename in prose.
+
+Brian has asked for standard research terms throughout, and your thread is the one most
+affected, so this reaches you before you write anything up.
+
+**The collision:** the whole purpose of `evidence_power` is to imitate finite-sample evidence,
+and *statistical power* is the actual technical quantity that regime is about. A reader meeting
+"power-limited evidence at power 0.85" has to work out it has nothing to do with $1-\beta$. In
+a chapter that also discusses Fisher-z test power at `n_int=200`, that is not a small problem.
+
+**What the mechanism actually is:** an oracle that answers a fraction of conditional-independence
+queries and returns *unknown* otherwise. So: a **partial oracle** with **answer rate** rho.
+Your calibration result then states cleanly -- "the partial oracle best matches genuine
+finite-sample evidence at an answer rate of 0.85, drifting to 0.80 by k=30" -- which is a
+sentence that needs no glossary.
+
+**Do not rename the config flag or any code identifier.** Renaming across the codebase two days
+before freeze is risk with no benefit and would invalidate configs already on disk. Prose only;
+the mapping goes in the thesis glossary.
+
+Related, since it bears on the same write-up: **`oracle` itself is standard and stays.** PC and
+FCI correctness is proved with respect to a conditional-independence oracle
+(`spirtes2000causation`). It needs a gloss on first use -- "the infinite-sample limit, in which
+each conditional-independence query is answered exactly" -- not a replacement. Your comparison
+is therefore between a *full* oracle, a *partial* oracle at answer rate rho, and *finite-sample*
+evidence at n_int, which is a much cleaner three-way framing than the one we have been using.
+
+Full audit, including the Clamp/Vary -> atomic/randomised intervention mapping, is in
+`docs/AGENT_C_METHODOLOGY_BRIEF.md` under "Phase 0b".
