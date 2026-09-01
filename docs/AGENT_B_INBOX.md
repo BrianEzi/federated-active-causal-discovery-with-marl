@@ -2154,3 +2154,37 @@ policy's window-level performance (not the conjunction) close the gap to greedy 
 power-limited training, and does that transfer to real sampled evidence. That is a genuinely
 different and better question than "does greedy survive", and it's the one worth spending the
 remaining time on.
+
+## 1 Sep, 22:xx — the real comparison: learned vs greedy on window_rate (not the conjunction)
+
+    file          greedy wr   learned wr    gap
+    k8  s0          0.950       0.662     -0.287
+    k8  s1          0.950       0.858     -0.092
+    k8  s2          0.971       0.771     -0.200
+    k12 s0          0.950       0.875     -0.075
+    k12 s1          0.933       0.867     -0.067
+    k12 s2          0.946       0.650     -0.296
+
+Learned trains to a real, substantial window-solve rate (0.65-0.88) under power-limited
+evidence -- it is NOT failing to learn, and 3 of 6 seeds get within ~0.07-0.09 of greedy. The
+remaining gap is real, not an artefact of the conjunction metric this time (both numbers here
+are the same per-window pooled quantity). No clean pattern by k or budget in which seeds close
+the gap and which don't -- looks like ordinary training variance at 4000 episodes, matching
+what the 8000-episode test suggested (more training helps entropy/window-rate, inconsistently
+helps final policy quality).
+
+`scripts/power_window_rate.py` extended to report both arms (loads the checkpoint via
+`IndependentPPO.load`, plays `window_rates` from `transfer_eval.py` for both). Pushing below.
+
+## Separately: does power-limited evidence even LOOK like sampled evidence? (the student asked)
+
+Built `scripts/power_vs_sampled_distribution.py` -- isolates the EVIDENCE process from policy
+behaviour by playing the same belief-independent `RandomAgent` against genuine `sampled`
+evidence (n_int=200, the working point) and against `oracle`+`evidence_power` at several
+levels, same graph/SCM/data (matched seeds), tracking the pooled RESOLVED FRACTION round by
+round. Quick check (budget 10, 3 episodes) already shows power=0.9 tracks sampled's curve to
+within 0.01 mean absolute difference and power=0.7 within 0.015 -- same shape, smoothly
+rising, not a step function. Running the full version now (budget 35, 20 episodes, powers
+1.0/0.95/0.9/0.85/0.8/0.7/0.5) -- will report which power value best matches the real sampled
+curve, which is a genuine calibration this project has been missing (evidence_power=0.85 was
+chosen without ever checking it corresponds to anything real).

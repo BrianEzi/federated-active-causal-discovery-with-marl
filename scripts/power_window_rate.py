@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 import numpy as np
@@ -27,6 +28,7 @@ import numpy as np
 sys.path.insert(0, ".")
 from ma.baselines import UncertaintyGreedyAgent                      # noqa: E402
 from ma.env import MAConfig, ROUND_ROBIN, VARY, TwoAgentEnv          # noqa: E402
+from ma.policy import IndependentPPO                                 # noqa: E402
 from ma.topology import Topology                                     # noqa: E402
 from scripts.transfer_eval import window_rates                       # noqa: E402
 
@@ -53,20 +55,30 @@ def main(argv=None) -> None:
     ap.add_argument("--episodes", type=int, default=60)
     args = ap.parse_args(argv)
 
-    print(f"{'file':45s} {'success(0.85 gate)':>20s} {'window_rate(0.70 gate)':>24s}")
+    print(f"{'file':45s} {'greedy wr':>10s} {'learned wr':>11s} {'gap':>8s}")
     for path in args.files:
         d = json.loads(open(path).read())
         cfg = d["config"]
         seed = d.get("seed", 0)
         env = build_env(cfg)
-        agent = UncertaintyGreedyAgent
-        policies = {a: agent(a, seed, bar=1.0) for a in env.topology.agents}
-        rates = window_rates(env, policies, args.episodes, seed_base=seed * 100_000)
-        wr = float(np.mean(rates))
-        success = d["arms"]["greedy_uncertainty"]["success"]
-        g_old = "PASS" if success >= 0.85 else "FAIL"
-        g_new = "PASS" if wr >= 0.70 else "FAIL"
-        print(f"{path:45s} success={success:.3f}[{g_old}]      window_rate={wr:.3f}[{g_new}]")
+        greedy_policies = {a: UncertaintyGreedyAgent(a, seed, bar=1.0) for a in env.topology.agents}
+        greedy_rates = window_rates(env, greedy_policies, args.episodes, seed_base=seed * 100_000)
+        gwr = float(np.mean(greedy_rates))
+
+        best_pt = path[:-5] + "_best.pt"
+        plain_pt = path[:-5] + ".pt"
+        pt_path = best_pt if os.path.exists(best_pt) else plain_pt
+        lwr = None
+        if os.path.exists(pt_path):
+            ppo = IndependentPPO.load(pt_path, env)
+            learned_policies = ppo.policies(deterministic=False)
+            learned_rates = window_rates(env, learned_policies, args.episodes,
+                                         seed_base=seed * 100_000)
+            lwr = float(np.mean(learned_rates))
+
+        gap_str = f"{lwr - gwr:+.3f}" if lwr is not None else "n/a"
+        lwr_str = f"{lwr:.3f}" if lwr is not None else "n/a"
+        print(f"{path:45s} {gwr:10.3f} {lwr_str:>11s} {gap_str:>8s}")
 
 
 if __name__ == "__main__":
