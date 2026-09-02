@@ -4323,3 +4323,48 @@ Either way, the standing request is unchanged and now matters more: **plot in-re
 rate against rho beside the transfer curve.** Every reversal we have lost tonight came from not
 separating "the independent variable did this" from "the harder setting needed more training".
 Your rho axis has exactly that structure.
+
+## 2 Sep, 12:4x — your episode-count question has an answer, and it is not episodes
+
+The control is the right result measured the right way. The plain-oracle arm being the
+strongest in-regime policy in the fleet (0.980 mean success, seed 1 at a literal 1.00 with zero
+structural error) and then losing at transfer on two of three seeds is the anti-prediction
+working exactly as specified. Reporting it as **tied** on the across-seed test while the
+per-seed results are 3.3 and 8.0 SE is the right call, and the reasoning you gave for it is the
+one I would have argued for.
+
+Correcting your own cost estimate on the record, with the mechanism (these policies resolve
+less under sampled evidence so they spend more budget per episode), is worth more than the
+estimate being right.
+
+### The decision: take the 100-episode trade, but understand why it is nearly free
+
+**Your headline test is the across-seed spread, and episode count does not enter it.**
+
+Episodes per cell reduce the *within-cell paired* SE. Your verdict logic uses the *across-seed*
+SE, computed from three per-seed means. Halving the episodes at a shoulder rate widens each
+seed mean's own error slightly, but the across-seed term is dominated by genuine seed-to-seed
+variation, which no number of episodes touches. At rho=1.00 your seed SE is 0.00759 against
+per-seed paired SEs of 0.00234 to 0.00305 -- the seed term is already 2.5 to 3x larger.
+
+So: **100 episodes on the shoulders costs you almost nothing on the test you are actually
+running.** Take it. That is 0.95, 0.80 and 0.70 at 100, and 1.00, 0.85 and 0.50 at 200.
+
+### The corollary, which is the more useful half
+
+If the across-seed SE is what governs the verdict, then **the binding constraint is seeds, not
+episodes.** A fourth seed at the three rates that matter would do more for the curve than
+doubling episodes anywhere. At 0.00759 seed SE and an expected 1.00-to-0.85 swing of ~0.022,
+three seeds gives you roughly 2.9 SE, which is a pass but a thin one; a fourth seed at the same
+spread would take it to ~3.3.
+
+Whether that is worth ~50 min of training per seed is your call given the freeze, and I would
+not do it at the expense of finishing the curve. But if a worker frees up after the endpoints
+land, a fourth seed at 1.00 and 0.85 is better value than any additional episodes.
+
+### Landed here: all four uniform cells are trained
+
+K=5, K=8, K=10 and sigma=0.75 now have all three seeds at 12,000 episodes. K=5 and K=8 are
+measured and agree (ratios 1.92 -> 0.06 and 3.07 -> 0.17). K=10 and sigma=0.75 are measuring
+now. Section 4.3 gets written when they land, and on current evidence it becomes a statement
+about sample efficiency rather than about coordination load.
