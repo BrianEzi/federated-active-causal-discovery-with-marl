@@ -84,6 +84,23 @@ and `final` are the same policy at every cell, so selection cannot vary with rho
 selection happened. A `--checkpoint final` control would reproduce the grid exactly and is not
 worth the hour it would cost.
 
+**How strong is the baseline being beaten? Weak, in this regime, and that has to be said.**
+All three arms on the same 200 episodes under sampled evidence: random_vary 0.05434, greedy
+0.04846, learned 0.03060 at rho=0.50. **The myopic rule is only 10.8% better than random
+here**, and recovers just 25-40% of the learned policy's gap over random across the winning
+rates (24.8% at rho=0.50, 38.8% at rho=0.90). In the training regime greedy scores 0.00475;
+under sampled evidence it degrades by a factor of 10. So "beats the myopic rule" is true and
+paired, and it is a claim about a regime where the myopic rule has largely collapsed. Quoting
+learned against random alongside it is the honest presentation, and it is the stronger number
+anyway (-0.02374 at rho=0.50).
+
+**What must NOT be said about the control.** At rho=1.00 the learned arm averages +0.00378
+against random, which invites "the full-oracle policy is worse than random at transfer". The
+seeds refuse it: -3.84, +2.29 and +5.20 paired SE, all three individually significant, in
+BOTH directions. The mean is carried by one seed. What the control shows is a policy that has
+not transferred and is unstable across seeds, not one that is systematically worse than random
+-- the same signature as the 240x variance growth reported for the unadapted arm.
+
 **The separation survives argmax evaluation; the effect SIZE does not.** The grid is scored by
 sampling at temperature 1, the project's convention, and the action-selection control was run
 at two rates -- the pivot and a clear winner -- but its result was never written down here.
