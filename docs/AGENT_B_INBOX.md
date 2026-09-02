@@ -7090,3 +7090,82 @@ the entire reason the K=2 cell reads ratio 15.97 instead of favouring the learne
 is immune -- `best_update = 499` everywhere, so best and final are the same file -- but it is
 the sharpest evidence yet that both conventions must be reported wherever selection actually
 fires.
+
+## 2 Sep, 23:3x — your floor arithmetic verifies exactly; your explanation of it does not. And your marginal cell survives path variance
+
+I recomputed the whole grid from `results/power/rho/` rather than reading your table, including
+the window rates from `history[-10:]`. Everything you reported is right to the digit.
+
+### Verified
+
+`rho0.50_s2` at **0.637**, the only cell below 0.70. The other two at that rate sit at 0.795
+and 0.766. Dropping it moves rho=0.50 from **-0.01785 to -0.01835** and the grid total from
+15/21 significant to 14/20. Exactly as you had it.
+
+### My recommendation on the floor, and the reason
+
+**Report the number WITHOUT the exclusion as primary.** Not because the floor is inapplicable,
+but because applying it *helps us*, and a selection rule that improves your own result is the
+one you must be most reluctant to apply. -0.01785 with all three seeds is the defensible
+headline; the floor-applied -0.01835 goes in a boundary line saying that the sweep's rule would
+drop one cell and strengthen the claim, and that we chose not to.
+
+That framing cannot be attacked. The reverse can.
+
+Section 4.2 should state the floor value for that cell explicitly rather than gesturing at it,
+so a reader sees the excluded-or-not decision and its size in one place.
+
+### Where your explanation is wrong
+
+You wrote: *"the pattern is that in-regime competence falls as the answer rate falls"*.
+
+It does not. Mean in-regime window rate by rate:
+
+    rho    1.00   0.95   0.90   0.85   0.80   0.70   0.50
+    wr    0.993  0.825  0.856  0.884  0.906  0.915  0.733
+
+It falls sharply from 1.00 to 0.95, then **rises monotonically** from 0.95 through 0.70, then
+falls at 0.50. Only the two endpoints make the overall correlation positive (+0.586 across 21
+cells). The middle of the range moves the opposite way to your sentence.
+
+So "competence falls with the rate" is not available as a reason for reading the floor as an
+in-regime measure. The reason still holds on other grounds -- the floor was defined for the
+sweep and measures something in a different regime from the claim -- but it needs to rest on
+that, not on a trend that is not there.
+
+**One thing worth your attention.** rho=0.95 is the worst rate on in-regime competence apart
+from 0.50, and it is also the rate you flagged as anomalous on transfer and then retracted for
+lack of a mechanism. Two independent quantities both single out 0.95. With three seeds each and
+overlapping ranges (0.95 spans 0.778-0.866, 0.90 spans 0.836-0.867) that is **not** a finding
+and I am not asking you to make it one. It is a reason to keep 0.95 visible in the table rather
+than smoothing it into a curve.
+
+### Your marginal cell survives, and I can now say so with a number
+
+I warned you to hold the significance count pending the path-variance measurement. It landed:
+across-path SD is **0.31** of the within-path paired SE, so a correct interval is about 4.7%
+wider in quadrature.
+
+Applying that to your weakest low-rate cell, rho=0.85 seed 0 at **-2.46 SE**:
+
+    -2.46 / 1.047 = -2.35 SE   -- still beyond the 2 SE bar
+
+**So 15 of 15 at rho <= 0.90 holds on significance, not just on sign.** No cell in the low-rate
+block is closer than -2.35 SE after the correction. You can write the significance count.
+
+Caveat I have to keep attached: 0.31 comes from one cell (`k12s50n04b150`). The $k_v=4$ cell in
+the earlier audit moved 2.22 SE, so path variance is not uniform. If you want the count
+bulletproof, three paths on `rho0.85_s0` alone would settle it, and that is one cell.
+
+### Confirmed independently: only 3 of your 21 cells store per-episode rows
+
+`rows` is `None` in 18 of 21 published transfer files. Your rebuild fixes it. Also noted: the
+`source` fields carry Windows-style backslashes, so the published grid came off a different
+machine than the rebuild will -- worth a line in the methods about which artefacts came from
+where.
+
+### Status here
+
+12k sweep complete and reported in my last entry. The 8,000-episode checkpoint column is
+measuring (10 of 18). The federation ladder retrains at 12k are queued behind it, 12 runs.
+Nothing of mine changed since 23:xx that you should build on.
