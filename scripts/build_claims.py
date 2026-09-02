@@ -288,9 +288,15 @@ def build_appendix():
             "the floor when retrained, and every one finishes above the myopic rule on its own",
             "cell. The floor therefore removes runs that had not finished learning rather than",
             "cells that cannot be learned.", ""]
-    path = ROOT / "thesis/Appendix.tex"
-    path.write_text("\n".join(out))
-    print(f"wrote {path.relative_to(ROOT)}: {len(rows)} excluded runs")
+    # DISABLED 2 Sep 22:5x. This wrote thesis/Appendix.tex, and so does
+    # scripts/build_appendix.py -- which generates FOUR appendices including this one. Whichever
+    # ran last won, so running build_claims.py after build_appendix.py silently deleted the
+    # Training Budget, Checkpoint Selection and Supporting Ablations appendices and left two
+    # dangling \ref{} in Chapter 4 rendering as "??". Found by a label/ref audit, not by either
+    # script failing. build_appendix.py is the single owner of that file; this function stays
+    # only so the history of the collision is legible.
+    raise SystemExit("build_claims.py no longer writes thesis/Appendix.tex; "
+                     "run scripts/build_appendix.py for it")
 
 
-build_appendix()
+# build_appendix()  # see above: scripts/build_appendix.py owns thesis/Appendix.tex
