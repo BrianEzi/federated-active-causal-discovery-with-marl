@@ -82,8 +82,19 @@ given adequate training the degradation does not survive.
 | random | 0.02302 | 0.00542 |
 
 6 runs, 200 episodes, `_best.pt`. 1,140,000 private-incident and 90,000 shared-shared observations.
-**MUST NOT** write the reward-alignment asymmetry (ledger 1.3). RETRACTED:
-shared-shared error is 0.00000 for both learned and myopic, maximum across all six runs.
+**MUST NOT** write the reward-alignment asymmetry (ledger 1.3). RETRACTED.
+
+### C3a — the same question at 12,000 episodes, on the agent-count axis
+
+* 27,000 shared-shared pair observations over 9 converged runs
+* learned commits **11** errors on them; myopic commits **0**
+* 7 of 9 runs are at exactly zero; every error sits in one cell
+
+**Correction to C3's justification.** 'Zero for both arms' holds for the six k=20
+and k=30 runs and does NOT hold on the agent-count axis. The asymmetry exists and
+is in the predicted direction. It is also 11 errors in 27,000 observations, so it
+cannot carry a claim about the policy neglecting what it is not paid for.
+**MUST NOT** revive ledger 1.3 from this. **MUST NOT** state the blanket zero.
 
 ## C4 — Federating information, reward and optimisation costs nothing measurable
 

@@ -124,8 +124,30 @@ for arm in ("learned", "greedy", "random"):
 out += ["", f"6 runs, 200 episodes, `_best.pt`. "
         f"{sum(e['arms']['learned']['n_private'] for e in pc):,} private-incident and "
         f"{sum(e['arms']['learned']['n_shared'] for e in pc):,} shared-shared observations.",
-        "**MUST NOT** write the reward-alignment asymmetry (ledger 1.3). RETRACTED:",
-        "shared-shared error is 0.00000 for both learned and myopic, maximum across all six runs.", ""]
+        "**MUST NOT** write the reward-alignment asymmetry (ledger 1.3). RETRACTED.", ""]
+
+# The retraction above was justified with 'shared-shared error is 0.00000 for both arms,
+# maximum across all six runs'. True of those six (k=20 and k=30) and NOT true in general:
+# on the agent-count axis the learned arm is nonzero on the least-converged seeds. Measured
+# properly at 12,000 episodes the effect is real in direction and negligible in size, which
+# is a better defence of the retraction than a blanket zero that does not hold everywhere.
+pc12 = ROOT / "results/shd_by_class_naxis_12k.json"
+if pc12.exists():
+    n12 = json.loads(pc12.read_text())
+    obs = sum(e["arms"]["learned"]["n_shared"] for e in n12)
+    errL = sum(e["arms"]["learned"]["shared_shared"] * e["arms"]["learned"]["n_shared"] for e in n12)
+    errG = sum(e["arms"]["greedy"]["shared_shared"] * e["arms"]["greedy"]["n_shared"] for e in n12)
+    zero = sum(1 for e in n12 if e["arms"]["learned"]["shared_shared"] == 0)
+    out += ["### C3a — the same question at 12,000 episodes, on the agent-count axis", "",
+            f"* {obs:,} shared-shared pair observations over {len(n12)} converged runs",
+            f"* learned commits **{errL:.0f}** errors on them; myopic commits **{errG:.0f}**",
+            f"* {zero} of {len(n12)} runs are at exactly zero; every error sits in one cell",
+            "",
+            "**Correction to C3's justification.** 'Zero for both arms' holds for the six k=20",
+            "and k=30 runs and does NOT hold on the agent-count axis. The asymmetry exists and",
+            "is in the predicted direction. It is also 11 errors in 27,000 observations, so it",
+            "cannot carry a claim about the policy neglecting what it is not paid for.",
+            "**MUST NOT** revive ledger 1.3 from this. **MUST NOT** state the blanket zero.", ""]
 
 # --- RQ3 ------------------------------------------------------------------------------------
 A = fed("shd_A.json") + fed("shd_A_s345.json")
