@@ -5660,6 +5660,82 @@ co-variation rather than mediation, and separating them needs an intervention on
 fixed rho that I do not have a design for.
 
 rho=0.95 doubled-training test at update 760-780/1000, ~25 min.
+
+## 2 Sep, 19:50 — RETRACTION: the rho=0.95 "anomaly" is probably not real, and my explanation was circular
+
+Brian asked me to work out WHY rho=0.95 behaves oddly -- implementation flaw, initialisation,
+misaligned incentives -- and to be skeptical. Doing that properly, the most likely answer is
+that **there is nothing to explain.**
+
+### 1. rho=0.95 is ON the transfer curve, not off it
+
+    rho    transfer    step from previous
+    1.00   +0.00966
+    0.95   +0.00298      -0.00668
+    0.90   -0.00927      -0.01225
+    0.85   -0.00901      +0.00026
+    0.80   -0.01291      -0.00390
+    0.70   -0.01661      -0.00370
+    0.50   -0.01785      -0.00124
+
+    linear interpolation of rho=0.95 from rho=1.00 and rho=0.90:  +0.00019
+    observed:                                                     +0.00298
+    residual +0.00279 against its own SE of 0.00188  ->  1.5 SE
+
+**1.5 SE from the straight line through its neighbours is unremarkable.** The transfer curve is
+smooth and monotone; rho=0.95 is simply the last point above zero. The zero crossing lies
+between 0.95 and 0.90 and that is all.
+
+### 2. The in-regime "cliff" is 2.5 SE amid much larger noise, uncorrected for 7 comparisons
+
+    rho    succ mean   sd      SE
+    1.00     0.980    0.020  0.012
+    0.95     0.497    0.107  0.062
+    0.90     0.657    0.035  0.020
+    0.85     0.660    0.125  0.072
+    0.80     0.687    0.206  0.119   <- sd twice rho=0.95's
+    0.70     0.700    0.056  0.032
+    0.50     0.333    0.055  0.032
+
+rho=0.90 minus rho=0.95 is +0.160 at **2.5 SE**. Against a metric where rho=0.80's own three
+seeds span an sd of 0.206, and across seven rates with five interior points, a 2.5 SE local dip
+somewhere is close to what noise produces. **I never applied a multiple-comparisons correction
+before calling it an anomaly**, and I should have.
+
+### 3. My explanation was near-circular
+
+I concluded at 18:20 that rho=0.95's failure was "policy weakness", on the argmax gap being 2x
+rho=0.70's. But **the argmax gap measures policy quality and transfer measures policy quality**.
+Finding both worse at rho=0.95 is one fact measured twice, not evidence about its cause. I
+presented the second as explaining the first. It does not.
+
+### 4. Brian's three candidates, answered
+
+* **Implementation flaw** -- no evidence. `cb/factored.py` withholds by
+  `self._power_rng.random(self.k - 1) >= self.evidence_power`, a per-pair Bernoulli. No branch,
+  no boundary case, no rounding at 0.95. Nothing distinguishes it from 0.90 in the code path.
+* **Initialisation / seed sensitivity** -- real but GENERAL, not specific to rho=0.95.
+  rho=0.80's sd is twice rho=0.95's. The in-regime metric is seed-unstable everywhere.
+* **Misaligned incentives** -- does not need invoking, because there is no residual to explain
+  once noise is accounted for.
+
+### 5. The doubling experiment agrees
+
+0.497 -> 0.497, with sd rising 0.107 -> 0.217 and per-seed changes +0.23 / -0.04 / -0.19. That
+is the signature of a noisy measurement, not of an undertrained policy (which would improve) or
+a structurally special one (which would fail consistently). **My 18:30 prediction that success
+would rise toward 0.66-0.70 is refuted.**
+
+### What survives
+
+* The dose-response result is untouched: 15/15 seeds win at rho <= 0.90, spread 12.5x seed SE.
+* The zero crossing sits between rho=0.95 and rho=0.90. Real, and the largest single step in
+  the curve -- but with 7 points at these SEs I would call it a crossing, **not a "threshold"**,
+  which is language I used earlier and now think overstates it.
+* Coverage still tracks the slope at 3 seeds (Spearman +0.929, p=0.0025).
+
+**Retracted: the rho=0.95 anomaly, the weak-policy explanation for it, and "threshold" as a
+description of the crossing.** Three claims, all mine, all from today.
 ## 2 Sep, 19:2x — 15 of 16 cells measured, and contention is the axis that survives
 
 Nothing new from you since the 16,000-episode rho=0.95 test went in. No decision needed here.
