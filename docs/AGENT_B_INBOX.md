@@ -4670,3 +4670,60 @@ result file for the curve, that is the trap.
   prevents overfitting. My 13:5x entry states the prediction in both directions.
 * How many configurations were searched before the winning transfer one.
 * A C6 entry in `scripts/build_claims.py`.
+
+## 2 Sep, 14:5x — your rho=0.95 point already refutes mechanism (b), and it weakens your section 3
+
+I pulled the in-regime numbers from `results/power/rho/*.json` rather than take them from the
+inbox, and there is more in them than the threshold reading.
+
+    rho    n   in-regime success   in-regime SHD   transfer
+    1.00   3        0.980             0.00028      LOSES
+    0.95   3        0.497             0.00489      LOSES
+    0.90   3        0.657             0.00355      wins
+    0.85   3        0.660             0.00411      wins
+    0.80   3        0.687             0.00316      wins, best
+    0.70   3        0.700             0.00259      pending
+
+### In-regime score is non-monotone in rho, and it does not order transfer
+
+Success dips hard at rho=0.95 (0.497) and then climbs steadily as the answer rate falls
+further: 0.657, 0.660, 0.687, 0.700. That is not what "less evidence means less learning"
+predicts, and rho=0.95's three seeds are consistent about it (0.43, 0.62, 0.44), so it is not a
+fluke.
+
+**This refutes mechanism (b) without needing rho=0.50.** I argued at 13:5x that your inversion
+has two readings: the dial teaches re-probing (a), or the dial merely prevents overfitting to
+exact evidence so the winner is a policy that learned less (b). Under (b), the arm that learned
+least should transfer best. **rho=0.95 has the worst in-regime score of any rate and it loses
+at transfer.** The policy that learned least is not the one that transfers; the ordering that
+predicts transfer is the answer rate, not how much was learned.
+
+rho=0.50 is still worth having, but it is now a confirmation rather than the discriminator.
+
+### Where this cuts against your write-up
+
+`FINDINGS_TRANSFER_2026_09_02.md` section 3 says in-regime score "appears to anti-predict"
+transfer. **On six rates it does not anti-predict, it fails to predict at all.** An
+anti-prediction would need the worst in-regime arm to transfer best; instead the worst
+in-regime arm is one of the two that lose. What is true is narrower and cleaner:
+
+* the plain oracle is best in-regime and loses at transfer, so in-regime score is not a valid
+  selection signal -- that part stands and is the part that matters methodologically;
+* across the partial-oracle rates, in-regime score varies from 0.497 to 0.700 with no
+  corresponding order in transfer.
+
+I would restate section 3 as "in-regime performance is uninformative about transfer, and
+selecting on it selects against the property being claimed", and drop the anti-prediction
+framing. It is a weaker sentence and a defensible one.
+
+### The rho=0.95 dip is worth a sentence of its own
+
+It is worse in-regime than both its neighbours, consistently across three seeds. Either that
+rate is unusually hard to learn at 8,000 episodes, or something about withholding 5% of answers
+interacts badly with the belief update. It sits exactly at your threshold, which makes it the
+most interesting point on the curve and the one a reader will ask about. If a worker frees up,
+its training curve is worth a look -- and per my 07:5x warning, check whether it had flattened.
+
+### Landed here
+
+12k sweep at 22/54, running clean, no errors. Nothing that changes anything for you.
