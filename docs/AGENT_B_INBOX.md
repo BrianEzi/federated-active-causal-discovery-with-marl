@@ -7571,3 +7571,54 @@ This is the fourth time today that a mean has concealed disagreeing seeds. It is
 most productive check available on this dataset and it costs one loop.
 
 Both notes are in `FINDINGS_TRANSFER_2026_09_02.md` section 1.
+
+## 3 Sep, 02:0x — Chapter 4 is now figures only, and the answer-rate grid is the last section with nothing in it
+
+### What changed in the chapter, because it changes what you should produce
+
+Brian instructed a declutter and agent C implemented it: each subsection is now one paragraph
+describing the experiment, then a marker where his analysis goes. **Data tables moved out of
+Chapter 4 into a holding appendix** (`thesis/Results Tables.tex`, `app:res_tables`), labels
+unchanged so nothing dangles.
+
+The consequence for you: **a figure now earns a place in the chapter and a table does not.**
+When your grid lands, the answer-rate curve should be a figure in `sec:res_rho` with its table
+in the holding appendix, not the other way round. I converted the pair-class result to a figure
+tonight for exactly this reason and its table went to the appendix.
+
+Two constraints agent C set that bind us both: do not write analysis prose into Chapter 4, and
+do not run `build_results_skeleton.py` against it — it would overwrite the paragraph scaffold,
+the analysis markers and the commented evidence beneath them. Generate refreshed tables into
+`Results Tables.tex` instead.
+
+### The one defect worth checking on your side
+
+Following the figure fix I reported at 01:0x, I checked the chapter's four axis tables and found
+the same defect: their structural-distance columns were each run's own `global_hard_shd`,
+matching to the digit. At $k_v=20$ that field reads $0.00065$ where the paired measurement reads
+$0.00000$.
+
+`global_hard_shd` has now caused four separate errors here. **If any table or figure of yours
+reads it, it has the same problem.** Your transfer files carry `means` and `paired` blocks from
+`global_shd_paired.py`, so the grid itself is clean; the risk is in anything that reads the
+training run files directly.
+
+### Where the chapter stands, by section
+
+* **RQ1** — complete. Sweep, budget and pair class, all measured, all at 12,000 episodes.
+* **RQ2** — **empty.** All three subsections read \textsc{Pending table}. 21 training runs and
+  21 transfer evaluations exist; 3 of 21 store per-episode rows; the deterministic rebuild is at
+  0 of 21 in `results/power/rho/deterministic/`.
+* **RQ3** — ladder retrains at 11 of 12, measurement queued at both conventions.
+* **Negative results** — complete, and three entries longer than this morning.
+
+**RQ2 is the only section of the thesis with no numbers in it**, and your grid is the only
+thing that fills it. If the rebuild is going to take materially longer than the estimate, say
+so and I will write the section against the published grid with an explicit provenance note
+rather than leave it empty for a supervisor draft.
+
+### Nothing of mine to build on tonight
+
+The ladder numbers in `sec:res_ladder` are still the 4,000-episode ones. The interim
+three-seed read at 12,000 is in `docs/FINDINGS_LADDER12K_INTERIM_2026_09_03.md` and is
+explicitly not the result.
