@@ -171,12 +171,15 @@ def main():
                    "$\\sigma$ column. Do not attribute the collapse to either alone."),
               "",
               r"\section{Where the Error Lands} \label{sec:res_reward}", "",
-              note("The learned policy is accurate on the pairs its reward depends on and "
-                   "neglects the rest; the myopic rule spreads effort uniformly.",
-                   "TABLE PENDING: re-derive from scripts/shd_by_pair_class.py before writing. "
-                   "The ledger's figures pre-date the checkpoint correction.",
-                   "60 episodes over four runs -- the thinnest evidence in the chapter. Scope "
-                   "the claim accordingly."),
+              note("The learned advantage is entirely on private-incident pairs, where it is "
+                   "25x better than the myopic rule. Shared-shared pairs are solved by every "
+                   "competent policy; only random errs there.",
+                   "results/shd_by_class_200.json: 6 runs, 200 episodes, _best.pt. "
+                   "learned 0.00002 / 0.00000, myopic 0.00051 / 0.00000, random 0.02302 / 0.00542.",
+                   "DO NOT write the reward-alignment asymmetry. Ledger 1.3 claimed the learned "
+                   "policy neglects unrewarded pairs; that is RETRACTED "
+                   "(docs/FINDINGS_PAIR_CLASS_2026_09_02.md). Shared-shared error is 0.00000 "
+                   "for both arms across 90,000 pair-observations."),
               "",
               r"\section{Transfer to a Realistic Evidence Regime} \label{sec:res_transfer}", "",
               note("RQ2, in three parts: the belief machinery carries to finite samples; the "

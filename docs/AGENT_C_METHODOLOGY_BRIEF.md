@@ -315,3 +315,124 @@ in.** Mine it for facts and write the sentences yourself.
 Three sections carry a PENDING marker and must not be written from memory: the pair-class table
 (re-derive from `scripts/shd_by_pair_class.py`; the ledger figures pre-date the checkpoint
 correction), and the two halves of RQ2 that depend on agent B's fleet.
+
+---
+
+# APPENDED 2 Sep, 06:4x — we collided on Chapter 4. It is yours from here.
+
+We both wrote \S\ref{sec:res_attribution}. I drafted it, then found your version already in the
+file below mine. **I removed mine and kept yours.** Yours is in your voice, which is the point
+of the division of labour, and mine had a number wrong that yours had right.
+
+**Chapter 4 prose is yours. I have stopped writing it.** What I will keep doing is generating
+the tables and figures from data, verifying numbers against the raw files, and leaving CLAIM /
+DATA / BOUNDARY comments in the sections that are still empty. If a number in your prose
+disagrees with `thesis_results/`, I will correct the number and leave a marker rather than
+rewrite the sentence around it.
+
+## Two numbers in your attribution section corrected against the raw files
+
+Both were ledger-sourced and the ledger is slightly off; `results/attr/transfer_*.json` are the
+originals.
+
+* attribution-greedy private share: `7%` -> **7.6%** (measured 0.0757)
+* identified, attribution-greedy against the generic uncertainty rule: `0.185` against `0.333`
+  -> **0.181** against **0.327** (measured 0.1808, 0.3267)
+
+## And a correction to MY figure that your prose caught
+
+You wrote the closed-form residual as **0.041**. My draft and `thesis/figures/attribution_law.pdf`
+both said 0.040. Yours is right. `scripts/figures.py` was deriving the residual by subtracting
+the printed predicted and measured columns, which are rounded to three places, instead of
+reading the residual column that `scripts/attr_model.py` prints directly. Fixed, figure
+regenerated, and it now reads 0.041.
+
+## What is verified and safe to quote in \S\ref{sec:res_attribution}
+
+Checked against `thesis_results/attribution/` tonight, not against the ledger:
+
+* Matched-budget control, rounds per agent held at **15.0**: two-variable groups attributed at
+  1.00, 0.80, 0.77, 0.72 at one, two, three and seven peers. Larger groups: **67 correct at one
+  peer, then 0, 0, 0**. Zero misattributions in every row. This is the cleanest control in the
+  thesis and the sentence that rules out resource starvation.
+* Coverage: 21 of 1056 at budget 30; **349 of 1056 at 60, at 120 and at 240** -- the identical
+  count, not merely the same rate.
+* Group sizes are in VARIABLES, and a group spanning $n$ variables explains $\binom{n}{2}$
+  pairs. At one peer, five- and six-variable groups are already at zero, which the ledger's
+  three-column table does not show.
+* Scale: 21, 33 and 27 correct at $k_v$ = 30, 40, 50; zero wrong; 5.3, 5.1 and 9.4 s/episode.
+
+## Do not write these
+
+* **The reward-alignment asymmetry** (ledger 1.3). Retracted:
+  `docs/FINDINGS_PAIR_CLASS_2026_09_02.md`. Shared-shared error is 0.00000 for both learned and
+  myopic over 90,000 pair observations.
+* **The agent-count reversal beginning at five agents.** At $K=5$ it is one seed: the
+  learned-to-myopic ratio is 1.65 with all seeds and 0.25 without seed 2. \S\ref{sec:res_scale}
+  now states the reversal as beginning at eight, and reports both figures.
+
+---
+
+# APPENDED 2 Sep, 09:3x — `thesis_results/CLAIMS.md` is now the source for Chapter 4 numbers
+
+Built by `scripts/build_claims.py`, regenerated from `thesis_results/` rather than maintained
+by hand. Five claims so far (C1 crossover, C2 agent count, C3 pair class, C4 federation cost,
+C5 undertraining), each with the number, the sample it rests on, and a boundary.
+
+**Read the MUST NOT lines before writing any sentence in that section.** They are
+hand-maintained, because a retraction is a judgement rather than a computation, and each one
+marks a claim that was made in good faith and then refuted:
+
+* **C1** -- do not quote a ratio of means at $k_v=30$; two seeds are significant and one is
+  indistinguishable, and the ratio hides that.
+* **C2** -- do not claim the myopic rule improves across the agent-count axis. Per-pair SHD
+  divides by `global_pairs`, which runs 117 to 525; in raw counts that arm is close to flat.
+  Also: at $K=5$ the reversal is one seed (1.65 with all seeds, 0.25 without), and two of the
+  high-$K$ runs may be unconverged, which is under test now.
+* **C3** -- do not write the reward-alignment asymmetry. Retracted.
+* **C4** -- do not state a direction for the federation cost; mean and median disagree.
+* **C5** -- do not substitute the 12,000-episode retrains into any sweep table.
+
+**Prefer CLAIMS.md over `docs/RESULTS_LEDGER_2026_09_01.md`.** The ledger is a working document
+and has now been wrong twice in ways that reached a draft: section 2.2 quoted a
+share-of-ceiling as though it were a raw rate, and section 1.3 reported an asymmetry that a
+larger re-measurement retracted. Both are corrected in place with banners, but the ledger is
+maintained by hand and CLAIMS.md is derived, so where they disagree CLAIMS.md is right.
+
+`scripts/collect_thesis_results.py --check` reports drift between `thesis_results/` and the
+live `results/` tree. It reads 0 drifted, 0 missing as of this entry.
+
+---
+
+# APPENDED 2 Sep, 10:1x — one thing for you to wire in, and a figure now reproducible
+
+## `thesis/Appendix.tex` exists and needs an `\input` in `Report.tex`
+
+Section 4.1 cites `Appendix~\ref{app:excluded}`. I wrote that reference and there was no
+appendix, so it was a dangling `\ref` that would have surfaced as `??` in the build. The file
+now exists, generated by `scripts/build_claims.py` so the list of excluded runs cannot drift
+from the competence floor that produced it. It opens with `\appendix` and carries
+`\label{app:excluded}`.
+
+**It needs `\input{Appendix}` in `Report.tex` after `\input{6 Conclusion}`.** That file is
+structural and yours; I have not touched it. Until it is wired in, the reference in 4.1 will not
+resolve.
+
+The table gives each excluded run at the sweep's budget and at three times it, so a reader can
+see both that the runs were removed and what they reach when trained to convergence.
+
+## All five figures now come from `scripts/figures.py`
+
+`sweep_grid.pdf`, the backbone figure of the chapter, was previously produced by a throwaway
+script in a scratchpad directory and would have vanished with the session. It is now a function
+in `scripts/figures.py` alongside the other four, so `python scripts/figures.py` regenerates
+every figure the chapter uses from the data on disk.
+
+Figures currently available in `thesis/figures/`: `sweep_grid`, `crossover`, `checkpoint`,
+`attribution_law`, `federation`.
+
+## Reminder on the one you should not run
+
+`scripts/build_results_skeleton.py` **overwrites Chapter 4 entirely**, prose included. It was
+right for the first scaffold and is wrong now that the chapter has writing in it. If a table
+needs regenerating, copy the prose out first or patch the table in place.
