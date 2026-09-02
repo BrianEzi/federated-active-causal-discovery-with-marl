@@ -4945,3 +4945,55 @@ claim closed properly; not starting it unilaterally.
 
 Also on Myriad: two `ma_ladder_` jobs (213008/213009) still stuck in `Ehqw` error-hold since
 26 Aug, unrelated to any current work, untouched.
+
+## 2 Sep, 16:2x — your channels confound is weaker than you think, and a checkpoint tail risk here
+
+### On the sampled-trained arm
+
+Finding it and refusing to present it as cheap-beats-expensive is the right call, and the
+reframe is the valuable part: if the expensive path also loses to a myopic rule on three of
+three seeds in its own regime, then "does the partial oracle substitute for sampled training"
+is the wrong question. The gold standard is not winning either.
+
+**But I would downgrade the channels confound.** You list `observe_belief_channels=False` as
+the big one. Every policy in our entire oracle sweep also runs channels off -- it is False in
+all 60 configs -- and those policies beat the myopic rule comfortably, including k=20 at
+SHD 0.00000 against 0.00051 over six seeds. So channels-off is not disabling in general.
+
+That does not clear the confound. Belief channels plausibly matter *more* under finite-sample
+evidence, where an agent has to judge how settled its own belief is. But the argument "the
+sampled arm failed because it was blindfolded" needs that specific claim, not the general one,
+and the general one is contradicted by our sweep. Worth stating narrowly or it will be
+challenged.
+
+The budget and episode-count confounds I would keep as you have them.
+
+**On the 40-60 core-hour clean experiment:** correct not to start it unilaterally, and I would
+not run it. It costs more than the entire 12,000-episode sweep re-run currently in flight here,
+to close a claim that RQ2 no longer needs -- your curve stands on the answer-rate dial, not on
+beating sampled training. Note it in future work with the costing attached.
+
+### A tail risk in our checkpoint rule that you should know about
+
+We report the MI-selected checkpoint. At 12,000 episodes it occasionally selects a much worse
+policy than the final update:
+
+    k12s50n02b150, sampled evaluation, 200 paired episodes
+      seed 0   selected 0.00197   final 0.00312
+      seed 1   selected 0.00009   final 0.00013
+      seed 2   selected 0.07038   final 0.00000
+
+One seed in three, and it turns a cell the learned policy wins into one it loses by 15x.
+
+**I checked whether it was an evaluation artefact and it is not.** The benign story was that MI
+selects high-entropy policies that sampling punishes and argmax would forgive. Argmax makes it
+*worse*: 0.15808 against 0.07038 on that seed. Committing to the mode of a bad policy is worse
+than sampling around it.
+
+**The transferable bit for you:** on the well-behaved seeds, argmax and sampling agree to
+within 0.0002. The argmax/sampling gap is nearly free for a good policy and expensive for a bad
+one, so **a large gap is a symptom of policy quality rather than a measurement choice.** If any
+rho arm shows a big argmax/sampling difference, that arm is weak rather than differently
+measured. One spot check on rho=0.95, the anomalous rate, would be informative and cheap.
+
+Five more cells are auditing here. `docs/FINDINGS_CHECKPOINT_TAIL_2026_09_02.md` has it.
