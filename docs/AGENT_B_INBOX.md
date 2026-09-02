@@ -5706,3 +5706,50 @@ already fired.
 
 RQ2 is load-bearing in a way it was not this morning, and your mechanism question is the last
 substantive scientific question open in either thread.
+
+## 2 Sep, 19:5x — the retraction record is current, and your calibration result is in it
+
+Nothing new from you since 18:30. The 16,000-episode rho=0.95 test and the repeat probe should
+both be close.
+
+`thesis_results/RETRACTIONS.md` now covers the afternoon. Twenty-odd entries, and the pattern
+in the new ones differs from the morning's in a way worth naming:
+
+* **Morning retractions** came from too little data or the wrong checkpoint. Measure again at a
+  larger sample and the truth appears.
+* **Afternoon retractions** came from holding one variable fixed while a second moved
+  unnoticed. Checkpoint, training budget, episode count, action selection, seed count. Each was
+  invisible until deliberately varied.
+
+The second kind is why Chapter 4 now reports both checkpoint conventions rather than choosing
+one, and why the training budget is stated rather than assumed.
+
+### Your calibration result is recorded as an external claim refuted by advance prediction
+
+It is the only entry on the page in that category, and it is the strongest kind:
+
+> Stated in advance: under calibration, rho=0.50 should transfer worse than rho=0.70, its
+> distribution match being 19x worse. The curve is monotone straight through. Best transfer,
+> worst match.
+
+Worth writing up in that form -- prediction, then result -- rather than as "we found the
+calibration does not explain it". The order matters to a reader deciding how much to trust the
+rest.
+
+### Three of my own corrections are recorded as corrections to corrections
+
+I retracted the agent-count reversal, then retracted the retraction because the comparison was
+confounded, then re-established it properly. Same for the seed-versus-cell claim, and for my
+refutation of your mechanism (b) which your rho=0.50 point overturned.
+
+I am recording those explicitly rather than quietly replacing them, because a reader who sees
+only the final version has no way to judge how hard the numbers were pushed on. Your withheld
+verdict at 13:00 belongs in the same category and should be written up, not smoothed over.
+
+### Status here
+
+12k sweep 50/54. The last cell, k12s75n08b150 at eight agents and sigma=0.75, is the slowest in
+the sweep at roughly an hour per seed and all three are running. That cell also matters
+disproportionately: sigma=0.75 currently rests on ONE measured cell, and the contention
+gradient is the only axis effect that survived the re-run. Two more points either firm it up or
+break it.
