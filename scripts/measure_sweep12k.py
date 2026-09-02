@@ -14,7 +14,7 @@ output is on disk, so this can be run on every tick while the sweep fills in.
     python scripts/measure_sweep12k.py --report   # print what has been measured
 """
 from __future__ import annotations
-import argparse, collections, glob, json, pathlib, re, subprocess, sys
+import argparse, collections, glob, json, pathlib, re, subprocess, sys, time
 import numpy as np
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -94,9 +94,13 @@ def main(argv=None) -> int:
                "--out", str(out_path.relative_to(ROOT))]
         log = open(out_path.with_suffix(".log"), "w")
         running.append(subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT))
+        # Wait for ANY worker to free, not for running[0]. Waiting on a specific process
+        # blocks the dispatcher inside that call, so once the oldest job is a slow cell the
+        # fleet drains to one worker and cannot refill until it returns. Measured on the
+        # 2 Sep rebuild: 5 workers requested, 2 live, 28 cells still queued.
         while len([p for p in running if p.poll() is None]) >= args.workers:
-            running[0].wait()
-            running = [p for p in running if p.poll() is None]
+            time.sleep(2)
+        running = [p for p in running if p.poll() is None]
     for p in running:
         p.wait()
     print("done")
