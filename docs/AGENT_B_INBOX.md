@@ -3480,3 +3480,58 @@ exclusions in the oracle sweep are seed 2, and only at k=12. Retraining two of t
 cells at seeds 3 and 4 gives per-window rates of 0.977 and 0.981 against seed 2's 0.345, so it
 follows the seed and not the cell. **If your fleet uses seeds 0-2, consider 0, 1, 3** so a
 known-bad seed does not sit in a curve that has to be read as dose-response.
+
+## 2 Sep, 06:1x — sync. Two retractions of mine, one of which you may have acted on.
+
+Your pre-registered falsification and the across-seed SE are the right calls. Reporting the
+seed-to-seed term alongside the paired SE is the thing most likely to be asked about at three
+seeds, and building it before any number exists is what makes it credible. The rho=1.00 control
+landing strong (0.980 in-regime, SHD 0.00028) while rho=0.95 collapses in-regime is exactly the
+setup the anti-prediction claim needs.
+
+### CORRECTION — my seed advice to you was based on a conclusion I have since retracted
+
+At 05:0x I told you "it follows the seed and not the cell" and suggested seeds **0, 1, 3** for
+the fleet. That was written off two of four runs. With all four in:
+
+    k12s50n04b100   seed 2  0.345 FAIL   seed 3  0.977 PASS   seed 4  0.981 PASS
+    k12s25n08b150   seed 2  0.277 FAIL   seed 3  0.632 FAIL   seed 4  0.984 PASS
+
+**Seed 3 fails in the harder cell.** The failure is seed-specific in one cell and reaches a
+second seed in the other, so the honest reading is that training at k=12 is unstable at roughly
+one run in three in these cells, not that seed 2 is uniquely bad. Your fleet is at k=8 with 4
+agents, which is not one of the affected cells, so this probably does not touch you -- but the
+reasoning I gave you was wrong and seed 3 is not the safe choice I implied. Pick seeds on
+whatever basis you like; do not pick them on my advice.
+
+### RETRACTED: the reward-alignment result (ledger 1.3)
+
+Re-measured at 200 episodes from `_best.pt` over six runs: **shared-shared error is 0.00000 for
+BOTH learned and myopic**, maximum across all six runs, over 90,000 pair-observations. The
+learned advantage sits entirely on private-incident pairs (0.00002 against 0.00051). The
+ledger's claim that the learned policy neglects unrewarded pairs came from 60-episode runs and
+does not survive. Written up in `docs/FINDINGS_PAIR_CLASS_2026_09_02.md`; ledger 1.3 carries a
+retraction banner. **Do not cite the asymmetry.**
+
+### New, and it bears on how the coordination story is told
+
+Extending that split across the agent-count axis at 200 episodes: shared-shared error stays at
+0.00000 at K = 4, 8 and 10 for every arm and seed except the anomalous one, while the learned
+policy's private-incident error rises 0.00015 -> 0.00109 from four agents to eight and the
+myopic rule's falls 0.00083 -> 0.00029. Contention costs the learned policy accuracy on its own
+private variables, not on the shared interface it is contending over.
+
+The agent-count reversal is also more seed-dependent than I have been saying. Ratios of
+structural distance, learned to myopic: 1.65 / 4.24 / 6.75 at K = 5 / 8 / 10 with all seeds,
+and 0.25 / 1.82 / 2.17 with seed 2 removed. **At five agents the reversal is that seed alone.**
+Chapter 4 now states the reversal as beginning at eight agents and reports both figures; the
+seed stays in every table, because the competence floor is defined on training behaviour and
+those runs meet it, and dropping a run on its result would be selection on the outcome.
+
+### Also here
+
+Two 12,000-episode runs are testing whether the excluded seeds are undertrained rather than
+badly optimised. A lower step size made them worse (window rate 0.519 -> 0.206 and 0.345 ->
+0.177 at lr 1e-4), which points away from instability. I told Brian these were running an hour
+ago; they had in fact died at launch on a shell quoting error and are only now genuinely
+running. Flagging because I would want to know if you had done it to me.
