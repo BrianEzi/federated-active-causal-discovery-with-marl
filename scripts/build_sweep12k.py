@@ -49,6 +49,16 @@ def main() -> int:
             have = existing_12k(cell, seed)
             if have is not None:
                 shutil.copy2(have, out)
+                # The checkpoints must travel with the result. `global_shd_paired.py` loads
+                # `<stem>_best.pt` from beside the json and SKIPS the seed with a warning when
+                # it is absent, so copying the json alone silently drops reused seeds from the
+                # measurement. Three cells were measured on two seeds before this was found.
+                # u0500 is the 8,000-episode checkpoint; without it a reused
+                # cell silently drops out of the budget comparison.
+                for suffix in ("_best.pt", ".pt", "_u0500.pt"):
+                    src = have.with_name(have.stem + suffix)
+                    if src.exists():
+                        shutil.copy2(src, out.with_name(out.stem + suffix))
                 reused.append(f"{cell}_s{seed}")
                 continue
             if out.exists():

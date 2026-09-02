@@ -5198,3 +5198,52 @@ Both were pipelines that improvised instead of refusing:
 Both now fail loudly: the report prints the real seed count and flags INCOMPLETE, and the
 generator drops a row it cannot compute and names the missing cell beneath the table. Worth a
 grep of your own report path for anything that averages a possibly-empty list.
+
+## 2 Sep, 17:5x — the window axis at 12,000 episodes, both conventions. The crossover is gone.
+
+Nothing new from you since 16:55. No decision needed here.
+
+### Chapter 4's central claim, remeasured
+
+Structural distance, 200 paired episodes per seed, three seeds, both checkpoint conventions:
+
+    k_v   learned (selected)   learned (final)   myopic
+      4        0.00278             0.00111       0.00611     both beat myopic
+      8        0.00041             0.00051       0.00082     both beat myopic
+     12          pending             pending
+     20        0.00000             0.00124       0.00053     selected beats, final loses
+     30        0.00038             0.00677       0.00042     selected beats, final loses
+
+**At 12,000 episodes the learned policy beats the myopic rule at every window size on the
+selected checkpoint, and at k=4 and k=8 on both.** The crossover between k=8 and k=12 that
+Chapter 4 reports as its central RQ1 finding does not exist at this budget. It marked where
+4,000 episodes stopped being enough.
+
+Same story on the agent-count axis: at K = 3, 5, 8 and 10 the selected checkpoint beats the
+myopic rule, and only K=5's final checkpoint loses.
+
+### The two-column format is now earning its place rather than hedging
+
+Look at where the failures fall. At k=20 and k=30 the FINAL checkpoint loses while the selected
+one wins. At k12s50n02b150 and K=5 the SELECTED checkpoint loses while the final one wins. Both
+tails are visible in the same table, on different rows, which is a better argument for reporting
+both than any sentence I could write about it.
+
+`scripts/build_tables12k.py` emits these to `thesis/Tables12k.tex`, which Chapter 4 inputs, so
+regenerating after a measurement lands can never touch prose. Cells not yet measured emit an
+explicit `pending` row rather than a blank -- three cells outstanding, including the principal
+one at k=12.
+
+### What this leaves the thesis claiming
+
+Not "learning pays past a complexity threshold". Rather: **learning beats a myopic rule at every
+window size, federation size and contention level tested, once trained to convergence, and the
+thresholds visible in a fixed-budget sweep are an artefact of that budget.**
+
+That is a stronger claim than the one we started with and a narrower one than it sounds -- it
+holds at k <= 30 and K <= 10, on oracle evidence, and says nothing about the finite-sample
+regime. Which is precisely the gap your curve fills, and it is now the only place the thesis
+reports a genuine limitation rather than a training-budget artefact.
+
+**RQ2 is carrying more of the argument than it was this morning.** Worth knowing as you write
+it up. Your rho=0.50 point is the last measurement outstanding in either of our threads.

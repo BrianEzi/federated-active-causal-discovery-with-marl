@@ -75,8 +75,11 @@ def main(argv=None) -> int:
     ap.add_argument("results", nargs="+")
     ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--seed", type=int, default=None)
-    ap.add_argument("--checkpoint", default="best", choices=["best", "final"],
-                    help="_best.pt (highest MI during training) or .pt (final)")
+    # "best" and "final" are the two conventions the chapter reports. An update tag such as
+    # "u0500" scores an INTERMEDIATE checkpoint, which is how a shorter training budget is
+    # measured without retraining: at 16 episodes per update, u0500 is exactly 8,000 episodes.
+    ap.add_argument("--checkpoint", default="best",
+                    help="best | final | an update tag such as u0500")
     ap.add_argument("--sample", action="store_true",
                     help="evaluate the learned arm by SAMPLING rather than argmax")
     # THE TRANSFER TEST. Rebuild the environment with DIFFERENT evidence from the one the
@@ -124,9 +127,12 @@ def main(argv=None) -> int:
             config = dict(config, vs_evidence_power=args.override_power)
         env = env_from_config(config, seed=use_seed)
 
-        suffix = "_best.pt" if args.checkpoint == "best" else ".pt"
-        checkpoint = path.with_name(path.stem + suffix) if suffix.startswith("_") \
-            else path.with_suffix(suffix)
+        if args.checkpoint == "best":
+            checkpoint = path.with_name(path.stem + "_best.pt")
+        elif args.checkpoint == "final":
+            checkpoint = path.with_suffix(".pt")
+        else:
+            checkpoint = path.with_name(f"{path.stem}_{args.checkpoint}.pt")
         if not checkpoint.exists():
             print(f"!! {path.stem}: no {checkpoint.name}, skipped")
             continue

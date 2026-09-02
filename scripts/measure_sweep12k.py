@@ -37,10 +37,12 @@ def complete_cells():
     return sorted(c for c, s in seen.items() if s >= {0, 1, 2})
 
 
-def measured_path(cell: str) -> pathlib.Path:
-    if cell in PREMEASURED:
-        return ROOT / PREMEASURED[cell]
-    return OUT / f"{cell}.json"
+def measured_path(cell: str, convention: str = "best") -> pathlib.Path:
+    if convention == "best":
+        if cell in PREMEASURED:
+            return ROOT / PREMEASURED[cell]
+        return OUT / f"{cell}.json"
+    return OUT.parent / f"shd_{convention}" / f"{cell}.json"
 
 
 def main(argv=None) -> int:
@@ -48,12 +50,19 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--workers", type=int, default=2)
+    # Both conventions, because at 12,000 episodes each has a tail the other does not:
+    # MI selection occasionally picks an exploratory policy, and the final update occasionally
+    # picks a drifted one. FINDINGS_CHECKPOINT_TAIL_2026_09_02.md. Neither is safe alone, so
+    # the chapter reports both. u0500 is 8,000 episodes, for the budget question.
+    ap.add_argument("--conventions", default="best,final",
+                    help="comma-separated: best, final, or an update tag such as u0500")
     args = ap.parse_args(argv)
     OUT.mkdir(parents=True, exist_ok=True)
 
     cells = complete_cells()
     if args.report:
-        print(f"{'cell':18s} {'learned':>9} {'myopic':>9} {'ratio':>7} {'favour':>7} {'sig':>4}")
+        print(f"{'cell':18s} {'learned':>9} {'myopic':>9} {'ratio':>7} "
+              f"{'favour':>6} {'sig':>6}")
         for cell in cells:
             path = measured_path(cell)
             if not path.exists():
@@ -64,19 +73,26 @@ def main(argv=None) -> int:
             G = np.mean([e["means"]["greedy"]["hard"] for e in d])
             fav = sum(1 for e in d if e["paired"]["learned-greedy"]["delta"] < 0)
             sig = sum(1 for e in d if e["paired"]["learned-greedy"]["significant"])
-            print(f"{cell:18s} {L:9.5f} {G:9.5f} {L/G if G else float('nan'):7.2f} "
-                  f"{fav:5d}/3 {sig:2d}/3")
+            n = len(d)          # never assume 3: a cell can be measured while a seed is
+            print(f"{cell:18s} {L:9.5f} {G:9.5f} "   # still training, and /3 would lie
+                  f"{L/G if G else float('nan'):7.2f} {fav:3d}/{n} {sig:3d}/{n}"
+                  f"{'   INCOMPLETE' if n < 3 else ''}")
         return 0
 
-    todo = [c for c in cells if not measured_path(c).exists()]
-    print(f"{len(cells)} complete cells, {len(todo)} to measure: {todo}")
+    conventions = [c.strip() for c in args.conventions.split(",") if c.strip()]
+    todo = [(c, k) for c in cells for k in conventions
+            if not measured_path(c, k).exists()]
+    print(f"{len(cells)} complete cells x {len(conventions)} conventions, "
+          f"{len(todo)} to measure")
     running = []
-    for cell in todo:
+    for cell, convention in todo:
+        out_path = measured_path(cell, convention)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         cmd = [".venv/bin/python", "-u", "scripts/global_shd_paired.py",
                *[f"results/sweep12k/{cell}_s{s}.json" for s in (0, 1, 2)],
-               "--episodes", "200", "--sample", "--checkpoint", "best",
-               "--out", f"results/sweep12k/shd/{cell}.json"]
-        log = open(OUT / f"{cell}.log", "w")
+               "--episodes", "200", "--sample", "--checkpoint", convention,
+               "--out", str(out_path.relative_to(ROOT))]
+        log = open(out_path.with_suffix(".log"), "w")
         running.append(subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT))
         while len([p for p in running if p.poll() is None]) >= args.workers:
             running[0].wait()
