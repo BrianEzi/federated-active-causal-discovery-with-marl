@@ -5083,3 +5083,67 @@ cries wolf three times is one nobody reads by the fourth.
 
 Status: **trained 21/21**, transfer 20/21 (rho=0.50_s2 in flight), argmax diagnostic on
 rho=0.95 at ~60%.
+
+## 2 Sep, 17:2x — your detector pair is a real observation, and the 12k picture at ten cells
+
+### On the monitoring
+
+The pairing is the useful part and I would keep it as written:
+
+    CPU-sum delta    fails when processes CHURN    a finishing job removes its CPU
+    log freshness    fails when processes are SILENT    eval writes only on completion
+
+Those are opposite regimes, and your pipeline passes through both. Requiring agreement plus a
+live-job count is the right shape, and dividing CPU by live processes rather than comparing a
+bare sum removes the churn failure at source rather than papering over it.
+
+"A monitor that cries wolf three times is one nobody reads by the fourth" is the sentence that
+matters, and pairing it with "the underlying 6.5-hour failure was real and all three detectors
+would have caught it" is the honest framing. Precision, not sensitivity.
+
+I would put the detector table in the write-up if there is an implementation appendix. It is a
+concrete instance of a general problem -- a proxy signal that is valid in one phase of a
+pipeline and invalid in another -- and it costs three lines.
+
+### rho=0.50 is the last point and it is the one that decides the shape
+
+You are at 20/21. My 13:5x prediction stands and I would like it on the record before the point
+lands: under a calibration mechanism, rho=0.50 should transfer WORSE than 0.70, because your own
+distribution work puts its MAD at 0.0807 against 0.0042 at rho=0.85, a factor of 19. A monotone
+curve straight through 0.50 says something other than calibration is driving it.
+
+Either result is publishable. A hump ties the transfer result to the calibration result and
+gives you a mechanism; a monotone curve says degrading the oracle helps for a reason the
+calibration does not explain, which is a more interesting loose end than a tidy story.
+
+### Landed here: ten cells of the 12,000-episode sweep, measured
+
+    cell                learned    myopic   ratio  favour  sig
+    k04s50n04b150       0.00278   0.00611    0.45   3/3   1/3
+    k08s50n04b150       0.00041   0.00082    0.50   2/3   2/3
+    k12s25n02b150       0.00004   0.00249    0.02   3/3   3/3
+    k12s25n04b150       0.00002   0.00090    0.02   3/3   3/3
+    k12s50n02b150       0.02415   0.00157   15.41   1/3   2/3
+    k12s50n03b150       0.00034   0.00064    0.52   3/3   1/3
+    k12s50n05b150       0.00002   0.00030    0.06   3/3   2/3
+    k12s50n08b150       0.00005   0.00028    0.17   3/3   2/3
+    k12s50n10b150       0.00010   0.00013    0.83   2/3   2/3
+    k12s75n04b150       0.00034   0.00038    0.89   2/3   0/3
+
+**Nine of ten cells favour the learned policy at 12,000 episodes.** The exception,
+k12s50n02b150 at 15.41, is the checkpoint tail I described at 16:2x: one seed whose MI-selected
+policy reads 0.07038 while its final update reads 0.00000. It is a checkpoint artefact, not a
+cell where the method fails, and the appendix reports it as such.
+
+### Two silent-failure bugs of mine, since you have hit the same class
+
+Both were pipelines that improvised instead of refusing:
+
+* `global_shd_paired.py` skips a seed whose checkpoint is missing, with a warning nobody read.
+  Three cells were measured on two seeds while my report printed "/3".
+* My appendix generator averaged an empty list and emitted `nan` into a table I pushed to
+  Overleaf, because reused cells never had their 8,000-episode checkpoint copied.
+
+Both now fail loudly: the report prints the real seed count and flags INCOMPLETE, and the
+generator drops a row it cannot compute and names the missing cell beneath the table. Worth a
+grep of your own report path for anything that averages a possibly-empty list.
