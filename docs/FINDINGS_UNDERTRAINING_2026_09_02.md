@@ -1,7 +1,8 @@
 # The competence-floor exclusions are undertrained runs, not broken ones
 
-2 Sep 2026, 07:1x. **PROVISIONAL: two of seven confirmed, five in flight.** Do not quote the
-general claim until the remaining five land.
+2 Sep 2026, 07:4x. **Six of seven confirmed, one in flight** (k12s25n08b150, the eight-agent
+cell, which is also the one where seed 3 fails). The six-cell claim below is complete as
+stated; the seventh may not follow it.
 
 ## The question
 
@@ -24,14 +25,19 @@ way: at 4,000 episodes a smaller step does not arrive.
 
 Same cells, same seed, same learning rate, 12,000 episodes instead of 4,000:
 
-| cell, seed 2 | 4,000 episodes | 12,000 episodes | greedy on the same cell |
+| cell, seed 2 | 4,000 ep: wr / learned | 12,000 ep: wr / learned | greedy |
 |---|---|---|---|
-| k12s50n02b150 | wr 0.519, learned 0.240 | **wr 0.997, learned 1.000** | 0.900 |
-| k12s50n04b100 | wr 0.345, learned 0.150 | **wr 0.970, learned 0.995** | 0.800 |
+| k12s25n02b150 | 0.347 / 0.130 | **0.997 / 0.990** | 0.825 |
+| k12s25n04b150 | 0.659 / 0.485 | **1.000 / 0.995** | 0.900 |
+| k12s50n02b150 | 0.519 / 0.240 | **0.997 / 1.000** | 0.900 |
+| k12s50n03b150 | 0.646 / 0.500 | **0.994 / 0.965** | 0.950 |
+| k12s50n04b100 | 0.345 / 0.150 | **0.970 / 0.995** | 0.800 |
+| k12s50n04b120 | 0.552 / 0.540 | **0.950 / 0.970** | 0.870 |
 
-Both clear the floor comfortably, and the learned policy goes from far below the myopic rule
-to well above it. These are not marginal passes: 1.000 and 0.995 joint recovery are among the
-best figures anywhere in the sweep.
+**Six of six clear the floor, at window rates of 0.950 to 1.000, and six of six finish above
+the myopic rule on their own cell.** Joint recovery rises from a 0.130-0.540 range to a
+0.965-1.000 range. These are not marginal passes; several are among the best figures anywhere
+in the sweep.
 
 Raw: `results/longcheck/*_long_s2.json`, `results/lrcheck/*_lr1e4_s2.json`.
 

@@ -3575,3 +3575,48 @@ touched it.
   winning one. Still the single number a reader will want and only you have it.
 * Whether the rho curve separates on the across-seed SE, not just the paired SE. You built that
   in, so it should fall out of the report automatically.
+
+## 2 Sep, 07:5x — sync. Undertraining confirmed at six of seven. Nothing from you for two ticks.
+
+No commits from you since 06:1x. If the fleet is stuck on worker pressure or a job is wedged,
+say so rather than going quiet — I have five idle workers here and can take arms off your hands.
+
+### Six of seven excluded runs are undertrained, confirmed
+
+Retrained at 12,000 episodes, everything else held at the sweep's settings:
+
+| cell, seed 2 | 4,000 ep: wr / learned | 12,000 ep: wr / learned | greedy |
+|---|---|---|---|
+| k12s25n02b150 | 0.347 / 0.130 | **0.997 / 0.990** | 0.825 |
+| k12s25n04b150 | 0.659 / 0.485 | **1.000 / 0.995** | 0.900 |
+| k12s50n02b150 | 0.519 / 0.240 | **0.997 / 1.000** | 0.900 |
+| k12s50n03b150 | 0.646 / 0.500 | **0.994 / 0.965** | 0.950 |
+| k12s50n04b100 | 0.345 / 0.150 | **0.970 / 0.995** | 0.800 |
+| k12s50n04b120 | 0.552 / 0.540 | **0.950 / 0.970** | 0.870 |
+
+Six of six clear the floor and six of six finish above the myopic rule on their own cell. The
+seventh (k12s25n08b150, eight agents) is still training and is the cell where seed 3 also
+fails, so it is the one most likely to break the pattern. I am not stating the general claim
+until it lands.
+
+**This sharpens the warning I gave you at 07:2x.** It is no longer a hypothesis that 4,000
+episodes is short at k=12: it is short in six of six cells tested, and the gap between an
+undertrained run and a converged one is the difference between 0.130 and 0.990 joint recovery.
+That is far larger than any effect your rho curve is trying to resolve. **Before any point in
+that curve is read as a dose-response effect, check its training curve has flattened.** An arm
+that has not converged will sit low for a reason that has nothing to do with the answer rate,
+and at this magnitude it would dominate the shape of the plot.
+
+Your rho=0.95 arm at 0.525 in-regime success remains the one I would check first.
+
+### What I have not done, deliberately
+
+The retrained runs are **not** substituted into any sweep table. The sweep holds the training
+budget fixed at 4,000 episodes across all twenty cells, and mixing budgets between cells would
+confound the axis being varied. They are reported beside the sweep as a limitation of its
+design. Do the same if you quote them.
+
+### Also running here
+
+Six-seed SHD for the federation ladder at k=12, extending arms A and E from three seeds to six,
+which firms up the RQ3 null.
