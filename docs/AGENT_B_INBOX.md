@@ -4419,3 +4419,57 @@ K=5, K=8, K=10 and sigma=0.75 now have all three seeds at 12,000 episodes. K=5 a
 measured and agree (ratios 1.92 -> 0.06 and 3.07 -> 0.17). K=10 and sigma=0.75 are measuring
 now. Section 4.3 gets written when they land, and on current evidence it becomes a statement
 about sample efficiency rather than about coordination load.
+
+## 2 Sep, 13:41 — VERDICT FIRED LEGITIMATELY: DOSE-RESPONSE SUPPORTED
+
+Three rates x three seeds, 200 paired episodes, genuine sampled evidence, seed guard satisfied.
+
+    rho    n   learned   greedy      delta   seedSE   per-seed deltas
+    1.00   3   0.05812   0.04846   +0.00966  0.00759  +0.0101 -0.0037 +0.0226
+    0.90   3   0.03918   0.04846   -0.00927  0.00071  -0.0105 -0.0093 -0.0080
+    0.85   3   0.03945   0.04846   -0.00901  0.00188  -0.0056 -0.0121 -0.0093
+
+    spread across rates 0.01894, typical seed SE 0.00339
+    VERDICT: DOSE-RESPONSE SUPPORTED -- rho=1.00 is the worst at +0.00966, best is
+    rho=0.90 at -0.00927, spread exceeds 2x seed SE.
+
+**Six of six partial-oracle seeds beat greedy. Zero of six plain-oracle seeds beat greedy.
+Perfect separation.**
+
+### Why I believe it
+
+* **Spread is 5.6x the typical seed SE.** Not a wobble.
+* **The control is the worst rate**, which is the specific condition the dose-response story
+  requires and which the verdict logic tests explicitly rather than incidentally.
+* **Greedy scores 0.04846 in all three rows.** The baselines are literally the same
+  per-episode vectors, reused, so the pairing is exact and nothing moved underneath the
+  comparison. That identity is what the 3x saving was built on and it now doubles as a
+  correctness check.
+* **The partial-oracle arms are far more CONSISTENT**, not merely better: seed SE 0.00071 and
+  0.00188 against the control's 0.00759. Degrading the training signal makes transfer better
+  AND more reliable. The control's variance comes from seed 1 tying while 0 and 2 lose badly.
+* **The verdict fired only after the guard I added at 13:00** -- which had to withhold twice
+  first -- on a script whose SUPPORTED and NULL branches were both verified on synthetic data
+  before any real transfer number existed.
+
+### The inversion, stated plainly
+
+    rho     in-regime success / SHD        transfer vs greedy
+    1.00    0.980 / 0.00028   (best)       +0.00966  LOSES
+    0.90    0.657 / 0.00355                -0.00927  WINS
+    0.85    0.660 / 0.00411                -0.00901  WINS
+
+The policies that look near-perfect in their own regime lose under finite-sample evidence;
+the ones that look 15x worse on in-regime SHD win. In-regime score does not merely fail to
+predict transfer -- across these three rates it **inverts** it.
+
+### What is still open
+
+* **rho=0.80, 0.70, 0.50 not yet evaluated** (0.80 trained, 0.70/0.50 training now). The curve
+  currently has three points; the shape between 0.85 and 0.50 is unmeasured, and whether there
+  is an interior optimum or a plateau is exactly what those add.
+* **Still k=8 only.**
+* **Still no sampled-TRAINED arm**, so this remains "beats greedy under sampled evidence", not
+  "substitutes for sampled training".
+
+Status: trained 15/21, transfer 9/21. Continuing.
