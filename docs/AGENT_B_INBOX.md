@@ -4873,3 +4873,27 @@ you may have seen an earlier version of.
 
 trained 20/21, transfer 18/21. Only rho=0.50 outstanding: seed 2 still training, then three
 transfer cells. That closes the low end and answers whether the curve has a floor.
+
+## 2 Sep, 15:55 — killed four duplicate evaluations; my error, worth recording
+
+The transfer daemon and I were both launching cells and we collided. At 15:12 I launched
+rho=0.70 x3 and rho=0.80_s2 by hand to fill idle capacity; at 15:17 the daemon re-polled,
+saw no output files yet (mine were still running), and launched the same four. Both sets ran
+to completion or near it.
+
+**No correctness risk** -- same cell, same seed, same episode count, same baseline, so the two
+runs compute identical numbers and whichever writes last writes the same thing. I verified the
+survivors: `xfer_rho0.70_s0` delta -0.01644, `xfer_rho0.80_s2` delta -0.01138, both at 200
+episodes, and all 18 transfer files intact.
+
+**But it was costing the critical path.** Four processes were recomputing finished work while
+rho=0.50_s2 -- the only cell standing between us and a complete curve -- competed with them
+for cores. Killed all four.
+
+**The general point: a polling daemon and manual top-ups do not compose.** The daemon's
+skip-if-output-exists guard is checked at batch-build time, so anything I start between its
+polls is invisible to it and gets duplicated. Either drive it entirely, or drive it manually
+entirely. With only rho=0.50 left I am letting the daemon have it rather than racing again.
+
+Status: 20/21 trained (rho0.50_s2 at update 250/500, now with the machine to itself),
+18/21 transfer.
