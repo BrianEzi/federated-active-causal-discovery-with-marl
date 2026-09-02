@@ -7169,3 +7169,48 @@ where.
 12k sweep complete and reported in my last entry. The 8,000-episode checkpoint column is
 measuring (10 of 18). The federation ladder retrains at 12k are queued behind it, 12 runs.
 Nothing of mine changed since 23:xx that you should build on.
+
+## 2 Sep, 23:5x — CORRECTION to my own headline, and C2 is finally resolved
+
+### I told you 15 of 18 cells flip. It is 14.
+
+My 23:xx entry said "fifteen of eighteen cells flip winner". Recomputed in the generator rather
+than in a throwaway script: **2 of 18 cells have the learned arm ahead at 4,000 episodes, 16 of
+18 at 12,000, and 14 cells change winner.** The fifteenth is `k12s50n05b150`, which is an
+**exact tie** at 12,000 -- 0.957 against 0.957 -- and my first comparison used `(L4<M) != (L12<M)`,
+which counts a tie as a change. The headline count 2 -> 16 is unaffected.
+
+Small, and it is exactly the class of error we have both been catching all night: a count
+computed by a comparison whose edge case was never considered. `CLAIMS.md` C7 now carries a
+MUST NOT against the 15 figure so it cannot come back.
+
+### C2 is resolved after reading UNRESOLVED all day
+
+`CLAIMS.md` C2 has carried an UNRESOLVED banner since 10:5x. It now reads from the completed
+12,000-episode sweep, measured with `global_shd_paired.py` at both conventions:
+
+| $K$ | 2 | 3 | 4 | 5 | 8 | 10 |
+|---|---|---|---|---|---|---|
+| ratio, selected | 15.97 | 0.74 | 0.85 | 0.25 | 0.26 | 0.78 |
+| seeds ahead | 1/3 | 2/3 | 2/3 | 3/3 | 3/3 | 2/3 |
+
+Against 0.12, 0.33, 0.10, 1.65, 4.24, 6.75 at 4,000 episodes. **There is no agent-count
+reversal.** It was the third of three structural claims to resolve as training budget.
+
+$K=2$ is the exception and it is not a two-agent result: `k12s50n02b150` seed 2 measures
+**0.07372** selected against **0.00000** final on the same 200 episodes. One seed, one bad
+checkpoint pick, the entire column.
+
+### One thing in your table I would not build on yet
+
+Your grid's `best_update = 499` finding makes best and final identical, so you are immune to the
+above. But it also means **the MI gate never fired anywhere in your grid**, and my $K=2$ case is
+what happens when it does fire on a long run. If you extend the rho grid to 12,000 episodes as
+Brian asked, the gate gets 50% more updates to pick from and may start selecting mid-run
+checkpoints. Store both conventions from the start on the 12k runs rather than discovering later
+that best and final have diverged.
+
+### Status
+
+The 8,000-episode checkpoint column is at 13 of 18 and the federation-ladder retrains at 12k are
+queued behind it. Nothing else of mine has changed.
