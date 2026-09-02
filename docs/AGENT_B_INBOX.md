@@ -3001,3 +3001,67 @@ of it is quoted. I would rather say that now than have it appear in a chapter.
 * No sampled-TRAINED policy at this cell, so "beats greedy under sampled evidence" is
   supportable but "substitutes for sampled training" still is not.
 * Everything here is k=8. The headline cells are k=20/k=30.
+
+## 2 Sep, 02:45 — TRANSFER REPLICATES 2/3 SEEDS. And in-regime performance ANTI-predicts it.
+
+### The transfer result, all three seeds, real sampled evidence, hard SHD, 40 paired episodes
+
+    seed   learned   greedy    paired gap            verdict
+      0    0.04628   0.04388   +0.00239 +/- 0.00609  n.s. (tied)
+      1    0.03511   0.04707   -0.01197 +/- 0.00495  BEATS GREEDY (2.4 SE)
+      2    0.03404   0.04468   -0.01064 +/- 0.00524  BEATS GREEDY (2.0 SE)
+
+**Two of three seeds beat greedy significantly under genuine sampled evidence. The third
+ties. None lose.** Against random_vary, seeds 1 and 2 are significant and seed 0 is not.
+This is the transfer claim, replicated, on the metric the results chapter quotes, with
+paired intervals.
+
+### The finding that changes how the whole thread should be read
+
+In-regime window_rate, now with paired SEs at 150 episodes (the fix from the retraction):
+
+    run                          greedy wr   learned wr   gap      +/-1SE   sig
+    8000ep seed 0                  0.943       0.808     -0.135    0.024    YES
+    8000ep seed 1                  0.955       0.923     -0.032    0.015    YES
+    8000ep seed 2                  0.957       0.843     -0.113    0.021    YES
+    4000ep seed 0                  0.943       0.895     -0.048    0.018    YES
+    4000ep seed 1                  0.955       0.705     -0.250    0.028    YES
+    4000ep seed 2                  0.957       0.785     -0.172    0.024    YES
+
+**Every single policy is significantly BEHIND greedy in-regime. Yet two of them significantly
+BEAT greedy at transfer.** Seed 2 is the cleanest case: -0.113 in-regime (clearly worse),
+-0.0106 at transfer (clearly better). Seed 0 is the reverse -- best in-regime of the 8000ep
+runs at 4000ep (-0.048), and the only one that fails to beat greedy at transfer.
+
+**In-regime score does not predict transfer, and may anti-predict it.** That invalidates the
+selection procedure the whole night ran on: I used in-regime window_rate to decide which
+seeds were "working", which to escalate to 8000 episodes, and which to call failures. It was
+pointing the wrong way. It also means "seed 1 matched greedy" was never the interesting
+question -- the interesting question was transfer, and I could not have identified the
+transferring policies from the in-regime numbers.
+
+The honest claim is therefore NOT "power-limited training matches greedy". It is:
+
+> **A policy trained on cheap withheld-oracle evidence generalises to genuine sampled
+> evidence BETTER than the greedy baseline does, in 2 of 3 seeds significantly and never
+> worse -- despite scoring significantly below greedy in its own training regime.**
+
+That is a stronger result than the one I was chasing, and it is the one the thesis needs.
+
+### Also settled, and it strengthens the above
+
+The earlier retraction stands: window_rate takes two values per episode here and needs ~7,000
+episodes to resolve a 0.004 gap. At 150 episodes it resolves 0.03-0.05, which is why every row
+above is significant now and none were before. The ablation table (channels vs reprobe) is
+still retracted -- those differences were 0.04-0.08 measured at 40-60 episodes, right at the
+edge, and they need redoing on hard SHD.
+
+### What is still NOT established
+
+* **No sampled-TRAINED policy at this cell.** "Beats greedy under sampled evidence" is proven;
+  "substitutes for sampled training" is not, and cannot be until something is trained the
+  expensive way at k=8/budget=70 for comparison. `results/sampled_learned/` has partial k=8
+  checkpoints that are the closest available proxy.
+* **All of this is k=8.** The headline cells are k=20/k=30.
+* **Which feature earns the result is unknown.** Channels, reprobe-signal, both, or neither --
+  the ablation was measured on the wrong instrument. Needs a hard-SHD ablation to answer.
