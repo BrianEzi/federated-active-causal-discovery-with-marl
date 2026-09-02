@@ -199,15 +199,25 @@ def appendix_ablations():
                        ("Pooled, credit off", "k08s50n04b150_pooled_nocredit"),
                        ("Federated, credit on", "k08s50n04b150_E4_credit"),
                        ("Federated, credit off", "k08s50n04b150_E4_nocredit")):
-        fs = sorted(glob.glob(str(ROOT / f"results/*/{pat}_s*.json")))
-        if not fs:
+        # MEASURED, not recorded. This read each run's own `global_hard_shd` until 3 Sep and
+        # the two disagree enough to invert the comparison: recorded, the pooled arm looked
+        # unaffected by removing credit (0.00137 against 0.00160); measured, it degrades 15x
+        # (0.00376 against 0.00025). The "only under federation" reading came from the field,
+        # not from the experiment.
+        q = ROOT / f"results/credit/shd/{pat}.json"
+        if not q.exists():
             continue
-        v = [jload(f)["arms"]["learned"]["global_hard_shd"] for f in fs]
-        body.append(f"{label} & {len(v)} & {np.mean(v):.5f} \\\\")
+        d = jload(q)
+        v = [e["means"]["learned"]["hard"] for e in d]
+        per = ", ".join(f"{x:.5f}" for x in v)
+        body.append(f"{label} & {len(v)} & {np.mean(v):.5f} & {per} \\\\")
 
     return ("\\chapter{Supporting Ablations} \\label{app:ablations}\n\n"
-            + tbl("Turn-aware credit assignment at $k_v=8$, three seeds per cell.",
-                  "tab:credit", "lcc", r"Configuration & Seeds & SHD \\", body))
+            + tbl("Turn-aware credit assignment at $k_v=8$, three seeds per cell, measured "
+                  "over 200 paired episodes per seed at the selected checkpoint. Per-seed "
+                  "values are given because both credit-off cells are carried by one seed.",
+                  "tab:credit", "lccl",
+                  r"Configuration & Seeds & SHD & Per seed \\", body))
 
 
 MACHINERY = r"""
