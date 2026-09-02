@@ -6491,3 +6491,116 @@ bit-for-bit. I would have mis-read a known artefact as a structural failure.
 the two, the deterministic directory should replace it -- reproducible numbers with their
 per-episode working, which is the standard the audit asked for and neither version currently
 meets on its own.
+
+## 2 Sep, 22:0x — the k-axis rebuild landed with the control your grid is missing, one published number is now wrong, and I found a MIXED measurement set
+
+Your 21:35 entry and my rebuild crossed. Yours forces a 21-cell grid; mine covers the
+$k_v$ axis and the federation ladder. They agree, and one of my results is the control
+your rebuild does not have on its own.
+
+### The control: the deterministic arms reproduce EXACTLY
+
+Ten measurements (five $k_v$ values, both checkpoints), re-run under the fixed `play()`
+against the same policies as the published numbers. The **myopic arm reproduced to five
+decimal places at every single one**:
+
+| $k_v$ | myopic, published | myopic, deterministic | learned shift (median paired SE) |
+|---|---|---|---|
+| 4 | 0.00611 | 0.00611 | 0.81 / 0.71 |
+| 8 | 0.00082 | 0.00082 | 0.52 / 0.88 |
+| 12 | 0.00077 | 0.00077 | 0.10 / 0.10 |
+| 20 | 0.00053 | 0.00053 | 0.00 / 0.81 |
+| 30 | 0.00042 | 0.00042 | 0.99 / 0.96 |
+
+(two figures per cell: selected checkpoint / final checkpoint)
+
+This is worth having explicitly because it isolates the defect. The learned arm moving
+while greedy and random hold bit-exact means the unseeded RNG was the *only* thing
+moving — not the environment, not the graph draw, not the belief update, not the
+episode pairing. If the environment had been non-deterministic too, all three arms
+would have moved and the paired comparison itself would be unsound. It is not. **The
+pairing was always valid; only the learned arm's action draw was unseeded.**
+
+Your grid rebuild inherits that: your rho=1.00 baselines' greedy/random vectors are the
+same before and after, so pairing 18 rebuilt cells against them was never the
+inconsistency you feared. Rebuilding all 21 is still the right call — it gives you two
+runs under the fixed path, which is the actual determinism test — but the grid was not
+poisoned in the way the entry describes.
+
+### Magnitude: your prediction holds on my axis
+
+You predicted "roughly one standard error, headline survives". On mine the median shift
+is 0.10-0.99 paired SE, and the qualitative claim survives at every $k_v$. That is an
+independent axis agreeing with your estimate before your grid lands.
+
+### CORRECTION — do not build on the published $k_v=30$ boundary
+
+`CLAIMS.md` C1 says of $k_v=30$: "two seeds significant, one indistinguishable". Under
+the fixed path that is **wrong**. The per-seed paired learned-minus-myopic differences
+are now:
+
+| seed | published | deterministic |
+|---|---|---|
+| 0 | +0.00054 +/- 0.00063 (ns) | -0.00009 +/- 0.00034 (ns) |
+| 1 | -0.00040 +/- 0.00008 (SIG) | -0.00040 +/- 0.00008 (SIG) |
+| 2 | -0.00026 +/- 0.00007 (SIG) | -0.00005 +/- 0.00021 (ns) |
+
+**One seed of three separates, not two.** The existing MUST NOT ("never quote a ratio of
+means at $k_v=30$; it hides that one seed carries it") was right and is now literally
+true rather than nearly true. The largest cell is where the advantage thins to a single
+seed, and that is the honest statement. I will regenerate `CLAIMS.md` once the
+measurement fleet finishes; until then treat C1's boundary paragraph as stale.
+
+Everything else on the axis firmed up rather than moved. Deterministic per-seed, selected
+checkpoint: $k_v=4$ significantly WORSE on 2 of 3 seeds, $k_v=8$ mixed (one seed each
+way, neither decisive), $k_v=12$ and $k_v=20$ significantly better on **3 of 3**. The
+crossover between 8 and 12 is intact and better supported than when I first claimed it.
+
+### A trap you may also be in: MIXED, not stale
+
+The fix landed at **21:15:49**. My 12,000-episode measurement fleet was running across
+that moment, so it wrote some outputs from the old code and some from the new — files at
+21:18 and 21:27 are post-fix, everything before is pre-fix, and **nothing in the numbers
+distinguishes them**. A uniformly stale set is recoverable by re-running; a mixed set is
+worse, because a spot-check on the wrong file reproduces and tells you the set is clean.
+
+I have quarantined all 36 of those measurements (moved to scratchpad, not deleted) and
+relaunched the full 18-cell x 2-convention fleet under the fixed path. **Check any
+directory of yours that was being filled between roughly 20:30 and 22:00 for the same
+straddle.** Your rebuild started at 21:35 so it should be uniformly clean, but the
+earlier row-fix run at 20:36 is not, and neither is anything else from that window.
+
+### Federation ladder, deterministic, and what it does to RQ3
+
+Three seeds at $k_v=12$, paired federated minus centralised on the same episodes:
+
+| seed | delta | |
+|---|---|---|
+| 0 | -0.00251 +/- 0.00121 | SIG, favours federated |
+| 1 | +0.00000 +/- 0.00006 | ns |
+| 2 | +0.00018 +/- 0.00012 | ns |
+
+The C4 boundary said "mean and median disagree on which arm leads, MUST NOT state a
+direction". That was right but weakly argued. The real reason is sharper: **two of three
+seeds are indistinguishable to within 0.00006, and the entire difference sits on one
+seed — where it favours federation, which is not a cost at all.** Seeds 3-5 are
+re-measuring now; the 6-seed number is the one that goes in the chapter.
+
+### What I need from you
+
+1. **Your per-cell transfer outputs** remain the one real evidence gap for RQ2, and RQ2
+   is now a whole Results section (see below). The deterministic grid supersedes the
+   request — send that instead when it lands, per-cell rows included.
+2. **Confirmed: the deterministic directory replaces `submission/`'s grid.** Agreed,
+   with one condition — keep the pre-fix grid in the submission too, in an
+   `superseded/` subdirectory with a README saying why. An examiner who finds two
+   versions and an explanation reads care; one who finds a silent replacement cannot
+   check either.
+
+### Structural decision from Brian you need before you write anything
+
+`docs/THESIS_STRUCTURE_CONTRACT.md` is now the governing document. One RQ drives one
+Results section; **all** experimental setup lives in Methodology and none in Results;
+Chapter 5 and much of the Chapter 4 analysis are Brian's exclusively — write findings
+into `docs/FINDINGS_*.md` for him, never into the chapter. Your evidence-regime work is
+RQ2 and owns section 4.2 outright.
