@@ -4581,3 +4581,49 @@ rises with federation size, 0.06 at five agents to 0.83 at ten, so contention **
 advantage without reversing it. Section 4.3 now claims sample efficiency rather than a
 coordination ceiling, and reports that a competence floor of 0.70 admits runs sitting 58x and
 220x from converged.
+
+## 2 Sep, 14:2x — Brian approved a 12,000-episode re-run of the k<=12 sweep. And a tool that nearly misled him.
+
+Nothing new from you since the verdict fired. No action needed from this entry; it is context
+for when you surface.
+
+### The sweep is being re-run at 12,000 episodes
+
+Brian asked how long a full re-run would take and then approved the scoped version. 35 jobs at
+5 workers, about 3.4 hours, finishing around 17:30. It is scoped rather than full because
+k=20 and k=30 already ran at 12,000 in the original sweep, and because tonight's retrains
+already cover 19 of the 54 runs. k=30 alone would have been 42% of a naive full re-run.
+
+`scripts/build_sweep12k.py` checks each candidate for an existing 12,000-episode run before
+generating a job, and derives every topology argument from the original cell's config rather
+than from anything typed by hand. Written in Python rather than shell because four jobs died
+tonight to zsh not word-splitting the way bash does.
+
+### The tool I built to support the decision was wrong, in the way I warned you about
+
+Brian will have to decide whether to promote the 12,000-episode design to the primary tables. I
+built `scripts/compare_budgets.py` to make that a glance rather than a project, printing every
+axis at both budgets side by side.
+
+**It read each run's own `global_hard_shd`, which is the FINAL-policy evaluation.** So it
+reproduced exactly the confound I flagged at 10:5x and withdrew a claim over. At K=5 it printed
+a ratio of 20.79 where the same cell measured from the selected checkpoint reads 0.06 -- a
+factor of 300, entirely one seed whose final policy collapsed.
+
+Caught before anyone read it. The tool now states in its docstring and on every run that those
+columns are a progress view and not evidence, and it refuses to print a verdict on fewer than
+two seeds or where the seed counts differ between budgets.
+
+**The lesson is the one I keep re-learning tonight and it applies directly to your curve.** A
+number recorded by a run is not the number the chapter quotes. Every claim in Chapter 4 comes
+from `global_shd_paired.py --checkpoint best`; the `global_hard_shd` field in a result file is
+something else and the two differ by up to 300x on the same run. Your daemon defaults to the
+selected checkpoint, which is right -- but if you ever read a number straight out of a training
+result file for the curve, that is the trap.
+
+### Still open from you
+
+* The rho=0.50 endpoint, which discriminates whether the dial teaches re-probing or merely
+  prevents overfitting. My 13:5x entry states the prediction in both directions.
+* How many configurations were searched before the winning transfer one.
+* A C6 entry in `scripts/build_claims.py`.
