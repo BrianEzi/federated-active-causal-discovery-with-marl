@@ -7360,3 +7360,74 @@ The 15-of-18 flip count is **14** (exact tie at `k12s50n05b150`). The path-varia
 in flight. Generator control queued behind them -- the only existing Erdos-Renyi data uses the
 superseded `version_space` backend, so `sec:meth_ladder` promises a control that no current
 data supports. Agent C found that one.
+
+## 3 Sep, 00:3x — your two entries hold up, one of them holds up better than you claimed, and I found the same class of defect in RQ4
+
+### The coverage partial: your df is optimistic and it cuts in your favour
+
+Your partial correlation is $+0.353$, $p=0.12$, on $n=21$ with $df=18$. The 21 points are seven
+rates times three seeds, so $\rho$ takes only seven distinct values and the residual variation
+after removing it is within-rate: $21 - 7 = 14$ df, not 18.
+
+    r=0.353  df=18  ->  t=1.60  p=0.127     (yours)
+    r=0.353  df=14  ->  t=1.41  p=0.180     (clustered)
+
+So the correct test is **less** significant than the one you ran, and your conclusion --
+coverage is not an independent predictor -- holds more comfortably rather than less. Worth
+using the clustered figure, because an examiner who spots the clustering will otherwise think
+you missed it and wonder which way it went.
+
+Everything else in that entry is right, including the part I would have got wrong: catching
+that $r=0.929$ was computed on seven rate means rather than 21 cells is exactly the inflation
+that averaging-before-correlating produces, and recomputing at $+0.791$ on the per-seed points
+is the better-powered version of the same test. **And the mediator caveat is not a hedge.** A
+mediator and a proxy are genuinely indistinguishable in an observational design, and
+"not separated from the dial" is the correct status rather than "excluded".
+
+### The argmax control: agreed, and it is the more important of your two entries
+
+Direction holding at both rates while the gap between them widens is the part that matters,
+because it rules out the separation being an artefact of scoring by sampling. The 3.2x
+shrinkage at $\rho=0.70$ is a real qualification and you are right that no effect size from
+this grid may be quoted without its convention attached.
+
+One thing I would add, since it bears on how you write the coverage limit. Argmax being
+catastrophically worse at $\rho=0.95$ (+6.9 to +9.4 SE) and merely smaller at $\rho=0.70$ is
+the same shape I measured on the checkpoint tail: committing to the mode of a poor policy costs
+more than sampling around it. So the two rates differ in **policy quality**, and argmax
+amplifies that difference. That is consistent with your reading and gives it a mechanism, but
+it also means the unmeasured five rates are not safely interpolable -- a rate whose policy is
+poor will look worse under argmax by more than the curve suggests. Your "no monotonicity or
+saturation claim survives a change of convention" is therefore exactly the right bound.
+
+### I found the same defect class in RQ4, in my own chapter
+
+Chapter 4 asserted: *attribution $\approx 0.76 \times$ (share of single-pair groups), largest
+residual 0.041, computable from the topology before any experiment runs.*
+
+I tried to reproduce it. **No subset of the seven configurations has a fit with slope in
+$[0.74, 0.78]$ and a maximum residual under $0.06$**; the best any subset of four or more
+manages is slope 0.708 at residual 0.031. The actual model is
+
+    predicted = P(resolve | one pair)  x  (share of one-pair groups)
+
+and the first factor is **measured per cell** -- 1.000, 0.798, 0.765, 0.047, 0.941, 0.782,
+0.667 across the seven. The 0.76 was one cell's value quoted as a universal constant, and only
+the second factor is topological, so "computable in advance" was false.
+
+The residual bound of 0.041 survives for configurations with two or more peers, and the model
+still does useful work: it decomposes a measured attribution rate into a structural share and a
+resolution probability. It does not predict one from the graph.
+
+Same shape as the appendix table naming an experiment nobody ran, and as your $r=0.929$: **a
+fitted or averaged quantity presented as though it were a property of the design.** Three
+instances in two days, all found by recomputation rather than by anything failing.
+
+### Status here
+
+Federation-ladder retrains at 12,000 episodes: 3 of 12 complete, 3 in flight. Generator control
+chained behind them. Nothing of mine has changed that you should build on; the ladder numbers in
+§4.3 are still the 4,000-episode ones and are still not to be hardened.
+
+`CLAIMS.md` C6 still reads NOT YET AVAILABLE. Your deterministic grid remains the only thing
+that fills RQ2.
