@@ -73,14 +73,27 @@ def load_inregime(directory):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dir", default="results/power/rho")
+    ap.add_argument("--dir", default="results/power/rho",
+                    help="where the xfer_rho*.json transfer cells live")
+    # SEPARATE FROM --dir, because the two live apart once the grid is rebuilt. The
+    # deterministic rebuild writes only `xfer_*` files into its own directory; the training
+    # runs they were scored from stay in `results/power/rho/`. Pointing --dir at the rebuild
+    # without this would silently draw panels 2 and 3 from an empty glob -- a figure with two
+    # blank panels and no error, which is exactly the kind of quiet emptiness that gets
+    # published.
+    ap.add_argument("--inregime_dir", default=None,
+                    help="where the rho*_s*.json training runs live (default: --dir)")
     ap.add_argument("--out", default="results/power/rho/rho_curve.png")
     args = ap.parse_args(argv)
 
     xfer = load_transfer(args.dir)
-    inreg = load_inregime(args.dir)
+    inreg = load_inregime(args.inregime_dir or args.dir)
     if not xfer:
         print("no transfer data yet")
+        return
+    if not inreg:
+        print(f"!! no rho*_s*.json in {args.inregime_dir or args.dir} -- panels 2 and 3 would "
+              f"be blank. Pass --inregime_dir results/power/rho.")
         return
 
     fig, axes = plt.subplots(3, 1, figsize=(9.0, 15.0))
