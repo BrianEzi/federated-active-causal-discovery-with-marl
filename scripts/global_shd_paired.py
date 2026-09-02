@@ -53,9 +53,17 @@ def play(env, policies, episodes: int, seed: int, path: int = 0) -> Dict[str, Li
 
     Measured before the fix, over 24 re-runs of stored results: the greedy and random arms
     reproduced exactly, and the learned arm moved by 0.10 to 2.22 of the reported paired
-    standard error, median about 0.4. So the published intervals were honest -- the variation
-    sits inside them -- but the numbers were not reproducible, which is a separate and
-    unacceptable property for a result that ships with its checkpoints.
+    standard error, median about 0.4.
+
+    THAT WAS READ BACKWARDS AT FIRST, and the misreading is corrected here rather than
+    deleted. It was recorded as evidence the published intervals were honest, the variation
+    sitting inside them. Those re-runs were different POLICY SAMPLE PATHS over the same
+    episodes, so the spread between them is exactly the variance the within-path paired SE
+    below does not contain. A re-run landing 2.22 SE away does not show the interval covers
+    the variation; it shows a missing component of the same order as the interval itself.
+    `ma/evaluate.py::run_arm_paths` records that the reseed on `load` was suppressed
+    DELIBERATELY for this reason, and supplies the multi-path protocol that answers it.
+    Use --path to measure the missing component; quote it beside any significance count.
 
     Seeding from the same `seed` that fixes the episode sequence makes an evaluation a pure
     function of (checkpoint, seed, episodes, convention). Results produced BEFORE this change
