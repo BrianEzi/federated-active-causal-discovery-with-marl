@@ -52,3 +52,34 @@ The measurement queued for the full six seeds therefore runs **both conventions*
 first pass did not. If the final-update column is uniformly better than the selected one here,
 the ladder is a checkpoint-selection story and not a federation story, and the subsection has
 to say which.
+
+---
+
+## The checkpoint-tail hypothesis above is refuted on these seeds
+
+Written twenty minutes after the section above, from the final-update measurement it asked for.
+
+| seed | A selected | A final | E selected | E final |
+|---|---|---|---|---|
+| 0 | 0.00075 | 0.00132 | 0.00000 | 0.00000 |
+| 1 | 0.00000 | 0.00171 | 0.00130 | 0.00130 |
+| 2 | 0.00121 | 0.00121 | 0.00000 | 0.00000 |
+| mean | **0.00065** | 0.00142 | 0.00043 | 0.00043 |
+
+Selection **helps** the federated arm here, by a factor of 2.2, and is inert for the pooled one.
+The opposite of what the section above predicted. So the numbers being worse at 12,000 than at
+4,000 on these seeds is not a checkpoint-selection artefact and needs another explanation, or
+none: three seeds inside their own noise do not require one.
+
+The gate's firing pattern says the same thing. It selected an earlier update on 2 of 4
+federated runs and 1 of 4 pooled runs, and where it fired the two conventions still measure
+identically on the pooled arm. Firing and mattering are separate events.
+
+**Both conventions still go in the table**, for the reason `FINDINGS_CHECKPOINT_TAIL` gave and
+not for the reason predicted here: they disagree unpredictably per cell, so reporting one is
+choosing a convention that fails somewhere without knowing where.
+
+One observation held at arm's length because four runs cannot carry it: `best_mi_ratio` is
+higher for every pooled run than for any federated run (0.74--0.85 against 0.67--0.74). Pooled
+optimisation reaching a higher training-health score is what one would expect and it is not
+evidence of anything at this sample size.
