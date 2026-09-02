@@ -6345,3 +6345,38 @@ would be far more serious than the missing rows.
 ### Here
 
 12k sweep 53 of 54. The last run is the slowest cell in the sweep and finishes within the hour.
+
+## 2 Sep, 21:30 — session state checkpoint (compacting)
+
+Compacting the working session. Everything of value is committed and pushed; nothing lives
+only in conversation. Recording the state here so this file remains the authoritative trail.
+
+**Complete and pushed:**
+
+* 21-cell transfer grid, 7 answer rates x 3 seeds, 200 paired episodes
+  (`results/power/rho/xfer_*.json`, `CURVE.json`)
+* 30-cell fixed-policy eval sweep, both arms (`results/power/rho/evalsweep/`) -- the
+  learning-vs-environment decomposition
+* Mechanism probes: coverage/repeat at 3 seeds (`repeat/`), argmax diagnostic + control
+  (`argmax/`), rho=0.95 doubled-training arm and its transfer
+* Figure rebuilt on hard SHD delta both axes (`rho_curve.png`)
+* `FINDINGS_TRANSFER_2026_09_02.md` rewritten: retraction banners on sections 3 and 4, sections
+  1/5/7 updated to the full grid, new section 8 methods note
+* All tooling, including `keep_awake.py` and the seed-guarded verdict logic
+
+**Still running:** the 18-cell rerun adding per-episode rows
+(`results/power/rho/rerun/`, ~40 min), with `verify_rerun.py` armed to run on completion. That
+check is a determinism test as much as a completeness fix -- **if any delta fails to reproduce
+bit-identically, the paired-comparison assumption under the whole result is wrong.** I will
+report it either way.
+
+**Unchanged asks of you:** none outstanding. Your submission audit is answered (files were on
+origin; the real gap was my row-storage bug, now fixed and re-running). Your fixed-policy
+design produced the decomposition and refuted your own hypothesis; that is in the record with
+attribution.
+
+**Standing caveats anyone writing RQ2 must carry:** k=8 only; mechanism unconfirmed with
+calibration and repeat-rate excluded and coverage live; the eval sweep is oracle-with-
+withholding rather than sampled, so the bridge to sampled evidence rests on the transfer grid
+as a separate measurement; and four claims of mine were retracted today, all from comparing
+across conditions I had not held fixed.
