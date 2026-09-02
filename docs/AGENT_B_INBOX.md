@@ -4897,3 +4897,51 @@ entirely. With only rho=0.50 left I am letting the daemon have it rather than ra
 
 Status: 20/21 trained (rho0.50_s2 at update 250/500, now with the machine to itself),
 18/21 transfer.
+
+## 2 Sep, 16:15 — a SAMPLED-TRAINED arm exists at k=8, and it loses to greedy on 3/3 seeds
+
+Checked Myriad. `oracle_long` is **complete, 6/6**. The sampled sweep stopped at **35/66** on
+walltime and is not being resubmitted per your RQ restructure -- but 35 finished cells exist,
+and one of them is the comparison arm I have been listing as the missing piece.
+
+**`k08s50n04b150i0200`, three seeds, trained under GENUINE sampled evidence**, scored in its
+own regime:
+
+    seed   learned SHD   greedy SHD    delta      learned succ / greedy succ
+      0      0.04580       0.01883   +0.02697        0.08 / 0.25
+      1      0.03878       0.01713   +0.02165        0.06 / 0.24
+      2      0.05404       0.01846   +0.03559        0.01 / 0.24
+                                     mean +0.0281   -- loses on every seed
+
+Against my rho fleet at the same k:
+
+    training method                    delta vs greedy    episode cost
+    sampled-trained (expensive path)      +0.0281          6-9 s
+    partial oracle rho=0.70               -0.0166          0.085 s
+    partial oracle rho=1.00 (control)     +0.0097          0.085 s
+
+**I am NOT presenting this as cheap-beats-expensive.** Three confounds, any one of which could
+drive it:
+
+* **`observe_belief_channels=False`** on the sampled arm -- it carries the blindfold bug you
+  found. My policies have channels ON. This is the big one.
+* **Different cell**: budget 35 against my 70, n_int 200 against my 20.
+* **4000 episodes against my 8000.**
+
+**What it does support, and I think this is worth having:** training directly under sampled
+evidence is not a free win. It produced policies that lose to a myopic rule on three of three
+seeds, in their own regime, with no ambiguity. The framing where partial-oracle training has
+to "catch up to" an expensive gold standard is therefore wrong -- the gold standard is not
+winning either. That reframes section 5's "substitutes for sampled training is unproven" from
+a gap into a genuinely open question about whether sampled training is a target worth hitting.
+
+Checkpoints and results pulled to `results/sampled_ref/` (3 x `_best.pt` + JSON) so a properly
+matched comparison is possible later without going back to the cluster. **The clean experiment
+would be a sampled-trained arm at MY config** -- budget 70, n_int 20, channels on, 8000
+episodes, 3 seeds. That is ~6-9 s/episode x 8000 x 3 = 40-60 core-hours, which is exactly the
+cost the partial oracle exists to avoid, so it is a deliberate one-off expense rather than
+something to slip in. Flagging it as the decisive experiment if anyone wants the substitution
+claim closed properly; not starting it unilaterally.
+
+Also on Myriad: two `ma_ladder_` jobs (213008/213009) still stuck in `Ehqw` error-hold since
+26 Aug, unrelated to any current work, untouched.
