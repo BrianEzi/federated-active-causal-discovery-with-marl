@@ -108,9 +108,8 @@ def main() -> int:
             rows.append(f"{x:g} & {b[0]:.5f} & {f[0]:.5f} & {g[0]:.5f} & {rec} & {fv} \\\\")
         parts.append("\n".join([
             r"\begin{table}[htbp]", r"\centering",
-            f"\\caption{{{title} axis at $12{{,}}000$ episodes. Structural distance of the "
-            r"pooled global graph on committed marks, 200 paired episodes per seed, at both "
-            r"checkpoint conventions.}",
+            f"\\caption{{{title} axis at $12{{,}}000$ episodes: SHD on committed marks and "
+            r"joint recovery, 200 paired episodes per seed, both checkpoint conventions.}",
             f"\\label{{tab:12k_{key}}}", r"\begin{tabular}{rcccccrr}", r"\toprule",
             f"{sym} & \\multicolumn{{3}}{{c}}{{SHD}} & \\multicolumn{{2}}{{c}}{{Joint recovery}} "
             r"& \multicolumn{2}{c}{Seeds ahead} \\",
@@ -137,10 +136,8 @@ def main() -> int:
                      f"{r12[0]:.3f} & {M:.3f} & {mark} \\\\")
     parts.append("\n".join([
         r"\begin{table}[htbp]", r"\centering",
-        r"\caption{Joint recovery rate for every cell of the sweep at both training budgets. "
-        r"The myopic column is one number per cell because that arm does not train, so the "
-        r"same policy is scored at both budgets. An arrow marks a cell where the winner "
-        r"changes.}",
+        r"\caption{Joint recovery per cell at both training budgets. The myopic arm does "
+        r"not train, so one number per cell; an arrow marks a change of winner.}",
         r"\label{tab:12k_headline}", r"\begin{tabular}{lcccc}", r"\toprule",
         r"Cell & Learned, $4{,}000$ & Learned, $12{,}000$ & Myopic & \\",
         r"\midrule", *hrows, r"\bottomrule", r"\end{tabular}", r"\end{table}", ""]))
