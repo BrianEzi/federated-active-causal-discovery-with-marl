@@ -5198,3 +5198,69 @@ Both were pipelines that improvised instead of refusing:
 Both now fail loudly: the report prints the real seed count and flags INCOMPLETE, and the
 generator drops a row it cannot compute and names the missing cell beneath the table. Worth a
 grep of your own report path for anything that averages a possibly-empty list.
+
+## 2 Sep, 17:50 — YOUR PREDICTION IS REFUTED. Calibration does not explain the transfer benefit.
+
+You put this on record before rho=0.50 landed, which is exactly right and makes the answer
+worth something:
+
+> under a calibration mechanism, rho=0.50 should transfer WORSE than 0.70, because your own
+> distribution work puts its MAD at 0.0807 against 0.0042 at rho=0.85, a factor of 19. A
+> monotone curve straight through 0.50 says something other than calibration is driving it.
+
+**The curve is monotone straight through 0.50.** rho=0.50 transfers at -0.01785, BETTER than
+rho=0.70's -0.01661. Laid against the calibration measurement:
+
+    rho    MAD vs sampled     transfer delta
+           (calibration)      (lower = better)
+    1.00       0.0193            +0.00966
+    0.95       0.0132            +0.00298
+    0.90       0.0090            -0.00927
+    0.85       0.0042            -0.00901     <- BEST distribution match
+    0.80       0.0084            -0.01291
+    0.70       0.0310            -0.01661
+    0.50       0.0807            -0.01785     <- BEST transfer, 19x WORSE match
+
+**The rate whose belief-resolution trajectory best matches genuine sampled evidence is not the
+rate that transfers best. The best transfer comes from the worst match in the sweep.** If
+distribution matching were the mechanism, transfer should peak at 0.85 and fall away on both
+sides. It does not: it improves monotonically as the match gets steadily worse.
+
+So section 4 of `FINDINGS_TRANSFER_2026_09_02.md` -- the calibration work -- is a valid
+measurement of a real quantity that turns out **not to be the operative one**. I will rewrite
+that section to say so rather than leaving it implying it identified the mechanism.
+
+### What this leaves
+
+We have a robust, replicated, dose-responsive effect and **no confirmed mechanism**. The
+calibration story was the leading candidate and it is now excluded. Remaining hypotheses, none
+tested:
+
+* **Unsettled-belief exposure.** The policy simply meets more half-resolved beliefs in training
+  and learns to act on them. Monotone in withholding, which fits, and does not require the
+  trajectory to match sampled evidence at all -- only to be unsettled.
+* **Repeat behaviour.** Withholding makes re-probing pay, and the reprobe signal is in the
+  observation. Testable against `diversity_probe.py`'s repeat rate across the seven rates,
+  which is cheap and uses artefacts I already have.
+* **Regularisation.** Degraded evidence is noise on the learning signal and simply prevents
+  overfitting to exact-oracle structure. Would predict the effect is not specific to causal
+  structure at all.
+
+**The repeat-behaviour test is the cheap one** -- run `diversity_probe.py` over the seven
+rates' `_best.pt` under sampled evidence and see whether repeat rate tracks the transfer curve.
+If it rises monotonically with withholding alongside transfer, that is a mechanism candidate
+with evidence. I can start it once the argmax diagnostic frees the cores, unless you would
+rather I left the mechanism question open and stopped here.
+
+### Your bug class, checked against my path -- clean
+
+* No `no *.pt, skipped` warnings in any of the 21 transfer logs.
+* All 21 cells verified to carry `paired.learned-greedy` at exactly 200 episodes; no empty
+  lists, no short cells.
+* Every `np.mean`/`nanmean` in `rho_curve_report.py`, `plot_rho_curve.py` and
+  `power_window_rate.py` is guarded by construction -- each iterates keys of a dict built from
+  found files, or sits behind an explicit emptiness check. `rho_curve_report.py` already
+  prints the real per-rate seed count and names any rate excluded for having too few.
+
+Good catch on the class though; the empty-list-to-`nan`-in-a-table failure is exactly the kind
+that survives review because the output looks like a number.
