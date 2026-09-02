@@ -5829,3 +5829,60 @@ the sweep at roughly an hour per seed and all three are running. That cell also 
 disproportionately: sigma=0.75 currently rests on ONE measured cell, and the contention
 gradient is the only axis effect that survived the re-run. Two more points either firm it up or
 break it.
+
+## 2 Sep, 20:05 — RETRACTION 4: the "inversion" was a metric mismatch. The corrected claim is sharper.
+
+Brian asked whether we ever computed in-regime SHD. We had, and I had not been using it -- I
+was comparing in-regime **success** (the all-agents conjunction) against transfer **hard SHD
+delta**. Two different metrics on the two sides of the comparison that carried my headline.
+
+Measured consistently, learned-minus-greedy hard SHD on both sides:
+
+    rho    in-regime delta   transfer delta   change on moving to sampled
+    1.00       -0.00014         +0.00966          +0.00980   WORSE
+    0.95       +0.00337         +0.00298          -0.00039   unchanged
+    0.90       +0.00011         -0.00927          -0.00938   better
+    0.85       +0.00053         -0.00901          -0.00954   better
+    0.80       -0.00071         -0.01291          -0.01220   better
+    0.70       -0.00397         -0.01661          -0.01264   better
+    0.50       -0.00606         -0.01785          -0.01179   better
+
+    in-regime delta vs transfer delta:  Pearson +0.703   Spearman +0.786
+
+**In-regime POSITIVELY predicts transfer.** There is no inversion. My claim that "in-regime
+anti-predicts transfer" -- which I stated repeatedly today and built panel 3 of the figure
+around -- is **retracted**.
+
+**Why I got it wrong.** rho=1.00 scores 0.980 on `success` and looks dominant in-regime. On
+hard SHD delta it is merely **tied with greedy (-0.00014)**. Its apparent in-regime supremacy
+was a property of the conjunction metric -- the one this project demoted in August precisely
+because it saturates -- and not of the policy. I compared a saturating metric on one side
+against a continuous one on the other and read the difference as a finding about policies.
+
+### The corrected claim, which I think is better
+
+**The full oracle is the only arm that gets WORSE when moved to sampled evidence. Every
+partial-oracle arm gets better relative to greedy, and rho=0.95 sits exactly at the pivot.**
+
+That is a sharper statement than "inversion", it is measured on one metric throughout, and it
+explains the transfer curve's steepness: in-regime deltas span 0.0094 while transfer deltas
+span 0.0275, so **moving to sampled evidence amplifies the rho effect about 2.9x.**
+
+### What this costs
+
+Panels 2 and 3 of `rho_curve.png` are built on `success` and overstate their case; panel 3's
+annotation is now actively wrong. **Rebuilding both on hard SHD delta.** Anyone who has the
+current figure should not use it.
+
+### What survives untouched
+
+The transfer result itself: 15/15 seeds beat greedy at rho <= 0.90, 0/6 at rho >= 0.95, spread
+12.5x seed SE, monotone dose-response, rho=1.00 control loses. None of that touched `success`.
+
+### Pattern across today's four retractions
+
+Interior optimum (retracted when rho=0.50 landed), the rho=0.95 anomaly, the weak-policy
+explanation, and now the inversion. **All four came from comparing across conditions I had not
+held fixed** -- different numbers of seeds, different points on a noisy curve, two measures of
+the same underlying quantity, and now two different metrics. The failure mode is consistent
+enough that it belongs in the write-up as a methods note, not just as corrections.
