@@ -123,7 +123,7 @@ Regenerate with: `scripts/attr_ceiling.py, scripts/attr_model.py`
 
 ## `federation/` — 4.4 (RQ3), figure federation
 
-RQ3. v2_k12_* and v2_k20_*: arm A is the federated baseline, arm E removes the information partition (partners' beliefs and counts observed) and the optimiser partition (trajectories pooled instead of FedAvg). Action rights stay partitioned in both. shd_k20_*: the same arms on the primary metric, where the recovery rate has saturated and cannot separate them.
+RQ3, plus the sweep's training-budget limitation. v2_k12_* and v2_k20_*: arm A is the federated baseline, arm E removes the information partition (partners' beliefs and counts observed) and the optimiser partition (trajectories pooled instead of FedAvg). Action rights stay partitioned in both. shd_k20_*: the same arms on the primary metric, where the recovery rate has saturated and cannot separate them. longcheck/*_long_s2: all seven competence-floor exclusions retrained at 12,000 episodes; all seven pass and all seven beat the myopic rule. lrcheck/*: the same runs at lr 1e-4, which makes them worse and rules out an unstable step size.
 
 Regenerate with: `results/central/jobs/*.sh and jobs2/*.sh, then global_shd_paired.py`
 
@@ -151,8 +151,21 @@ Regenerate with: `results/central/jobs/*.sh and jobs2/*.sh, then global_shd_pair
 | `v2_k20_E_s1.json` | `49c26918edd99849` | `results/central/v2_k20_E_s1.json` |
 | `v2_k20_E_s2.json` | `fa486406b54162fd` | `results/central/v2_k20_E_s2.json` |
 | `shd_A.json` | `e6767fc74a96188b` | `results/central/shd_A.json` |
+| `shd_A_s345.json` | `1d98d875518f93ae` | `results/central/shd_A_s345.json` |
 | `shd_E.json` | `dae11cbc36ff37b3` | `results/central/shd_E.json` |
+| `shd_E_s345.json` | `122a8895e6ee520c` | `results/central/shd_E_s345.json` |
 | `shd_k20_A.json` | `a953eb67e2405f70` | `results/central/shd_k20_A.json` |
 | `shd_k20_E.json` | `b904860f7e0eb79e` | `results/central/shd_k20_E.json` |
+| `k12s25n02b150_long_s2.json` | `1cf9d31735174b67` | `results/longcheck/k12s25n02b150_long_s2.json` |
+| `k12s25n04b150_long_s2.json` | `abc7c6b42e20421f` | `results/longcheck/k12s25n04b150_long_s2.json` |
+| `k12s25n08b150_long_s2.json` | `3f80ee2d9aa2218d` | `results/longcheck/k12s25n08b150_long_s2.json` |
+| `k12s50n02b150_long_s2.json` | `5047e1d62ad567d2` | `results/longcheck/k12s50n02b150_long_s2.json` |
+| `k12s50n03b150_long_s2.json` | `b28124e5fbdacaf6` | `results/longcheck/k12s50n03b150_long_s2.json` |
+| `k12s50n04b100_long_s2.json` | `f0136cc95df44ef5` | `results/longcheck/k12s50n04b100_long_s2.json` |
+| `k12s50n04b120_long_s2.json` | `d609f059d8e68849` | `results/longcheck/k12s50n04b120_long_s2.json` |
+| `k12s25n08b150_lr1e4_s2.json` | `8c4173de43df08e4` | `results/lrcheck/k12s25n08b150_lr1e4_s2.json` |
+| `k12s25n08b150_lr1e4_s3.json` | `c8b028825f007ab2` | `results/lrcheck/k12s25n08b150_lr1e4_s3.json` |
+| `k12s50n02b150_lr1e4_s2.json` | `2686569d21866b15` | `results/lrcheck/k12s50n02b150_lr1e4_s2.json` |
+| `k12s50n04b100_lr1e4_s2.json` | `92c6e90b2d308950` | `results/lrcheck/k12s50n04b100_lr1e4_s2.json` |
 
-25 files.
+38 files.

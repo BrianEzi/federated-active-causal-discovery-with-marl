@@ -370,3 +370,34 @@ Checked against `thesis_results/attribution/` tonight, not against the ledger:
 * **The agent-count reversal beginning at five agents.** At $K=5$ it is one seed: the
   learned-to-myopic ratio is 1.65 with all seeds and 0.25 without seed 2. \S\ref{sec:res_scale}
   now states the reversal as beginning at eight, and reports both figures.
+
+---
+
+# APPENDED 2 Sep, 09:3x — `thesis_results/CLAIMS.md` is now the source for Chapter 4 numbers
+
+Built by `scripts/build_claims.py`, regenerated from `thesis_results/` rather than maintained
+by hand. Five claims so far (C1 crossover, C2 agent count, C3 pair class, C4 federation cost,
+C5 undertraining), each with the number, the sample it rests on, and a boundary.
+
+**Read the MUST NOT lines before writing any sentence in that section.** They are
+hand-maintained, because a retraction is a judgement rather than a computation, and each one
+marks a claim that was made in good faith and then refuted:
+
+* **C1** -- do not quote a ratio of means at $k_v=30$; two seeds are significant and one is
+  indistinguishable, and the ratio hides that.
+* **C2** -- do not claim the myopic rule improves across the agent-count axis. Per-pair SHD
+  divides by `global_pairs`, which runs 117 to 525; in raw counts that arm is close to flat.
+  Also: at $K=5$ the reversal is one seed (1.65 with all seeds, 0.25 without), and two of the
+  high-$K$ runs may be unconverged, which is under test now.
+* **C3** -- do not write the reward-alignment asymmetry. Retracted.
+* **C4** -- do not state a direction for the federation cost; mean and median disagree.
+* **C5** -- do not substitute the 12,000-episode retrains into any sweep table.
+
+**Prefer CLAIMS.md over `docs/RESULTS_LEDGER_2026_09_01.md`.** The ledger is a working document
+and has now been wrong twice in ways that reached a draft: section 2.2 quoted a
+share-of-ceiling as though it were a raw rate, and section 1.3 reported an asymmetry that a
+larger re-measurement retracted. Both are corrected in place with banners, but the ledger is
+maintained by hand and CLAIMS.md is derived, so where they disagree CLAIMS.md is right.
+
+`scripts/collect_thesis_results.py --check` reports drift between `thesis_results/` and the
+live `results/` tree. It reads 0 drifted, 0 missing as of this entry.

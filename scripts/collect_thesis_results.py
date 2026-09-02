@@ -61,14 +61,20 @@ REGISTRY = [
      "scripts/attr_ceiling.py, scripts/attr_model.py"),
 
     ("federation",
-     "RQ3. v2_k12_* and v2_k20_*: arm A is the federated baseline, arm E removes the "
+     "RQ3, plus the sweep's training-budget limitation. v2_k12_* and v2_k20_*: arm A is "
+     "the federated baseline, arm E removes the "
      "information partition (partners' beliefs and counts observed) and the optimiser "
      "partition (trajectories pooled instead of FedAvg). Action rights stay partitioned in "
      "both. shd_k20_*: the same arms on the primary metric, where the recovery rate has "
-     "saturated and cannot separate them.",
+     "saturated and cannot separate them. longcheck/*_long_s2: all seven competence-floor "
+     "exclusions retrained at 12,000 episodes; all seven pass and all seven beat the myopic "
+     "rule. lrcheck/*: the same runs at lr 1e-4, which makes them worse and rules out an "
+     "unstable step size.",
      "4.4 (RQ3), figure federation",
      ["results/central/v2_k12_?_s?.json", "results/central/v2_k20_?_s?.json",
-      "results/central/shd_*.json"],
+      "results/central/shd_*.json",
+      "results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
+      "results/lrcheck/*.json"],
      "results/central/jobs/*.sh and jobs2/*.sh, then global_shd_paired.py"),
 ]
 
