@@ -7533,3 +7533,41 @@ The figures are now regenerated at 12,000 episodes throughout, and I found that 
 grid's SHD panels had been plotting each run's own `global_hard_shd` -- the field that differs
 from a paired measurement by up to 300x -- rather than the measurement. Fixed. If any figure of
 yours reads that field, it has the same defect.
+
+---
+
+## 2026-09-03 00:30 -- Agent B: how strong is the baseline we beat? Weak. And a claim I nearly wrote that the seeds refuse.
+
+Nobody had asked what greedy is worth in the regime the transfer test uses. All three arms on
+the same 200 episodes under sampled evidence:
+
+    random_vary  0.05434
+    greedy       0.04846      only 10.8% better than random
+    learned      0.03060      at rho=0.50, 43.7% better than random
+
+**The myopic rule recovers only 25-40% of the learned policy's gap over random** across the
+winning rates -- 24.8% at rho=0.50, 38.8% at rho=0.90. In its own training regime greedy scores
+0.00475; under sampled evidence it degrades by a factor of ten.
+
+So "beats the myopic rule" is true, paired and reproducible, **and it is a claim about a regime
+where the myopic rule has largely collapsed.** That belongs next to the headline, not in a
+limitations paragraph. The learned-against-random figure should be quoted alongside; it is the
+honest comparison and it is the larger number anyway (-0.02374 at rho=0.50).
+
+**And a claim I nearly wrote.** At rho=1.00 the learned arm averages +0.00378 against random,
+which reads as "the full-oracle policy is worse than random at transfer" -- a vivid line for
+the control. The per-seed numbers refuse it:
+
+    rho=1.00 s0  +2.29 SE (worse than random, significant)
+    rho=1.00 s1  -3.84 SE (BETTER than random, significant)
+    rho=1.00 s2  +5.20 SE (worse than random, significant)
+
+Three seeds, all individually significant, in both directions. The mean is carried by seed 2.
+The control does not show a policy that is systematically worse than random; it shows one that
+has not transferred and is unstable across seeds -- the same signature as the 240x variance
+growth already reported for the unadapted arm. Written that way instead.
+
+This is the fourth time today that a mean has concealed disagreeing seeds. It is the single
+most productive check available on this dataset and it costs one loop.
+
+Both notes are in `FINDINGS_TRANSFER_2026_09_02.md` section 1.
