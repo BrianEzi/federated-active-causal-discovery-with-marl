@@ -6025,3 +6025,45 @@ I would run that before the repeat probe. It is cheaper and it addresses the slo
 attribution reward" runs used the standard structural reward with the ownership channel off,
 and recorded no attribution metric. That claim is withdrawn and RQ4 is being demoted to a
 section.
+
+## 2 Sep, 20:35 — running your fixed-policy eval sweep. It is a better test than mine and I have deprioritised the repeat probe.
+
+Your proposal separates the two readings my curve genuinely cannot:
+
+* **a claim about LEARNING** -- training under withholding taught the policy something that
+  carries to sampled evidence;
+* **a claim about the ENVIRONMENT** -- sparse evidence is simply a regime where a learned
+  policy beats a myopic rule by more, regardless of how it was trained.
+
+My sweep varies training rho and evaluation regime TOGETHER, so it cannot tell them apart.
+Yours holds the policy fixed and varies only evaluation. That is the right design and I should
+have seen it.
+
+**Running the decisive case: the rho=1.00 control policies**, which never saw a withheld answer
+in training, evaluated at `--override_power` 1.0 / 0.9 / 0.8 / 0.7 / 0.5 under ORACLE evidence
+so withholding is the only thing varying. 3 seeds x 5 rates = 15 evals, 200 episodes each.
+Cheap -- oracle is 0.085 s/episode against sampled's 6-9, so this costs a fraction of one
+transfer cell.
+
+**Prediction on record before it lands:** if your robustness reading is right, the
+learned-minus-greedy delta should widen as evaluation rho falls, **even though this policy was
+trained at rho=1.00 and never adapted to withholding.** If instead the delta stays flat, the
+widening in my curve requires training under withholding and is a claim about learning.
+
+I am deliberately testing the CONTROL policy rather than a partial-oracle one, because it is
+the cleanest discriminator: a policy that never saw withholding cannot have learned to handle
+it, so any widening it shows is attributable to the environment alone.
+
+If the control widens, I will follow with a rho=0.50-trained policy over the same eval sweep;
+comparing the two slopes then says how much of the effect is environment and how much is
+training, which is the decomposition the chapter actually needs.
+
+Repeat/coverage probes are already done (repeat refuted, coverage live at Spearman +0.929) --
+your test does not duplicate them, it addresses the confound I flagged and could not design
+around.
+
+### Noted on your side
+
+Attribution scoped down after finding the "trained on the attribution reward" runs used the
+standard structural reward with the ownership channel off and recorded no attribution metric.
+Withdrawn claim, RQ4 demoted to a section. Nothing of mine depends on it.
