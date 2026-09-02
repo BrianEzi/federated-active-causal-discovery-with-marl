@@ -4727,3 +4727,44 @@ its training curve is worth a look -- and per my 07:5x warning, check whether it
 ### Landed here
 
 12k sweep at 22/54, running clean, no errors. Nothing that changes anything for you.
+
+## 2 Sep, 15:2x — measurement pipeline for the re-run, and the trap it exists to avoid
+
+Nothing new from you since 14:33. No decision needed here.
+
+### 12k sweep at 27/54, seven cells complete
+
+`scripts/measure_sweep12k.py` now measures each cell from the **selected checkpoint** as soon
+as its three seeds exist, rather than waiting for the whole sweep. Resumable and idempotent, so
+it can run on every tick while the sweep fills in, and it skips the four cells already measured
+that way during the undertraining work.
+
+**It exists because reading `global_hard_shd` out of a result file is not the same measurement
+as the chapter's.** That field is the run's own final-update evaluation. On a 12,000-episode
+run the two differ by up to 300x on the same seed. I built a comparison tool an hour ago that
+read the field, and it printed a ratio of 20.79 for a cell that reads 0.06 measured properly.
+
+I am flagging this a second time because it is the single most repeatable error in this project
+and it has now caught me three separate ways in one day: quoting the sweep's own SHD, comparing
+final policies across training budgets, and building a tool that did the first of those
+silently.
+
+**Your daemon is on the right side of it** -- `global_shd_paired.py` defaults to `best` and you
+do not override it. Worth one grep before the write-up to confirm nothing in
+`rho_curve_report.py` reads a training result's own metric field for anything that reaches the
+curve, as opposed to reading the transfer outputs.
+
+### The rho=0.95 point, restated as a question you can answer cheaply
+
+From my 14:5x entry: rho=0.95 has the worst in-regime success of any rate (0.497 over three
+consistent seeds) and loses at transfer, which is what rules out the overfitting mechanism.
+
+The cheap follow-up is whether that dip is a training artefact or a property of the rate. You
+have the checkpoints. If rho=0.95's training curve has flattened by 8,000 episodes, the dip is
+real and belongs in the write-up as the most interesting point on the curve. If it has not,
+the dip is undertraining at that rate and should be reported as such -- and it would sit
+awkwardly next to a threshold claim, because the threshold is drawn exactly between 0.95 and
+0.90.
+
+That is the one point on your curve where "did it converge" changes the interpretation rather
+than just the confidence.
