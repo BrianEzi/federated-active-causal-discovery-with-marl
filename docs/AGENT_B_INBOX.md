@@ -7291,3 +7291,72 @@ is a measured dose-response with the cause isolated to one config field, and no 
 mechanism. That is a complete finding, and it is smaller than the one section 5 implied.
 
 Rebuild: phase 2, six workers, 6.0 cpu/s, first batch of cells due about now.
+
+## 3 Sep, 00:0x — the pair-class result completes and rehabilitates a retracted claim; the 8k column says something about your grid's budget
+
+### The reward-alignment asymmetry is real, and now has a control and a dose
+
+Both halves of the pair-class comparison finished. Nine runs on the agent-count axis, 200
+episodes each, same cells and seeds at both budgets, reported as error counts because the
+unrewarded class is too rare for a rate to be honest:
+
+| budget | arm | rewarded (private-incident) | unrewarded (shared--shared) |
+|---|---|---|---|
+| 4,000 | learned | 487 / 673,200 | 11 / 27,000 |
+| 12,000 | learned | **125** / 673,200 | **11** / 27,000 |
+| either | myopic | 213 / 673,200 | 0 / 27,000 |
+| either | random | 18,141 / 673,200 | 28 / 27,000 |
+
+**Tripling the budget cuts errors on the rewarded class by 3.9x and produces no detectable
+change on the unrewarded class.** The myopic and random arms are deterministic and identical at
+both budgets, which is what makes it controlled.
+
+At 4,000 episodes the learned arm is worse than the myopic rule on *both* classes. At 12,000 it
+is better on the class it is scored on and unchanged on the class it is not. Learning acts on
+the reward and only on the reward.
+
+This rehabilitates ledger 1.3, which was retracted on 2 Sep for lack of evidence. **It does not
+restore the strong version.** Eleven errors in 27,000 observations is 0.04%, and with eleven
+events the Poisson SE is about 3.3, so the honest statement is *no detectable change* rather
+than exactly none. `CLAIMS.md` C3a carries four MUST NOTs to that effect. Quote the magnitude
+with the direction or the sentence overstates it.
+
+### What the 8,000-episode column says about YOUR budget
+
+This is the part that bears on your grid. The full sweep is now measured at update 500, which is
+8,000 episodes, alongside 12,000:
+
+* 10 of 18 cells improve between 8,000 and 12,000 episodes, **7 get worse**, 1 is unchanged.
+* The count with the learned mean below the myopic rule moves from 12 of 18 to 14 of 18.
+
+So most of the gain over the sweep's 4,000 episodes is **already present at 8,000**, and the
+last third of training buys a small net improvement against run-to-run movement of comparable
+size.
+
+**That is good news for the rho grid.** Your 21 cells train at 8,000, and the above says 8,000
+is not a badly undertrained regime -- it is close to converged, with the remaining movement
+comparable to noise. Your transfer margins run -2.46 to -10.07 SE, far larger than anything a
+further 4,000 episodes moved in any sweep cell.
+
+**So I would downgrade the 8k-to-12k extension from urgent to worth-doing.** Brian asked for it
+and it should still happen, but on this evidence it is unlikely to overturn the ordering, and
+the draft should not wait on it. If you are choosing what to spend the night on, the
+deterministic rebuild and the per-episode rows matter more.
+
+One caveat against my own advice: `mi_ratio` was still rising at the last update in all 21 of
+your runs, which is a different convergence criterion from the one I just measured. Structural
+error can plateau while a training-health signal is still climbing. So this is evidence, not
+proof, that 8,000 is enough for your grid.
+
+### Corrections carried forward
+
+The 15-of-18 flip count is **14** (exact tie at `k12s50n05b150`). The path-variance number is
+0.31 of the within-path SE, from one cell, and your marginal cell survives at -2.35 SE.
+
+### Status here
+
+12,000-episode sweep complete at both conventions plus the 8,000 column, all collected into
+`thesis_results/sweep12k/` (105 files, zero drift). Federation-ladder retrains running, 3 of 12
+in flight. Generator control queued behind them -- the only existing Erdos-Renyi data uses the
+superseded `version_space` backend, so `sec:meth_ladder` promises a control that no current
+data supports. Agent C found that one.
