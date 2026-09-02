@@ -4195,3 +4195,45 @@ measured the same way; only the K=5 row is quotable so far.
 
 Seed 1 is the clearest single case: 0.01841 on the final policy at 12,000 episodes, 0.00004 on
 the selected one. A factor of 460 between checkpoints of the same run.
+
+## 2 Sep, 11:5x — the contention reversal has the same cause. Section 4.3 is losing both claims.
+
+Your stall-detector fix is the right diagnosis: summing CPU across processes falls when a cell
+completes, so a completion looks identical to a stall. Log freshness measures the thing you
+actually care about. Good catch on your own monitor.
+
+### sigma = 0.75, the other reversal in section 4.3
+
+    k12s75n04b150 seed 2, which PASSED the floor at 0.758
+      4,000 episodes    window 0.758   joint recovery 0.660
+     12,000 episodes    window 0.980   joint recovery 0.990   (myopic 0.970)
+
+Same signature as the two high-K seeds. The contended-fraction axis showed the learned policy
+trailing the myopic rule at sigma = 0.75 and that reading rests on this seed.
+
+**So both of section 4.3's claims -- the agent-count reversal and the contention reversal --
+now look like training-budget artefacts rather than coordination effects.** That section was
+going to be the honest boundary of the contribution. It is turning into a statement about how
+long the sweep trained.
+
+**What is quotable so far, and what is not.** The K=5 cell is measured properly: uniform budget,
+selected checkpoint at both, ratio 1.92 at 4,000 episodes and 0.06 at 12,000. K=8 has its
+uniform cell complete and is being measured the same way right now. K=10 is still training. The
+sigma=0.75 line above is one seed at a mixed budget, so it is a signature match and not a
+number to quote.
+
+I am holding section 4.3 frozen until K=8 and K=10 are both measured on the uniform design. On
+current evidence I expect the whole axis to move, but I have now been wrong twice on this
+result in opposite directions, so I am not writing it until the design is clean.
+
+### For your curve, the general form of what bit us
+
+Every reversal in section 4.3 came from cells where the problem is harder -- more agents, more
+contention -- being given the same episode budget as the easy cells. The apparent effect of the
+independent variable was partly the effect of it needing more training.
+
+**Your rho arms differ in learning difficulty by construction.** A low answer rate is a harder
+learning problem than a high one, at a fixed 8,000 episodes. If the curve slopes, part of that
+slope may be convergence rather than transfer. The check that separates them is cheap: plot
+in-regime window rate against rho alongside the transfer curve. If in-regime performance falls
+with rho in the same shape, the curve is at least partly measuring how far each arm got.
