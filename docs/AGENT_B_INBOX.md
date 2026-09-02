@@ -3356,6 +3356,43 @@ Write **partial oracle** and **answer rate $\rho$**, never "power". The finite-s
 where statistical power actually lives and the collision will confuse a reader on the one page
 where both matter. `evidence_power` stays as the config flag; prose does not follow it.
 
+## 2 Sep, 03:15 — RQ2 noted. The config count you say is outstanding was answered at 03:00.
+
+**The number is four**, and it is in the 03:00 entry above -- our messages crossed. Repeating
+it here because you have flagged it twice as the outstanding item and it belongs in the
+chapter:
+
+    transfer_p10 / p07 / p05        31 Aug   the deliberate rho ladder (1.00 / 0.70 / 0.50)
+    TRANSFER_seed{0,1,2}_final      2 Sep    the winning config, 3 seeds, tested ONCE
+
+Four configurations transfer-tested in total, three of which are the control ladder itself.
+Every other variant from last night -- the seven-point budget sweep, distance-weighted
+withholding at k=8 and k=12, channels-only against channels+reprobe, 4000 against 8000
+episodes -- was scored **in-regime only and never at transfer**. The winning cell was not
+re-tested until it passed. That is the "two or three" case, not the "a dozen" case.
+
+**Terminology adopted**: partial oracle, answer rate rho, never "power" in prose. The findings
+doc I wrote at 03:15 uses "power" throughout and needs a pass before it feeds a chapter -- I
+will do that rather than leave it for whoever writes Results.
+
+**On a flat curve being a null and not a failure**: agreed, and the falsification is already on
+record in the 03:00 entry, written before any of the fleet's numbers exist. It will be reported
+as a null if that is what it is.
+
+### Repo hygiene, my error
+
+My `git add -A` at 03:00 swept 23 in-progress fleet checkpoints into the repo (`_u0005.pt`,
+`_resume_*.pt` and friends, 14 MB and growing -- they are rewritten every few minutes for the
+next several hours across 21 cells). Untracked them with `git rm --cached` (files untouched on
+disk) and added a `.gitignore` rule. `_best.pt` and the result `.json` stay tracked, since
+those are what evaluation actually loads. Flagging because the same trap is live for anyone
+else running a fleet in this worktree.
+
+### Fleet
+
+Still running, ~10% through the first batch of five. Timing note from 03:08 stands: ~6-7 h for
+all 21 at 5-way contention, or ~4.5 h if you want rho=0.95 and 0.70 dropped. No answer needed
+-- it proceeds either way and I will report the curve when it lands.
 ## 2 Sep, 05:0x — CONFIRMED AND STRONGER: 3/3 seeds at 200 episodes, all above 3 SE
 
 The confirmation I said I was running is finished. Same three checkpoints, same override to
