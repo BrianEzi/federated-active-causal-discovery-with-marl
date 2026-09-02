@@ -59,7 +59,15 @@ the thesis must say which it is asking. Success asks "did the agent complete the
 set"; SHD asks "how accurate is the whole recovered graph, including parts nobody was scored
 on". This is a genuine methodological point, not a hedge -- see 1.3 for the mechanism.
 
-### 1.3 The policy is better where rewarded and worse where not — **B**
+### 1.3 RETRACTED 2 Sep — see `docs/FINDINGS_PAIR_CLASS_2026_09_02.md`
+
+Re-measured at 200 episodes from `_best.pt` over six runs: shared-shared error is
+**0.00000 for BOTH learned and greedy**, maximum across all six runs, over 90,000
+pair-observations. The learned advantage is entirely on private-incident pairs
+(0.00002 against 0.00051). The asymmetry below came from 60-episode runs and does not
+survive. Kept only so the old numbers are not re-derived.
+
+### 1.3 (retracted) The policy is better where rewarded and worse where not — **B**
 
 Hard SHD split by pair class, 60 episodes, 4 runs:
 
