@@ -84,6 +84,22 @@ and `final` are the same policy at every cell, so selection cannot vary with rho
 selection happened. A `--checkpoint final` control would reproduce the grid exactly and is not
 worth the hour it would cost.
 
+**The separation survives argmax evaluation; the effect SIZE does not.** The grid is scored by
+sampling at temperature 1, the project's convention, and the action-selection control was run
+at two rates -- the pivot and a clear winner -- but its result was never written down here.
+200 paired episodes, same checkpoints, learned arm scored by argmax instead:
+
+| rho | argmax delta | sampled delta | argmax per-seed significance |
+|---|---|---|---|
+| 0.95 | +0.02658 +/- 0.00268 | +0.00298 | 3/3 significantly WORSE than greedy |
+| 0.70 | -0.00512 +/- 0.00052 | -0.01661 | 2/3 significantly better (-2.57, -2.06, -1.96) |
+
+The direction holds at both rates and the separation between them widens, so the qualitative
+claim is not a convention artefact. The magnitude is: at rho=0.70 the advantage shrinks by a
+factor of 3.2 and one seed of three drops just under the 2 SE bar. **Any effect size quoted
+from this grid is a sampled-evaluation number and must be labelled as one.** The control covers
+2 of 7 rates; the shape of the curve under argmax is unmeasured.
+
 The same table carries a limitation. `mi_ratio` was still rising at the last update in 21 runs
 out of 21, so none of these policies is converged on the training-health criterion at 8,000
 episodes. What the grid compares is 21 equally-undertrained policies, which is a fair
