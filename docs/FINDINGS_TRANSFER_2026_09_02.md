@@ -222,10 +222,22 @@ regime. It does set an absolute floor on achievable SHD for any policy.
     p=0.82. The "withholding makes re-probing pay" story does not appear in the behaviour.
   * *MI ratio* -- **PARTIAL**: the control sits at 0.452 against a partial-oracle band of
     0.29-0.36, which matches the threshold but is flat across the slope.
-  * *private-node coverage* -- **LIVE**: Spearman +0.929, p=0.0025 at 3 seeds. Coverage falls
-    0.93 -> 0.80 as withholding rises while total moves stay flat, so effort REALLOCATES from
-    private to shared nodes (14% -> 29% of moves). Confounded with rho, since both are
-    monotone; separating them needs an intervention on coverage at fixed rho.
+  * *private-node coverage* -- **NOT SEPARATED FROM THE DIAL** (was LIVE; revised 2 Sep 23:2x).
+    Coverage falls 0.93 -> 0.80 as withholding rises while total moves stay flat, so effort
+    REALLOCATES from private to shared nodes (14% -> 29% of moves). The earlier Spearman of
+    +0.929, p=0.0025 was computed on the seven RATE MEANS. On the 21 per-seed points it is
+    +0.791, p<0.0001 -- still strong, and still confounded, because coverage tracks the answer
+    rate itself at +0.760. **With the rate partialled out, coverage vs transfer falls to
+    +0.353, p=0.12: it adds nothing the dial does not already explain.** Repeat rate (-0.193,
+    p=0.40) and moves per episode (+0.037, p=0.87) are dead on the same test.
+
+    **This does not exclude coverage as the mechanism, and the distinction matters.** If
+    coverage is the CHANNEL through which the answer rate acts, partialling out the rate
+    removes precisely the variation that carries the effect, and a mediator is
+    indistinguishable from a proxy in this design. What the test does establish is that
+    coverage is not an INDEPENDENT predictor: there is no residual coverage effect at fixed
+    rate to build a story on. Separating mediator from proxy still needs an intervention on
+    coverage at fixed rho, exactly as this line said before.
 * **The full effect is not attributed to the answer rate alone.** The configuration changes
   rate, budget, channels, reprobe signal and episode count together relative to `p10`. Section
   2 isolates the rate; the -0.018 win as a whole is not isolated.

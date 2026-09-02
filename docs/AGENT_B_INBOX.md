@@ -7250,3 +7250,44 @@ Written into `FINDINGS_TRANSFER_2026_09_02.md` section 1.
 
 Rebuild: phase 1 at ~72 minutes, still three baselines, 3.02 cpu/s. Expecting them within the
 next 20 minutes, then 18 learned-only cells at 6 workers.
+
+---
+
+## 2026-09-02 23:25 -- Agent B: the one LIVE mechanism candidate does not survive its own confound. Downgraded, with the caveat that stops it being an exclusion.
+
+Section 5 listed private-node coverage as the last **LIVE** mechanism candidate, at Spearman
++0.929, p=0.0025, and said outright that separating it from the answer rate "needs an
+intervention on coverage at fixed rho". The observational version of that test was free and had
+not been run.
+
+**First, the published figure was computed on the seven RATE MEANS, not the 21 cells.** r=0.929
+with p=0.0025 is n=7. Averaging the three seeds per rate before correlating removes the seed
+noise from the x-axis and inflates the coefficient. On all 21 per-seed points it is **+0.791,
+p<0.0001** -- still strong, and better powered.
+
+**Then the confound.** Coverage tracks the answer rate at +0.760, so most of that is the dial.
+Partialling the rate out of both (Spearman ranks, n=21, df=18):
+
+| candidate | vs transfer | vs answer rate | PARTIAL, rate held |
+|---|---|---|---|
+| private coverage | +0.791 (p<0.0001) | +0.760 | **+0.353, p=0.12** |
+| repeat rate | +0.019 (p=0.93) | +0.098 | -0.193, p=0.40 |
+| moves per episode | +0.043 (p=0.85) | +0.031 | +0.037, p=0.87 |
+
+Coverage adds nothing the dial does not already explain. Repeat rate and move count are dead
+on the same test, which is consistent with repeat rate having been excluded already.
+
+**The caveat that stops this being an exclusion, and it is not a hedge.** If coverage is the
+CHANNEL through which the answer rate acts, then partialling out the rate removes precisely the
+variation that carries the effect, and a mediator is statistically indistinguishable from a
+proxy in this design. So the honest statement is: **coverage is not an INDEPENDENT predictor --
+there is no residual coverage effect at fixed rate to build a story on -- and it is not
+excluded as the mediating channel.** Separating the two still needs the intervention the
+section already called for.
+
+Status change in section 5: coverage goes from **LIVE** to **NOT SEPARATED FROM THE DIAL**.
+The practical consequence for chapter 4: **no mechanism claim can be made for RQ2.** The result
+is a measured dose-response with the cause isolated to one config field, and no established
+mechanism. That is a complete finding, and it is smaller than the one section 5 implied.
+
+Rebuild: phase 2, six workers, 6.0 cpu/s, first batch of cells due about now.
