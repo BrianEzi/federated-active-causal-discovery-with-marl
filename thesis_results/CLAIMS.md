@@ -33,9 +33,17 @@ At $k_v=30$ the paired per-seed differences are +0.00054 +/- 0.00063, -0.00040 +
 
 **Boundary.** At $K=5$ the reversal is one seed: 1.65 with all seeds, 0.25 without.
 State the reversal as beginning at eight agents. Both figures must appear.
-**UNDER TEST 2 Sep 09:0x.** `k12s50n08b150_s2` and `k12s50n10b150_s2` passed the
-competence floor at 0.838 and 0.804 but may be unconverged; both are retraining at
-12,000 episodes. Until they land, prefer the seed-2-excluded ratios.
+**LARGELY REFUTED 2 Sep 11:0x, K=10 pending.** `k12s50n08b150_s2` passed the floor at
+0.838 but was unconverged. Retrained at 12,000 episodes its SHD goes 0.00290 -> 0.00005,
+and the K=8 ratio goes 4.24 (as run) -> 1.82 (excluding it) -> **0.89 (with it
+converged)**. At eight agents the learned policy is BETTER than the myopic rule once
+trained to convergence, and the reversal there is a training-budget artefact.
+`k12s50n10b150_s2` is still retraining. Seed 3 at eight agents and sigma=0.25 also
+went 0.632 FAIL -> 1.000 PASS with learned 1.000 against myopic 0.860.
+**MUST NOT** state an agent-count reversal until K=10 lands. If it also converges away,
+the honest claim is about SAMPLE EFFICIENCY under contention, not achievable accuracy:
+at a fixed 4,000-episode budget the learned policy degrades as agents are added, and
+given adequate training the degradation does not survive.
 **MUST NOT** claim the myopic rule improves across this axis. Per-pair SHD divides by
 `global_pairs`, which runs 117 -> 525; in raw counts the myopic arm is close to flat.
 

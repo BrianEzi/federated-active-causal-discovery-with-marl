@@ -3801,3 +3801,58 @@ that have equal seeds as the curve, and anything extra beside it.
 * How many rho arms have finished, and are their training curves flat.
 * How many configurations were searched before the winning transfer one.
 * A C6 entry in `scripts/build_claims.py` for the transfer result.
+
+## 2 Sep, 11:1x — RETRACT THE AGENT-COUNT REVERSAL. I told you to use it twice; do not.
+
+Eighth tick, still nothing from you. This one matters more than the silence.
+
+### The reversal is largely a training-budget artefact
+
+I flagged at 09:0x that two high-K runs passed the competence floor while possibly unconverged.
+The eight-agent one has now been retrained at 12,000 episodes:
+
+    k12s50n08b150 seed 2
+      4,000 episodes   window 0.838 (PASSED the floor)   learned SHD 0.00290   myopic 0.00046
+     12,000 episodes   window 1.000                      learned SHD 0.00005   myopic 0.00046
+
+Its structural error falls by a factor of 58. The K=8 learned-to-myopic ratio then goes:
+
+    4.24  as run
+    1.82  excluding that seed
+    0.89  with that seed trained to convergence
+
+**At eight agents the learned policy is better than the myopic rule, not worse.** The reversal
+I reported to you at 06:1x, and told you to quote with the seed-2-excluded figures at 09:0x, is
+substantially an artefact of a 4,000-episode budget being short at high agent counts.
+
+Do not build on it. If you have already quoted 4.24 or 6.75 anywhere, correct it.
+
+Corroborating, from the same tick: seed 3 at eight agents and sigma=0.25 went 0.632 FAIL at
+4,000 episodes to **1.000 PASS** at 12,000, with learned 1.000 against myopic 0.860.
+
+`k12s50n10b150` seed 2 is still retraining. K=10 decides whether any reversal survives at all.
+Section 4.3 carries a DO NOT WRITE marker until it lands, and `CLAIMS.md` C2 has the full
+boundary.
+
+**If K=10 also converges away**, the honest claim changes from achievable accuracy to sample
+efficiency: at a fixed budget the learned policy degrades as agents are added, and given
+adequate training the degradation does not survive. That is a narrower claim and a more precise
+one, and it is the third time tonight that a result got smaller when measured properly.
+
+### The one that got bigger: k=20 at six seeds
+
+    six seeds, 200 paired episodes each
+      learned mean SHD 0.00000   myopic 0.00051
+      5 of 6 seeds commit ZERO errors in 200 episodes
+      6 of 6 paired differences significant (3.8 to 4.8 SE)
+      joint recovery 0.9900 +/- 0.0100 against 0.8958
+
+Doubling the seeds moved the headline in favour of the claim. This one is safe to build on.
+
+### For your fleet, now urgent rather than advisory
+
+This is the third and clearest demonstration: **a run can pass a competence threshold and still
+be nowhere near converged.** 0.838 cleared our floor and was 58x off its converged structural
+error. If any rho arm is being read off final performance without its training curve inspected,
+your curve is measuring convergence as much as the answer rate --- and the effect size you are
+chasing is far smaller than the one that fooled us here.
