@@ -5607,6 +5607,59 @@ in the methods rather than being left for a reader to notice.
 measured at the final checkpoint, ten at the selected one, and the axis tables stay incomplete
 until the last three land.
 
+## 2 Sep, 19:15 — coverage SURVIVES at 3 seeds; repeat rate conclusively dead
+
+14 more probes landed. Both hypotheses now at 3 seeds x 7 rates.
+
+    rho    coverage (s0,s1,s2)      mean     SE   | repeat  transfer
+    1.00   0.933 0.881 0.969       0.928  0.0254  |  0.749  +0.00966
+    0.95   0.908 0.931 0.963       0.934  0.0157  |  0.720  +0.00298
+    0.90   0.887 0.873 0.940       0.900  0.0202  |  0.733  -0.00927
+    0.85   0.865 0.858 0.952       0.892  0.0303  |  0.735  -0.00901
+    0.80   0.869 0.858 0.923       0.883  0.0200  |  0.732  -0.01291
+    0.70   0.781 0.821 0.883       0.828  0.0297  |  0.731  -0.01661
+    0.50   0.752 0.779 0.858       0.797  0.0319  |  0.739  -0.01785
+
+    coverage     Pearson +0.852   Spearman +0.929   p=0.0025
+    repeat rate  Pearson +0.157   Spearman +0.107   p=0.8192
+
+**Repeat rate is conclusively dead** -- mean flat within 0.03 across every rate, p=0.82, and the
+sign even flipped from the seed-0 estimate. The hypothesis we both rated most likely is refuted
+by measurement.
+
+**Coverage survives tripling and strengthens slightly** (Spearman 0.893 -> 0.929).
+
+### But two things the correlation hides, which I would not want quoted without
+
+**1. The top two rates invert.** rho=1.00 coverage 0.928 against rho=0.95's 0.934 -- slightly
+HIGHER, not lower. Coverage is not monotone at the top; the clean descent only begins at
+rho=0.90. Spearman rewards the overall ordering and conceals this.
+
+**2. Adjacent-rate seed ranges overlap heavily.** rho=0.90 spans 0.873-0.940 and rho=0.85 spans
+0.858-0.952. Only the ENDS separate cleanly: rho=1.00/0.95 sit near 0.93, rho=0.70/0.50 near
+0.80-0.83.
+
+**So the supportable claim is coarse: policies trained at high answer rates spread their private
+probing wider than policies trained at low rates, and the difference is about 0.13 in coverage
+between the extremes.** It is NOT a per-rate ranking and it does not resolve the 0.85/0.80
+inversion that also shows in the transfer curve.
+
+### Where the mechanism question now stands
+
+    calibration (distribution match)   EXCLUDED -- best transfer has 19x worst match
+    repeat rate                        EXCLUDED -- flat, p=0.82
+    MI ratio                           partial -- explains the threshold, flat across the slope
+    coverage / private-shared shift    LIVE -- tracks the slope, coarse, confounded with rho
+
+Four candidates this morning, two excluded by measurement, one partial, one live and
+qualified. **The effect remains robust and its cause remains unconfirmed**, but the space is
+materially narrower and both exclusions came from data rather than argument.
+
+The coverage confound stands unaddressed: coverage and rho are both monotone, so this may be
+co-variation rather than mediation, and separating them needs an intervention on coverage at
+fixed rho that I do not have a design for.
+
+rho=0.95 doubled-training test at update 760-780/1000, ~25 min.
 ## 2 Sep, 19:2x — 15 of 16 cells measured, and contention is the axis that survives
 
 Nothing new from you since the 16,000-episode rho=0.95 test went in. No decision needed here.
