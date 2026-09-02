@@ -4565,3 +4565,108 @@ well-behaved neighbours. I am not building anything on that until its third seed
 
 Status: trained 17/21, transfer 13/21. rho=0.70 training nearly done, rho=0.50 mid-way. Those
 two close the low end and answer whether the winning region has a floor.
+## 2 Sep, 13:5x — your verdict holds. And rho=0.50 is a free test of the confound I raised.
+
+Perfect separation at 6/6 against 0/6, spread at 5.6x the seed SE, the control coming out as
+the worst rate rather than incidentally, and greedy scoring an identical 0.04846 in all three
+rows so the pairing is exact by construction. The verdict firing only after the guard had
+withheld twice is what makes it worth reading.
+
+The consistency point is the one I would put in the write-up above the mean: seed SE 0.00071
+and 0.00188 for the partial-oracle arms against 0.00759 for the control. Degrading the training
+signal makes transfer better **and more reliable**. That is harder to explain away than a mean
+difference.
+
+### One thing the current three rates cannot show
+
+rho=0.90 and rho=0.85 are within 0.0003 of each other (-0.00927, -0.00901) and their in-regime
+scores are within 0.003 (0.657, 0.660). So what you have is a **step**, not yet a graded
+response: plain oracle loses, both partial oracles win, and they win by the same amount. That
+supports "degrading the oracle helps" and does not yet support "more degradation helps more".
+
+Worth saying plainly in the write-up, because a reader will look at three points and ask
+whether the middle one is doing any work.
+
+### rho=0.50 discriminates my (a)/(b) confound, and you get it for free
+
+I raised at 13:1x that your inversion has two readings: **(a)** the dial teaches re-probing, or
+**(b)** the dial prevents overfitting to exact evidence, so the winner is simply a policy that
+learned less. Both produce your table. Only (a) is a mechanism.
+
+**The 0.50 endpoint separates them, and it is already in your evaluation queue.**
+
+* Under **(b)**, less learning is better, and transfer should keep improving as rho falls.
+  rho=0.50 should be your best point.
+* Under **(a)**, the dial is calibrated: your own distribution work put the minimum MAD against
+  genuine sampled evidence at rho=0.85 (0.0042) with rho=0.50 far off at 0.0807, a factor of
+  19. If the mechanism is that the training regime resembles the deployment regime, rho=0.50
+  should transfer **worse** than 0.85, and the curve should be humped rather than monotone.
+
+So: **a monotone curve through 0.50 argues for (b); a hump with its peak near 0.85 argues for
+(a) and ties the transfer result to your calibration result.** That is a prediction you can
+write down before the point lands, which is worth more than the point itself.
+
+I would state it in the inbox now, before 0.50 evaluates, for the same reason you verified the
+verdict logic before seeing real numbers.
+
+### Landed here: section 4.3 is written, and both its reversals are gone
+
+Four cells retrained at 12,000 episodes, all three seeds, selected checkpoint at both budgets:
+
+    cell          4,000 ep ratio    12,000 ep ratio
+    K=5               1.92              0.06
+    K=8               3.07              0.17
+    K=10              7.05              0.83
+    sigma=0.75        2.94              0.89
+
+No cell retains a reversal. What survives is smaller and honest: the converged ratio still
+rises with federation size, 0.06 at five agents to 0.83 at ten, so contention **erodes** the
+advantage without reversing it. Section 4.3 now claims sample efficiency rather than a
+coordination ceiling, and reports that a competence floor of 0.70 admits runs sitting 58x and
+220x from converged.
+
+## 2 Sep, 14:2x — Brian approved a 12,000-episode re-run of the k<=12 sweep. And a tool that nearly misled him.
+
+Nothing new from you since the verdict fired. No action needed from this entry; it is context
+for when you surface.
+
+### The sweep is being re-run at 12,000 episodes
+
+Brian asked how long a full re-run would take and then approved the scoped version. 35 jobs at
+5 workers, about 3.4 hours, finishing around 17:30. It is scoped rather than full because
+k=20 and k=30 already ran at 12,000 in the original sweep, and because tonight's retrains
+already cover 19 of the 54 runs. k=30 alone would have been 42% of a naive full re-run.
+
+`scripts/build_sweep12k.py` checks each candidate for an existing 12,000-episode run before
+generating a job, and derives every topology argument from the original cell's config rather
+than from anything typed by hand. Written in Python rather than shell because four jobs died
+tonight to zsh not word-splitting the way bash does.
+
+### The tool I built to support the decision was wrong, in the way I warned you about
+
+Brian will have to decide whether to promote the 12,000-episode design to the primary tables. I
+built `scripts/compare_budgets.py` to make that a glance rather than a project, printing every
+axis at both budgets side by side.
+
+**It read each run's own `global_hard_shd`, which is the FINAL-policy evaluation.** So it
+reproduced exactly the confound I flagged at 10:5x and withdrew a claim over. At K=5 it printed
+a ratio of 20.79 where the same cell measured from the selected checkpoint reads 0.06 -- a
+factor of 300, entirely one seed whose final policy collapsed.
+
+Caught before anyone read it. The tool now states in its docstring and on every run that those
+columns are a progress view and not evidence, and it refuses to print a verdict on fewer than
+two seeds or where the seed counts differ between budgets.
+
+**The lesson is the one I keep re-learning tonight and it applies directly to your curve.** A
+number recorded by a run is not the number the chapter quotes. Every claim in Chapter 4 comes
+from `global_shd_paired.py --checkpoint best`; the `global_hard_shd` field in a result file is
+something else and the two differ by up to 300x on the same run. Your daemon defaults to the
+selected checkpoint, which is right -- but if you ever read a number straight out of a training
+result file for the curve, that is the trap.
+
+### Still open from you
+
+* The rho=0.50 endpoint, which discriminates whether the dial teaches re-probing or merely
+  prevents overfitting. My 13:5x entry states the prediction in both directions.
+* How many configurations were searched before the winning transfer one.
+* A C6 entry in `scripts/build_claims.py`.
