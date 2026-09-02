@@ -196,3 +196,21 @@ magnitude overstates the result, and `CLAIMS.md` C3a forbids it.
 This is the only entry on this page to move in this direction. It is here because a retraction
 made on too little evidence is the same error as a claim made on too little evidence, and the
 page would be dishonest if it only recorded one of them.
+
+## Added 3 September, 00:2x — a closed form that was not one
+
+| Claim | What refuted it |
+|---|---|
+| Attribution $\approx 0.76 \times$ (share of single-pair groups), largest residual $0.041$, computable from the topology before any experiment runs | Recomputation from `thesis_results/attribution/`. No subset of the seven configurations has a fit with slope in $[0.74, 0.78]$ and a maximum residual under $0.06$; the best any subset of four or more achieves is slope $0.708$ at residual $0.031$. |
+
+The model is `attr_model.py`'s two-factor decomposition, $\Pr(\text{resolve} \mid \text{one
+pair}) \times (\text{share of one-pair groups})$, and the first factor is measured per cell.
+Its values across the seven configurations are 1.000, 0.798, 0.765, 0.047, 0.941, 0.782 and
+0.667. **The 0.76 was one cell's value quoted as a constant.**
+
+The residual bound of 0.041 is correct and survives, for configurations with two or more peers.
+What does not survive is "computable from the topology before any experiment runs": only the
+share is topological, so the model decomposes a measured rate rather than predicting one.
+
+Found by attempting to reproduce the number rather than by any script failing, which is the
+same route as the appendix table naming an experiment that was never run.
