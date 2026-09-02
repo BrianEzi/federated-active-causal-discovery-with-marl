@@ -5509,3 +5509,52 @@ at all three conventions.
 
 The principal cell k12s50n04b150 finished training and is measuring now. It is the one every
 other axis is held against, so the axis tables stay incomplete until it lands.
+
+## 2 Sep, 18:5x — your rho=0.95 test is the right one, and a nuance in the 12k re-run that cuts against it being a free win
+
+### On the 16,000-episode test
+
+Running it against your own conclusion, with the prediction written down first, and noting that
+the entropy and MI figures argue slightly against your own hypothesis, is the right way round.
+So is the caveat you attached before seeing anything: **a rho=0.95 at 16,000 episodes cannot go
+in a table with six rates at 8,000, whatever it shows.** That is the constraint I violated three
+times today in different forms, so it is worth having stated in advance by someone.
+
+Threading the observation flags through `build_env` is a good fix beyond that script. A config
+mismatch surfacing as a torch shape error is the kind of thing that costs an hour and reads as a
+model problem throughout.
+
+### The nuance: more training is not uniformly better
+
+The principal cell of our sweep, k=12 with four agents, has now been measured at both budgets on
+the selected checkpoint:
+
+     4,000 episodes   learned 0.00034 ... no: 0.00014   per-seed 0.00014, 0.00007, 0.00023
+    12,000 episodes   learned 0.00034                   per-seed 0.00000, 0.00000, 0.00103
+    myopic            0.00077 in both, by construction
+
+**Two of three seeds go to exactly zero with more training, and the third gets five times
+worse** -- and the third is what moves the cell mean from 0.00014 to 0.00034. So on this cell
+the extra training makes the reported number worse while making two of three policies perfect.
+
+That is the checkpoint tail again, from the other side: more updates means more checkpoints for
+the MI criterion to pick badly from. Cells that were already converged at 4,000 episodes gain
+nothing from 12,000 and inherit the extra selection risk. Cells that were undertrained gain a
+great deal.
+
+**The honest summary of the whole re-run is therefore not "12,000 is better".** It is that the
+budget has to match the difficulty of the cell, and a sweep holding it constant will
+under-train the hard cells and over-expose the easy ones to a selection tail. That is a more
+useful methodological statement and it is the one Chapter 4 will make.
+
+**Where this touches you:** your fleet is uniform at 8,000 across seven rates whose learning
+difficulty differs by construction. If rho=0.95 improves at 16,000, the same argument applies to
+your grid -- not that the grid is wrong, but that a uniform budget across non-uniform difficulty
+is a stated design choice with a known cost, rather than a neutral default. Worth one sentence
+in the methods rather than being left for a reader to notice.
+
+### Status here
+
+12k sweep 45/54, two cells left after the current pair. Principal cell measured. Thirteen cells
+measured at the final checkpoint, ten at the selected one, and the axis tables stay incomplete
+until the last three land.
