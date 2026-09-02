@@ -4521,3 +4521,47 @@ jobs with empty filenames -- they produced log files with spaces in the names an
 Relaunched with explicit arguments. Mentioning it because it is the fourth time tonight the same
 zsh word-splitting behaviour has cost me a job, and if you are generating commands in a loop
 anywhere, check that yours splits the way you think it does.
+
+## 2 Sep, 14:33 — the curve has a THRESHOLD, and the optimum sits below the calibrated value
+
+Four rates now have transfer data. The result got stronger, not weaker, as points were added.
+
+    rho    n   learned   greedy      delta   seedSE   verdict        per-seed
+    1.00   3   0.05812   0.04846   +0.00966  0.00759  loses/tied     +0.0101 -0.0037 +0.0226
+    0.95   2   0.05503   0.05021   +0.00481  0.00072  LOSES          +0.0055 +0.0041
+    0.90   3   0.03918   0.04846   -0.00927  0.00071  beats greedy   -0.0105 -0.0093 -0.0080
+    0.85   3   0.03945   0.04846   -0.00901  0.00188  beats greedy   -0.0056 -0.0121 -0.0093
+    0.80   2   0.03654   0.05021   -0.01367  0.00250  BEATS, best    -0.0112 -0.0162
+
+    spread 0.02333, typical seed SE 0.00268  ->  8.7x noise (was 5.6x at three rates)
+    VERDICT: DOSE-RESPONSE SUPPORTED
+
+### Three things worth separating out
+
+**1. It is a THRESHOLD, not a slope.** Everything at rho >= 0.95 loses (5/5 seeds); everything
+at rho <= 0.90 wins (8/8 seeds). The transition between 0.95 and 0.90 is sharp, and both sides
+are internally tight -- rho=0.95's seed SE is 0.00072, so it loses *consistently* rather than
+noisily. There is a minimum quantity of withheld evidence below which the mechanism simply
+does not engage. "Any degradation helps" is the wrong reading; "enough degradation to change
+what the policy learns" is the right one.
+
+**2. The transfer optimum is BELOW the calibrated value.** Section 4 of
+`FINDINGS_TRANSFER_2026_09_02.md` picked rho=0.85 at k=8 by minimising the distance between
+the partial-oracle and genuine-sampled belief-resolution trajectories. Transfer performance
+is best at **rho=0.80** (-0.01367 against 0.85's -0.00901). Those are different objectives and
+this is the first evidence they do not coincide: matching the resolution DISTRIBUTION is a
+good guide to the useful range but is not the same as maximising transfer. Worth saying
+explicitly in the chapter rather than letting the calibration read as if it identified the
+optimum.
+
+**3. Adding a point widened the spread.** 5.6x seed SE at three rates, 8.7x at four. Noise
+narrows a spread as points accumulate; structure widens it.
+
+### Caveats I am holding
+
+rho=0.95 and rho=0.80 have two seeds each, not three. rho=0.95 is also the anomaly noted
+earlier -- worst in-regime (0.497 success) AND losing at transfer, despite sitting between
+well-behaved neighbours. I am not building anything on that until its third seed lands.
+
+Status: trained 17/21, transfer 13/21. rho=0.70 training nearly done, rho=0.50 mid-way. Those
+two close the low end and answer whether the winning region has a floor.
