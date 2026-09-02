@@ -3127,3 +3127,40 @@ quotes, it has paired intervals, greedy is at its strongest setting, and there i
 single-variable control showing the power dial itself causes the improvement. What is NOT
 established is the attribution of the full effect size to any one ingredient, and the scale
 generalisation beyond k=8.
+
+## 2 Sep, 03:15 — consolidated: `FINDINGS_TRANSFER_2026_09_02.md`, and the old file is banner-retracted
+
+Brian wants this handed over for deeper investigation, so everything from the night is now in
+one document rather than spread across ~15 inbox entries:
+
+**`docs/FINDINGS_TRANSFER_2026_09_02.md`** -- the transfer result (all 3 seeds, paired
+intervals), the single-variable power isolation (p10 vs p07, verified field-by-field), the
+in-regime-anti-predicts-transfer finding, the calibration table across k=8/12/20/30, the
+error-rate asymmetry and why it does not undermine the result, a section 5 listing everything
+NOT established, and the window-rate resolution caveat with the episode-count arithmetic.
+
+**`FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md` now carries a SUPERSEDED banner** naming
+which sections are retracted (2 and 3), which survives (4, distance-weighting still fails,
+and why that one is independent of all three defects), and the three defects behind the
+retraction. Left the body intact rather than editing numbers into it, matching how
+`FINDINGS_ATTRIBUTION_CEILING` was handled.
+
+Also deleted three empty `CONTROL_plainoracle_s*.json` stubs -- an attempt to transfer-test
+the sweep's own k=8 oracle policies, which failed because those `_best.pt` files live on
+Myriad, not locally. **If someone wants that arm, pulling `results/sweep/oracle/k08s50n04b150_s*_best.pt`
+from Myriad would give a 3-seed plain-oracle control at budget 35 for ~10 minutes of
+evaluation** -- stronger than the single-seed p10 arm currently carrying that comparison, and
+the cheapest remaining thing that would harden the causal claim.
+
+### Highest-value next steps, in the order I would do them
+
+1. **Pull the Myriad k=8 oracle checkpoints and transfer-test them** (3 seeds, ~10 min).
+   Turns the one-seed power isolation into a three-seed one.
+2. **More episodes on the three transfer tests.** Effects are 2.0-2.4 SE at 40 episodes;
+   150-200 episodes would settle whether seed 0's tie is real or underpowered.
+3. **Hard-SHD ablation of channels vs reprobe-signal.** The window-rate ablation is retracted
+   and nobody currently knows which feature earns the improvement.
+4. **k=20 transfer.** The headline cells are k=20/k=30 and the transfer claim is k=8 only.
+   Calibration already reaches k=30 and says to use p=0.80 there, not 0.85.
+5. **A sampled-TRAINED arm at k=8/budget 70**, which is the only thing that can upgrade
+   "beats greedy under sampled evidence" to "substitutes for sampled training".

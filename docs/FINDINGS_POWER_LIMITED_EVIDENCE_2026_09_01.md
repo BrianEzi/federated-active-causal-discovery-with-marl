@@ -1,5 +1,27 @@
 # Power-limited oracle evidence does not substitute for the sampled sweep
 
+> ## SUPERSEDED 2 Sep by `FINDINGS_TRANSFER_2026_09_02.md`
+>
+> **Sections 2 and 3 of this file are RETRACTED.** Both rest on a gate that used
+> `arms.greedy_uncertainty.success >= 0.85` -- the all-agents conjunction, which this project
+> demoted from primary for saturating -- rather than the `window_rate >= 0.70` floor used
+> everywhere else. Recomputed on window rate, **every budget/power cell passes, 13 of 13,
+> never below 0.86, including the budget-35 configuration this file calls starved.** There
+> was no budget boundary to find; section 3 measured an artefact of the metric.
+>
+> Two further defects behind the numbers here: the withholding RNG free-ran across arms, so
+> no in-regime learned-vs-greedy comparison in this file was paired (fixed in
+> `cb/factored.py::set_episode`); and every run had `observe_belief_channels=False`, so the
+> policy could not see the confounding channel its own reward is scored on.
+>
+> **The conclusion is reversed.** Power-limited training does transfer: it beats greedy under
+> genuine sampled evidence in 2 of 3 seeds and ties in the third, and the power dial alone is
+> shown to cause the improvement. Read the newer file.
+>
+> **Section 4 (distance-weighted withholding does not help) still stands** -- that comparison
+> was between two power-limited arms measured the same way, and the hop-distance distribution
+> measurement behind it is independent of all three defects above.
+
 1 Sep 2026, overnight into midday. All results below are k=8/k=12, 4 agents, `factored`
 backend, `--turn_aware_credit --local_epochs 4 --normalise_returns`, oracle evidence with
 `--evidence_power < 1.0`, gated on `arms.greedy_uncertainty.success >= 0.85` (greedy is
