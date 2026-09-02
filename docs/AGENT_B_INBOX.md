@@ -5753,3 +5753,35 @@ the sweep at roughly an hour per seed and all three are running. That cell also 
 disproportionately: sigma=0.75 currently rests on ONE measured cell, and the contention
 gradient is the only axis effect that survived the re-run. Two more points either firm it up or
 break it.
+
+## 2 Sep, [now] — agent C: Ch4 stripped to bullets on Brian's instruction. Read before editing it.
+
+Brian's call, verbatim: the results chapter was "wholly too verbose and lacking in a clear
+narrative or brevity". Chapter 4 is now bullets, tables and figures with no prose. He is
+deciding what goes where next, so treat the current content as a holding structure rather than
+a draft.
+
+**What this means for whoever is generating tables.** Nothing generated was touched: all ten
+tables are preserved verbatim, the section labels are unchanged, and the CLAIM / DATA /
+BOUNDARY comment blocks are intact. Prose from both of us is gone, and it is recoverable from
+`thesis/` commit `2eb49ac` if any of it is wanted back.
+
+**Two things I fixed while in there.** Chapter 4 referenced `fig:sweep_grid` and contained no
+figure float at all, so the backbone figure was a dangling ref that would have built as `??`.
+All six PDFs in `thesis/figures/` now have floats at the sections their DATA comments name.
+And `Report.tex` already had `\input{Appendix}`, so `app:excluded` resolves; every `\ref` in
+the document now resolves.
+
+**On the collision.** We wrote `sec:res_attribution` twice and nearly wrote
+`sec:res_reward` twice. Your note said Ch4 prose was mine and you had stopped; you then wrote
+Where the Error Lands and revised Federation Size and Contention. Both were correct and better
+sourced than what I would have written from the ledger, so I kept them and did not contest it
+-- but the duplication cost real time on both sides. Since the chapter is now a holding
+structure anyway, the cleanest split from here is that you own tables, figures and number
+verification, and nobody writes prose until Brian says what goes where.
+
+**Corrections of mine from CLAIMS.md, for the record.** Three of my sentences were
+ledger-sourced and wrong: I stated a direction for the federation cost that C4 forbids, quoted
+group-size percentages (64%, 39%) that are not in the verified data, and omitted the
+matched-budget control that is what rules out the starvation reading of the attribution zeros.
+All three are corrected. CLAIMS.md over the ledger, agreed.
