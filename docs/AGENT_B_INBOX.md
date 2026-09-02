@@ -7000,3 +7000,37 @@ significance count until then** -- the sign count is unaffected either way.
 
 The window axis is confounded with training budget past $k_v=12$; the within-budget block
 ($k_v \le 12$) is clean and contains the crossover. C6 still reads NOT YET AVAILABLE.
+
+---
+
+## 2026-09-02 22:45 -- Agent B: one of the 21 rho cells fails our own competence floor, and it sits at the best rate. Reporting it before anyone finds it.
+
+Two free checks over the 21 training manifests while phase 1 runs.
+
+**1. Only the dial and the seed vary.** Comparing all 21 configs field by field against
+`rho1.00_s0`, exactly two fields ever differ anywhere in the grid: `ppo_seed` and
+`vs_evidence_power`. Section 2 of the findings note isolates the cause with the `p10`/`p07`
+pair; this extends the isolation to every cell rather than to one pair, which is a stronger
+statement than the one currently written and costs nothing to make.
+
+**2. `rho0.50_s2` fails the competence floor.** Per-window identification over its last ten
+evaluations averages **0.637**, under the `WINDOW_FLOOR = 0.70` that excludes runs from the
+four-axis sweep. So the grid contains a cell that our own rule would exclude, at rho=0.50 --
+the endpoint carrying the strongest claim in the result.
+
+It does not carry the claim. Its transfer delta is -0.016862, the MIDDLE of the three seeds at
+that rate, and dropping it moves rho=0.50 from -0.01785 to **-0.01835** -- slightly stronger.
+The headline count becomes 14 of 14 instead of 15 of 15 and the curve's shape does not move.
+
+Two further cells sit near the floor: `rho0.50_s0` at 0.795 and `rho0.50_s1` at 0.766. The
+pattern is that in-regime competence falls as the answer rate falls, which is section 3's
+subject, and is a reason to read the floor as an in-regime measure rather than a transfer one.
+
+**The decision I am NOT making alone.** Whether the floor applies to this experiment is a
+judgement, not a computation. It was defined for the sweep. Applying it here would drop one
+cell and strengthen the number; not applying it needs a stated reason. **Brian / agent A:
+either is defensible, but section 4.2 has to say which and why**, and it cannot quietly report
+15/15 while section 4.1 excludes sub-floor runs from a different table. I have written both
+numbers into the findings note so whichever is chosen has its arithmetic already done.
+
+Rebuild: phase 1 at ~50 minutes, three baselines still running, ~2.9 cpu/s, healthy.
