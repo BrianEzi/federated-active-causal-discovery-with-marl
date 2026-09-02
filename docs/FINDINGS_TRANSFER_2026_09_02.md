@@ -19,22 +19,35 @@ All cells below are k=8, 4 agents, `factored` backend, `--turn_aware_credit --lo
 
 ## 1. The result
 
-A policy trained under a **partial oracle** -- oracle ancestry answers withheld
-with probability `1 - p`, which costs ~0.085 s/episode -- is evaluated under **genuine
-sampled evidence**, the 6-9 s/episode regime it never saw during training. Hard SHD of the
-pooled global graph, paired per-episode differences against the greedy baseline:
+A policy trained under a **partial oracle** -- oracle ancestry answers withheld with
+probability `1 - rho`, costing ~0.085 s/episode -- is evaluated under **genuine sampled
+evidence**, the 6-9 s/episode regime it never saw in training. Hard SHD of the pooled global
+graph, paired per-episode against greedy, **200 episodes, 7 rates x 3 seeds = 21 cells**:
 
-| seed | learned | greedy | random | paired learned - greedy | verdict |
-|---|---|---|---|---|---|
-| 0 | 0.04628 | 0.04388 | 0.05559 | +0.00239 +/- 0.00609 | tied |
-| 1 | 0.03511 | 0.04707 | 0.06090 | **-0.01197 +/- 0.00495** | beats greedy, 2.4 SE |
-| 2 | 0.03404 | 0.04468 | 0.05452 | **-0.01064 +/- 0.00524** | beats greedy, 2.0 SE |
+| rho | n | learned | greedy | delta | seed SE | verdict |
+|---|---|---|---|---|---|---|
+| 1.00 | 3 | 0.05812 | 0.04846 | +0.00966 | 0.00759 | tied (control) |
+| 0.95 | 3 | 0.05144 | 0.04846 | +0.00298 | 0.00188 | tied |
+| 0.90 | 3 | 0.03918 | 0.04846 | -0.00927 | 0.00071 | **beats greedy** |
+| 0.85 | 3 | 0.03945 | 0.04846 | -0.00901 | 0.00188 | **beats greedy** |
+| 0.80 | 3 | 0.03555 | 0.04846 | -0.01291 | 0.00163 | **beats greedy** |
+| 0.70 | 3 | 0.03184 | 0.04846 | -0.01661 | 0.00032 | **beats greedy** |
+| 0.50 | 3 | 0.03060 | 0.04846 | -0.01785 | 0.00141 | **beats greedy** |
 
-**Two of three seeds beat greedy significantly under evidence they never trained on. The
-third ties. None lose.**
+**15 of 15 seeds at rho <= 0.90 beat greedy. 0 of 6 at rho >= 0.95 do.** Perfect separation.
+Spread across rates 0.02752 against a typical seed SE of 0.00220 -- **12.5x the noise.**
 
-Config: `--budget 70 --evidence_power 0.85 --observe_belief_channels
---observe_reprobe_signal --train_episodes 8000`.
+The curve is **monotone and saturating**: it improves all the way to rho=0.50 but the last
+step is a fifth of the earlier ones. There is no interior optimum in the swept range, and no
+floor is claimed since rho < 0.50 is unmeasured. The zero crossing lies between rho=0.95 and
+rho=0.90.
+
+Greedy scores identically (0.04846) at every rate because the baseline arms are the SAME
+per-episode vectors, reused across rates -- an exact pairing, and a correctness check that the
+comparison did not shift underneath.
+
+Config: `--budget 70 --observe_belief_channels --observe_reprobe_signal --train_episodes 8000`,
+k=8, 4 agents, `factored` backend. Only `--evidence_power` varies.
 
 ## 2. The answer rate is the cause, isolated
 
@@ -53,29 +66,61 @@ identically in both transfer tests (0.06649 hard SHD), which confirms the pairin
 oracle-trained policies do not transfer, which is what makes the comparison meaningful rather
 than circular.
 
-## 3. In-regime score does not predict transfer, and appears to anti-predict it
+## 3. In-regime score PREDICTS transfer -- and the full oracle is the only arm that degrades
 
-Paired per-episode window rate, 150 episodes, in the training regime:
+> **REWRITTEN 2 Sep, 20:00.** This section previously claimed in-regime performance
+> anti-predicts transfer. **That was wrong and is retracted.** It compared in-regime `success`
+> -- the all-agents conjunction, which this project demoted in August for saturating -- against
+> transfer hard SHD delta. Two different metrics on the two sides of the comparison. Measured
+> consistently they are POSITIVELY correlated. The corrected analysis follows.
 
-| run | greedy | learned | gap | +/-1 SE | significant |
-|---|---|---|---|---|---|
-| 8000ep seed 0 | 0.943 | 0.808 | -0.135 | 0.024 | yes |
-| 8000ep seed 1 | 0.955 | 0.923 | -0.032 | 0.015 | yes |
-| 8000ep seed 2 | 0.957 | 0.843 | -0.113 | 0.021 | yes |
-| 4000ep seed 0 | 0.943 | 0.895 | -0.048 | 0.018 | yes |
-| 4000ep seed 1 | 0.955 | 0.705 | -0.250 | 0.028 | yes |
-| 4000ep seed 2 | 0.957 | 0.785 | -0.172 | 0.024 | yes |
+Learned-minus-greedy hard SHD on both sides, three seeds per rate:
 
-**Every policy is significantly behind greedy in its own training regime, yet two of them
-significantly beat greedy at transfer.** Seed 2 is the sharpest case: -0.113 in-regime,
--0.0106 at transfer. Seed 0 is the reverse -- strongest of the 4000ep runs in-regime, and the
-only one that fails to beat greedy at transfer.
+| rho | in-regime delta | transfer delta | change on moving to sampled |
+|---|---|---|---|
+| 1.00 | -0.00014 | +0.00966 | **+0.00980 WORSE** |
+| 0.95 | +0.00337 | +0.00298 | -0.00039 unchanged |
+| 0.90 | +0.00011 | -0.00927 | -0.00938 better |
+| 0.85 | +0.00053 | -0.00901 | -0.00954 better |
+| 0.80 | -0.00071 | -0.01291 | -0.01220 better |
+| 0.70 | -0.00397 | -0.01661 | -0.01264 better |
+| 0.50 | -0.00606 | -0.01785 | -0.01179 better |
 
-Consequence for methodology: **in-regime performance is not a valid selection signal for
-transfer.** Any procedure that picks checkpoints or seeds on in-regime score is selecting
-against the property being claimed.
+**Pearson +0.703, Spearman +0.786.** In-regime predicts transfer.
 
-## 4. The proxy is calibrated, and its limits are known
+**The finding is the ASYMMETRY, not an inversion.** The full oracle is the only arm that gets
+worse when moved to sampled evidence; every partial-oracle arm gets better relative to greedy,
+and rho=0.95 sits exactly at the pivot. The move also amplifies the effect: in-regime deltas
+span 0.0094, transfer deltas span 0.0275, a factor of **2.9**.
+
+**Why the wrong version was seductive.** rho=1.00 scores 0.980 on `success` and looks
+dominant in-regime; on hard SHD delta it is merely TIED with greedy at -0.00014. Its apparent
+in-regime supremacy was a property of the saturating metric, not of the policy. A cross-metric
+comparison manufactured a reversal that a single-metric comparison does not support.
+
+**Methodological consequence, corrected.** In-regime score is a WEAK but positive predictor of
+transfer, not a misleading one. Selecting checkpoints on in-regime performance is defensible;
+selecting on `success` specifically is not, because it saturates exactly where the arms differ.
+
+## 4. The proxy is calibrated -- but calibration is NOT the mechanism
+
+> **QUALIFIED 2 Sep, 17:50.** Everything measured in this section stands. What it does NOT
+> support is the implication that distribution matching explains the transfer result. The
+> completed rho sweep refutes that: **the best-transferring rate has the WORST distribution
+> match in the sweep, by a factor of 19.**
+>
+> | rho | MAD vs sampled | transfer delta |
+> |---|---|---|
+> | 0.85 | **0.0042** best match | -0.00901 |
+> | 0.70 | 0.0310 | -0.01661 |
+> | 0.50 | **0.0807** worst match | **-0.01785** best transfer |
+>
+> If matching the belief-resolution trajectory were the operative mechanism, transfer would
+> peak at rho=0.85 and fall away either side. It does not; it improves monotonically as the
+> match degrades. This section measures a real quantity that turns out not to be the one
+> driving the effect. Agent A predicted the opposite before rho=0.50 landed, on record, which
+> is what makes the refutation worth something.
+
 
 `scripts/power_vs_sampled_distribution.py` plays a belief-independent `RandomAgent` against
 both evidence regimes on matched seeds, so only the evidence rule differs.
@@ -108,19 +153,36 @@ regime. It does set an absolute floor on achievable SHD for any policy.
 
 ## 5. What is NOT established
 
-* **The full effect is not attributed.** The winning configuration changes answer rate, budget,
-  observation channels, the reprobe signal and episode count together relative to `p10`. The
-  answer rate is isolated by section 2; the -0.012 win as a whole is not.
-* **"Substitutes for sampled training" is unproven.** Every comparison here is against
-  GREEDY under sampled evidence. Establishing substitution needs a sampled-TRAINED policy at
-  the same cell, which is exactly the cost the method exists to avoid. Partial k=8 sampled
-  checkpoints exist in `results/sampled_learned/` and are the closest available proxy.
-* **Scale.** Everything here is k=8 (calibration reaches k=30, the transfer result does not).
+* **The mechanism is unconfirmed.** Four candidates were tested today; two are excluded by
+  measurement:
+  * *calibration / distribution match* -- **EXCLUDED**, section 4: best transfer has the worst
+    match by 19x.
+  * *repeat rate* -- **EXCLUDED**: flat at 0.720-0.749 across every rate, Spearman +0.107,
+    p=0.82. The "withholding makes re-probing pay" story does not appear in the behaviour.
+  * *MI ratio* -- **PARTIAL**: the control sits at 0.452 against a partial-oracle band of
+    0.29-0.36, which matches the threshold but is flat across the slope.
+  * *private-node coverage* -- **LIVE**: Spearman +0.929, p=0.0025 at 3 seeds. Coverage falls
+    0.93 -> 0.80 as withholding rises while total moves stay flat, so effort REALLOCATES from
+    private to shared nodes (14% -> 29% of moves). Confounded with rho, since both are
+    monotone; separating them needs an intervention on coverage at fixed rho.
+* **The full effect is not attributed to the answer rate alone.** The configuration changes
+  rate, budget, channels, reprobe signal and episode count together relative to `p10`. Section
+  2 isolates the rate; the -0.018 win as a whole is not isolated.
+* **"Substitutes for sampled training" is unproven.** Every comparison is against GREEDY under
+  sampled evidence. A sampled-TRAINED arm at k=8 exists (`results/sampled_ref/`) and loses to
+  greedy on 3/3 seeds -- suggestive that the expensive path is not a free win, but confounded
+  by budget 35 vs 70, n_int 200 vs 20, 4000 vs 8000 episodes, and channels off. A matched arm
+  costs 40-60 core-hours and was deliberately not run.
+* **Scale.** Everything here is k=8. Calibration reaches k=30; the transfer result does not.
   The thesis headline cells are k=20 and k=30.
-* **Effect sizes are 2.0-2.4 SE at 40 episodes.** Real but marginal; more episodes would firm
-  this up cheaply.
 * **Which observation feature earns the improvement is unknown.** The channels-vs-reprobe
-  ablation was measured on window rate, which cannot resolve it -- see below.
+  ablation was measured on window rate, which cannot resolve it -- see section 6.
+* **rho=0.95 is not a special point.** It sits 1.5 SE from the straight line through its
+  neighbours; the apparent in-regime "cliff" is 2.5 SE, uncorrected for seven comparisons,
+  against a metric where rho=0.80's own three seeds span twice that. Doubling its training to
+  16,000 episodes left in-regime success unchanged (0.497 -> 0.497) while doubling its variance,
+  and moved transfer from +0.003 to +0.014 on one seed's collapse. **It is a noisy point near
+  the zero crossing, not a threshold.**
 
 ## 6. A metric caveat that invalidates several earlier comparisons
 
@@ -141,10 +203,47 @@ cleanly, and resolved a 0.012 effect on 40 episodes.
 
 ## 7. Files
 
-* Transfer: `results/power/TRANSFER_seed{0,1,2}_final.json`
+* Transfer grid (21 cells): `results/power/rho/xfer_rho*_s*.json`
+* Training (21 cells): `results/power/rho/rho*_s*.json`
+* Curve summary: `results/power/rho/CURVE.json`; figure `results/power/rho/rho_curve.png`
 * Answer-rate isolation: `results/power/transfer_p{10,07,05}.json`, `results/power/p{10,07,05}.json`
 * Calibration: `results/power/dist_compare_k8_b35_with_error.json`, `dist_compare_k{12,20,30}.json`
-* Checkpoint sweeps: `results/power/ckptsweep_{4k,long}_s{0,2}.json`
-* Tooling: `scripts/power_vs_sampled_distribution.py`, `scripts/power_window_rate.py`,
-  `scripts/checkpoint_sweep_window_rate.py`, `scripts/diversity_probe.py`
-* Feature: `--observe_reprobe_signal` (`ma/env.py::_reprobe_signal`), opt-in, off by default
+* Mechanism probes: `results/power/rho/repeat/` (coverage + repeat rate, 3 seeds x 7 rates)
+* Argmax diagnostic and control: `results/power/rho/argmax/`
+* rho=0.95 doubled-training arm: `results/power/rho/rho0.95_long_s*.json` and its transfer
+* Sampled-trained reference (confounded, see section 5): `results/sampled_ref/`
+* Tooling: `scripts/run_rho_fleet.sh`, `scripts/rho_transfer_daemon.sh`,
+  `scripts/rho_curve_report.py`, `scripts/plot_rho_curve.py`,
+  `scripts/power_vs_sampled_distribution.py`, `scripts/diversity_probe.py`,
+  `scripts/power_window_rate.py`, `scripts/keep_awake.py`
+
+## 8. Methods note: how the four wrong claims in this document were made
+
+Four claims were stated and retracted on 2 Sep. They share one cause and it is worth naming,
+because the same shape will recur in any sweep of this sort.
+
+| retracted claim | what was actually compared |
+|---|---|
+| an interior optimum in the transfer curve | four rates, before the fifth and sixth landed |
+| a rho=0.95 anomaly | one point against six, no multiple-comparison correction |
+| "weak policies" explaining that anomaly | argmax gap and transfer -- two measures of ONE quantity |
+| in-regime anti-predicts transfer | in-regime `success` against transfer hard SHD |
+
+**Every one came from comparing across a condition that was not held fixed** -- number of
+seeds, position on a noisy curve, two proxies for the same underlying property, and two
+different metrics. None came from a coding error, and all four survived casual review because
+the numbers involved were individually correct.
+
+Two practices caught them, and both are cheap:
+
+1. **Plot the spread, not the mean.** The rho=0.95 "cliff" is invisible as a defect until the
+   seed error bars are drawn, at which point rho=0.80's own three seeds visibly span more than
+   the dip being pointed at. `plot_rho_curve.py` panel 2 now draws them for this reason.
+2. **State the falsification before the data lands.** Six predictions were registered in
+   `AGENT_B_INBOX.md` before their measurements; four were refuted. Without the prior
+   registration, at least two of those would have been quietly reinterpreted as support.
+
+The verdict logic in `rho_curve_report.py` also had to be given a seed guard after it printed
+DOSE-RESPONSE SUPPORTED on two single-seed rates, via `np.nanmean` silently dropping their
+missing standard errors. A verdict function that can fire on absent data is worse than none,
+and it fired in the direction its author wanted.
