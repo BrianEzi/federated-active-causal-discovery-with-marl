@@ -141,6 +141,63 @@ out += ["",
         "fixed at 4,000 episodes across all twenty cells; mixing budgets between cells would",
         "confound the axis being varied. Report them beside the sweep as a limitation of it.", ""]
 
+# --- RQ2: the partial oracle ------------------------------------------------------------------
+# Written before the deterministic grid finished building, so it degrades to a note rather
+# than raising when the files are absent -- CLAIMS.md must stay regenerable at any moment.
+RATES = [1.00, 0.95, 0.90, 0.85, 0.80, 0.70, 0.50]
+WIN_AT_OR_BELOW = 0.90
+grid = {}
+for r in RATES:
+    for s in (0, 1, 2):
+        p = TR / "power" / f"xfer_rho{r:.2f}_s{s}.json"
+        if p.exists():
+            d = json.loads(p.read_text())
+            grid[(r, s)] = (d[0] if isinstance(d, list) else d)
+
+out += ["## C6 — Training under a partial oracle transfers to sampled evidence", ""]
+if len(grid) < len(RATES) * 3:
+    out += [f"**NOT YET AVAILABLE** -- {len(grid)} of {len(RATES) * 3} cells present in",
+            "`thesis_results/power/`. Chapter 4 may assert nothing here until the grid is",
+            "complete. Do not fill the gap from `docs/FINDINGS_TRANSFER_2026_09_02.md`; that",
+            "note quotes the pre-fix grid.", ""]
+else:
+    out += ["| $\\rho$ | learned | myopic | paired $\\Delta$ | seed SE | ahead beyond 2 SE |",
+            "|---|---|---|---|---|---|"]
+    for r in RATES:
+        cells = [grid[(r, s)] for s in (0, 1, 2)]
+        dl = np.array([c["paired"]["learned-greedy"]["delta"] for c in cells])
+        sig = sum(c["paired"]["learned-greedy"]["delta"] < 0
+                  and abs(c["paired"]["learned-greedy"]["delta"])
+                  > 2 * c["paired"]["learned-greedy"]["se"] for c in cells)
+        out.append(f"| {r:.2f} | {np.mean([c['means']['learned']['hard'] for c in cells]):.5f} "
+                   f"| {np.mean([c['means']['greedy']['hard'] for c in cells]):.5f} "
+                   f"| {dl.mean():+.5f} | {dl.std(ddof=1) / np.sqrt(3):.5f} | {sig}/3 |")
+    lo = [c for (r, _), c in grid.items() if r <= WIN_AT_OR_BELOW]
+    hi = [c for (r, _), c in grid.items() if r > WIN_AT_OR_BELOW]
+
+    def sig_ahead(cs):
+        return sum(c["paired"]["learned-greedy"]["delta"] < 0
+                   and abs(c["paired"]["learned-greedy"]["delta"])
+                   > 2 * c["paired"]["learned-greedy"]["se"] for c in cs)
+
+    out += ["",
+            f"* $\\rho \\le {WIN_AT_OR_BELOW}$: {sum(c['paired']['learned-greedy']['delta'] < 0 for c in lo)}"
+            f"/{len(lo)} cells ahead by sign, **{sig_ahead(lo)}/{len(lo)} ahead beyond 2 SE**",
+            f"* $\\rho > {WIN_AT_OR_BELOW}$: {sum(c['paired']['learned-greedy']['delta'] < 0 for c in hi)}"
+            f"/{len(hi)} ahead by sign, **{sig_ahead(hi)}/{len(hi)} ahead beyond 2 SE**", ""]
+    out += [
+        "**Boundary.** One cell -- $k_v=8$, four agents, budget 70, `factored` backend. The",
+        "curve is monotone and saturating over the swept range; no interior optimum is claimed",
+        "and no floor, since $\\rho < 0.50$ was not measured. The myopic column is identical at",
+        "every rate by construction: the baseline arms are the same per-episode vectors reused",
+        "across rates, which is an exact pairing and a check that the comparison did not move.",
+        "**MUST NOT** say \"no high-rate cell beats the myopic rule\" without the 2 SE",
+        "qualifier. Two of the six high-rate cells are numerically ahead and both are inside",
+        "noise; the claim is about significance, not sign, and an earlier draft of the findings",
+        "note blurred the two.",
+        "**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`. The",
+        "pre-fix grid was scored without a seeded torch RNG and is not reproducible.", ""]
+
 path = TR / "CLAIMS.md"
 path.write_text("\n".join(out))
 print(f"wrote {path.relative_to(ROOT)}: {len(out)} lines")

@@ -76,6 +76,25 @@ REGISTRY = [
       "results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/lrcheck/*.json"],
      "results/central/jobs/*.sh and jobs2/*.sh, then global_shd_paired.py"),
+
+    ("power",
+     "RQ2, the answer-rate arm. Policies trained under a PARTIAL ORACLE -- ancestry answers "
+     "withheld with probability 1 - rho, ~0.085 s/episode -- evaluated under genuine sampled "
+     "evidence at 6-9 s/episode, which they never saw in training. The grid is 7 rates x 3 "
+     "seeds x 200 paired episodes, taken from `deterministic/`: the same 21 cells were first "
+     "built on an evaluation path that did not seed the torch RNG, so a learned arm scored "
+     "with --sample was not reproducible, and `deterministic/` is the rebuild after that fix. "
+     "Do not mix the two directories in one table. transfer_p{10,07,05} with p{10,07,05} is "
+     "the isolation pair, differing in exactly one config field. repeat/ carries the coverage "
+     "and repeat-rate mechanism probes; argmax/ the action-selection control.",
+     "4.2 (RQ2), figure rho_curve",
+     ["results/power/rho/deterministic/xfer_rho*_s?.json",
+      "results/power/rho/rho[01].[0-9]*_s?.json",
+      "results/power/rho/CURVE.json",
+      "results/power/transfer_p[0-9][0-9].json", "results/power/p[0-9][0-9].json",
+      "results/power/rho/repeat/*.json", "results/power/rho/argmax/*.json"],
+     "scripts/run_rho_fleet.sh, then scripts/rebuild_grid_deterministic.sh, then "
+     "scripts/rho_curve_report.py --dir results/power/rho/deterministic"),
 ]
 
 
