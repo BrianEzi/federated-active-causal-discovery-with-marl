@@ -150,7 +150,10 @@ def fig_attribution_law(out: pathlib.Path):
     for line in proc.stdout.splitlines():
         parts = line.split()
         if len(parts) == 7 and parts[0].startswith("k") and parts[1].isdigit():
-            rows.append((parts[0], int(parts[1]), float(parts[4]), float(parts[5])))
+            # parts[6] is the residual as printed; deriving it from the rounded
+            # predicted/measured columns loses a digit and understates the maximum.
+            rows.append((parts[0], int(parts[1]), float(parts[4]), float(parts[5]),
+                         abs(float(parts[6]))))
     if not rows:
         print("!! attr_model.py produced no parseable rows; skipping the law figure")
         return
@@ -164,10 +167,10 @@ def fig_attribution_law(out: pathlib.Path):
                zorder=4, label="two or more peers")
     ax.scatter([r[2] for r in excluded], [r[3] for r in excluded], s=42, facecolors="none",
                edgecolors=MYOPIC, zorder=4, label="one peer (model excludes)")
-    for cell, peers, pred, meas in rows:
+    for cell, peers, pred, meas, _r in rows:
         ax.annotate(cell.replace("k", "$k$="), (pred, meas), fontsize=6.5,
                     xytext=(4, -3), textcoords="offset points", color="#555555")
-    resid = max(abs(m - p) for _, peers, p, m in rows if peers > 1)
+    resid = max(r for _, peers, _p, _m, r in rows if peers > 1)
     ax.set_xlim(0, lim); ax.set_ylim(0, lim)
     ax.set_aspect("equal")
     ax.set_xlabel(r"predicted: $0.76 \times$ share of single-pair latents")
