@@ -24,6 +24,19 @@ At $k_v=30$ the paired per-seed differences are -0.00009 +/- 0.00034, -0.00040 +
 indistinguishable. The earlier reading of this line said two of three; that was
 measured before the evaluation RNG was seeded and is withdrawn.
 **MUST NOT** quote a ratio of means at $k_v=30$; one seed carries the whole of it.
+**MUST NOT** read this axis as monotone in $k_v$, and MUST NOT say the sweep holds the
+training budget fixed. It does not. Verified from `config.train_episodes` over all 60
+runs: 18 cells at 4,000 episodes and 2 at 12,000, and the two at 12,000 are
+`k20s50n04b150` and `k30s50n04b150` -- the two that carry the headline. Window size and
+training budget are perfectly collinear across the last two points.
+(FINDINGS_WINDOW_BUDGET_CONFOUND_2026_09_02.md, agent C.)
+**WHAT SURVIVES, and it is more than that note allows.** $k_v=4$, $8$ and $12$ are all
+at 4,000 episodes, so the recovery gap over those three points -- -0.075, -0.025, +0.058
+-- is a clean within-budget comparison, and it contains the sign change. The monotone
+trend and the crossover may both be stated over $k_v \le 12$. What may NOT be done is
+extend the trend to $k_v=20$ and $30$, where the budget triples with the window.
+The uniform-budget version of this axis is `tab:12k_k` in thesis/Tables12k.tex, which
+reports all five windows at 12,000 episodes.
 **MUST NOT** describe $k_v=8$ as favouring either arm. Per seed the paired differences
 are -0.00016 (ns), -0.00059 (SIG, learned ahead) and +0.00096 (ns): the seeds disagree
 and the mean is carried by seed 2. The crossover is between 8 and 12, and 8 is the
