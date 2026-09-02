@@ -38,6 +38,22 @@ REGISTRY = [
      ["results/sweep/oracle/k*s*n*b*_s?.json"],
      "scripts/ma_train.py per results/sweep/oracle/jobs/*.sh"),
 
+    ("sweep12k",
+     "THE PRIMARY SWEEP. Every cell retrained to 12,000 episodes, the budget at which the "
+     "policies converge, and measured with scripts/global_shd_paired.py at the selected "
+     "checkpoint, the final update, and update 500 (8,000 episodes). The 4,000-episode "
+     "`sweep` folder is retained because Chapter 4 reports what that budget did to three "
+     "structural claims, not because it is the headline. Joint recovery has the learned arm "
+     "ahead of the myopic rule in 2 of 18 cells at 4,000 episodes and 16 of 18 at 12,000.",
+     "RQ1, tables tab:12k_*, figure crossover_budget",
+     ["results/sweep12k/k*s*n*b*_s?.json",
+      "results/sweep12k/shd/*.json", "results/sweep12k/shd_final/*.json",
+      "results/sweep12k/shd_u0500/*.json",
+      "results/longcheck/shd_n05_12k.json", "results/longcheck/shd_n08_12k.json",
+      "results/longcheck/shd_n10_12k.json", "results/longcheck/shd_s75_12k.json"],
+     "scripts/build_sweep12k.py to generate jobs, then scripts/measure_sweep12k.py "
+     "--conventions best,final,u0500"),
+
     ("checkpoint",
      "Early-stopped against final policy on the window-size axis, 200 paired episodes per "
      "seed. Establishes that the checkpoint choice is inert below the crossover and worth "
@@ -137,19 +153,31 @@ def build(check_only: bool) -> int:
         lines += [f"## `{folder}/` — {section}", "", claim, "",
                   f"Regenerate with: `{command}`", "",
                   "| file | sha256 (16) | source |", "|---|---|---|"]
+        # Two sources can share a basename. results/sweep12k/shd/, shd_final/ and shd_u0500/
+        # all hold `<cell>.json`, so a flat copy silently overwrote two of the three
+        # conventions with the third -- 108 files collapsing to 76, with no error anywhere.
+        # Disambiguate by the source's parent directory whenever a name repeats in this folder.
+        seen_names = {}
+        for src in files:
+            seen_names.setdefault(src.name, []).append(src)
+        clashing = {n for n, v in seen_names.items() if len(v) > 1}
+        if clashing:
+            print(f"  {folder}: {len(clashing)} basenames appear in more than one source "
+                  f"directory; prefixing those with their parent")
         for src in files:
             digest = sha(src)
             rel = src.relative_to(ROOT)
-            dst = target / src.name
+            name = f"{src.parent.name}__{src.name}" if src.name in clashing else src.name
+            dst = target / name
             if check_only:
                 if not dst.exists():
-                    print(f"  MISSING  {folder}/{src.name}"); missing += 1
+                    print(f"  MISSING  {folder}/{name}"); missing += 1
                 elif sha(dst) != digest:
-                    print(f"  DRIFTED  {folder}/{src.name}  (source re-run since copy)"); drift += 1
+                    print(f"  DRIFTED  {folder}/{name}  (source re-run since copy)"); drift += 1
             else:
                 shutil.copy2(src, dst); copied += 1
-            lines.append(f"| `{src.name}` | `{digest}` | `{rel}` |")
-            index.setdefault(folder, []).append({"file": src.name, "sha256_16": digest,
+            lines.append(f"| `{name}` | `{digest}` | `{rel}` |")
+            index.setdefault(folder, []).append({"file": name, "sha256_16": digest,
                                                  "source": str(rel)})
         lines += ["", f"{len(files)} files.", ""]
 

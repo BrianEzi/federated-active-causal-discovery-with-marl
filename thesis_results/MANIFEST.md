@@ -78,6 +78,122 @@ Regenerate with: `scripts/ma_train.py per results/sweep/oracle/jobs/*.sh`
 
 60 files.
 
+## `sweep12k/` — RQ1, tables tab:12k_*, figure crossover_budget
+
+THE PRIMARY SWEEP. Every cell retrained to 12,000 episodes, the budget at which the policies converge, and measured with scripts/global_shd_paired.py at the selected checkpoint, the final update, and update 500 (8,000 episodes). The 4,000-episode `sweep` folder is retained because Chapter 4 reports what that budget did to three structural claims, not because it is the headline. Joint recovery has the learned arm ahead of the myopic rule in 2 of 18 cells at 4,000 episodes and 16 of 18 at 12,000.
+
+Regenerate with: `scripts/build_sweep12k.py to generate jobs, then scripts/measure_sweep12k.py --conventions best,final,u0500`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `k04s50n04b150_s0.json` | `429e2434973f1d7f` | `results/sweep12k/k04s50n04b150_s0.json` |
+| `k04s50n04b150_s1.json` | `43a7888ece40a830` | `results/sweep12k/k04s50n04b150_s1.json` |
+| `k04s50n04b150_s2.json` | `7bd468b439ba5046` | `results/sweep12k/k04s50n04b150_s2.json` |
+| `k08s50n04b150_s0.json` | `68d83035b67f8fd4` | `results/sweep12k/k08s50n04b150_s0.json` |
+| `k08s50n04b150_s1.json` | `9b612ebf50129cc3` | `results/sweep12k/k08s50n04b150_s1.json` |
+| `k08s50n04b150_s2.json` | `84985252a28a70db` | `results/sweep12k/k08s50n04b150_s2.json` |
+| `k12s25n02b150_s0.json` | `cc1ba4529e676252` | `results/sweep12k/k12s25n02b150_s0.json` |
+| `k12s25n02b150_s1.json` | `78c629a5f4e85438` | `results/sweep12k/k12s25n02b150_s1.json` |
+| `k12s25n02b150_s2.json` | `1cf9d31735174b67` | `results/sweep12k/k12s25n02b150_s2.json` |
+| `k12s25n04b150_s0.json` | `5ab20e4bc27ac30e` | `results/sweep12k/k12s25n04b150_s0.json` |
+| `k12s25n04b150_s1.json` | `9096a658ca07c1f7` | `results/sweep12k/k12s25n04b150_s1.json` |
+| `k12s25n04b150_s2.json` | `abc7c6b42e20421f` | `results/sweep12k/k12s25n04b150_s2.json` |
+| `k12s25n08b150_s0.json` | `9aabc6d0e8acf230` | `results/sweep12k/k12s25n08b150_s0.json` |
+| `k12s25n08b150_s1.json` | `6bf1460d2e98c860` | `results/sweep12k/k12s25n08b150_s1.json` |
+| `k12s25n08b150_s2.json` | `3f80ee2d9aa2218d` | `results/sweep12k/k12s25n08b150_s2.json` |
+| `k12s50n02b150_s0.json` | `bd2fa64602af5ef3` | `results/sweep12k/k12s50n02b150_s0.json` |
+| `k12s50n02b150_s1.json` | `9add3212e496c01f` | `results/sweep12k/k12s50n02b150_s1.json` |
+| `k12s50n02b150_s2.json` | `5047e1d62ad567d2` | `results/sweep12k/k12s50n02b150_s2.json` |
+| `k12s50n03b150_s0.json` | `44b8336c5f1cb339` | `results/sweep12k/k12s50n03b150_s0.json` |
+| `k12s50n03b150_s1.json` | `897d538f79fc708a` | `results/sweep12k/k12s50n03b150_s1.json` |
+| `k12s50n03b150_s2.json` | `b28124e5fbdacaf6` | `results/sweep12k/k12s50n03b150_s2.json` |
+| `k12s50n04b100_s0.json` | `4bc65994d1551985` | `results/sweep12k/k12s50n04b100_s0.json` |
+| `k12s50n04b100_s1.json` | `d95fb0367e007ac0` | `results/sweep12k/k12s50n04b100_s1.json` |
+| `k12s50n04b100_s2.json` | `f0136cc95df44ef5` | `results/sweep12k/k12s50n04b100_s2.json` |
+| `k12s50n04b120_s0.json` | `90703f0a7313bbd8` | `results/sweep12k/k12s50n04b120_s0.json` |
+| `k12s50n04b120_s1.json` | `2af007e59e8054a7` | `results/sweep12k/k12s50n04b120_s1.json` |
+| `k12s50n04b120_s2.json` | `d609f059d8e68849` | `results/sweep12k/k12s50n04b120_s2.json` |
+| `k12s50n04b150_s0.json` | `2848ae0da0436fe4` | `results/sweep12k/k12s50n04b150_s0.json` |
+| `k12s50n04b150_s1.json` | `024677e453372a96` | `results/sweep12k/k12s50n04b150_s1.json` |
+| `k12s50n04b150_s2.json` | `13eaef4f8212d4b4` | `results/sweep12k/k12s50n04b150_s2.json` |
+| `k12s50n04b200_s0.json` | `4591e778f62a2607` | `results/sweep12k/k12s50n04b200_s0.json` |
+| `k12s50n04b200_s1.json` | `7476179cdfd74ef1` | `results/sweep12k/k12s50n04b200_s1.json` |
+| `k12s50n04b200_s2.json` | `c9795b82fe204435` | `results/sweep12k/k12s50n04b200_s2.json` |
+| `k12s50n04b500_s0.json` | `9e9218e936f7db1a` | `results/sweep12k/k12s50n04b500_s0.json` |
+| `k12s50n04b500_s1.json` | `cfebf9282e0a8a13` | `results/sweep12k/k12s50n04b500_s1.json` |
+| `k12s50n04b500_s2.json` | `0f6e8dfe64e2fcc8` | `results/sweep12k/k12s50n04b500_s2.json` |
+| `k12s50n05b150_s0.json` | `226aac33595dfb3e` | `results/sweep12k/k12s50n05b150_s0.json` |
+| `k12s50n05b150_s1.json` | `9622e72de5ba93df` | `results/sweep12k/k12s50n05b150_s1.json` |
+| `k12s50n05b150_s2.json` | `b8f7f73d1bf5eb24` | `results/sweep12k/k12s50n05b150_s2.json` |
+| `k12s50n08b150_s0.json` | `0434b8f76e009ac6` | `results/sweep12k/k12s50n08b150_s0.json` |
+| `k12s50n08b150_s1.json` | `a67e01770683e95b` | `results/sweep12k/k12s50n08b150_s1.json` |
+| `k12s50n08b150_s2.json` | `159ee50fb9c70023` | `results/sweep12k/k12s50n08b150_s2.json` |
+| `k12s50n10b150_s0.json` | `2a5a2a22d5f80e27` | `results/sweep12k/k12s50n10b150_s0.json` |
+| `k12s50n10b150_s1.json` | `ac3f7b8895c4383c` | `results/sweep12k/k12s50n10b150_s1.json` |
+| `k12s50n10b150_s2.json` | `599f2b8b882c10af` | `results/sweep12k/k12s50n10b150_s2.json` |
+| `k12s75n02b150_s0.json` | `88ed4418e462b535` | `results/sweep12k/k12s75n02b150_s0.json` |
+| `k12s75n02b150_s1.json` | `88a25cea0cdc36db` | `results/sweep12k/k12s75n02b150_s1.json` |
+| `k12s75n02b150_s2.json` | `36fa7a3476fbb186` | `results/sweep12k/k12s75n02b150_s2.json` |
+| `k12s75n04b150_s0.json` | `45a5f2528ee92438` | `results/sweep12k/k12s75n04b150_s0.json` |
+| `k12s75n04b150_s1.json` | `273bc5ac56b35457` | `results/sweep12k/k12s75n04b150_s1.json` |
+| `k12s75n04b150_s2.json` | `1041c0c4f3603aa3` | `results/sweep12k/k12s75n04b150_s2.json` |
+| `k12s75n08b150_s0.json` | `cdb403e06218391f` | `results/sweep12k/k12s75n08b150_s0.json` |
+| `k12s75n08b150_s1.json` | `b17a24e9914f185f` | `results/sweep12k/k12s75n08b150_s1.json` |
+| `k12s75n08b150_s2.json` | `f071a3c55c6b714c` | `results/sweep12k/k12s75n08b150_s2.json` |
+| `shd__k04s50n04b150.json` | `3d84d18829f42a84` | `results/sweep12k/shd/k04s50n04b150.json` |
+| `shd__k08s50n04b150.json` | `308121a666a8cc58` | `results/sweep12k/shd/k08s50n04b150.json` |
+| `shd__k12s25n02b150.json` | `63282c8f4f3ce801` | `results/sweep12k/shd/k12s25n02b150.json` |
+| `shd__k12s25n04b150.json` | `0b2a60c97971d275` | `results/sweep12k/shd/k12s25n04b150.json` |
+| `shd__k12s25n08b150.json` | `2d7524e70ff5866b` | `results/sweep12k/shd/k12s25n08b150.json` |
+| `shd__k12s50n02b150.json` | `ee2d9d9635734826` | `results/sweep12k/shd/k12s50n02b150.json` |
+| `shd__k12s50n03b150.json` | `014335b99f60cf0b` | `results/sweep12k/shd/k12s50n03b150.json` |
+| `shd__k12s50n04b100.json` | `fbb46b7128cb37ac` | `results/sweep12k/shd/k12s50n04b100.json` |
+| `shd__k12s50n04b120.json` | `eacc2053a6471ad0` | `results/sweep12k/shd/k12s50n04b120.json` |
+| `shd__k12s50n04b150.json` | `92c6a9a3eaae41fd` | `results/sweep12k/shd/k12s50n04b150.json` |
+| `shd__k12s50n04b200.json` | `a78d4a220681c6e2` | `results/sweep12k/shd/k12s50n04b200.json` |
+| `shd__k12s50n04b500.json` | `f3efcebd5d03dd9d` | `results/sweep12k/shd/k12s50n04b500.json` |
+| `shd__k12s75n02b150.json` | `56df3bc9b45ec427` | `results/sweep12k/shd/k12s75n02b150.json` |
+| `shd__k12s75n08b150.json` | `c423f7a980194bdd` | `results/sweep12k/shd/k12s75n08b150.json` |
+| `shd_final__k04s50n04b150.json` | `e818d6352fde6be2` | `results/sweep12k/shd_final/k04s50n04b150.json` |
+| `shd_final__k08s50n04b150.json` | `d7d759da1e9b14e0` | `results/sweep12k/shd_final/k08s50n04b150.json` |
+| `shd_final__k12s25n02b150.json` | `d3ca24d4d3ae6a83` | `results/sweep12k/shd_final/k12s25n02b150.json` |
+| `shd_final__k12s25n04b150.json` | `b3b1451f92d1aada` | `results/sweep12k/shd_final/k12s25n04b150.json` |
+| `shd_final__k12s25n08b150.json` | `289ff95762932a31` | `results/sweep12k/shd_final/k12s25n08b150.json` |
+| `shd_final__k12s50n02b150.json` | `84a0ea037f3d51dc` | `results/sweep12k/shd_final/k12s50n02b150.json` |
+| `shd_final__k12s50n03b150.json` | `7163af7f62e3387e` | `results/sweep12k/shd_final/k12s50n03b150.json` |
+| `shd_final__k12s50n04b100.json` | `6880a6855d44babb` | `results/sweep12k/shd_final/k12s50n04b100.json` |
+| `shd_final__k12s50n04b120.json` | `ec903fd7f9c2db72` | `results/sweep12k/shd_final/k12s50n04b120.json` |
+| `shd_final__k12s50n04b150.json` | `7fa18c3509069f1e` | `results/sweep12k/shd_final/k12s50n04b150.json` |
+| `shd_final__k12s50n04b200.json` | `5b0e70d7e8bd0e4c` | `results/sweep12k/shd_final/k12s50n04b200.json` |
+| `shd_final__k12s50n04b500.json` | `544c8e9a3940cf0e` | `results/sweep12k/shd_final/k12s50n04b500.json` |
+| `shd_final__k12s50n05b150.json` | `43a72825430126f7` | `results/sweep12k/shd_final/k12s50n05b150.json` |
+| `k12s50n08b150.json` | `e02e06957c21b868` | `results/sweep12k/shd_final/k12s50n08b150.json` |
+| `k12s50n10b150.json` | `70548377582aadb2` | `results/sweep12k/shd_final/k12s50n10b150.json` |
+| `shd_final__k12s75n02b150.json` | `286682671e785991` | `results/sweep12k/shd_final/k12s75n02b150.json` |
+| `shd_final__k12s75n04b150.json` | `08896e6c55488d97` | `results/sweep12k/shd_final/k12s75n04b150.json` |
+| `shd_final__k12s75n08b150.json` | `c8e6a0e2ce230d0e` | `results/sweep12k/shd_final/k12s75n08b150.json` |
+| `shd_u0500__k04s50n04b150.json` | `b513086afd14b95f` | `results/sweep12k/shd_u0500/k04s50n04b150.json` |
+| `shd_u0500__k08s50n04b150.json` | `4a65425fa8b74da0` | `results/sweep12k/shd_u0500/k08s50n04b150.json` |
+| `shd_u0500__k12s25n02b150.json` | `95daa1a36418adaf` | `results/sweep12k/shd_u0500/k12s25n02b150.json` |
+| `shd_u0500__k12s25n04b150.json` | `9031880225dc8755` | `results/sweep12k/shd_u0500/k12s25n04b150.json` |
+| `shd_u0500__k12s25n08b150.json` | `7d581b5671567680` | `results/sweep12k/shd_u0500/k12s25n08b150.json` |
+| `shd_u0500__k12s50n02b150.json` | `39de3de2338f5ed4` | `results/sweep12k/shd_u0500/k12s50n02b150.json` |
+| `shd_u0500__k12s50n03b150.json` | `f9ffa7632c3e313d` | `results/sweep12k/shd_u0500/k12s50n03b150.json` |
+| `shd_u0500__k12s50n04b100.json` | `f2fc6aef1bb44bc5` | `results/sweep12k/shd_u0500/k12s50n04b100.json` |
+| `shd_u0500__k12s50n04b120.json` | `e57edc9b6e787f43` | `results/sweep12k/shd_u0500/k12s50n04b120.json` |
+| `shd_u0500__k12s50n04b150.json` | `8ec8225d4988890e` | `results/sweep12k/shd_u0500/k12s50n04b150.json` |
+| `shd_u0500__k12s50n04b200.json` | `2ad5ec457eaa956b` | `results/sweep12k/shd_u0500/k12s50n04b200.json` |
+| `shd_u0500__k12s50n04b500.json` | `e9ef89ba1eced374` | `results/sweep12k/shd_u0500/k12s50n04b500.json` |
+| `shd_u0500__k12s50n05b150.json` | `8764eb151a982c5d` | `results/sweep12k/shd_u0500/k12s50n05b150.json` |
+| `shd_u0500__k12s75n02b150.json` | `a7bca6d023b69d49` | `results/sweep12k/shd_u0500/k12s75n02b150.json` |
+| `shd_u0500__k12s75n04b150.json` | `85ee3518973509fa` | `results/sweep12k/shd_u0500/k12s75n04b150.json` |
+| `shd_n05_12k.json` | `2765890352ab4825` | `results/longcheck/shd_n05_12k.json` |
+| `shd_n08_12k.json` | `e226be006e03aede` | `results/longcheck/shd_n08_12k.json` |
+| `shd_n10_12k.json` | `79711fe5ef3b1d09` | `results/longcheck/shd_n10_12k.json` |
+| `shd_s75_12k.json` | `4fe3ca6da8ae32d2` | `results/longcheck/shd_s75_12k.json` |
+
+105 files.
+
 ## `checkpoint/` — 4.1.1 and 4.2 (RQ1), figure checkpoint
 
 Early-stopped against final policy on the window-size axis, 200 paired episodes per seed. Establishes that the checkpoint choice is inert below the crossover and worth 2.3x at k=20 and 16x at k=30 above it.
