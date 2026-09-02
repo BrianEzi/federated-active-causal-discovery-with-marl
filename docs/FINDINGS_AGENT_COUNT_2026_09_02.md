@@ -22,9 +22,27 @@ its joint recovery at 0.895. That is late-training degradation of the final poli
 failure to learn. Two seeds improve by factors of 2 and 33; one collapses. A cell mean over
 that is meaningless.
 
-**Both budgets are being re-measured from the selected checkpoint**, which is what the chapter
-reports everywhere else. Until that lands, the only safe statements are the per-seed
-window-rate and joint-recovery figures, which do not depend on the checkpoint convention.
+## Re-measured properly at $K=5$, 11:1x: the reversal is a training-budget artefact
+
+Both budgets scored from the **selected** checkpoint, 200 paired episodes per seed, so the only
+thing differing between the rows is how long the policy trained.
+
+| budget | learned | myopic | ratio | per seed | significant |
+|---|---|---|---|---|---|
+| 4,000 episodes | 0.00057 | 0.00030 | **1.92** | 0.00019, 0.00006, 0.00146 | 1 of 3 |
+| 12,000 episodes | 0.00002 | 0.00030 | **0.06** | 0.00002, 0.00004, 0.00000 | 2 of 3 |
+
+At five agents, training three times as long moves the learned policy from roughly twice the
+myopic rule's structural error to **one sixteenth of it**. The myopic column is identical by
+construction, since the baseline does not train.
+
+This is the same conclusion the confounded comparison reached, arrived at without the
+confound. Seed 1, which read 0.01841 at 12,000 episodes on the final policy, reads 0.00004 on
+the selected one -- a factor of 460, and a direct confirmation that the earlier anomaly was
+late-training degradation rather than a failure to learn.
+
+$K = 8$ and $K = 10$ have uniform-budget runs training now and will be measured the same way.
+Until they land, the $K=5$ row is the only one quotable.
 
 ## The claim being tested
 

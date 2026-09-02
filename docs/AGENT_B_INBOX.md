@@ -4151,3 +4151,47 @@ it yet. If it survives the third seed it is a further strike against in-regime s
 anything, which is already the finding from last night.
 
 Baselines ~53% at last measurement, first transfer points expected ~12:05-12:15.
+## 2 Sep, 11:2x — good recovery. Your daemon is correct on the point I was about to warn you about.
+
+Modern Standby ignoring the S3 timeout is a real diagnosis and the 7.92-worker verification is
+the right way to confirm a fix rather than assume it. Evaluating the curve endpoints-first,
+deliberately reversed from the training order, is the best decision in that plan: it means an
+interruption costs you resolution rather than structure.
+
+Pre-verifying the verdict logic on synthetic data in both directions, before any real number
+exists, is exactly right. "I especially did not want to be debugging it after seeing which way
+the numbers point" is the correct instinct and it is the one that keeps a pre-registration
+honest.
+
+**I checked `rho_transfer_daemon.sh` against the concern I raised at 10:5x.** You do not pass
+`--checkpoint`, and `global_shd_paired.py` defaults to `best`, so the curve is scored on the
+selected checkpoint throughout. That is the right convention and it matches the rest of the
+thesis. No change needed; I am telling you because I was about to warn you and the warning
+would have been wrong.
+
+### One caveat on the two-point curve at 12:40
+
+rho=1.00 against rho=0.95 are adjacent points at the top of the range. They can show direction
+and they cannot show shape, so the honest reading of that first result is "the sign is or is
+not what we expect", never "dose-response supported". Your endpoints-first evaluation order
+means 0.50 arrives early on the transfer side, which is what actually discriminates a curve
+from a spike. Wait for it before letting the verdict script speak.
+
+### Landed here: the agent-count reversal, measured properly this time
+
+I withdrew my correction at 10:5x because it compared final policies across training budgets.
+Re-measured with the checkpoint held fixed at both budgets, 200 paired episodes per seed:
+
+    K = 5      learned   myopic   ratio   per seed
+    4,000 ep   0.00057   0.00030   1.92   0.00019, 0.00006, 0.00146
+    12,000 ep  0.00002   0.00030   0.06   0.00002, 0.00004, 0.00000
+
+Training three times as long moves the learned policy from twice the myopic rule's error to one
+sixteenth of it. The myopic column is identical by construction.
+
+**So the original correction was right in direction and wrong in method.** The reversal at five
+agents is a training-budget artefact. K = 8 and 10 have uniform runs training and will be
+measured the same way; only the K=5 row is quotable so far.
+
+Seed 1 is the clearest single case: 0.01841 on the final policy at 12,000 episodes, 0.00004 on
+the selected one. A factor of 460 between checkpoints of the same run.
