@@ -53,10 +53,21 @@ def _ckpt(k: int, which: str):
     return json.loads((ROOT / f"results/ckpt/k{k:02d}_{which}.json").read_text())
 
 
-def _sweep_success(k: int):
-    """Joint recovery rate per seed, from the sweep run's own evaluation pass."""
+def _sweep_success(k: int, budget: int = 4000):
+    """Joint recovery rate per seed, from the run's own evaluation pass.
+
+    WHICH BUDGET, AND WHY IT HAS TO BE A PARAMETER. `results/sweep/oracle/` is NOT one design:
+    k=4, 8 and 12 trained for 4,000 episodes and k=20 and 30 for 12,000. Drawing all five from
+    that directory puts a budget change inside the x-axis, so a line through it shows window
+    size and training budget together. `results/sweep12k/` holds k=4, 8 and 12 at 12,000; the
+    two largest windows are the same files either way, because they were always at 12,000.
+    """
+    d = "results/sweep12k" if budget == 12000 else "results/sweep/oracle"
+    paths = sorted(glob.glob(str(ROOT / d / f"k{k:02d}s50n04b150_s*.json")))
+    if not paths and budget == 12000:          # k=20 and k=30 live only in the sweep directory
+        paths = sorted(glob.glob(str(ROOT / f"results/sweep/oracle/k{k:02d}s50n04b150_s*.json")))
     out = []
-    for path in sorted(glob.glob(str(ROOT / f"results/sweep/oracle/k{k:02d}s50n04b150_s*.json"))):
+    for path in paths:
         arms = json.loads(pathlib.Path(path).read_text())["arms"]
         out.append((arms["learned"]["success"], arms["greedy_uncertainty"]["success"]))
     return out
@@ -64,24 +75,37 @@ def _sweep_success(k: int):
 
 # ---------------------------------------------------------------------------------------
 def fig_crossover(out: pathlib.Path):
-    """THE headline figure: both criteria change sign between k=8 and k=12."""
+    """The window axis at both training budgets.
+
+    The 4,000-episode line crosses zero between k=8 and k=12 and the 12,000-episode line does
+    not cross at all. Reporting only the first, which is what this figure used to do, reports
+    the budget as though it were the window. The lower panel is SHD at the selected checkpoint
+    from results/rerows, which is the 4,000-episode design for k<=12 and 12,000 for k=20 and 30;
+    its budget is stated in the caption rather than mixed silently.
+    """
     fig, (top, bottom) = plt.subplots(2, 1, figsize=(5.0, 5.2), sharex=True,
                                       gridspec_kw={"height_ratios": [1, 1.15]})
 
-    gaps_mean, gaps_seed = [], []
-    for k in KS:
-        pairs = _sweep_success(k)
-        gaps = [l - g for l, g in pairs]
-        gaps_mean.append(np.mean(gaps))
-        gaps_seed.append(gaps)
     top.axhline(0, color="black", lw=0.8)
-    for x, gaps in zip(KS, gaps_seed):
-        top.scatter([x] * len(gaps), gaps, s=14, color=LEARNED, alpha=0.45, zorder=3)
-    top.plot(KS, gaps_mean, "o-", color=LEARNED, lw=1.6, ms=5, zorder=4)
+    # Two lines, because the sign change is a property of the 4,000-episode budget and not of
+    # the window. At 12,000 the gap is positive at every window and there is no crossing.
+    for budget, colour, style, label in ((4000, MYOPIC, "o--", "4,000 episodes"),
+                                         (12000, LEARNED, "o-", "12,000 episodes")):
+        ks, means = [], []
+        for k in KS:
+            pairs = _sweep_success(k, budget)
+            if not pairs:
+                continue
+            gaps = [l - g for l, g in pairs]
+            ks.append(k)
+            means.append(np.mean(gaps))
+            top.scatter([k] * len(gaps), gaps, s=13, color=colour, alpha=0.4, zorder=3)
+        top.plot(ks, means, style, color=colour, lw=1.6, ms=5, zorder=4, label=label)
     top.set_ylabel("joint recovery rate\nlearned $-$ myopic")
-    top.set_title("Both criteria change sign between $k_v=8$ and $k_v=12$")
-    top.annotate("myopic sufficient", xy=(5.2, -0.055), fontsize=8, color="#555555")
-    top.annotate("learning pays", xy=(21, 0.06), fontsize=8, color="#555555")
+    top.set_title("The sign change belongs to the budget, not the window")
+    top.legend(loc="lower right", frameon=False, fontsize=8)
+    top.annotate("no 4,000-episode runs\nexist at $k_v=20$ or $30$", xy=(19, -0.05),
+                 fontsize=7, color="#666666")
 
     for label, arm, colour in (("learned (selected)", "learned", LEARNED),
                                ("myopic", "greedy", MYOPIC),
@@ -109,7 +133,6 @@ def fig_crossover(out: pathlib.Path):
     bottom.legend(loc="upper right", frameon=False)
     for ax in (top, bottom):
         ax.set_xticks(KS)
-        ax.axvspan(8, 12, color="black", alpha=0.045, zorder=0)
     fig.tight_layout()
     fig.savefig(out / "crossover.pdf", bbox_inches="tight")
     plt.close(fig)
