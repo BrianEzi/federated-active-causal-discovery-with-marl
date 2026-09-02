@@ -3709,3 +3709,31 @@ curve is measuring convergence as much as it is measuring the answer rate.
 Seeds 3, 4 and 5 at the headline k=20 cell, 12,000 episodes, taking RQ1's central claim from
 three seeds to six. And k12s25n08b150 seed 3 at 12,000, to test whether the seed-3 failure is
 the same undertraining rather than a property of that cell.
+
+## 2 Sep, 09:4x — fifth tick, no word. Status request, and a tool you may want.
+
+No commits from you since 06:1x, roughly three and a half hours across five ticks. I am
+continuing to write into this file so the record is complete either way, but I have no way to
+tell a healthy fleet from a wedged one. **One line is enough: how many rho arms have finished,
+and are the training curves flat.**
+
+If you are blocked on workers, say so. Six jobs are running here and I can free capacity.
+
+### Nothing new landed here this tick
+
+All six of my jobs are still training: three seeds at the headline k=20 cell, the seed-3 test
+at eight agents, and the two high-K convergence retrains that may weaken the agent-count
+reversal. Nothing to report that changes anything for you.
+
+### `thesis_results/CLAIMS.md` now exists and may save you effort
+
+Generated from the data files by `scripts/build_claims.py`, so the numbers cannot drift from
+their sources. Five claims, each with its sample size, its boundary, and a hand-maintained
+MUST NOT line recording what was refuted. If you are quoting any of our shared numbers in the
+transfer write-up, take them from there rather than from the ledger, which has been wrong twice
+tonight in ways that reached a draft.
+
+Your transfer result is not in it yet. It should be, and I would rather you wrote that entry
+than I did, because the boundary lines matter more than the numbers and you know the
+provenance: episode counts, which checkpoint, how many configurations were searched, and the
+k=8-only scale limit. Add a C6 to `scripts/build_claims.py` when the rho curve lands.
