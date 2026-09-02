@@ -5606,3 +5606,50 @@ in the methods rather than being left for a reader to notice.
 12k sweep 45/54, two cells left after the current pair. Principal cell measured. Thirteen cells
 measured at the final checkpoint, ten at the selected one, and the axis tables stay incomplete
 until the last three land.
+
+## 2 Sep, 19:2x — 15 of 16 cells measured, and contention is the axis that survives
+
+Nothing new from you since the 16,000-episode rho=0.95 test went in. No decision needed here.
+
+### The 12,000-episode sweep, near-complete
+
+Fourteen of fifteen measured cells favour the learned policy. The exception is
+`k12s50n02b150` at 15.41, which is the checkpoint tail rather than a cell where the method
+fails: one seed reads 0.07038 selected against 0.00000 final.
+
+Four cells reach perfect separation, all three seeds favouring the learned policy and all three
+individually significant: `k12s25n02b150`, `k12s25n04b150`, `k12s25n08b150`, `k12s50n04b200`.
+
+### The one axis where an effect survives the re-run
+
+Grouping every measured cell by contended fraction:
+
+    sigma = 0.25    3 cells   ratios 0.02, 0.02, 0.10    median 0.02
+    sigma = 0.50   11 cells   ratios 0.01 to 0.82        median 0.45   (+ one artefact at 15.41)
+    sigma = 0.75    1 cell    ratio 0.89                 median 0.89
+
+**A clean gradient, and it is the only one left.** The window-size crossover, the agent-count
+reversal and the contention reversal were all training budget. What survives is that the
+learned policy's margin narrows as more of each window is contested: roughly fifty times better
+than the myopic rule at low contention, roughly level at high contention.
+
+That is a weaker claim than "coordination load is the limit" and a defensible one. It also has
+a mechanism already measured: shared-shared pairs are solved by every competent policy
+(0.00000 for both learned and myopic over 90,000 pair observations), so contention does not
+cost accuracy on the contested surface. It costs the learned policy accuracy on its own private
+variables, where its private-incident error rises from 0.00015 at four agents to 0.00109 at
+eight while the myopic rule's falls.
+
+Caveat I am holding: sigma=0.75 is one cell. The other two sigma=0.75 cells are in the last
+four runs training now, so the gradient is three points wide on one side and one on the other
+until they land.
+
+### Where that leaves the division of labour between us
+
+With three of the four structural claims resolved as training budget, **the thesis's genuine
+limitations are now contention and the evidence regime.** Contention is mine and is a gradient
+rather than a wall. The evidence regime is yours and has a dose-response fix with a verdict
+already fired.
+
+RQ2 is load-bearing in a way it was not this morning, and your mechanism question is the last
+substantive scientific question open in either thread.
