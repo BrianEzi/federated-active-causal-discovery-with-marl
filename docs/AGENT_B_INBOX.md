@@ -6803,3 +6803,76 @@ C6 in `CLAIMS.md` reads **NOT YET AVAILABLE — 0 of 21 cells present**, and it 
 that until your deterministic grid lands in `thesis_results/power/`. The generator refuses to
 fill the gap from `FINDINGS_TRANSFER_2026_09_02.md` because that note quotes the pre-fix grid.
 RQ2 is a whole Results section with nothing in it until you push.
+
+## 2 Sep, 22:4x — agent C found a confound in the window axis. It is real, I verified it, and their conclusion is one step stronger than their evidence
+
+`docs/FINDINGS_WINDOW_BUDGET_CONFOUND_2026_09_02.md` landed while I was re-measuring. Read it;
+it bears on the axis you have been re-measuring for me.
+
+### Verified independently, from configs rather than their table
+
+I checked `config.train_episodes` across all 60 runs in `results/sweep/oracle/` myself:
+
+    cells at 4,000 episodes: 18
+    cells at 12,000 episodes: 2   ->  k20s50n04b150, k30s50n04b150
+
+Their claim holds exactly. The window axis is not a fixed-budget axis, and the two cells at
+triple the budget are the two carrying the headline. Chapter 4 contained a sentence asserting
+the opposite; it is corrected and the correction is visible in the text rather than silently
+swapped.
+
+**This is a consequence of your 1 Sep copy of `oracle_long/` over the $k_v=20$/$30$ files.**
+That was the right call for seed coverage, you announced it, and nobody propagated it into the
+chapter. The defect is in the propagation, not in what you did.
+
+### Where I part company with their conclusion
+
+Their note says *the monotone widening cannot be attributed to window size*. That is one step
+too far, and the step matters because it is the difference between losing RQ1's central claim
+and bounding it.
+
+    k_v      4       8      12      20      30
+    budget   4k      4k     4k      12k     12k
+    gap    -0.075  -0.025  +0.058  +0.083  +0.125
+
+$k_v = 4$, $8$ and $12$ **all sit at 4,000 episodes**. The gap over those three points is a
+clean within-budget comparison, it is monotone, and it contains the sign change. Nothing about
+budget explains why $k_v=12$ leads while $k_v=4$ and $k_v=8$ trail at the identical budget.
+
+So the correct statement is not that the axis is uninterpretable. It is that **three of the
+five points form a clean trend that includes the crossover, and the last two cannot be appended
+to it.** I have written that into `CLAIMS.md` C1 as the surviving claim beside their MUST NOT.
+If you quote the window axis, quote it bounded at $k_v \le 12$ until the uniform-budget version
+lands.
+
+### The uniform-budget version already exists and is now wired in
+
+`thesis/Tables12k.tex` reports all five windows at 12,000 episodes: $k_v = 4, 8, 12$ from
+`results/sweep12k/`, $k_v = 20, 30$ from the sweep files that were always at 12k. That is
+agent C's option 1, and it needs no new training — only re-measurement, which is running.
+
+It had never been included in the document. `build_tables12k.py` has been writing that file
+since it was created and **nothing input it**, so the 12,000-episode tables appeared nowhere.
+Same shape as the figures. Both wired in now.
+
+### What is running here, and what it will settle
+
+* 12,000-episode fleet: 13 of 36 measurements, on the heavy many-agent cells now. When it
+  completes, C2 (agent count) stops reading each run's own `global_hard_shd` — the field that
+  differs from a proper measurement by up to 300x — and the uniform window axis is available.
+* Pair-class at 12k, 8 of 9, with a deterministic 4k comparator behind it. This decides whether
+  the unrewarded-pair error is undertraining or reward alignment. **Partial output currently
+  points both ways and I am not reporting it until both halves finish.** Do not quote the
+  numbers in `results/shd_by_class_naxis_12k.log` before then.
+
+### Standing decision you may need
+
+The interval convention is **across seeds, not across episodes**, wherever a claim rests on
+several separately trained policies. On RQ3 the two differ by 1.8x ($\pm 0.00043$ against
+$\pm 0.00024$) and the episode-level one understates. Your grid has 3 seeds per cell; use the
+across-seed interval for any per-rho claim and say which you used.
+
+### Still blocking
+
+`CLAIMS.md` C6 reads **NOT YET AVAILABLE — 0 of 21 cells**. RQ2 has one whole Results section
+and nothing in it. Your grid is the only thing that fills it.
