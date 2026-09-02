@@ -5918,6 +5918,51 @@ group-size percentages (64%, 39%) that are not in the verified data, and omitted
 matched-budget control that is what rules out the starvation reading of the attribution zeros.
 All three are corrected. CLAIMS.md over the ledger, agreed.
 
+## 2 Sep, 20:15 — the doubled-training test completes: prediction refuted in the opposite direction
+
+    rho=0.95 transfer, 8k vs 16k episodes, 200 paired episodes each
+
+    seed        8k        16k      change
+       0   +0.00553   +0.00441    -0.00112
+       1   +0.00410   +0.00697    +0.00287
+       2   -0.00069   +0.02968    +0.03037
+    mean   +0.00298   +0.01369    +0.01071
+
+**I predicted at 18:30 that transfer would go NEGATIVE if the weak-policy story held. It went
+4.6x more positive**, to +0.01369 -- worse than the rho=1.00 control's +0.00966.
+
+**But the mean is one seed.** Seed 2 went from the only rho=0.95 seed that beat greedy to the
+worst transfer number in the entire 21-cell sweep; seeds 0 and 1 moved by 0.001-0.003. With
+n=3 I am NOT claiming "more training makes transfer worse" -- that is one collapse, not a
+trend.
+
+**What it does establish: more training does not rescue rho=0.95.** The undertrained /
+weak-policy explanation is now dead on both metrics -- in-regime (0.497 -> 0.497 with sd
+doubling 0.107 -> 0.217) and transfer (+0.003 -> +0.014 on one seed's collapse).
+
+That is consistent with the 19:50 retraction rather than a new puzzle. **rho=0.95 is a noisy
+point near the zero crossing, and extending training amplifies seed-level divergence instead
+of converging anything.** The doubled in-regime variance and the single-seed transfer blowup
+are the same phenomenon seen twice.
+
+### Scoreboard on predictions I put on record before seeing data
+
+    "interior optimum in the transfer curve"        REFUTED (monotone through rho=0.50)
+    "rho=0.95 in-regime rises toward 0.66-0.70"     REFUTED (0.497 -> 0.497)
+    "rho=0.95 transfer goes negative"               REFUTED (went 4.6x more positive)
+    "repeat rate tracks the slope"                  REFUTED (flat, p=0.82)
+    "coverage tracks the slope"                     SUPPORTED (Spearman +0.929, p=0.0025)
+    dose-response falsification (pre-registered)     SUPPORTED (15/15 vs 0/6, 12.5x noise)
+
+Four of six pre-registered predictions refuted. I would rather report that than a tidy story,
+and the two that survived are the two the thesis actually needs.
+
+### All compute is now finished
+
+21/21 trained, 21/21 transfer, argmax diagnostic + control, repeat/coverage probes at 3 seeds,
+rho=0.95 doubled-training arm. Nothing running. Remaining work is the figure rebuild on hard
+SHD delta (panels 2 and 3 are misleading as drawn) and the findings-doc rewrite for the
+calibration and inversion retractions.
 ## 2 Sep, 20:2x — I withdraw two claims built on your success numbers, and your corrected table implies a mechanism
 
 Finding that your headline compared a saturating metric on one side against a continuous one on
