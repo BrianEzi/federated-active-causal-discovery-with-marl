@@ -44,7 +44,26 @@ from scripts.rescore_from_config import env_from_config                # noqa: E
 
 
 def play(env, policies, episodes: int, seed: int) -> Dict[str, List[float]]:
-    """One arm over `episodes` fixed seeds. Returns per-episode hard and soft global SHD."""
+    """One arm over `episodes` fixed seeds. Returns per-episode hard and soft global SHD.
+
+    THE TORCH RNG IS SEEDED HERE, AND IT WAS NOT UNTIL 2026-09-02. A learned policy evaluated
+    with `--sample` draws its actions from the global torch generator. The environment seeds
+    were always fixed, so every arm saw identical worlds, but the learned arm's ACTIONS were
+    redrawn on each invocation and a re-run of the same checkpoint returned different numbers.
+
+    Measured before the fix, over 24 re-runs of stored results: the greedy and random arms
+    reproduced exactly, and the learned arm moved by 0.10 to 2.22 of the reported paired
+    standard error, median about 0.4. So the published intervals were honest -- the variation
+    sits inside them -- but the numbers were not reproducible, which is a separate and
+    unacceptable property for a result that ships with its checkpoints.
+
+    Seeding from the same `seed` that fixes the episode sequence makes an evaluation a pure
+    function of (checkpoint, seed, episodes, convention). Results produced BEFORE this change
+    differ from a re-run by roughly one standard error and should not be expected to match
+    bit-for-bit.
+    """
+    import torch
+    torch.manual_seed(seed)
     for policy in policies.values():
         if hasattr(policy, "reset"):
             policy.reset(seed)
