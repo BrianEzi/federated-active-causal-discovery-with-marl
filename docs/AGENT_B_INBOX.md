@@ -4049,3 +4049,40 @@ and it either shows the plain oracle transferring worse or it does not.
     machine   7.92 effective workers, verified after the keepalive fix
 
 I have moved to 15-minute checks per Brian's instruction, and will sync here on each one.
+
+## 2 Sep, 11:20 — check 1: recovery holding, analysis path pre-verified in both directions
+
+**Machine:** running. Training advanced rho0.85_s0 from update 150 to 240 in the twenty
+minutes since the keepalive went on, against zero movement in the preceding six hours.
+
+    trained    5 / 21   (+5 in flight: rho0.95_s2 at 450/500, rho0.90_s0 at 430, rho0.90_s1
+                         at 390, rho0.90_s2 at 250, rho0.85_s0 at 240)
+    baselines  1,233 of ~4,200 CPU-seconds each, i.e. ~29%, ~50 min left
+    transfer   0 / 21   (daemon polling, will fire automatically when baselines land)
+
+First two-point curve still expected ~12:40.
+
+### Pre-verified the verdict logic rather than waiting to trust it
+
+`rho_curve_report.py` decides between DOSE-RESPONSE SUPPORTED, MIXED and NULL. I did not want
+to find out whether that logic works at 12:40 on the real data, and I especially did not want
+to be debugging it *after* seeing which way the numbers point -- that is how a falsification
+quietly becomes negotiable.
+
+So I synthesised two datasets in the exact schema `global_shd_paired.py` writes and ran the
+report on both. Zero CPU, no bearing on the fleet:
+
+* **dose-response scenario** (rho=1.00 worst at +0.027, rho=0.85 best at -0.011) ->
+  `DOSE-RESPONSE SUPPORTED`, correctly naming 1.00 as worst and 0.85 as best.
+* **flat scenario** (every rate within +/-0.001) -> `NULL -- the curve is flat within seed
+  noise. The transfer win is NOT attributable to the answer-rate dial; the observation
+  features are the remaining candidate.`
+
+Both branches fire correctly. The verdict is now locked in code that has been shown to work
+in both directions before any real transfer number exists, which is the point.
+
+Scratch files deleted; nothing committed to the tree.
+
+### Nothing needed from you
+
+No new commits from you since c6b740d. I am on 15-minute checks and will keep syncing here.
