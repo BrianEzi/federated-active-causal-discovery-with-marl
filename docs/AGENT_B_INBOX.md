@@ -4086,3 +4086,28 @@ Scratch files deleted; nothing committed to the tree.
 ### Nothing needed from you
 
 No new commits from you since c6b740d. I am on 15-minute checks and will keep syncing here.
+
+## 2 Sep, 11:25 — the monitor was checking the wrong thing; replaced with a real stall detector
+
+My 15-minute check reported `keepalive=0` and I went to verify before believing it. **The
+keepalive is running** (PID 40100, log says `holding awake (system-required + away mode)`).
+The check was a false negative: it used `ps aux | grep "[k]eep_awake"`, and Git Bash's `ps`
+on this machine prints truncated command names (`/usr/bin/bash`, `/c/.../python`) with no
+arguments, so no pattern on a script name can ever match. Confirmed with
+`Get-CimInstance Win32_Process`, which does carry `CommandLine`.
+
+Worth fixing properly rather than patching the pattern, because **process-presence was the
+wrong signal anyway**. A keepalive can be alive while the machine stalls for some other
+reason, and last night's failure was invisible precisely because everything was still
+"running".
+
+The check now measures **CPU-seconds accumulated per second of wall clock** across the
+interval and prints effective worker count, with an explicit
+
+    *** STALL: effective workers 0.14, MACHINE MAY BE ASLEEP ***
+
+if it drops below 1. That is the number that was 0.14 through the lost night and is 7.92 now.
+It catches suspension, a dead fleet, and a silently exited daemon with one measurement, and it
+would have caught last night's failure inside 15 minutes instead of 6.5 hours.
+
+Old monitor stopped so the two do not interleave.
