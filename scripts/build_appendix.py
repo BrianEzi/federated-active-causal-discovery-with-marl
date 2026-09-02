@@ -265,7 +265,7 @@ the myopic rule applied to the attribution belief rather than the structural one
 WITHDRAWN = r"""
 \paragraph{Withdrawn during the work.} Five claims about attribution were made during
 this work and later withdrawn; the record of every withdrawal is
-\S\ref{sec:res_negative}, and the five that concern this appendix are kept beside the
+Appendix~\ref{app:negative}, and the five that concern this appendix are kept beside the
 results they qualify.
 
 \begin{table}[htbp]
@@ -431,7 +431,7 @@ def appendix_attribution():
           "with the reward unchanged (Table~\\ref{tab:attrbackend}): at $4{,}000$ episodes it\n"
           "reaches $0.400$, $0.355$ and $0.205$ joint recovery against the myopic rule's $0.945$,\n"
           "$0.955$ and $0.935$ on the same cell. $4{,}000$ episodes is a budget three structural\n"
-          "claims elsewhere in this work did not survive (\\S\\ref{sec:res_negative}), so this\n"
+          "claims elsewhere in this work did not survive (Appendix~\\ref{app:negative}), so this\n"
           "measures the backend at that budget rather than the backend's ceiling.\n\n"
         + tbl("Training under the attribution belief backend at $k_v=12$, four agents, "
               "$4{,}000$ episodes, scored on the structural criterion.",
