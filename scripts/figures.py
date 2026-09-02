@@ -48,9 +48,24 @@ LEARNED, MYOPIC, RANDOM, THIRD = "#0072B2", "#D55E00", "#999999", "#009E73"
 KS = [4, 8, 12, 20, 30]
 
 
+# Where a 12,000-episode measurement of the window axis lives. k=4, 8 and 12 were retrained
+# into results/sweep12k/; k=20 and k=30 were always at 12,000 and are measured in
+# results/rerows/. Both were produced by scripts/global_shd_paired.py under a seeded
+# evaluation. results/ckpt/ is the superseded pre-fix set and is not read by anything here.
+CKPT12 = {4:  "results/sweep12k/shd{fin}/k04s50n04b150.json",
+          8:  "results/sweep12k/shd{fin}/k08s50n04b150.json",
+          12: "results/sweep12k/shd{fin}/k12s50n04b150.json",
+          20: "results/rerows/k20_{which}.json",
+          30: "results/rerows/k30_{which}.json"}
+
+
 def _ckpt(k: int, which: str):
-    """results/ckpt/k04_best.json etc -- one entry per seed."""
-    return json.loads((ROOT / f"results/ckpt/k{k:02d}_{which}.json").read_text())
+    """One entry per seed, at 12,000 training episodes, for checkpoint convention `which`."""
+    tmpl = CKPT12[k]
+    path = ROOT / tmpl.format(which=which, fin="" if which == "best" else "_final")
+    if not path.exists():
+        raise FileNotFoundError(f"no 12,000-episode {which} measurement for k={k}: {path}")
+    return json.loads(path.read_text())
 
 
 def _sweep_success(k: int, budget: int = 4000):
@@ -139,7 +154,15 @@ def fig_crossover(out: pathlib.Path):
 
 
 def fig_checkpoint(out: pathlib.Path):
-    """The selected and final policies agree below the crossover and diverge above it."""
+    """Selected against final checkpoint, at 12,000 episodes on every window.
+
+    The title used to read "inert below the crossover and decisive above it". At a uniform
+    12,000 episodes there is no crossover to be below, and the earlier reading was confounded:
+    the windows where the conventions agreed were exactly the cells trained for 4,000 episodes
+    and the ones where they diverged were exactly the two trained for 12,000. Selection runs
+    once per checkpoint, so three times the updates give it three times the chances to retain
+    an exploratory policy. That is a budget effect, not a window effect.
+    """
     fig, ax = plt.subplots(figsize=(5.0, 2.9))
     floor = 1e-5
     for which, label, colour, style in (("best", "selected (early-stopped)", LEARNED, "-"),
@@ -156,10 +179,9 @@ def fig_checkpoint(out: pathlib.Path):
     ax.set_yscale("log")
     ax.set_ylim(7e-6, 3e-2)
     ax.set_xticks(KS)
-    ax.axvspan(8, 12, color="black", alpha=0.045, zorder=0)
     ax.set_xlabel("window size $k_v$")
     ax.set_ylabel("SHD on committed marks")
-    ax.set_title("Checkpoint choice is inert below the crossover and decisive above it")
+    ax.set_title("Neither checkpoint convention is safe alone at 12,000 episodes")
     ax.legend(loc="lower left", frameon=False)
     fig.tight_layout()
     fig.savefig(out / "checkpoint.pdf", bbox_inches="tight")
@@ -217,8 +239,14 @@ def fig_federation(out: pathlib.Path):
                 vals.append(arms[key]["success"])
         return vals
 
-    cells = [("$k_v=12$", "results/central/v2_k12_{a}_s*.json"),
-             ("$k_v=20$", "results/central/v2_k20_{a}_s*.json")]
+    # BUDGETS DIFFER BETWEEN THESE ROWS AND THE FIGURE SAYS SO. The k=12 ladder trained for
+    # 4,000 episodes and the k=20 ladder for 12,000. Retrains of the k=12 arms at 12,000 are
+    # in results/central12k/ and this function switches to them automatically once all twelve
+    # exist, so the figure cannot silently keep reporting the shorter budget.
+    twelve = sorted((ROOT / "results/central12k").glob("v2_k12_?_s?.json"))
+    k12 = ("results/central12k/v2_k12_{a}_s?.json" if len(twelve) >= 12
+           else "results/central/v2_k12_{a}_s*.json")
+    cells = [("$k_v=12$", k12), ("$k_v=20$", "results/central/v2_k20_{a}_s*.json")]
     series = [("random", "random_vary", RANDOM),
               ("myopic, fixed partition", "greedy_partitioned", THIRD),
               ("myopic, uncoordinated", "greedy_uncertainty", MYOPIC),
@@ -258,19 +286,63 @@ WINDOW_FLOOR, WINDOW_TAIL = 0.70, 10
 
 def _sweep_rows():
     """One row per (cell, seed), with the competence-floor statistic attached."""
+    # 12,000 episodes everywhere. results/sweep12k/ holds the 18 retrained cells; k=20 and
+    # k=30 exist only in results/sweep/oracle/ and were always trained at 12,000, so they are
+    # added from there. Nothing at 4,000 episodes reaches this figure.
     rows = []
-    for path in sorted((ROOT / "results/sweep/oracle").glob("*.json")):
+    seen = set()
+    sources = list(sorted((ROOT / "results/sweep12k").glob("k*s*n*b*_s?.json")))
+    sources += [q for q in sorted((ROOT / "results/sweep/oracle").glob("k*s*n*b*_s?.json"))
+                if q.stem.startswith(("k20", "k30"))]
+    for path in sources:
         m = CELL_RE.match(path.stem)
-        if not m:
+        if not m or path.stem in seen:
             continue
+        seen.add(path.stem)
         d = json.loads(path.read_text())
-        if "arms" not in d:
+        if "arms" not in d or d.get("config", {}).get("train_episodes") != 12000:
             continue
         tail = [h.get("window_rate", 0.0) for h in (d.get("history") or [])[-WINDOW_TAIL:]]
+        cell = re.match(r"(k\d+s\d+n\d+b\d+)_s(\d)", path.stem).group(1)
         rows.append(dict(k=int(m[1]), sigma=int(m[2]) / 100, n=int(m[3]), beta=int(m[4]) / 100,
-                         seed=d.get("seed"),
-                         wr=(sum(tail) / len(tail) if tail else 0.0), arms=d["arms"]))
+                         seed=d.get("seed"), cell=cell,
+                         wr=(sum(tail) / len(tail) if tail else 0.0), arms=d["arms"],
+                         shd=_measured_shd(cell, d.get("seed"))))
     return rows
+
+
+# Cells whose selected-checkpoint measurement was taken during the undertraining work and
+# lives outside results/sweep12k/shd/. Same script, same conventions.
+_PRE12 = {"k12s50n05b150": "results/longcheck/shd_n05_12k.json",
+          "k12s75n04b150": "results/longcheck/shd_s75_12k.json",
+          "k12s50n08b150": "results/longcheck/shd_n08_12k.json",
+          "k12s50n10b150": "results/longcheck/shd_n10_12k.json"}
+_SHD_CACHE: dict = {}
+
+
+def _measured_shd(cell: str, seed):
+    """Per-arm structural distance from a PAIRED MEASUREMENT, not from the run's own field.
+
+    WHY THIS EXISTS. Each training run records `global_hard_shd` from its own evaluation pass,
+    which scores the policy at its last update. That is not what the thesis reports, and on a
+    long run the two differ by up to a factor of 300 on the same seed -- the defect that put a
+    ratio of 20.79 in a table where the measured value is 0.06. Every SHD panel in this file
+    now reads scripts/global_shd_paired.py output at the selected checkpoint instead.
+    """
+    if cell not in _SHD_CACHE:
+        if cell in _PRE12:
+            q = ROOT / _PRE12[cell]
+        elif cell.startswith(("k20", "k30")):
+            q = ROOT / f"results/rerows/{cell[:3]}_best.json"
+        else:
+            q = ROOT / f"results/sweep12k/shd/{cell}.json"
+        _SHD_CACHE[cell] = ({e["seed"]: e["means"] for e in json.loads(q.read_text())}
+                            if q.exists() else {})
+    means = _SHD_CACHE[cell].get(seed)
+    if not means:
+        return {}
+    return {"learned": means["learned"]["hard"], "greedy_uncertainty": means["greedy"]["hard"],
+            "random_vary": means["random_vary"]["hard"]}
 
 
 def fig_sweep_grid(out: pathlib.Path):
@@ -305,17 +377,25 @@ def fig_sweep_grid(out: pathlib.Path):
         gone = [r for r in sel if r["wr"] < WINDOW_FLOOR]
         for row, (mkey, ylabel, logy) in enumerate(metrics):
             ax = axes[row][col]
-            ceiling = [np.mean([r["arms"]["oracle_cover"][mkey] for r in sel
-                                if r[key] == x and "oracle_cover" in r["arms"]] or [np.nan])
-                       for x in xs]
-            ax.plot(pos, [max(v, floor) if logy else v for v in ceiling], ls=":", color=THIRD,
-                    lw=1.2, zorder=2,
-                    label="full-coverage reference" if (row == 0 and col == 0) else None)
+            # The full-coverage reference exists only as a run-recorded field, so it is drawn
+            # on the recovery row and omitted from the SHD row rather than mixing a recorded
+            # number into a panel of measured ones.
+            if mkey != "global_hard_shd":
+                ceiling = [np.mean([r["arms"]["oracle_cover"][mkey] for r in sel
+                                    if r[key] == x and "oracle_cover" in r["arms"]] or [np.nan])
+                           for x in xs]
+                ax.plot(pos, [max(v, floor) if logy else v for v in ceiling], ls=":",
+                        color=THIRD, lw=1.2, zorder=2,
+                        label="full-coverage reference" if col == 0 else None)
             for label, arm, colour, marker, lw in series:
                 means, seeds = [], []
                 for x in xs:
-                    vals = [r["arms"][arm][mkey] for r in sel
-                            if r[key] == x and r["wr"] >= WINDOW_FLOOR and arm in r["arms"]]
+                    if mkey == "global_hard_shd":
+                        vals = [r["shd"][arm] for r in sel
+                                if r[key] == x and r["wr"] >= WINDOW_FLOOR and arm in r["shd"]]
+                    else:
+                        vals = [r["arms"][arm][mkey] for r in sel
+                                if r[key] == x and r["wr"] >= WINDOW_FLOOR and arm in r["arms"]]
                     means.append(np.mean(vals) if vals else np.nan)
                     seeds.append(vals)
                 for p_, vals in zip(pos, seeds):
@@ -346,8 +426,9 @@ def fig_sweep_grid(out: pathlib.Path):
     axes[0][0].legend(frameon=False, fontsize=7.6, loc="lower left", handlelength=1.6)
     fig.suptitle("Learned experiment selection against myopic and random baselines, "
                  "on every swept axis\n"
-                 "Final-policy evaluation, 3 seeds per cell; runs below the competence floor "
-                 "excluded", fontsize=10)
+                 "12,000 training episodes throughout, 3 seeds per cell. SHD from 200 paired "
+                 "episodes at the selected checkpoint; recovery from the final policy.",
+                 fontsize=10)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     fig.savefig(out / "sweep_grid.pdf", bbox_inches="tight")
     plt.close(fig)
