@@ -96,11 +96,29 @@ def main(argv=None) -> None:
         print(f"  rho={rho:.2f}  {row}")
 
     # -- the falsification, applied ----------------------------------------------------------
-    if len(curve) >= 3:
-        plain = next((c for c in curve if c["rho"] == 1.0), None)
-        best = min(curve, key=lambda c: c["mean_delta"])
-        spread = max(c["mean_delta"] for c in curve) - min(c["mean_delta"] for c in curve)
-        typical_se = float(np.nanmean([c["seed_se"] for c in curve]))
+    # SEED GUARD, added 2 Sep after this fired DOSE-RESPONSE SUPPORTED on two single-seed
+    # rates. With one seed a rate has no `seed_se` at all (nan), so `nanmean` silently took
+    # the SE of the ONLY multi-seed rate and compared a spread built from single points
+    # against it. That is a positive verdict manufactured from missing data, and it is
+    # exactly what the pre-registered falsification exists to stop. A rate now has to carry
+    # at least MIN_SEEDS seeds to enter the verdict at all, and the verdict is withheld
+    # entirely until enough rates qualify.
+    MIN_SEEDS = 2
+    ready = [c for c in curve if c["n_seeds"] >= MIN_SEEDS]
+    pending = [c for c in curve if c["n_seeds"] < MIN_SEEDS]
+    if pending:
+        print(f"\n{len(pending)} rate(s) below {MIN_SEEDS} seeds and excluded from the "
+              f"verdict: " + ", ".join(f"rho={c['rho']:.2f} (n={c['n_seeds']})"
+                                       for c in pending))
+    if len(ready) < 3:
+        print(f"VERDICT WITHHELD -- only {len(ready)} rate(s) have >= {MIN_SEEDS} seeds; "
+              f"need 3 to judge a curve. Nothing here is a finding yet.")
+    else:
+        curve_v = ready
+        plain = next((c for c in curve_v if c["rho"] == 1.0), None)
+        best = min(curve_v, key=lambda c: c["mean_delta"])
+        spread = max(c["mean_delta"] for c in curve_v) - min(c["mean_delta"] for c in curve_v)
+        typical_se = float(np.nanmean([c["seed_se"] for c in curve_v]))
         print(f"\nspread across rates {spread:.5f}, typical seed SE {typical_se:.5f}")
         if plain is None:
             print("VERDICT: cannot apply -- no rho=1.00 control in the directory")
@@ -108,7 +126,7 @@ def main(argv=None) -> None:
             print("VERDICT: NULL -- the curve is flat within seed noise. The transfer win is "
                   "NOT attributable to the answer-rate dial; the observation features are the "
                   "remaining candidate. Report as a null (see module docstring).")
-        elif plain["mean_delta"] == max(c["mean_delta"] for c in curve):
+        elif plain["mean_delta"] == max(c["mean_delta"] for c in curve_v):
             print(f"VERDICT: DOSE-RESPONSE SUPPORTED -- rho=1.00 (plain oracle) is the worst "
                   f"at {plain['mean_delta']:+.5f}, best is rho={best['rho']:.2f} at "
                   f"{best['mean_delta']:+.5f}, spread {spread:.5f} exceeds 2x seed SE.")

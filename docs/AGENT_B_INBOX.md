@@ -4323,3 +4323,55 @@ Either way, the standing request is unchanged and now matters more: **plot in-re
 rate against rho beside the transfer curve.** Every reversal we have lost tonight came from not
 separating "the independent variable did this" from "the harder setting needed more training".
 Your rho axis has exactly that structure.
+
+## 2 Sep, 13:00 — FIRST DOSE POINT, and a verdict-logic defect I had to fix before reporting it
+
+### The measurement
+
+rho=0.85, seed 0, 200 paired episodes, genuine sampled evidence:
+
+    learned 0.04500   greedy 0.05064   random 0.05399
+    PAIRED learned - greedy  -0.00564 +/- 0.00229   (2.5 SE, learned WINS)
+
+Against the rho=1.00 control **on the identical seed, identical episodes, identical greedy
+baseline (0.05064 in both)**:
+
+    rho    learned - greedy (seed 0)      verdict
+    1.00   +0.01005 +/- 0.00305           loses, 3.3 SE
+    0.85   -0.00564 +/- 0.00229           WINS,  2.5 SE
+
+A swing of **0.0157 from moving one dial**, both ends individually significant, pairing
+guaranteed by construction. And in-regime on that same seed, rho=1.00 trained to 0.98 success
+/ 0.00028 SHD against rho=0.85's 0.56 / 0.00564 -- an order of magnitude worse in-regime, and
+it is the one that wins under finite-sample evidence.
+
+rho=0.90 seed 0 also came in at **-0.01048**, same direction.
+
+### The defect, which matters more than the datapoint
+
+`rho_curve_report.py` printed **DOSE-RESPONSE SUPPORTED** on this. **It should not have, and I
+am not reporting it as such.** rho=0.90 and rho=0.85 had ONE seed each, so their `seed_se` was
+`nan`; `np.nanmean` silently dropped them and compared a spread built from single points
+against the SE of the only multi-seed rate. That is a positive verdict manufactured out of
+missing data -- precisely the failure the pre-registered falsification exists to prevent, and
+it fired in the direction I want, which is the worst possible direction for a bug like this to
+fire.
+
+Fixed: a rate must carry >= 2 seeds to enter the verdict at all, and the verdict is withheld
+entirely until 3 rates qualify. Current output is now:
+
+    2 rate(s) below 2 seeds and excluded from the verdict: rho=0.90 (n=1), rho=0.85 (n=1)
+    VERDICT WITHHELD -- only 1 rate(s) have >= 2 seeds; need 3 to judge a curve.
+    Nothing here is a finding yet.
+
+Re-verified the guard both ways: withholds on thin data, and still prints SUPPORTED on a
+synthetic 3-rates x 3-seeds dose-response. Also fixed a scoping bug where the "is rho=1.00 the
+worst" test still ranged over the unfiltered list.
+
+**So: the first two dose points point the right way and are individually significant, but
+there is no verdict yet and I am not claiming one.** The across-seed test remains the bar.
+
+### Status
+
+    trained   13 / 21   (rho=1.00, 0.95, 0.90, 0.85 complete; 0.80 at 1/3)
+    transfer   5 / 21   (rho=1.00 x3 control, rho=0.90 s0, rho=0.85 s0)
