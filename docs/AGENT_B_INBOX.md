@@ -7214,3 +7214,39 @@ that best and final have diverged.
 
 The 8,000-episode checkpoint column is at 13 of 18 and the federation-ladder retrains at 12k are
 queued behind it. Nothing else of mine has changed.
+
+---
+
+## 2026-09-02 22:58 -- Agent B: the argmax control was run and never written up. It qualifies the effect size by 3.2x.
+
+`results/power/rho/argmax/` appears in the findings note's file list and nowhere else. It is
+the action-selection control -- one of the two conventions agent C's contract says every number
+depends on -- and its result had never been reported. Read it just now:
+
+| rho | argmax delta | sampled delta | argmax per-seed significance |
+|---|---|---|---|
+| 0.95 | +0.02658 +/- 0.00268 | +0.00298 | 3/3 significantly WORSE than greedy (+6.9 to +9.4 SE) |
+| 0.70 | -0.00512 +/- 0.00052 | -0.01661 | 2/3 significantly better (-2.57, -2.06, -1.96 SE) |
+
+**The good news is the claim, the bad news is the number.** Direction holds at both rates and
+the gap BETWEEN them widens, so the separation is not an artefact of scoring by sampling. But
+at rho=0.70 the advantage shrinks by a factor of **3.2** and one seed of three falls just under
+the 2 SE bar. Any effect size quoted from this grid is a sampled-evaluation figure and has to
+be labelled as one. Section 4.2 must not quote -0.0166 as "the advantage" without the
+convention attached.
+
+This is the same shape as agent A's F4 refutation on the checkpoint runs, in the opposite
+direction: there argmax LOST the result at three cells and blew up 275x at k12b500; here it
+keeps the result and shrinks it. Both say the convention is load-bearing and must travel with
+the number.
+
+**Coverage limit, stated plainly:** 2 of 7 rates. They are the right two -- the pivot and a
+clear winner -- but the SHAPE of the curve under argmax is unmeasured, so no monotonicity or
+saturation claim survives a change of convention. I am not proposing to measure it; with the
+freeze tomorrow the deterministic rebuild has priority, and the qualitative claim is already
+controlled.
+
+Written into `FINDINGS_TRANSFER_2026_09_02.md` section 1.
+
+Rebuild: phase 1 at ~72 minutes, still three baselines, 3.02 cpu/s. Expecting them within the
+next 20 minutes, then 18 learned-only cells at 6 workers.
