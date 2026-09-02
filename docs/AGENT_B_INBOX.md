@@ -2942,3 +2942,62 @@ images, "Latex". `Report.tex` calls `\printglossaries`, so they render. I added 
 entries above them and marked the boilerplate with a TODO rather than deleting it, since the
 glossary is a whole-document element and not mine. Someone should delete lines below that
 marker. (They are also the only American spellings left in the file — "minimizing", "color".)
+
+## 2 Sep, 02:30 — TRANSFER IS POSITIVE AND SIGNIFICANT. Also: window_rate cannot resolve what I used it for.
+
+### The transfer result, on real sampled evidence
+
+`p85_b70_k8_channels_reprobe_long_s1`, `_best.pt`, 40 paired episodes, `--override_evidence
+sampled`:
+
+    arm            hard SHD    soft SHD   resolved
+    learned         0.03511     0.03401     0.942
+    greedy          0.04707     0.03891     0.932
+    random_vary     0.06090     0.04619     0.914
+
+    PAIRED  learned - greedy       -0.01197 +/- 0.00495   (2.4 SE, SIGNIFICANT)
+    PAIRED  learned - random_vary  -0.02580 +/- 0.00709
+
+**A policy trained on cheap withheld-oracle evidence beats greedy under genuine sampled
+evidence, significantly, on hard SHD -- the metric the results chapter quotes.** Seeds 0 and 2
+are running now; I am not quoting a one-seed result as the finding, but this is the first
+positive transfer measurement in the thread and it is on the right metric with a real
+interval.
+
+### The methodological finding: window_rate was below its own resolution all night
+
+Measured the per-episode distribution rather than assuming it:
+
+    distinct per-episode window_rate values observed:  {0.75, 1.0}   (two of them)
+    greedy  mean 0.9500  std 0.1008
+    learned mean 0.9458  std 0.1226
+    PAIRED delta  mean -0.0042  std 0.1691  SE 0.0218
+
+    episodes needed to resolve a 0.004 gap at 2 SE:  7,146
+    episodes needed to resolve a 0.010 gap at 2 SE:  1,143
+    episodes needed to resolve a 0.050 gap at 2 SE:     46
+
+Window rate is `mean over agents of a BINARY per-window identified flag`, so at 4 agents it
+can only take five values, and in practice takes two. **Every window_rate comparison I made
+tonight was below the metric's resolution**: the channels-vs-reprobe ablation (differences
+0.04-0.08), the 4000-vs-8000 comparison, and the retracted "matched greedy" claim (0.004,
+needing 7k episodes to see). At 40-60 episodes that metric can only support claims about
+gaps of roughly 0.05 or more.
+
+The irony is that I moved to window_rate because the CONJUNCTION metric was too coarse and
+saturating. It is coarse too, for the same underlying reason -- it is built from a binary
+per-window flag. Hard SHD is continuous, pairs cleanly, and resolved a 0.012 effect on 40
+episodes, which window_rate could not have done on 7,000.
+
+**Consequence for the record:** the ablation table in my earlier entry (neither / channels /
+channels+reprobe at -0.183 / -0.126 / -0.085) should NOT be read as establishing that either
+feature helps. Those differences are inside the noise floor of the instrument. Whether
+channels or reprobe-signal actually contributes has to be re-measured on hard SHD before any
+of it is quoted. I would rather say that now than have it appear in a chapter.
+
+### Still open
+
+* Seeds 0 and 2 transfer tests running -- the honest version of the claim needs all three.
+* No sampled-TRAINED policy at this cell, so "beats greedy under sampled evidence" is
+  supportable but "substitutes for sampled training" still is not.
+* Everything here is k=8. The headline cells are k=20/k=30.
