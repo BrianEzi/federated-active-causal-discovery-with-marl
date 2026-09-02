@@ -7034,3 +7034,59 @@ either is defensible, but section 4.2 has to say which and why**, and it cannot 
 numbers into the findings note so whichever is chosen has its arithmetic already done.
 
 Rebuild: phase 1 at ~50 minutes, three baselines still running, ~2.9 cpu/s, healthy.
+
+## 2 Sep, 23:xx — THE 12k SWEEP IS COMPLETE, and it changes the thesis. Also: extend the rho grid from 8k to 12k
+
+### The headline, 18 cells x 3 seeds, measured deterministically at both conventions
+
+**Recovery rate, learned ahead of myopic: 2 of 18 cells at 4,000 episodes, 16 of 18 at 12,000.**
+The myopic arm is bit-identical between the two (it does not train), so this is like-for-like.
+Fifteen of eighteen cells flip winner.
+
+Every structural reversal in Chapter 4 was a training-budget artefact. Not three of four -- all
+of them. Agent-count, contention and window all resolve the same way.
+
+### What this means for your grid
+
+Your 21 cells train for **8,000 episodes**, and your own 22:30 note says `mi_ratio` was still
+rising at the last update in all 21, so none is converged. Given the above, that is no longer a
+footnote. **Brian's instruction tonight is to extend the 8k runs to 12k in the background while
+we get a draft to Micro.** That is your grid.
+
+Suggestion, and it is yours to schedule: resume from the existing checkpoints rather than
+retraining from scratch if `ma_train.py` supports it on your side, take rho = 1.00, 0.90, 0.70,
+0.50 first, and leave the intermediate rates until those four land. If the ordering survives at
+12k on four rates, RQ2 holds and the rest is filling in. If it does not, better to know now than
+after the draft.
+
+I have queued the same for the federation ladder: `results/central12k/run_ladder12k.sh`, 12 runs.
+RQ3's six-seed result is currently measured on 4,000-episode policies, which after tonight is
+not defensible as a converged comparison.
+
+### The path-variance number I promised
+
+Four sample paths, same checkpoint, same seeds, identical episodes, `k12s50n04b150`:
+
+    across-path SD as a fraction of the reported within-path paired SE:  0.31 mean (0.27-0.39)
+
+So the omitted component inflates a correct interval by about 5% in quadrature, not the factor
+I implied. **I over-alarmed you and I am correcting that.** The intervals are close to right.
+
+But the count still moves. Seed 0's significance verdict across the four paths is
+`[True, True, True, False]` -- 3 of 3 seeds significant becomes 2 of 3 purely by choosing a
+different path. So:
+
+* **Your 15/15 by sign is safe.** Sign does not flip anywhere in my four paths.
+* **A significance count is not safe at the margin.** Report rho=0.85 seed 0 (-2.46 SE) by sign,
+  or run 3 paths on that one cell and quote the spread.
+* Caveat on my own number: it is ONE cell. The k=4 cell in the earlier audit moved 2.22 SE, so
+  path variance is not uniform across cells and 0.31 is not a general bound.
+
+### One more thing worth having
+
+`k12s50n02b150` seed 2 at 12k: selected checkpoint **0.07372**, final checkpoint **0.00000**.
+The MI gate picked a policy 570x worse than the one at the last update, and that single seed is
+the entire reason the K=2 cell reads ratio 15.97 instead of favouring the learned arm. Your grid
+is immune -- `best_update = 499` everywhere, so best and final are the same file -- but it is
+the sharpest evidence yet that both conventions must be reported wherever selection actually
+fires.
