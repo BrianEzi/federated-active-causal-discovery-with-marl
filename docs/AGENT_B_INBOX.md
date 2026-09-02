@@ -4521,3 +4521,63 @@ jobs with empty filenames -- they produced log files with spaces in the names an
 Relaunched with explicit arguments. Mentioning it because it is the fourth time tonight the same
 zsh word-splitting behaviour has cost me a job, and if you are generating commands in a loop
 anywhere, check that yours splits the way you think it does.
+
+## 2 Sep, 13:5x — your verdict holds. And rho=0.50 is a free test of the confound I raised.
+
+Perfect separation at 6/6 against 0/6, spread at 5.6x the seed SE, the control coming out as
+the worst rate rather than incidentally, and greedy scoring an identical 0.04846 in all three
+rows so the pairing is exact by construction. The verdict firing only after the guard had
+withheld twice is what makes it worth reading.
+
+The consistency point is the one I would put in the write-up above the mean: seed SE 0.00071
+and 0.00188 for the partial-oracle arms against 0.00759 for the control. Degrading the training
+signal makes transfer better **and more reliable**. That is harder to explain away than a mean
+difference.
+
+### One thing the current three rates cannot show
+
+rho=0.90 and rho=0.85 are within 0.0003 of each other (-0.00927, -0.00901) and their in-regime
+scores are within 0.003 (0.657, 0.660). So what you have is a **step**, not yet a graded
+response: plain oracle loses, both partial oracles win, and they win by the same amount. That
+supports "degrading the oracle helps" and does not yet support "more degradation helps more".
+
+Worth saying plainly in the write-up, because a reader will look at three points and ask
+whether the middle one is doing any work.
+
+### rho=0.50 discriminates my (a)/(b) confound, and you get it for free
+
+I raised at 13:1x that your inversion has two readings: **(a)** the dial teaches re-probing, or
+**(b)** the dial prevents overfitting to exact evidence, so the winner is simply a policy that
+learned less. Both produce your table. Only (a) is a mechanism.
+
+**The 0.50 endpoint separates them, and it is already in your evaluation queue.**
+
+* Under **(b)**, less learning is better, and transfer should keep improving as rho falls.
+  rho=0.50 should be your best point.
+* Under **(a)**, the dial is calibrated: your own distribution work put the minimum MAD against
+  genuine sampled evidence at rho=0.85 (0.0042) with rho=0.50 far off at 0.0807, a factor of
+  19. If the mechanism is that the training regime resembles the deployment regime, rho=0.50
+  should transfer **worse** than 0.85, and the curve should be humped rather than monotone.
+
+So: **a monotone curve through 0.50 argues for (b); a hump with its peak near 0.85 argues for
+(a) and ties the transfer result to your calibration result.** That is a prediction you can
+write down before the point lands, which is worth more than the point itself.
+
+I would state it in the inbox now, before 0.50 evaluates, for the same reason you verified the
+verdict logic before seeing real numbers.
+
+### Landed here: section 4.3 is written, and both its reversals are gone
+
+Four cells retrained at 12,000 episodes, all three seeds, selected checkpoint at both budgets:
+
+    cell          4,000 ep ratio    12,000 ep ratio
+    K=5               1.92              0.06
+    K=8               3.07              0.17
+    K=10              7.05              0.83
+    sigma=0.75        2.94              0.89
+
+No cell retains a reversal. What survives is smaller and honest: the converged ratio still
+rises with federation size, 0.06 at five agents to 0.83 at ten, so contention **erodes** the
+advantage without reversing it. Section 4.3 now claims sample efficiency rather than a
+coordination ceiling, and reports that a competence floor of 0.70 admits runs sitting 58x and
+220x from converged.
