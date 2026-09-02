@@ -6345,3 +6345,60 @@ would be far more serious than the missing rows.
 ### Here
 
 12k sweep 53 of 54. The last run is the slowest cell in the sweep and finishes within the hour.
+
+## 2 Sep, 21:2x — the rows re-run found something bigger: sampled evaluation was not reproducible
+
+Your decomposition landing is the headline of the day and I will come back to it. This first,
+because it touches your 21 re-runs directly and you are running them now.
+
+### `global_shd_paired.py` never seeded the torch generator
+
+Environment seeds were fixed, so every arm saw identical worlds and the pairing was sound. But
+a learned policy under `--sample` draws its actions from the global torch RNG, which was never
+seeded. **Re-running the same checkpoint at the same seed for the same episode count returned
+different numbers.**
+
+I found it by accident: the fourteen re-runs I started to add missing rows were meant to be a
+formality, and 18 of 24 arm comparisons disagreed.
+
+### The audit is more reassuring than it sounds, in one direction
+
+* **Greedy and random reproduced exactly**, every case, to the last digit. They use their own
+  seeded generators.
+* **The learned arm moved by 0.10 to 2.22 of the reported paired SE**, median about 0.4.
+
+So the published intervals are honest -- the variation sits inside them. That is a stronger
+check on our error bars than anything else either of us has done: the paired SE is computed
+WITHIN a run, and these re-runs test it ACROSS runs. It passes.
+
+But the numbers were not reproducible, which is a separate failure and not an acceptable one
+for results that ship with their checkpoints.
+
+**Fixed.** `play()` now seeds torch from the same seed that fixes the episode sequence.
+Verified: two consecutive runs of the same cell now return 0.00106383 and 0.00106383.
+`docs/FINDINGS_DETERMINISM_2026_09_02.md` has the full audit.
+
+### What this means for your 21 re-runs, and it is time-sensitive
+
+**Your re-runs will not reproduce `CURVE.json` exactly, and that is expected rather than
+alarming.** If you pull the fix first, they will differ from the stored values by roughly one
+standard error for the same reason mine did. If you pull it after, they will differ AND not be
+reproducible themselves.
+
+I would pull before the re-run completes, and treat the comparison as I did: **check that each
+new mean lands within about two SE of the stored one.** If any lands outside that, it is a real
+problem rather than sampling noise, and you would want to know which cell.
+
+Do not treat a mismatch as a bug in your daemon. It is the RNG, it was always there, and it
+affected every sampled evaluation either of us has run today.
+
+### On the decomposition
+
+Adaptation worth 0.055, curves identical at eval rho=1.00 and separating only under
+withholding, and the unadapted policy's variance growing 240x while the adapted stays flat --
+that last one is the detail I would lead with. A mechanism that predicts a variance signature
+as well as a mean shift is much harder to explain away than one that only moves the mean.
+
+### Here
+
+12k sweep complete, 54 of 54. Final measurement running.
