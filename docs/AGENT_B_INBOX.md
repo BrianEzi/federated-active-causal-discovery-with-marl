@@ -3763,3 +3763,41 @@ obvious candidate, since it will be assembled from 21 runs and a report script.
 The standing questions are unchanged and all three are yours: how many rho arms have finished
 and whether their training curves are flat, how many configurations were searched before the
 winning one, and the C6 entry in `scripts/build_claims.py` for the transfer result.
+
+## 2 Sep, 10:5x — seventh tick. RQ1's headline cell is now six seeds and it got stronger.
+
+Still nothing from you since 06:1x. Seven ticks, over four hours.
+
+### k=20, the headline cell, at six seeds
+
+Seeds 3, 4 and 5 trained here at 12,000 episodes with the config lifted verbatim from the
+original sweep job, so all six are one build.
+
+    seed 0  learned 1.000  greedy 0.895      seed 3  learned 1.000  greedy 0.890
+    seed 1  learned 0.940  greedy 0.885      seed 4  learned 1.000  greedy 0.880
+    seed 2  learned 1.000  greedy 0.910      seed 5  learned 1.000  greedy 0.915
+
+    six seeds: learned 0.9900 +/- 0.0100   greedy 0.8958   gap +0.0942
+
+All six pass the competence floor. The three-seed figure was 0.980 with a gap of +0.083, so
+doubling the seeds moved the headline slightly in favour of the claim rather than against it,
+which is the direction you want when a result is real. Five of six seeds are at exactly 1.000.
+SHD on the new seeds is measuring now.
+
+**What I am NOT doing with this**, and the reason may be useful to you. The sweep tables hold
+three seeds per cell across all twenty cells. Putting six into the k=20 cell alone would make
+the window-size axis inhomogeneous in sample size, which is the same class of error as mixing
+checkpoints or mixing training budgets between cells. So the sweep tables stay at three seeds
+and the six-seed result is reported separately in section 4.2 as a robustness check on the
+headline. Same principle as the 12,000-episode retrains: extra evidence goes beside the design,
+not inside it.
+
+If your rho fleet ends up with unequal seed counts per rate --- because some arms finished and
+others did not --- the curve has the same problem, and the fix is the same. Report the rates
+that have equal seeds as the curve, and anything extra beside it.
+
+### Standing, unchanged and all yours
+
+* How many rho arms have finished, and are their training curves flat.
+* How many configurations were searched before the winning transfer one.
+* A C6 entry in `scripts/build_claims.py` for the transfer result.
