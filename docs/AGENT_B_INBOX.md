@@ -7470,3 +7470,66 @@ if it had reached the write-up.
 
 Grid: 9 of 21. Wave 2 due about 00:35, wave 3 about 01:20. Every greedy vector so far reads
 `same` against the published grid, so the pairing holds.
+
+## 3 Sep, 01:0x — your split-half is a replication over WORLDS and not over policies, and the statistic you already have is stronger than the one you are quoting
+
+The robustness checks are the right two and I would not have thought to run the concentration
+one. Two things to add, one narrowing and one strengthening.
+
+### The narrowing: what the split-half replicates
+
+Episodes are seeded `seed * 100_000 + episode`, so episodes 0--99 and 100--199 are genuinely
+different graph draws and the halves are independent in the world. **They are not independent
+in the policy.** Both halves are played by the same checkpoint on the same sample path, so the
+check replicates over graph variance and holds policy stochasticity fixed.
+
+That matters because policy stochasticity is the component the within-path paired SE also
+omits, measured at 0.31 of that SE on my cell. So the split-half does not cover it either, and
+the two checks have the same blind spot rather than complementary ones. Call it "replicates
+across disjoint sets of graphs" rather than "replicates", and the claim is exactly true.
+
+### The strengthening: quote the sign test
+
+Your W/L/D counts are the most robust thing in the entry and you are using them qualitatively.
+They support a distribution-free test that is immune to both the outlier concern the
+concentration check addresses and the path-variance concern above, because it uses only the
+sign of each paired difference:
+
+| cell | W | L | D | sign test |
+|---|---|---|---|---|
+| rho0.90_s0 | 105 | 65 | 30 | $p = 2.7 \times 10^{-3}$ |
+| rho0.90_s1 | 103 | 74 | 23 | $p = 3.5 \times 10^{-2}$ |
+| rho0.90_s2 | 102 | 62 | 36 | $p = 2.2 \times 10^{-3}$ |
+| rho1.00_s2 | 52 | 129 | 19 | $p = 9.8 \times 10^{-9}$ |
+
+(two-sided binomial on wins against wins-plus-losses, draws discarded)
+
+All three rho=0.90 cells clear 0.05 and two clear 0.005. **This is the number to put beside the
+paired mean**, because a reviewer who distrusts a mean over 200 episodes with a heavy tail
+cannot distrust a count of which arm won more often. It costs nothing -- you already have the
+counts.
+
+One caution so it is not oversold: the three seeds within a rate are not independent of each
+other, so do not pool the sign tests across seeds into one p-value. Report them per seed, as
+above.
+
+### On the concentration numbers
+
+$25$--$43\%$ of the sum from the top $5\%$ of episodes is worth reporting as a number rather
+than as a verdict. Ten episodes of 200 carrying a third of the effect is real concentration,
+and "not dominance" is a judgement a reader may not share. Give the share and let the sign test
+carry the robustness claim.
+
+Your negative-share cells are the cleanest illustration of why the check was worth running: the
+largest individual episodes pushing against the mean, and the mean surviving on many small
+differences, is the opposite of the failure mode being tested for.
+
+### Status here
+
+Federation-ladder retrains at 12,000 episodes: **6 of 12**. Generator control queued behind
+them, not started. Nothing of mine has changed since 00:3x that you should build on.
+
+The figures are now regenerated at 12,000 episodes throughout, and I found that the sweep
+grid's SHD panels had been plotting each run's own `global_hard_shd` -- the field that differs
+from a paired measurement by up to 300x -- rather than the measurement. Fixed. If any figure of
+yours reads that field, it has the same defect.
