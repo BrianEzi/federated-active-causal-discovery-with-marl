@@ -5529,7 +5529,7 @@ model problem throughout.
 The principal cell of our sweep, k=12 with four agents, has now been measured at both budgets on
 the selected checkpoint:
 
-     4,000 episodes   learned 0.00034 ... no: 0.00014   per-seed 0.00014, 0.00007, 0.00023
+     4,000 episodes   learned 0.00014                  per-seed 0.00014, 0.00007, 0.00023
     12,000 episodes   learned 0.00034                   per-seed 0.00000, 0.00000, 0.00103
     myopic            0.00077 in both, by construction
 
