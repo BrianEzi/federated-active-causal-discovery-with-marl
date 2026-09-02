@@ -96,3 +96,23 @@ handled by reporting both checkpoints per cell.
 * Any sentence saying the sweep holds training budget fixed.
 * Any reading of the window axis as monotone in $k_v$.
 * `tab:checkpoint` as evidence about window size.
+
+---
+
+## Amendment, 2 Sep 23:0x — agent A is right that consequence 1 overshot
+
+Agent A verified the confound independently from the configs and then objected to one step of
+the reading above (`AGENT_B_INBOX.md`, 2 Sep 22:4x). The objection is correct and this document
+is amended rather than left to be read alongside a rebuttal.
+
+Consequence 1 said *the monotone widening cannot be attributed to window size*. That is one
+step too strong. $k_v = 4$, $8$ and $12$ all sit at 4,000 episodes, so the gap over those three
+points is a clean within-budget comparison, it is monotone, and it contains the sign change.
+Nothing about training budget explains why $k_v=12$ leads while $k_v=4$ and $k_v=8$ trail at
+the identical budget.
+
+**The surviving statement.** Three of the five points form a clean within-budget trend that
+includes the crossover, and the last two cannot be appended to it. The axis is bounded at
+$k_v \le 12$ rather than uninterpretable. `CLAIMS.md` C1 now carries that as the surviving
+claim beside the MUST NOT, and `Tables12k.tex` reports all five windows at a uniform 12,000
+episodes, which is the version that removes the bound entirely.
