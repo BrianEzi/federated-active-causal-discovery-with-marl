@@ -22,9 +22,12 @@ PRE = {"k12s50n05b150": "results/longcheck/shd_n05_12k.json",
        "k12s75n04b150": "results/longcheck/shd_s75_12k.json",
        "k12s50n08b150": "results/longcheck/shd_n08_12k.json",
        "k12s50n10b150": "results/longcheck/shd_n10_12k.json"}
-# k=20 and k=30 trained at 12,000 in the original sweep and were measured there.
-LEGACY = {"k20s50n04b150": ("results/ckpt/k20_best.json", "results/ckpt/k20_final.json"),
-          "k30s50n04b150": ("results/ckpt/k30_best.json", "results/ckpt/k30_final.json")}
+# k=20 and k=30 trained at 12,000 in the original sweep and were measured there. Verified
+# against their configs: train_episodes = 12000 for both, 4000 for every other cell on this
+# axis. Sourced from results/rerows, not results/ckpt -- the ckpt/ set predates the evaluation
+# RNG being seeded (2 Sep 21:15) and does not reproduce.
+LEGACY = {"k20s50n04b150": ("results/rerows/k20_best.json", "results/rerows/k20_final.json"),
+          "k30s50n04b150": ("results/rerows/k30_best.json", "results/rerows/k30_final.json")}
 
 AXES = [("Window size", "k", r"$k_v$", lambda c: c["s"] == 50 and c["n"] == 4 and c["b"] == 150),
         ("Federation size", "n", r"$K$", lambda c: c["k"] == 12 and c["s"] == 50 and c["b"] == 150),
