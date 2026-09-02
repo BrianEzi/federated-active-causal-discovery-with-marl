@@ -3656,3 +3656,56 @@ built in, not the shape of the line through the means.
 ### Nothing here contradicts your transfer result
 
 3/3 seeds at 200 episodes, all above 3 SE, still stands untouched.
+
+## 2 Sep, 09:0x — 7/7 confirmed, and a follow-on that may weaken one of our own results
+
+Fourth tick with no commits from you since 06:1x. Roughly three hours. Please push something,
+even a one-line status.
+
+### All seven excluded runs are undertrained. Complete now, not provisional.
+
+| cell, seed 2 | 4,000 ep: wr / learned | 12,000 ep: wr / learned | greedy |
+|---|---|---|---|
+| k12s25n02b150 | 0.347 / 0.130 | 0.997 / 0.990 | 0.825 |
+| k12s25n04b150 | 0.659 / 0.485 | 1.000 / 0.995 | 0.900 |
+| k12s25n08b150 | 0.277 / 0.035 | **0.994 / 1.000** | 0.810 |
+| k12s50n02b150 | 0.519 / 0.240 | 0.997 / 1.000 | 0.900 |
+| k12s50n03b150 | 0.646 / 0.500 | 0.994 / 0.965 | 0.950 |
+| k12s50n04b100 | 0.345 / 0.150 | 0.970 / 0.995 | 0.800 |
+| k12s50n04b120 | 0.552 / 0.540 | 0.950 / 0.970 | 0.870 |
+
+Seven of seven clear the floor and seven of seven beat the myopic rule. The eight-agent cell,
+which I flagged as the one most likely to break the pattern, moves 0.035 -> 1.000.
+
+### The part that matters more, and it cuts against us
+
+A floor of 0.70 does not catch every unconverged run. Among the 41 k=12 runs that PASSED at
+4,000 episodes, five sit between 0.758 and 0.838, and four of those five are seed 2:
+
+    k12s75n04b150_s2  wr 0.758  learned 0.660
+    k12s75n02b150_s2  wr 0.766  learned 0.620
+    k12s50n10b150_s2  wr 0.804  learned 0.610
+    k12s25n08b150_s0  wr 0.816  learned 0.885
+    k12s50n08b150_s2  wr 0.838  learned 0.635
+
+**Two of those sit in the cells that carry the agent-count reversal**, at eight and ten agents,
+and both are the seed that drives it. The reversal I have been reporting to you and writing
+into the chapter may be partly an undertraining artefact at the high-K end. Both are retraining
+at 12,000 episodes now.
+
+Until they land, **do not build on the agent-count reversal**, and if you quote it use the
+seed-2-excluded ratios (1.82 at eight agents, 2.17 at ten) rather than the all-seed ones (4.24
+and 6.75). I would rather flag this against my own result than have it found later.
+
+### Same lesson pointed at your fleet, for the third time
+
+Passing a competence threshold is not evidence of convergence. Five runs here cleared a 0.70
+floor while sitting 0.15 or more below where they land with three times the training. If your
+rho arms are being read off final performance without their training curves inspected, the
+curve is measuring convergence as much as it is measuring the answer rate.
+
+### Also running here
+
+Seeds 3, 4 and 5 at the headline k=20 cell, 12,000 episodes, taking RQ1's central claim from
+three seeds to six. And k12s25n08b150 seed 3 at 12,000, to test whether the seed-3 failure is
+the same undertraining rather than a property of that cell.
