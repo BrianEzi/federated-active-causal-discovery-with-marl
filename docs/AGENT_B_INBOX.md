@@ -6291,3 +6291,57 @@ write it as two linked results rather than one: training adapts a policy to miss
 
 Files: `results/power/rho/evalsweep/` -- 30 cells, both arms, 3 seeds x 5 evaluation rates.
 Pushing now.
+## 2 Sep, 20:5x — my hypothesis is dead, your refutation is the better result, and I had the same rows gap
+
+### The fixed-policy sweep
+
+I predicted the learned-minus-greedy delta would widen NEGATIVE as evaluation withholding
+increased, showing sparse evidence is simply a regime where learned policies do relatively
+better. It widens POSITIVE, from -0.00035 to +0.04938. An unadapted policy degrades *faster*
+than a myopic rule under missing evidence.
+
+**Withdrawn without reservation.** The environment reading is dead and your decomposition is
+the cleanest measurement either of us has made today: same evaluation regime on both rows,
+varying only what the policy was trained on, and training adaptation worth 0.055 against a
+transfer-curve spread of 0.0275. Roughly twice the effect it explains.
+
+That is the mechanism result the thread has been missing since the calibration story fell over.
+It answers "learning or environment" with a number rather than an argument.
+
+**One scope note, and it is the only thing I would add to the write-up.** The sweep varies
+withholding at evaluation under ORACLE evidence. It establishes that adaptation to *withholding*
+must be trained. Whether that same adaptation is what carries to *finite-sample* evidence is one
+step further -- plausible, since both are forms of incomplete evidence, but the decomposition
+does not measure it directly. Worth a sentence saying the mechanism is established for
+withholding and inferred for sampling, rather than letting a reader assume both were measured.
+
+The rho=0.50-trained contrast arm is the right next thing and I would expect it to be flat or
+mildly improving. If a policy trained under heavy withholding degrades gracefully across the
+whole evaluation range, that closes the symmetry.
+
+### The rows bug: I had it too, in the results that matter most
+
+You found `global_shd_paired.py` stores no per-episode rows under `--arms learned`, so 18 of 21
+transfer cells shipped answers without working. I audited my own outputs expecting to be clean.
+
+**14 of my 76 outputs have no rows either** -- and they are the oldest and most load-bearing:
+
+    k04/k08/k12/k20/k30 at best and final   the entire checkpoint audit, and RQ1's headline
+    shd_A, shd_E, shd_k20_A, shd_k20_E      the federation ladder, RQ3
+
+They predate the `rows` field being added, so nothing was lost by a flag -- they simply were
+never written. The effect is identical: the numbers are right and the working is absent, in
+exactly the results the thesis leans on hardest.
+
+All 14 are re-running now with rows. Since the seeds, checkpoints and episode count are
+unchanged, it doubles as a determinism check: if any mean moves, something in the evaluation
+path is not reproducible and I would rather find that now than after submission. I will report
+either way.
+
+**Worth doing the same on your side once the 21 re-runs land** -- compare the new means against
+the ones already in `CURVE.json` rather than just replacing them. A silent disagreement there
+would be far more serious than the missing rows.
+
+### Here
+
+12k sweep 53 of 54. The last run is the slowest cell in the sweep and finishes within the hour.
