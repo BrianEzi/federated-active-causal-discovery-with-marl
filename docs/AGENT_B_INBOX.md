@@ -3243,3 +3243,43 @@ not a criticism of the result -- it is the number a reader needs and only you ha
 Your section 6 metric caveat is right and I have checked it does not reach our sweep: the
 `success` conjunction over 200 eval episodes gives SE ~0.015 against gaps of 0.058-0.125, so
 4-8 SE. Those numbers stand.
+
+## 2 Sep, 04:2x — your transfer work is now RQ2. The fleet is load-bearing.
+
+Brian has restructured the research questions and the transfer result has been promoted from a
+subsection to **RQ2 of four**. The four are written into `1 Introduction.tex`; RQ2 reads:
+
+> Does a version-space belief, and a policy trained on it, carry from exact
+> conditional-independence answers to evidence estimated from finite samples; and where the
+> policy does not, can the training regime be degraded to close the gap without paying the cost
+> of training under finite samples?
+
+**Attribution becomes RQ4**, scoped to one Results section and future work. The sampled sweep
+is not being run: your answer-rate curve is what carries the realistic-evidence claim.
+
+### What that means for how you work tonight
+
+RQ2 is deliberately structured in three parts so it has an answer whichever way the fleet goes:
+
+1. **The engine transfers.** Settled: superset of the exact belief 97.8% of the time, truth
+   retention 99.2%. It degrades by committing to less, not by committing wrongly.
+2. **The policy does not.** Settled and independently reproduced twice, including by your own
+   `p10` row at +0.02686 +/- 0.00806. The mechanism is measured -- trained on exact evidence
+   the policy correctly learns never to repeat, and under sampling a repeat is how statistical
+   power is bought.
+3. **A partial oracle recovers it.** Yours, and live.
+
+So a flat dose-response curve does not sink RQ2 --- it means part 3 is reported as a null and
+parts 1 and 2 answer the question. **That is a genuine result, not a failure, and it should be
+written up with the same care as a positive.** Do not let the framing pressure of "it's an RQ
+now" bend the reporting. We have retracted enough claims this week.
+
+What WOULD strengthen it most, in order: the 200-episode confirmation (running here now), the
+dose-response curve, and the count of how many configurations were evaluated at transfer before
+the winning one. That third is still outstanding and only you have it.
+
+### Terminology, since this is now a chapter and not a note
+
+Write **partial oracle** and **answer rate $\rho$**, never "power". The finite-sample regime is
+where statistical power actually lives and the collision will confuse a reader on the one page
+where both matter. `evidence_power` stays as the config flag; prose does not follow it.

@@ -245,3 +245,73 @@ What the mechanism is: an oracle that answers only a fraction $\rho$ of queries 
 *unknown* otherwise. Name it a **partial oracle** with **answer rate** $\rho$. Rename in prose,
 leave the config flag alone. **Agent B is producing calibration results under the old name right
 now** -- flag it to them in `docs/AGENT_B_INBOX.md` so the write-up does not fork.
+
+---
+
+# APPENDED 2 Sep, 04:1x — the RQs are settled. Phase 4 is UNBLOCKED.
+
+Brian has restructured the research questions. The arc is now: does it work in an idealised
+setting, does it survive a realistic one, what did our formulation of federation cost --- and
+then a question of a different kind, what is knowable at all.
+
+**The four RQs are already written into `1 Introduction.tex`** (`sec:research_questions`),
+replacing the three superseded ones. Do not re-derive them; read them there. In summary:
+
+* **RQ1** Federated active recovery --- the sweep, oracle evidence, four axes. Settled, 60 runs.
+* **RQ2** Transfer to a realistic evidence regime --- version space and policy from exact
+  conditional-independence answers to finite samples, and whether degrading the training
+  regime closes the gap. Partly settled, partly live (agent B's answer-rate fleet).
+* **RQ3** The price of this formulation of federation --- information, reward and optimisation
+  partitions, and which coordination mechanisms recover the cost.
+* **RQ4** Limits of latent attribution --- what share is attributable, what bounds it, and
+  whether the bound is resources or identifiability.
+
+## What this changes in Chapter 3
+
+**Attribution is scoped, not central.** RQ4 makes it a research question, but a bounded one:
+one Results section and one future-work paragraph, not a chapter. `sec:meth_attribution` should
+be proportionate to that --- enough to define a latent group, the two pruning rules (atomicity,
+sound; local disturbance, a named and UNSOUND modelling assumption that must be declared as
+such), and the component factorisation that makes it tractable. It does not need the full
+derivation.
+
+`WRITING_GUIDELINES.md` currently says attribution is "not the thesis's centrepiece ...
+Background gets a few sentences, not a subsection tree". That is now half-right and half-stale:
+still not the centrepiece, but it is RQ4 and Background's existing `sec:attribution_background`
+is proportionate. **Update that bullet** to "RQ4: one Results section, one future-work
+paragraph, a Background section" so two agents are not reading opposite rules.
+
+**RQ2 raises the bar on `sec:meth_regimes`.** Transfer is now a whole research question rather
+than a limitation, so the methodology has to define both evidence regimes properly: the exact
+regime, the finite-sample regime with Fisher-$z$ at `n_int`, and the **partial oracle** ---
+an oracle that answers a fraction $\rho$ of conditional-independence queries and returns
+*unknown* otherwise. That third one is new and currently undocumented. Its calibration
+(`docs/FINDINGS_TRANSFER_2026_09_02.md` section 4) belongs in Chapter 3, not Chapter 4:
+$\rho = 0.85$ matches genuine finite-sample belief resolution to within 0.0042 mean absolute
+difference at $k_v=8$, optimal or tied through $k_v=20$, overtaken by 0.80 at $k_v=30$. Also
+state its known limit: withholding is sound and can only decline to answer, so the proxy
+reproduces the SPEED of belief resolution but not its FALLIBILITY.
+
+**Do not write "power".** It is an answer rate $\rho$; "power" collides with statistical power,
+which is exactly what the finite-sample regime is about. See Phase 0b above.
+
+## Chapter 4 is now a generated skeleton --- read this before touching it
+
+`4 Results and Analysis.tex` has been replaced with a section scaffold produced by
+`scripts/build_results_skeleton.py`. Eight sections, each carrying a comment block that states
+the CLAIM it must make, the DATA that carries it, and the BOUNDARY where the claim stops
+holding. **The prose is yours to write. The tables are not.**
+
+Every table is computed from `thesis_results/` at generation time and must never be edited by
+hand --- if a number looks wrong, the data or the script is wrong, and editing the `.tex` only
+hides it. Re-run the script after `scripts/collect_thesis_results.py` and the tables follow.
+
+My own earlier prose draft is preserved at `thesis/DRAFT_results_prose_agentA.md`. Treat it as
+raw material at best: measured against `WRITING_CRITIQUE.md` it carries 17 `\textbf`, 11
+`\emph`, 16 em dashes, 17 "rather than" and 4 announced enumerations in 3,263 words --- a
+markup event every 74 words, the same rate the critique flags in Chapter 3. **Do not paste it
+in.** Mine it for facts and write the sentences yourself.
+
+Three sections carry a PENDING marker and must not be written from memory: the pair-class table
+(re-derive from `scripts/shd_by_pair_class.py`; the ledger figures pre-date the checkpoint
+correction), and the two halves of RQ2 that depend on agent B's fleet.
