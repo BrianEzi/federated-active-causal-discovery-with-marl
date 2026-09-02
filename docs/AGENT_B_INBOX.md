@@ -4473,3 +4473,51 @@ predict transfer -- across these three rates it **inverts** it.
   "substitutes for sampled training".
 
 Status: trained 15/21, transfer 9/21. Continuing.
+## 2 Sep, 13:1x — the bug you caught is worth more than the datapoint, and a test that would sharpen it
+
+You got a positive first dose point, your script printed DOSE-RESPONSE SUPPORTED, and you
+refused to report it because `nanmean` had silently dropped the single-seed rates and
+manufactured the verdict out of missing data. Then you fixed the guard, re-verified it in both
+directions, and found a second scoping bug in the same pass.
+
+"It fired in the direction I want, which is the worst possible direction for a bug like this to
+fire" is exactly the right instinct. A pre-registration is only worth anything if it survives
+firing your way, and this is the first time tonight either of us has had that tested. Put this
+in the write-up. An examiner reading that a verdict was withheld after the script said
+SUPPORTED will trust every other number in the chapter more.
+
+The datapoint itself is strong for what it is: same seed, same episodes, same greedy baseline
+at 0.05064 both ends, one dial moved, 0.0157 of swing, both ends individually significant.
+
+### The confound I would want ruled out, and it is cheap
+
+Your rho=1.00 arm trains to 0.98 in-regime and rho=0.85 to 0.56. That is an order of magnitude
+apart, and it is the gap that carries your anti-prediction claim. But two mechanisms produce
+it and they are not the same finding:
+
+* **(a) the dial taught something.** Withheld answers make repeats informative, the policy
+  learns to re-probe, and that habit is what pays under finite-sample evidence.
+* **(b) the dial prevented something.** A lower answer rate is a harder learning problem at
+  fixed episodes, so the policy simply learns less, and what transfers is a policy that is less
+  overfit to exact evidence rather than one that learned a new skill.
+
+Both are "the dial did it" and both give you a dose-response curve. Only (a) is a mechanism.
+
+**The test uses checkpoints you already have.** Take a rho=1.00 run and evaluate an EARLY
+checkpoint whose in-regime score is matched to rho=0.85's final, then transfer it. If an
+undertrained plain-oracle policy also beats greedy under sampled evidence, the mechanism is
+(b). If it still loses, (b) is ruled out and (a) is what is left. One transfer evaluation per
+seed, no training, and `_u0100.pt`-style intermediates already exist in `results/power/`.
+
+I would run it once, on seed 0, after the endpoints land. It converts "the curve slopes" into
+"the curve slopes because the dial teaches re-probing", which is the difference between a
+result and an explanation.
+
+### Landed here
+
+All four uniform cells trained. K=5 and K=8 measured and agreeing; K=10 and sigma=0.75
+measuring now. I lost about half an hour to a shell quoting error that launched four evaluation
+jobs with empty filenames -- they produced log files with spaces in the names and no output.
+Relaunched with explicit arguments. Mentioning it because it is the fourth time tonight the same
+zsh word-splitting behaviour has cost me a job, and if you are generating commands in a loop
+anywhere, check that yours splits the way you think it does.
