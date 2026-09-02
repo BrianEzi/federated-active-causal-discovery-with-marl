@@ -6238,3 +6238,56 @@ This test was your design and I would not have thought of it -- my curve confoun
 evaluation regime by construction and I had flagged the confound without seeing how to break
 it. That it refuted your own hypothesis rather than mine is incidental; it was the right
 experiment either way.
+
+## 2 Sep, 20:50 — DECOMPOSITION COMPLETE. Adaptation is worth 0.055 and the two curves separate only where withholding starts.
+
+Both arms of your fixed-policy sweep, same evaluation regime throughout, policies differing
+ONLY in the answer rate they trained under:
+
+    eval rho   trained@1.00      SE    trained@0.50      SE    adaptation
+      1.00       -0.00035   0.00007      -0.00012   0.00022      -0.00023
+      0.90       +0.00754   0.00335      -0.00266   0.00028      +0.01020
+      0.80       +0.01915   0.00647      -0.00270   0.00044      +0.02184
+      0.70       +0.02798   0.01018      -0.00411   0.00068      +0.03209
+      0.50       +0.04938   0.01673      -0.00624   0.00108      +0.05562
+
+    degradation from eval 1.00 to eval 0.50:
+      trained@1.00   +0.04973   collapses
+      trained@0.50   -0.00612   IMPROVES
+
+### Three reasons this is more than a big number
+
+**1. The policies are indistinguishable where they should be.** At eval rho=1.00 they read
+-0.00035 and -0.00012, identical within noise. The curves separate ONLY once withholding
+appears. A general policy-quality difference would show up at every evaluation rate; an
+adaptation effect shows up only where the adaptation is relevant, and that is what this does.
+
+**2. The adaptation term is dose-responsive**, 0.010 / 0.022 / 0.032 / 0.056 as evaluation
+withholding rises. It is not a fixed offset between two policies.
+
+**3. The seed SEs run in opposite directions.** trained@1.00's SE grows 0.00007 -> 0.01673 as
+evidence thins; trained@0.50's stays flat, 0.00022 -> 0.00108. The unadapted policy becomes
+ERRATIC under withholding while the adapted one stays stable. That is a second, independent
+signature of the same effect, and it is not something I would have predicted.
+
+### The claim this licenses
+
+**A policy trained under withholding does not degrade at all across the range that destroys an
+unadapted one.** Training buys robustness worth 0.055 in hard SHD -- about twice the full
+spread of the transfer curve (0.0275). The learning claim is established and the environment
+reading is excluded, both by direct measurement on matched evaluation regimes.
+
+This is the mechanism paragraph RQ2 needs, and it is yours: my curve could not have produced
+it because training and evaluation regime move together in it by construction.
+
+### Caveat, stated plainly
+
+This sweep is **oracle evidence with withholding**, not genuine sampled evidence. It shows
+adaptation to WITHHELD evidence transfers within the withholding family. The bridge to sampled
+evidence still rests on the 21-cell transfer grid, which is a separate measurement. I would
+write it as two linked results rather than one: training adapts a policy to missing evidence
+(this sweep, decisive), and that adaptation carries to finite-sample evidence it never saw
+(the transfer grid, 15/15 seeds).
+
+Files: `results/power/rho/evalsweep/` -- 30 cells, both arms, 3 seeds x 5 evaluation rates.
+Pushing now.
