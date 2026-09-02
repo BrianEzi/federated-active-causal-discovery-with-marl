@@ -6710,3 +6710,69 @@ because of it, that is a bug in my edit and not a finding.
 around 00:20. `scripts/compare_deterministic_grid.py` is ready and tested. The order once it
 lands is: compare -> regenerate CURVE and the figure with `--dir results/power/rho/deterministic`
 -> update findings section 1 -> collect + build_claims.
+
+## 2 Sep, 22:2x — three defects found downstream of the RNG fix, one of which would have shipped a thesis with no figures in it
+
+Follow-up to my 22:0x entry, all found while re-measuring. None of these change your grid;
+two change what you can quote from the repository.
+
+### 1. The unseeded RNG is repo-wide, not one script
+
+Nineteen scripts load a policy and roll it out. **Seventeen were unseeded**, and essentially
+all roll out with `deterministic=False`. Seeded so far: `global_shd_paired.py`,
+`shd_by_pair_class.py`, `attr_score.py` — the three that feed numbers Chapter 4 quotes.
+
+`rebuild_grid_deterministic.sh` calls `global_shd_paired.py`, so **your grid is unaffected**.
+But `transfer_eval.py`, `transfer_behaviour.py`, `vs_evaluate.py` and `power_window_rate.py`
+are all on the unseeded list, so anything you produced with those before tonight does not
+reproduce either. Worth knowing before any of it reaches a table.
+
+### 2. A table in the appendix described an experiment that does not exist
+
+Appendix~C carried "Adding an attribution term to the training reward", with three runs at
+0.400, 0.355 and 0.205 joint recovery against the myopic rule's 0.945. Chapter 4 carried the
+matching bullet, "training on the attribution reward does not help".
+
+Those runs have `reward_criterion="claims"` and `observe_owner_channel=False`. The trainer
+accepts exactly two criteria, `claims` and `u14`, and neither scores attribution. I surveyed
+every result file in the repository: **435 runs, not one trained on an attribution objective,
+not one with the owner channel enabled.**
+
+What the three runs actually vary is the belief backend, `component_attributed` against the
+sweep's `factored`. So the honest claim is much narrower and is about the cost of carrying an
+attribution-capable belief, at 4,000 episodes — the budget three other structural claims did
+not survive.
+
+Corrected at the generator and relabelled `tab:attrbackend`. Brian raised precisely this
+objection in conversation two days ago and the text had not caught up with him.
+
+### 3. No figure has ever reached Overleaf
+
+`thesis/.gitignore` carries `*.pdf` to keep build artifacts out. It also matched
+`figures/*.pdf`, so all six `\includegraphics` targets were untracked and **the Overleaf
+project has been compiling with every figure missing since figures were first generated**.
+
+Fixed with a `!figures/*.pdf` exception and all six pushed. If you generate a figure, check
+`git ls-files thesis/figures` shows it rather than trusting `git status` to be clean — an
+ignored file is not reported as missing.
+
+### What landed, and what it changed
+
+* `CLAIMS.md` regenerated against the deterministic set. C1 now carries the corrected $k_v=30$
+  reading (one seed of three, not two) and a new MUST NOT barring any directional claim at
+  $k_v=8$, where the three seeds disagree and the mean is carried by seed 2.
+* RQ3 re-measured on all six seeds. Federated $0.00021$ mean / $0.00013$ median, centralised
+  $0.00058$ / $0.00008$, myopic $0.00068$; paired difference $-0.00037 \pm 0.00043$ across
+  seeds. Five of six seeds indistinguishable; the sixth favours federation and is carried by an
+  outlying centralised run rather than a strong federated one. At $k_v=20$ both arms are
+  error-free across 600 episodes and the cell settles nothing.
+* The interval convention: across seeds, not across episodes. Six separately trained policies
+  make the seed the replicate. Quoting the episode-level interval understates it 1.8x. Your
+  grid should use the same convention where a cell has several seeds behind it.
+
+### Still yours
+
+C6 in `CLAIMS.md` reads **NOT YET AVAILABLE — 0 of 21 cells present**, and it will keep saying
+that until your deterministic grid lands in `thesis_results/power/`. The generator refuses to
+fill the gap from `FINDINGS_TRANSFER_2026_09_02.md` because that note quotes the pre-fix grid.
+RQ2 is a whole Results section with nothing in it until you push.
