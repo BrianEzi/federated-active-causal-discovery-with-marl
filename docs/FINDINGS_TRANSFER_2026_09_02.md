@@ -34,8 +34,17 @@ graph, paired per-episode against greedy, **200 episodes, 7 rates x 3 seeds = 21
 | 0.70 | 3 | 0.03184 | 0.04846 | -0.01661 | 0.00032 | **beats greedy** |
 | 0.50 | 3 | 0.03060 | 0.04846 | -0.01785 | 0.00141 | **beats greedy** |
 
-**15 of 15 seeds at rho <= 0.90 beat greedy. 0 of 6 at rho >= 0.95 do.** Perfect separation.
-Spread across rates 0.02752 against a typical seed SE of 0.00220 -- **12.5x the noise.**
+**15 of 15 seeds at rho <= 0.90 beat greedy, every one of them beyond 2 paired SE (weakest
+-2.46, strongest -10.07). None of the 6 at rho >= 0.95 does.** Spread across rates 0.02752
+against a typical seed SE of 0.00220 -- **12.5x the noise.**
+
+The separation is stated in terms of significance because the two halves do not separate on
+sign alone, and an earlier draft of this sentence hid that. Two of the six high-rate cells --
+rho=1.00 seed 1 and rho=0.95 seed 2 -- are numerically ahead of greedy, at -1.57 and -0.29
+paired SE. Both are inside noise, and two of the remaining four are significantly BEHIND, so
+"no high-rate cell beats greedy" is true of what was measured and false of the raw sign. The
+low-rate half needs no such qualification: all fifteen are ahead on sign and all fifteen clear
+2 SE. Per-cell deltas, SEs and both counts: `results/power/rho/DETERMINISTIC_COMPARE.json`.
 
 The curve is **monotone and saturating**: it improves all the way to rho=0.50 but the last
 step is a fifth of the earlier ones. There is no interior optimum in the swept range, and no

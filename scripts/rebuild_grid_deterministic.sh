@@ -21,8 +21,13 @@
 # property for results shipping with their checkpoints. Expect the rebuilt deltas to differ
 # from the published ones by roughly one standard error; that is the known cost, not a finding.
 #
-# Phase 1 is serial: every learned-only cell pairs against a baseline, so a corrupt or partial
-# baseline would silently poison a whole seed column.
+# Phase 1 must COMPLETE before phase 2 starts, because every learned-only cell pairs against a
+# baseline and a missing baseline silently drops a whole seed column. It does not have to be
+# serial WITHIN itself: the three baselines are different seeds writing different files with no
+# shared state, and each process seeds its own torch generator, so running them concurrently
+# changes no number. The first attempt ran them one at a time and would have spent ~3.5 h on
+# one core of sixteen; measured working set is 338 MB per evaluator, so neither cores nor
+# memory were the binding constraint. Killed and relaunched parallel at 21:50.
 set -u
 cd "$(dirname "$0")/.."
 export PYTHONPATH=. OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
@@ -31,19 +36,28 @@ OUT=results/power/rho/deterministic
 mkdir -p "$OUT" logs/power/rho
 
 EPISODES=${EPISODES:-200}
-WORKERS=${WORKERS:-4}
+WORKERS=${WORKERS:-6}
 RATES=${RATES:-"0.95 0.90 0.85 0.80 0.70 0.50"}
 SEEDS=${SEEDS:-"0 1 2"}
 
-echo "$(date +%H:%M:%S)  phase 1: three rho=1.00 baselines (3 arms each), serial"
+echo "$(date +%H:%M:%S)  phase 1: three rho=1.00 baselines (3 arms each), parallel"
 for s in $SEEDS; do
   out="$OUT/xfer_rho1.00_s${s}.json"
   [ -f "$out" ] && { echo "  s$s exists, skip"; continue; }
-  .venv/bin/python scripts/global_shd_paired.py "results/power/rho/rho1.00_s${s}.json" \
-    --episodes "$EPISODES" --sample --override_evidence sampled --out "$out" \
-    > "logs/power/rho/det_rho1.00_s${s}.log" 2>&1
-  echo "$(date +%H:%M:%S)  baseline s$s done"
+  ( .venv/bin/python scripts/global_shd_paired.py "results/power/rho/rho1.00_s${s}.json" \
+      --episodes "$EPISODES" --sample --override_evidence sampled --out "$out" \
+      > "logs/power/rho/det_rho1.00_s${s}.log" 2>&1
+    echo "$(date +%H:%M:%S)  baseline s$s done" ) &
 done
+wait
+# Phase 2 pairs against these, so refuse to continue on a partial phase 1 rather than quietly
+# building a grid with a seed column missing.
+for s in $SEEDS; do
+  [ -f "$OUT/xfer_rho1.00_s${s}.json" ] || {
+    echo "$(date +%H:%M:%S)  ABORT: baseline s$s did not land; see logs/power/rho/det_rho1.00_s${s}.log"
+    exit 1; }
+done
+echo "$(date +%H:%M:%S)  phase 1 complete, all three baselines present"
 
 jobs=$(mktemp)
 for rho in $RATES; do
