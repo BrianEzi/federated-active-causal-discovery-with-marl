@@ -122,8 +122,13 @@ altruism gap of the thesis, and it is a hard boundary rather than a training fai
 
 ### 2.2 Coverage is a step function — **A**
 
-k=12, n=4: budget 30 -> **5%**, budget 60 -> **77%**, budget 120 -> 77%, budget 240 -> 77%.
-The 60/120/240 cells return IDENTICAL counts (349 of 1056).
+k=12, n=4, from `results/attr_ceiling_budget.json`: budget 30 -> **21 of 1056**, budget 60,
+120 and 240 -> **349 of 1056**, IDENTICAL counts.
+
+**CORRECTED 2 Sep.** This entry previously read "5% -> 77%". Those were share OF THE
+PREDICTED CEILING under a ceiling estimate of 0.4286 that the file no longer carries (it
+now records 0.4767, giving 4.2% -> 69.3%). Quote the raw counts: they are what the file
+contains and they make the step-function point without depending on a ceiling estimate.
 
 **Theme: a design rule.** Full window coverage is necessary and sufficient; beyond it, extra
 budget is provably inert because a repeat reveals nothing under exact evidence. One term
