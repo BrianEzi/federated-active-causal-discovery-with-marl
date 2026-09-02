@@ -43,17 +43,23 @@ REGISTRY = [
      "seed. Establishes that the checkpoint choice is inert below the crossover and worth "
      "2.3x at k=20 and 16x at k=30 above it.",
      "4.1.1 and 4.2 (RQ1), figure checkpoint",
-     ["results/ckpt/k??_best.json", "results/ckpt/k??_final.json"],
+     # results/rerows, not results/ckpt: the ckpt/ set was measured before the evaluation
+     # RNG was seeded (2 Sep 21:15) and does not reproduce. The rerows set is the same
+     # measurement under the fixed path, and its myopic arm matches ckpt/ to five decimals
+     # at every k, which is what confirms only the learned arm was ever affected.
+     ["results/rerows/k??_best.json", "results/rerows/k??_final.json"],
      "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}"),
 
     ("attribution",
-     "RQ2. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: "
+     "RQ4. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: "
      "the control holding rounds-per-agent fixed, which is what rules out budget starvation. "
      "attr_ceiling_budget: the coverage step function (21/1056 at budget 30; 349/1056 at "
      "60, 120 and 240 -- IDENTICAL counts, not merely equal rates). attr_scale_final and "
      "attr_reach: k=30/40/50 at 30 episodes each, zero misattributions. attr_train: training "
-     "on the attribution reward. attr/transfer_*: the self-interested attribution baseline.",
-     "4.5 (RQ2), figure attribution_law",
+     "under the ATTRIBUTION BELIEF BACKEND, scored on the structural criterion -- NOT an "
+     "attribution reward, which no run in this project uses. attr/transfer_*: the "
+     "self-interested attribution baseline.",
+     "RQ4, figure attribution_law",
      ["results/attr_ceiling.json", "results/attr_ceiling_matched_budget.json",
       "results/attr_ceiling_budget.json", "results/attr_scale_final.json",
       "results/attr_reach.json", "results/attr_train/*.json",
@@ -72,7 +78,9 @@ REGISTRY = [
      "unstable step size.",
      "4.4 (RQ3), figure federation",
      ["results/central/v2_k12_?_s?.json", "results/central/v2_k20_?_s?.json",
-      "results/central/shd_*.json",
+      "results/rerows/shd_A.json", "results/rerows/shd_E.json",
+      "results/rerows/shd_A_s345.json", "results/rerows/shd_E_s345.json",
+      "results/rerows/shd_k20_A.json", "results/rerows/shd_k20_E.json",
       "results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/lrcheck/*.json"],
      "results/central/jobs/*.sh and jobs2/*.sh, then global_shd_paired.py"),

@@ -54,9 +54,18 @@ for k in (4, 8, 12, 20, 30):
     out.append(f"| {k} | {rl:.3f} | {rm:.3f} | {b:.5f} | {f:.5f} | {m:.5f} |")
 out += ["",
         "**Boundary.** Recovery rate is the final policy; SHD is reported at both checkpoints.",
-        "At $k_v=30$ the paired per-seed differences are +0.00054 +/- 0.00063, -0.00040 +/-",
-        "0.00008 and -0.00026 +/- 0.00007: two seeds significant, one indistinguishable.",
-        "**MUST NOT** quote a ratio of means at $k_v=30$; it hides that one seed carries it.", ""]
+        "SHD is measured under a seeded evaluation (2 Sep 22:xx). The myopic column reproduces",
+        "the pre-fix measurement to five decimals at every $k_v$; the learned column moved by",
+        "0.00 to 0.99 paired SE. `FINDINGS_DETERMINISM_2026_09_02.md`",
+        "At $k_v=30$ the paired per-seed differences are -0.00009 +/- 0.00034, -0.00040 +/-",
+        "0.00008 and -0.00005 +/- 0.00021: **one seed of three separates**, two are",
+        "indistinguishable. The earlier reading of this line said two of three; that was",
+        "measured before the evaluation RNG was seeded and is withdrawn.",
+        "**MUST NOT** quote a ratio of means at $k_v=30$; one seed carries the whole of it.",
+        "**MUST NOT** describe $k_v=8$ as favouring either arm. Per seed the paired differences",
+        "are -0.00016 (ns), -0.00059 (SIG, learned ahead) and +0.00096 (ns): the seeds disagree",
+        "and the mean is carried by seed 2. The crossover is between 8 and 12, and 8 is the",
+        "cell where it is ambiguous rather than the last cell the myopic rule wins.", ""]
 
 # --- RQ1: agent count ---------------------------------------------------------------------
 out += ["## C2 — The advantage reverses as agents are added", "",

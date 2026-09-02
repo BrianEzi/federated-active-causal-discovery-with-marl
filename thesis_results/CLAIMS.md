@@ -9,16 +9,25 @@ Regenerate after `scripts/collect_thesis_results.py`.
 
 | $k_v$ | recovery L | recovery M | SHD L (selected) | SHD L (final) | SHD M |
 |---|---|---|---|---|---|
-| 4 | 0.808 | 0.883 | 0.01024 | 0.00865 | 0.00611 |
-| 8 | 0.922 | 0.947 | 0.00113 | 0.00082 | 0.00082 |
-| 12 | 0.977 | 0.918 | 0.00014 | 0.00014 | 0.00077 |
-| 20 | 0.980 | 0.897 | 0.00000 | 0.00124 | 0.00053 |
-| 30 | 0.968 | 0.843 | 0.00038 | 0.00677 | 0.00042 |
+| 4 | 0.808 | 0.883 | 0.01119 | 0.00944 | 0.00611 |
+| 8 | 0.922 | 0.947 | 0.00089 | 0.00126 | 0.00082 |
+| 12 | 0.977 | 0.918 | 0.00011 | 0.00014 | 0.00077 |
+| 20 | 0.980 | 0.897 | 0.00000 | 0.00103 | 0.00053 |
+| 30 | 0.968 | 0.843 | 0.00024 | 0.00653 | 0.00042 |
 
 **Boundary.** Recovery rate is the final policy; SHD is reported at both checkpoints.
-At $k_v=30$ the paired per-seed differences are +0.00054 +/- 0.00063, -0.00040 +/-
-0.00008 and -0.00026 +/- 0.00007: two seeds significant, one indistinguishable.
-**MUST NOT** quote a ratio of means at $k_v=30$; it hides that one seed carries it.
+SHD is measured under a seeded evaluation (2 Sep 22:xx). The myopic column reproduces
+the pre-fix measurement to five decimals at every $k_v$; the learned column moved by
+0.00 to 0.99 paired SE. `FINDINGS_DETERMINISM_2026_09_02.md`
+At $k_v=30$ the paired per-seed differences are -0.00009 +/- 0.00034, -0.00040 +/-
+0.00008 and -0.00005 +/- 0.00021: **one seed of three separates**, two are
+indistinguishable. The earlier reading of this line said two of three; that was
+measured before the evaluation RNG was seeded and is withdrawn.
+**MUST NOT** quote a ratio of means at $k_v=30$; one seed carries the whole of it.
+**MUST NOT** describe $k_v=8$ as favouring either arm. Per seed the paired differences
+are -0.00016 (ns), -0.00059 (SIG, learned ahead) and +0.00096 (ns): the seeds disagree
+and the mean is carried by seed 2. The crossover is between 8 and 12, and 8 is the
+cell where it is ambiguous rather than the last cell the myopic rule wins.
 
 ## C2 — The advantage reverses as agents are added
 
@@ -65,10 +74,10 @@ shared-shared error is 0.00000 for both learned and myopic, maximum across all s
 
 ## C4 — Federating information, reward and optimisation costs nothing measurable
 
-* federated SHD mean 0.00020, median 0.00017
-* centralised SHD mean 0.00037, median 0.00005
+* federated SHD mean 0.00021, median 0.00013
+* centralised SHD mean 0.00058, median 0.00008
 * myopic on the same episodes 0.00068
-* **paired federated - centralised over 6 seeds: -0.00017 +/- 0.00023 (inside 2 SE)**
+* **paired federated - centralised over 6 seeds: -0.00037 +/- 0.00043 (inside 2 SE)**
 
 **Boundary.** Action rights stay partitioned in both arms. This is the cost of
 partitioning information, reward and optimisation, not of decentralisation entire.
@@ -91,3 +100,10 @@ learning rate instead makes them worse (0.519 -> 0.206, 0.345 -> 0.177).
 **MUST NOT** substitute these into any sweep table. The sweep holds the training budget
 fixed at 4,000 episodes across all twenty cells; mixing budgets between cells would
 confound the axis being varied. Report them beside the sweep as a limitation of it.
+
+## C6 — Training under a partial oracle transfers to sampled evidence
+
+**NOT YET AVAILABLE** -- 0 of 21 cells present in
+`thesis_results/power/`. Chapter 4 may assert nothing here until the grid is
+complete. Do not fill the gap from `docs/FINDINGS_TRANSFER_2026_09_02.md`; that
+note quotes the pre-fix grid.

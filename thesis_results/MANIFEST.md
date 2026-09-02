@@ -86,22 +86,22 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 
 | file | sha256 (16) | source |
 |---|---|---|
-| `k04_best.json` | `a69472a8852b312d` | `results/ckpt/k04_best.json` |
-| `k08_best.json` | `9752e542df815d18` | `results/ckpt/k08_best.json` |
-| `k12_best.json` | `df2c5079070eacd6` | `results/ckpt/k12_best.json` |
-| `k20_best.json` | `44a7d7e82f74814a` | `results/ckpt/k20_best.json` |
-| `k30_best.json` | `78ba4536eac44d90` | `results/ckpt/k30_best.json` |
-| `k04_final.json` | `76a35ffcc2d7be6b` | `results/ckpt/k04_final.json` |
-| `k08_final.json` | `be09e3f4adb8236d` | `results/ckpt/k08_final.json` |
-| `k12_final.json` | `03383c6688818d58` | `results/ckpt/k12_final.json` |
-| `k20_final.json` | `a8d4c2abab76c318` | `results/ckpt/k20_final.json` |
-| `k30_final.json` | `ca17233ca00d4e55` | `results/ckpt/k30_final.json` |
+| `k04_best.json` | `7e59d41377929726` | `results/rerows/k04_best.json` |
+| `k08_best.json` | `2df3e903d5bff2d1` | `results/rerows/k08_best.json` |
+| `k12_best.json` | `42df423b453e4b19` | `results/rerows/k12_best.json` |
+| `k20_best.json` | `3743b81d763ae208` | `results/rerows/k20_best.json` |
+| `k30_best.json` | `257e8832c8ed424d` | `results/rerows/k30_best.json` |
+| `k04_final.json` | `e072b5ce034cfe74` | `results/rerows/k04_final.json` |
+| `k08_final.json` | `5efeb63aa2ae1e86` | `results/rerows/k08_final.json` |
+| `k12_final.json` | `207afe020cc42188` | `results/rerows/k12_final.json` |
+| `k20_final.json` | `eee0667433e2bdb9` | `results/rerows/k20_final.json` |
+| `k30_final.json` | `53b5d0ffc704c815` | `results/rerows/k30_final.json` |
 
 10 files.
 
-## `attribution/` — 4.5 (RQ2), figure attribution_law
+## `attribution/` — RQ4, figure attribution_law
 
-RQ2. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: the control holding rounds-per-agent fixed, which is what rules out budget starvation. attr_ceiling_budget: the coverage step function (21/1056 at budget 30; 349/1056 at 60, 120 and 240 -- IDENTICAL counts, not merely equal rates). attr_scale_final and attr_reach: k=30/40/50 at 30 episodes each, zero misattributions. attr_train: training on the attribution reward. attr/transfer_*: the self-interested attribution baseline.
+RQ4. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: the control holding rounds-per-agent fixed, which is what rules out budget starvation. attr_ceiling_budget: the coverage step function (21/1056 at budget 30; 349/1056 at 60, 120 and 240 -- IDENTICAL counts, not merely equal rates). attr_scale_final and attr_reach: k=30/40/50 at 30 episodes each, zero misattributions. attr_train: training under the ATTRIBUTION BELIEF BACKEND, scored on the structural criterion -- NOT an attribution reward, which no run in this project uses. attr/transfer_*: the self-interested attribution baseline.
 
 Regenerate with: `scripts/attr_ceiling.py, scripts/attr_model.py`
 
@@ -150,22 +150,106 @@ Regenerate with: `results/central/jobs/*.sh and jobs2/*.sh, then global_shd_pair
 | `v2_k20_E_s0.json` | `da8fee69af83ca4a` | `results/central/v2_k20_E_s0.json` |
 | `v2_k20_E_s1.json` | `49c26918edd99849` | `results/central/v2_k20_E_s1.json` |
 | `v2_k20_E_s2.json` | `fa486406b54162fd` | `results/central/v2_k20_E_s2.json` |
-| `shd_A.json` | `e6767fc74a96188b` | `results/central/shd_A.json` |
-| `shd_A_s345.json` | `1d98d875518f93ae` | `results/central/shd_A_s345.json` |
-| `shd_E.json` | `dae11cbc36ff37b3` | `results/central/shd_E.json` |
-| `shd_E_s345.json` | `122a8895e6ee520c` | `results/central/shd_E_s345.json` |
-| `shd_k20_A.json` | `a953eb67e2405f70` | `results/central/shd_k20_A.json` |
-| `shd_k20_E.json` | `b904860f7e0eb79e` | `results/central/shd_k20_E.json` |
+| `shd_A.json` | `a97e605d7fc07b4d` | `results/rerows/shd_A.json` |
+| `shd_E.json` | `bc7606b933ba2a2e` | `results/rerows/shd_E.json` |
+| `shd_A_s345.json` | `1cbc0ba29c83d4f5` | `results/rerows/shd_A_s345.json` |
+| `shd_E_s345.json` | `28ed3255a2c46d24` | `results/rerows/shd_E_s345.json` |
+| `shd_k20_A.json` | `f4f99c518056ffb5` | `results/rerows/shd_k20_A.json` |
+| `shd_k20_E.json` | `f9292a9dbf3d66a4` | `results/rerows/shd_k20_E.json` |
 | `k12s25n02b150_long_s2.json` | `1cf9d31735174b67` | `results/longcheck/k12s25n02b150_long_s2.json` |
 | `k12s25n04b150_long_s2.json` | `abc7c6b42e20421f` | `results/longcheck/k12s25n04b150_long_s2.json` |
 | `k12s25n08b150_long_s2.json` | `3f80ee2d9aa2218d` | `results/longcheck/k12s25n08b150_long_s2.json` |
+| `k12s25n08b150_long_s3.json` | `79c23e302cf40918` | `results/longcheck/k12s25n08b150_long_s3.json` |
 | `k12s50n02b150_long_s2.json` | `5047e1d62ad567d2` | `results/longcheck/k12s50n02b150_long_s2.json` |
 | `k12s50n03b150_long_s2.json` | `b28124e5fbdacaf6` | `results/longcheck/k12s50n03b150_long_s2.json` |
 | `k12s50n04b100_long_s2.json` | `f0136cc95df44ef5` | `results/longcheck/k12s50n04b100_long_s2.json` |
 | `k12s50n04b120_long_s2.json` | `d609f059d8e68849` | `results/longcheck/k12s50n04b120_long_s2.json` |
+| `k12s50n05b150_conv_s0.json` | `226aac33595dfb3e` | `results/longcheck/k12s50n05b150_conv_s0.json` |
+| `k12s50n05b150_conv_s1.json` | `9622e72de5ba93df` | `results/longcheck/k12s50n05b150_conv_s1.json` |
+| `k12s50n05b150_conv_s2.json` | `b8f7f73d1bf5eb24` | `results/longcheck/k12s50n05b150_conv_s2.json` |
+| `k12s50n08b150_conv_s0.json` | `0434b8f76e009ac6` | `results/longcheck/k12s50n08b150_conv_s0.json` |
+| `k12s50n08b150_conv_s1.json` | `a67e01770683e95b` | `results/longcheck/k12s50n08b150_conv_s1.json` |
+| `k12s50n08b150_conv_s2.json` | `159ee50fb9c70023` | `results/longcheck/k12s50n08b150_conv_s2.json` |
+| `k12s50n10b150_conv_s0.json` | `2a5a2a22d5f80e27` | `results/longcheck/k12s50n10b150_conv_s0.json` |
+| `k12s50n10b150_conv_s1.json` | `ac3f7b8895c4383c` | `results/longcheck/k12s50n10b150_conv_s1.json` |
+| `k12s50n10b150_conv_s2.json` | `599f2b8b882c10af` | `results/longcheck/k12s50n10b150_conv_s2.json` |
+| `k12s75n04b150_conv_s0.json` | `45a5f2528ee92438` | `results/longcheck/k12s75n04b150_conv_s0.json` |
+| `k12s75n04b150_conv_s1.json` | `273bc5ac56b35457` | `results/longcheck/k12s75n04b150_conv_s1.json` |
+| `k12s75n04b150_conv_s2.json` | `1041c0c4f3603aa3` | `results/longcheck/k12s75n04b150_conv_s2.json` |
 | `k12s25n08b150_lr1e4_s2.json` | `8c4173de43df08e4` | `results/lrcheck/k12s25n08b150_lr1e4_s2.json` |
 | `k12s25n08b150_lr1e4_s3.json` | `c8b028825f007ab2` | `results/lrcheck/k12s25n08b150_lr1e4_s3.json` |
 | `k12s50n02b150_lr1e4_s2.json` | `2686569d21866b15` | `results/lrcheck/k12s50n02b150_lr1e4_s2.json` |
 | `k12s50n04b100_lr1e4_s2.json` | `92c6e90b2d308950` | `results/lrcheck/k12s50n04b100_lr1e4_s2.json` |
 
-38 files.
+51 files.
+
+## `power/` — 4.2 (RQ2), figure rho_curve
+
+RQ2, the answer-rate arm. Policies trained under a PARTIAL ORACLE -- ancestry answers withheld with probability 1 - rho, ~0.085 s/episode -- evaluated under genuine sampled evidence at 6-9 s/episode, which they never saw in training. The grid is 7 rates x 3 seeds x 200 paired episodes, taken from `deterministic/`: the same 21 cells were first built on an evaluation path that did not seed the torch RNG, so a learned arm scored with --sample was not reproducible, and `deterministic/` is the rebuild after that fix. Do not mix the two directories in one table. transfer_p{10,07,05} with p{10,07,05} is the isolation pair, differing in exactly one config field. repeat/ carries the coverage and repeat-rate mechanism probes; argmax/ the action-selection control.
+
+Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_deterministic.sh, then scripts/rho_curve_report.py --dir results/power/rho/deterministic`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `rho0.50_s0.json` | `ca356dcc6b230da5` | `results/power/rho/rho0.50_s0.json` |
+| `rho0.50_s1.json` | `cb10d3d190c59167` | `results/power/rho/rho0.50_s1.json` |
+| `rho0.50_s2.json` | `52ed21d8f5614c68` | `results/power/rho/rho0.50_s2.json` |
+| `rho0.70_s0.json` | `88cdad49a6c71128` | `results/power/rho/rho0.70_s0.json` |
+| `rho0.70_s1.json` | `2468a9e38af9e61c` | `results/power/rho/rho0.70_s1.json` |
+| `rho0.70_s2.json` | `986ec7f3d0cb3b05` | `results/power/rho/rho0.70_s2.json` |
+| `rho0.80_s0.json` | `60ec6406ec7944d4` | `results/power/rho/rho0.80_s0.json` |
+| `rho0.80_s1.json` | `1e282ddaba1562d7` | `results/power/rho/rho0.80_s1.json` |
+| `rho0.80_s2.json` | `14710e4b90832f4b` | `results/power/rho/rho0.80_s2.json` |
+| `rho0.85_s0.json` | `897d65ba24a7291c` | `results/power/rho/rho0.85_s0.json` |
+| `rho0.85_s1.json` | `284c68abeba10946` | `results/power/rho/rho0.85_s1.json` |
+| `rho0.85_s2.json` | `8ccc4414a6e50dc7` | `results/power/rho/rho0.85_s2.json` |
+| `rho0.90_s0.json` | `6bffbc0597d645c3` | `results/power/rho/rho0.90_s0.json` |
+| `rho0.90_s1.json` | `fae22d360147cfbe` | `results/power/rho/rho0.90_s1.json` |
+| `rho0.90_s2.json` | `a63deb40664eb522` | `results/power/rho/rho0.90_s2.json` |
+| `rho0.95_long_s0.json` | `8289c20caf78372e` | `results/power/rho/rho0.95_long_s0.json` |
+| `rho0.95_long_s1.json` | `78be49ca24e4a948` | `results/power/rho/rho0.95_long_s1.json` |
+| `rho0.95_long_s2.json` | `66db49bd1d3de60b` | `results/power/rho/rho0.95_long_s2.json` |
+| `rho0.95_s0.json` | `b982a980bbb551b8` | `results/power/rho/rho0.95_s0.json` |
+| `rho0.95_s1.json` | `5cbbb20b41a07510` | `results/power/rho/rho0.95_s1.json` |
+| `rho0.95_s2.json` | `2a5f25ac3336ca9e` | `results/power/rho/rho0.95_s2.json` |
+| `rho1.00_s0.json` | `97d2ce2354d1ec81` | `results/power/rho/rho1.00_s0.json` |
+| `rho1.00_s1.json` | `94cc7e902db40ca8` | `results/power/rho/rho1.00_s1.json` |
+| `rho1.00_s2.json` | `9a1bb76b22a5b54e` | `results/power/rho/rho1.00_s2.json` |
+| `CURVE.json` | `29b6b29a926498cd` | `results/power/rho/CURVE.json` |
+| `transfer_p05.json` | `20562fd96445592b` | `results/power/transfer_p05.json` |
+| `transfer_p07.json` | `24bb4fc9aae931af` | `results/power/transfer_p07.json` |
+| `transfer_p10.json` | `acd0a97250b37eca` | `results/power/transfer_p10.json` |
+| `p05.json` | `4cc44cc405408ed6` | `results/power/p05.json` |
+| `p07.json` | `2baa6749b8f80914` | `results/power/p07.json` |
+| `p10.json` | `b85bfd6e67662419` | `results/power/p10.json` |
+| `p85.json` | `4dbd014a9b91facf` | `results/power/p85.json` |
+| `p95.json` | `386735f2cd87eae5` | `results/power/p95.json` |
+| `repeat_rho0.50.json` | `f2c954f0947ddbd0` | `results/power/rho/repeat/repeat_rho0.50.json` |
+| `repeat_rho0.50_s1.json` | `814bab4d438b8204` | `results/power/rho/repeat/repeat_rho0.50_s1.json` |
+| `repeat_rho0.50_s2.json` | `1819155db39fc840` | `results/power/rho/repeat/repeat_rho0.50_s2.json` |
+| `repeat_rho0.70.json` | `1a76b9c6300f299a` | `results/power/rho/repeat/repeat_rho0.70.json` |
+| `repeat_rho0.70_s1.json` | `f8d06e9f6958153e` | `results/power/rho/repeat/repeat_rho0.70_s1.json` |
+| `repeat_rho0.70_s2.json` | `04e77a93576cf796` | `results/power/rho/repeat/repeat_rho0.70_s2.json` |
+| `repeat_rho0.80.json` | `1931476dbf53a93c` | `results/power/rho/repeat/repeat_rho0.80.json` |
+| `repeat_rho0.80_s1.json` | `283c30fa7bff2f0f` | `results/power/rho/repeat/repeat_rho0.80_s1.json` |
+| `repeat_rho0.80_s2.json` | `ab90ad1413a4d02d` | `results/power/rho/repeat/repeat_rho0.80_s2.json` |
+| `repeat_rho0.85.json` | `5e5253b1093ed5f8` | `results/power/rho/repeat/repeat_rho0.85.json` |
+| `repeat_rho0.85_s1.json` | `aa6cfef4fd49cf04` | `results/power/rho/repeat/repeat_rho0.85_s1.json` |
+| `repeat_rho0.85_s2.json` | `793d96761fb6f67f` | `results/power/rho/repeat/repeat_rho0.85_s2.json` |
+| `repeat_rho0.90.json` | `e274f84748c65bc4` | `results/power/rho/repeat/repeat_rho0.90.json` |
+| `repeat_rho0.90_s1.json` | `ece706c845378e2d` | `results/power/rho/repeat/repeat_rho0.90_s1.json` |
+| `repeat_rho0.90_s2.json` | `bbf722e730cf3ad1` | `results/power/rho/repeat/repeat_rho0.90_s2.json` |
+| `repeat_rho0.95.json` | `2996ba16afb0cac5` | `results/power/rho/repeat/repeat_rho0.95.json` |
+| `repeat_rho0.95_s1.json` | `8a0d22c8e823385e` | `results/power/rho/repeat/repeat_rho0.95_s1.json` |
+| `repeat_rho0.95_s2.json` | `2549ad8461c3ba8b` | `results/power/rho/repeat/repeat_rho0.95_s2.json` |
+| `repeat_rho1.00.json` | `7dc626cdc8e63fed` | `results/power/rho/repeat/repeat_rho1.00.json` |
+| `repeat_rho1.00_s1.json` | `fc70ae80e1b85cbc` | `results/power/rho/repeat/repeat_rho1.00_s1.json` |
+| `repeat_rho1.00_s2.json` | `c0b3eebf3aedbbe6` | `results/power/rho/repeat/repeat_rho1.00_s2.json` |
+| `argmax_rho0.70_s0.json` | `9d6645b775cc736b` | `results/power/rho/argmax/argmax_rho0.70_s0.json` |
+| `argmax_rho0.70_s1.json` | `d8729d49959eb23e` | `results/power/rho/argmax/argmax_rho0.70_s1.json` |
+| `argmax_rho0.70_s2.json` | `48ca40a80a5ea393` | `results/power/rho/argmax/argmax_rho0.70_s2.json` |
+| `argmax_rho0.95_s0.json` | `63d30685fddc6d8c` | `results/power/rho/argmax/argmax_rho0.95_s0.json` |
+| `argmax_rho0.95_s1.json` | `1108f5e1fd29191b` | `results/power/rho/argmax/argmax_rho0.95_s1.json` |
+| `argmax_rho0.95_s2.json` | `9de55fd96017a624` | `results/power/rho/argmax/argmax_rho0.95_s2.json` |
+
+60 files.
