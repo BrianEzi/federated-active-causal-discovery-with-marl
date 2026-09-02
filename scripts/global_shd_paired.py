@@ -89,7 +89,28 @@ def main(argv=None) -> int:
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
     ap.add_argument("--out", default="results/global_shd_paired.json")
+    # THE 3x SAVING, and the identity that licenses it. Greedy and random_vary do not read the
+    # trained policy, so for a fixed (cell, seed, episodes, evidence) they replay identical
+    # episodes and produce identical numbers no matter which checkpoint sits in the learned
+    # arm. Measured: greedy scored 0.06649 hard SHD in BOTH the p10 and p07 transfer tests,
+    # which differ only in the training answer rate. So across an answer-rate sweep the two
+    # baselines need computing once per seed and can be reused for every rate.
+    #
+    # `--baseline_from` reads those stored per-episode vectors and pairs against them;
+    # `--arms learned` computes only the learned arm. Under sampled evidence, where a single
+    # arm is 6-9 s/episode, this turns 21 three-arm evaluations into 3 three-arm plus 18
+    # one-arm -- the difference between a tractable overnight run and an eight-hour tail.
+    #
+    # REFUSES A MISMATCH rather than silently pairing against the wrong episodes: the stored
+    # baseline records its cell, seed, episode count and evidence regime, and all four must
+    # agree. Pairing needs the SAME episodes, not merely the same count.
+    ap.add_argument("--arms", default="all", choices=["all", "learned"],
+                    help="'learned' computes only the learned arm; requires --baseline_from")
+    ap.add_argument("--baseline_from", default=None,
+                    help="a prior --arms all output to reuse greedy/random_vary from")
     args = ap.parse_args(argv)
+    if args.arms == "learned" and not args.baseline_from:
+        ap.error("--arms learned requires --baseline_from")
 
     payload = []
     for path in args.results:
@@ -111,15 +132,31 @@ def main(argv=None) -> int:
             continue
 
         ppo = IndependentPPO.load(str(checkpoint), env)
-        arms = {
-            "learned": ppo.policies(deterministic=not args.sample),
-            "greedy": {a: UncertaintyGreedyAgent(a, use_seed, bar=1.0)
-                       for a in env.topology.agents},
-            "random_vary": {a: RandomAgent(a, use_seed, allow_clamp=False)
-                            for a in env.topology.agents},
-        }
+        arms = {"learned": ppo.policies(deterministic=not args.sample)}
+        if args.arms == "all":
+            arms["greedy"] = {a: UncertaintyGreedyAgent(a, use_seed, bar=1.0)
+                              for a in env.topology.agents}
+            arms["random_vary"] = {a: RandomAgent(a, use_seed, allow_clamp=False)
+                                   for a in env.topology.agents}
         rows = {label: play(env, policies, args.episodes, use_seed)
                 for label, policies in arms.items()}
+
+        if args.arms == "learned":
+            stored = json.loads(pathlib.Path(args.baseline_from).read_text())
+            base = stored[0] if isinstance(stored, list) else stored
+            want = (use_seed, args.episodes,
+                    args.override_evidence or config.get("vs_evidence"))
+            have = (base.get("seed"), base.get("episodes"), base.get("eval_evidence"))
+            if want != have:
+                raise SystemExit(
+                    f"baseline mismatch: {args.baseline_from} is seed/episodes/evidence "
+                    f"{have}, this run needs {want}. Pairing requires the SAME episodes.")
+            if "rows" not in base:
+                raise SystemExit(
+                    f"{args.baseline_from} has no per-episode rows; regenerate it with "
+                    f"--arms all on this version, which stores them for reuse.")
+            for other in ("greedy", "random_vary"):
+                rows[other] = base["rows"][other]
 
         print(f"\n=== {path.stem}  ({args.episodes} episodes, "
               f"{args.checkpoint} checkpoint, "
@@ -134,6 +171,12 @@ def main(argv=None) -> int:
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},
+                 # PER-EPISODE vectors, not just means, so a later `--arms learned` run can
+                 # pair against these exact episodes. Stored only when this run computed the
+                 # baselines itself; a learned-only run has nothing new to contribute.
+                 "rows": ({k: {m: [float(x) for x in v[m]]
+                               for m in ("hard", "soft", "resolved")}
+                           for k, v in rows.items()} if args.arms == "all" else None),
                  "paired": {}}
         for other in ("greedy", "random_vary"):
             p = paired(rows["learned"]["hard"], rows[other]["hard"])

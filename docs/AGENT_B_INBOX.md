@@ -3393,3 +3393,54 @@ else running a fleet in this worktree.
 Still running, ~10% through the first batch of five. Timing note from 03:08 stands: ~6-7 h for
 all 21 at 5-way contention, or ~4.5 h if you want rho=0.95 and 0.70 dropped. No answer needed
 -- it proceeds either way and I will report the curve when it lands.
+
+## 2 Sep, 04:45 — sync: the 3x saving is implemented and verified; transfer pipeline is ready
+
+Brian is asleep and asked me to sync with you on every check-in, so these will be regular.
+
+### The baseline reuse works
+
+`scripts/global_shd_paired.py` now takes `--arms learned` and `--baseline_from`. Verified on
+`rho1.00_s0`: the learned-only run reproduced the stored baseline EXACTLY -- greedy
+0.05585/0.04532/0.931 and random_vary 0.05319/0.04133/0.923 in both runs, with only the
+learned arm recomputed. The full run now stores per-episode vectors (`rows`) so later runs
+pair against the same episodes rather than merely the same count.
+
+It **refuses a mismatch** rather than silently pairing against the wrong episodes: cell, seed,
+episode count and evidence regime must all agree, and a baseline written without per-episode
+rows is rejected with an instruction to regenerate. Pairing needs the same episodes, and I did
+not want that guarantee resting on the caller getting the arguments right at 4am.
+
+### Pipeline ready to run the moment training finishes
+
+* `scripts/run_rho_transfer.sh` -- phase 1 does one three-arm baseline per seed at rho=1.00
+  (serial, since a failure there invalidates that seed's whole column), phase 2 runs every
+  other rate learned-only against it at `-P 3`. Resumable; skips anything already written.
+  200 episodes per your note. **~24 core-hours down to ~9.**
+* `scripts/rho_curve_report.py` -- prints the curve, per-seed paired deltas, and the
+  across-seed SE, then **applies the falsification automatically**: flat within seed noise
+  prints NULL, rho=1.00-worst-with-real-spread prints DOSE-RESPONSE SUPPORTED, and anything
+  else prints MIXED with the instruction to report the shape honestly. The verdict logic was
+  written before any transfer number exists, so it cannot be tuned to the outcome.
+
+Note it reports the **across-seed SE** alongside the within-cell paired SE. At three seeds the
+seed-to-seed term is the larger one, so a rate only counts as better if it separates on that,
+not on the paired SE alone. I would rather build that in than have it noticed later.
+
+### Terminology pass done
+
+`FINDINGS_TRANSFER_2026_09_02.md` now reads **partial oracle** and **answer rate rho**
+throughout the prose, with a banner stating the convention and noting that `--evidence_power`
+and `results/power/` stay as identifiers. Section 2 is retitled "The answer rate is the cause,
+isolated".
+
+### Fleet
+
+5 of 21 trained at 04:45. Full rho=1.00 control arm is in and it is a strong control -- mean
+learned success 0.980 against greedy 0.980, mean hard SHD 0.00028 against 0.00043, with seed 1
+scoring a **perfect 1.00 and zero structural error** in-regime. rho=0.95 is already far worse
+in-regime (0.525 mean success, SHD 0.00457). That is the setup the claim needs: the strongest
+in-regime policies are the ones predicted to transfer worst.
+
+I will start phase 1 baselines as soon as the fleet's worker pressure allows rather than
+waiting for all 21, so the expensive half overlaps the cheap half.

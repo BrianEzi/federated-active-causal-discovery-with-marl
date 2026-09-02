@@ -1,4 +1,9 @@
-# Power-limited oracle training transfers to sampled evidence, and beats greedy there
+# Partial-oracle training transfers to sampled evidence, and beats greedy there
+
+> **Terminology.** This document says **partial oracle** and **answer rate rho**, never
+> "power" -- statistical power is what the finite-sample regime is actually about and the
+> collision would confuse a reader on the one page where both appear. The config flag remains
+> `--evidence_power` and the paths remain `results/power/`; those are identifiers, not prose.
 
 2 Sep 2026, 03:00. **Supersedes the conclusion of
 `FINDINGS_POWER_LIMITED_EVIDENCE_2026_09_01.md`**, which closed this line at grade D on a
@@ -14,7 +19,7 @@ All cells below are k=8, 4 agents, `factored` backend, `--turn_aware_credit --lo
 
 ## 1. The result
 
-A policy trained under **power-limited oracle evidence** -- oracle ancestry answers withheld
+A policy trained under a **partial oracle** -- oracle ancestry answers withheld
 with probability `1 - p`, which costs ~0.085 s/episode -- is evaluated under **genuine
 sampled evidence**, the 6-9 s/episode regime it never saw during training. Hard SHD of the
 pooled global graph, paired per-episode differences against the greedy baseline:
@@ -31,7 +36,7 @@ third ties. None lose.**
 Config: `--budget 70 --evidence_power 0.85 --observe_belief_channels
 --observe_reprobe_signal --train_episodes 8000`.
 
-## 2. The power dial is the cause, isolated
+## 2. The answer rate is the cause, isolated
 
 `results/power/p10.json` and `p07.json` differ in **exactly one config field**, verified
 field by field: `vs_evidence_power` (1.0 against 0.7). Same budget 35, same 4000 episodes, no
@@ -43,7 +48,7 @@ identically in both transfer tests (0.06649 hard SHD), which confirms the pairin
 | `vs_evidence_power = 1.0` (plain oracle) | **+0.02686 +/- 0.00806** -- loses, 3.3 SE |
 | `vs_evidence_power = 0.7` | -0.00399 +/- 0.00435 -- tied |
 
-**Turning the power dial alone moves transfer from significantly losing to tied, a swing of
+**Turning the answer rate alone moves transfer from significantly losing to tied, a swing of
 ~0.031.** The plain-oracle row independently reproduces `FINDINGS_2026_08_27`'s finding that
 oracle-trained policies do not transfer, which is what makes the comparison meaningful rather
 than circular.
@@ -75,7 +80,7 @@ against the property being claimed.
 `scripts/power_vs_sampled_distribution.py` plays a belief-independent `RandomAgent` against
 both evidence regimes on matched seeds, so only the evidence rule differs.
 
-**Resolution speed matches.** Mean absolute difference between the power-limited and genuine
+**Resolution speed matches.** Mean absolute difference between the partial-oracle and genuine
 sampled belief-resolution trajectories, by window size:
 
 | k | p=0.90 | p=0.85 | p=0.80 |
@@ -86,12 +91,12 @@ sampled belief-resolution trajectories, by window size:
 | 30 | 0.0137 | 0.0111 | **0.0085** |
 
 (k=8 also swept 1.0/0.95/0.7/0.5; the curve is U-shaped with a clear minimum.) `p = 0.85` is
-optimal or tied-optimal through k=20 and is overtaken by 0.80 at k=30, so **the optimal power
-drifts downward as the window grows** and should be recalibrated per scale rather than fixed.
+optimal or tied-optimal through k=20 and is overtaken by 0.80 at k=30, so **the optimal answer
+rate drifts downward as the window grows** and should be recalibrated per scale rather than fixed.
 
 **Fallibility does not match, and cannot.** Sampled evidence settles pairs on a WRONG mark at
-a rate rising to a ~2% plateau; power-limited evidence produces exactly 0.000 error at every
-power value and every round, by construction -- withholding is sound, it can only decline to
+a rate rising to a ~2% plateau; the partial oracle produces exactly 0.000 error at every
+answer rate and every round, by construction -- withholding is sound, it can only decline to
 answer. So the proxy reproduces the SPEED of sampled belief resolution but not its
 FALLIBILITY.
 
@@ -103,9 +108,9 @@ regime. It does set an absolute floor on achievable SHD for any policy.
 
 ## 5. What is NOT established
 
-* **The full effect is not attributed.** The winning configuration changes power, budget,
+* **The full effect is not attributed.** The winning configuration changes answer rate, budget,
   observation channels, the reprobe signal and episode count together relative to `p10`. The
-  power dial is isolated by section 2; the -0.012 win as a whole is not.
+  answer rate is isolated by section 2; the -0.012 win as a whole is not.
 * **"Substitutes for sampled training" is unproven.** Every comparison here is against
   GREEDY under sampled evidence. Establishing substitution needs a sampled-TRAINED policy at
   the same cell, which is exactly the cost the method exists to avoid. Partial k=8 sampled
@@ -137,7 +142,7 @@ cleanly, and resolved a 0.012 effect on 40 episodes.
 ## 7. Files
 
 * Transfer: `results/power/TRANSFER_seed{0,1,2}_final.json`
-* Power isolation: `results/power/transfer_p{10,07,05}.json`, `results/power/p{10,07,05}.json`
+* Answer-rate isolation: `results/power/transfer_p{10,07,05}.json`, `results/power/p{10,07,05}.json`
 * Calibration: `results/power/dist_compare_k8_b35_with_error.json`, `dist_compare_k{12,20,30}.json`
 * Checkpoint sweeps: `results/power/ckptsweep_{4k,long}_s{0,2}.json`
 * Tooling: `scripts/power_vs_sampled_distribution.py`, `scripts/power_window_rate.py`,
