@@ -2775,3 +2775,81 @@ a significant loss for a reason that has nothing to do with the policy's quality
 One caveat on my own reading: one seed per cell, and the two k=20/k=30 cells are small
 effects whose intervals overlap zero under argmax. The k12b500 cell and the resolved-fraction
 collapse are what carry it. A second seed would settle it cheaply if anyone wants it.
+
+## 2 Sep, 02:15 — attacking my own results. Two items cleared, one CONFIRMS I overstated a claim.
+
+Brian asked for viciously thorough skepticism on the power thread. Seven items; three are
+resolved, and the outcomes matter.
+
+### RETRACTION: "seed 1 matched greedy (0.954 vs 0.950)" is NOT supported
+
+The checkpoint sweep exposed it. **The same checkpoint measures 0.904 at 60 episodes and
+0.938 at 40 episodes** -- a 0.034 swing from episode count alone, on identical weights.
+Greedy moves too (0.971 -> 0.963 on seed 2). My headline gap was +0.004. **The measurement
+noise is roughly ten times the effect I reported.** I published a bare mean with no error bar
+on a difference that small, which was wrong.
+
+`scripts/power_window_rate.py` now computes the PAIRED per-episode standard error (both arms
+already play `seed*100_000 + episode`, so the pairing was always available -- I just didn't
+use it) and flags 2-SE significance. Re-running all six runs at 150 episodes now. Until that
+lands, treat "power-limited training can match greedy" as UNPROVEN, not as a positive result.
+
+### Checkpoint sweep: MI-selection is not the problem, and 8000 episodes HURT
+
+    run                          u0250   u0350   u0499   best.pt   greedy
+    long (8000ep) seed 0         0.800   0.863   0.819    0.781    0.950
+    long (8000ep) seed 2         0.831   0.744   0.838    0.856    0.963
+
+    run                   u0100  u0150  u0200  u0249   best.pt   greedy
+    4000ep seed 0         0.881  0.669  0.844  0.856    0.938    0.950
+    4000ep seed 2         0.838  0.794  0.750  0.869    0.819    0.963
+
+Two things. **`best.pt` is often the best available checkpoint anyway** (4000ep seed 0: 0.938,
+higher than every eval checkpoint) so the "MI picked the wrong snapshot" theory does NOT
+rescue seeds 0/2. And **the 8000-episode runs are worse than the 4000-episode ones at every
+checkpoint for seed 0** (peak 0.863 against 0.938). Extra training is actively harmful here,
+which is consistent with the entropy collapse and contradicts the "they just needed longer"
+reading I gave earlier tonight.
+
+Also note the trajectories are non-monotonic and jump around by 0.1-0.2 between adjacent
+checkpoints (seed 0: 0.881 -> 0.669 -> 0.844). At 40 episodes much of that is measurement
+noise, which is the same point as the retraction above.
+
+### CLEARED: the reprobe-signal does not leak oracle information
+
+Worth checking because the feature reads `belief.last`, and under power-limited ORACLE
+evidence that belief is built from revealed ancestry. If it meant something different under
+real sampled evidence, it would help in training and evaporate at transfer.
+
+By inspection: it reads only the agent's own belief marginals and its own `own_counts`, both
+already in the observation. It is a derived combination of visible features, not new
+information. Measured activation rate under a fixed random policy:
+
+    power-limited 0.85      4.14%
+    REAL sampled n_int=200  3.54%
+
+Same order, close values. The feature means substantially the same thing in both regimes, so
+a weak transfer result cannot be blamed on it.
+
+### The structural hole nobody has named, and it is the important one
+
+**The cheap method cannot be validated without paying the expensive cost at least once.**
+Every transfer test I have run compares a power-trained policy against GREEDY under sampled
+evidence. That answers "does it beat greedy there". The thesis claim is "power-limited
+training substitutes for sampled training", and testing THAT needs a sampled-TRAINED policy
+at the same cell to compare against -- which is exactly the 6-9 s/episode cost the method
+exists to avoid. There is no such policy at k=8/budget=70. Until one exists, the strongest
+honest claim is "a policy trained on cheap withheld-oracle evidence beats greedy under real
+sampled evidence", NOT "it matches sampled training".
+
+`results/sampled_learned/` has partially-trained sampled checkpoints at k=8 from earlier in
+this thread. Those are the closest thing available to the missing comparison and I did not
+think to use them as an arm until now.
+
+### Still open (not yet checked)
+
+* All power results are k=8 (some k=12). The thesis headline is k=20/k=30. Nothing tested there.
+* No channels/reprobe-OFF control at 8000 episodes, so seed 1's jump could be extra training
+  rather than the features. The ablation was entirely at 4000.
+* Transfer running for all three seeds now, not just the winner -- testing only the seed that
+  won would have been selection on the outcome.
