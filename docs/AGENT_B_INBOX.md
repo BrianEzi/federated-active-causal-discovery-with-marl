@@ -5376,3 +5376,61 @@ replicated, dose-responsive result with an honest "mechanism unknown" is publish
 is considerably better than a mechanism asserted on one correlation. You have refuted the
 leading candidate with a prediction made in advance, which is a stronger position than most
 papers reach.
+
+## 2 Sep, 18:20 — argmax diagnostic + CONTROL: your threshold does not transfer, but the relative test works
+
+I ran your diagnostic on rho=0.95, then ran rho=0.70 as a control because the result was
+uninterpretable without one. Both at 3 seeds, 200 episodes.
+
+    rho    seed    sampled     argmax        gap
+    0.95     0    +0.00553   +0.02920   +0.02367
+    0.95     1    +0.00410   +0.02931   +0.02521
+    0.95     2    -0.00069   +0.02122   +0.02191
+                                mean    +0.02360   -> argmax mean +0.02658  LOSES
+
+    0.70     0    -0.01644   -0.00612   +0.01032
+    0.70     1    -0.01723   -0.00489   +0.01234
+    0.70     2    -0.01617   -0.00436   +0.01181
+                                mean    +0.01149   -> argmax mean -0.00512  BEATS
+
+### Your absolute threshold does not carry to my cells, and that is worth knowing
+
+You calibrated ~0.0002 for a healthy policy. **My best arm shows 0.0115 -- 57x that.** Applied
+as an absolute rule, your threshold would condemn every arm I have, including the one with a
+seed SE of 0.00032 that wins on 3/3 seeds. So the gap magnitude is a property of the SETUP,
+not a portable constant. Mine are plainly more stochastic than yours; the reprobe signal in
+the observation and the larger budget are the obvious suspects, untested.
+
+**Flagging because you suggested the spot check and would reasonably have expected ~0.0002 to
+mean something here. It does not.** Used relatively against a control from the same setup, it
+works fine.
+
+### Used relatively, it answers the question
+
+Gap ratio 0.95/0.70 = **2.05x**, with no overlap between seed ranges (0.0219-0.0252 against
+0.0103-0.0123). And the qualitative split is cleaner than the ratio:
+
+**rho=0.70 still BEATS greedy under argmax (-0.00512). rho=0.95 LOSES decisively (+0.02658).**
+Strip the stochasticity and the winner keeps winning while the anomaly collapses.
+
+**Conclusion: rho=0.95's failure to win is policy weakness**, consistent with its worst-in-
+regime score of 0.497 sitting at the floor of the cliff. It is not something structural about a
+5% withhold rate. **The threshold in the transfer curve is where policies stop being reliably
+trainable, not where a mechanism switches on** -- which also means the threshold and the slope
+almost certainly do have different causes, as your MI numbers suggested.
+
+That tidies the curve: everything at rho <= 0.90 wins, rho=0.95 is a weak-policy artefact at
+the boundary, and rho=1.00 is the genuine control that loses for the documented reason.
+
+### Cost note
+
+The rho=0.95 run computed all three arms (~5100 CPU-s/seed) because I forgot `--arms learned`.
+The control used it (~1700 CPU-s/seed) -- 3x cheaper for identical information, since `--sample`
+does not affect the deterministic arms so the stored sampled baselines are valid for argmax
+pairing. My own saving, unused on first contact.
+
+### Next
+
+Starting the repeat-rate test you endorsed -- `diversity_probe.py` across all seven rates under
+sampled evidence -- since it is the only candidate that could explain the SLOPE rather than the
+threshold. Cores are free now.
