@@ -6067,3 +6067,61 @@ around.
 Attribution scoped down after finding the "trained on the attribution reward" runs used the
 standard structural reward with the ownership channel off and recorded no attribution metric.
 Withdrawn claim, RQ4 demoted to a section. Nothing of mine depends on it.
+
+## 2 Sep, 20:5x — SUBMISSION AUDIT: your per-cell transfer outputs are the one real gap
+
+Brian wants a clean, structured submission set. I have assembled `submission/` here -- 183 MB,
+268 result files and 437 checkpoints selected from a 2.1 GB working tree, grouped by the
+research question each supports, with a manifest and a hash check. `scripts/build_submission.py`
+builds and verifies it.
+
+Auditing what is present for RQ2 against what the other groups have, one thing is missing.
+
+### What we have of yours, and it is nearly everything
+
+    results/power/rho/          100 files -- 21 training JSON + 21 _best.pt + .pt + CURVE + plot
+    results/power/confirm/        6 files -- the 200-episode confirmation, all three seeds
+    results/sampled_ref/          6 files -- the sampled-trained reference arm
+    results/power/transfer_p*     3 files -- the p10/p07/p05 isolation
+
+The rho fleet is complete: three trained runs and three `_best.pt` at every one of the seven
+rates. Nothing missing there.
+
+### What is missing: the 21 per-cell transfer evaluations
+
+`CURVE.json` holds the aggregate -- mean delta, seed SE, per-seed deltas, verdict, per rate.
+That is enough to redraw the curve and nothing more.
+
+**What it does not hold is the paired per-episode data underneath each point.** Every other
+result in the submission ships the `global_shd_paired.py` output itself: 200 per-episode hard
+and soft SHD values per arm, the resolved fraction, and the paired standard error computed from
+them. `CURVE.json` gives me the answer without the working.
+
+Concretely, with only CURVE.json a reader cannot:
+
+* recompute a paired SE, or check the one reported
+* see the resolved fraction, which is how we rule out an arm winning by settling fewer pairs --
+  the check that saved the k=20 headline this morning
+* re-derive the curve at a different episode count or a different checkpoint convention
+* verify that greedy really is the identical per-episode vector across rates, which is the
+  correctness check your 3x baseline saving rests on
+
+**Please push whatever your daemon wrote per cell.** `logs/power/rho/` is empty here, so either
+they went somewhere untracked or somewhere not pushed. 21 files, small, and it takes RQ2 from
+"the curve is reproducible" to "the curve is checkable", which is the standard the other three
+research questions meet.
+
+### Also worth having, lower priority
+
+* **`rho_curve.png` is stale.** You are rebuilding panels 2 and 3 on hard SHD delta after
+  retraction 4. Push the rebuilt version; the current one is in the repo and its panel 3
+  annotation is now wrong.
+* **The 16,000-episode rho=0.95 runs**, whatever they show. If the answer is "more training
+  does not rescue it", that is a result and belongs in the record.
+* **The repeat-probe output**, if you ran it.
+* **`scripts/rho_transfer_daemon.sh` and `rho_curve_report.py`** are already tracked. Good --
+  the verdict logic being inspectable matters more than usual given it withheld twice.
+
+### What I am NOT asking for
+
+The 40-60 core-hour matched sampled-training arm. Still the right call not to run it.
