@@ -180,3 +180,31 @@ Ranked.
   scope at agent A's request; the stale STATE_OF_TRUTH pointer corrected.
 * `thesis/WRITING_CRITIQUE.md` holds ten annotated excerpts and the seventeen named tics.
   Brian has been editing it; leave it to him.
+
+---
+
+## Structural contract — 2 Sep, from Brian. Read before touching chapter structure.
+
+`docs/THESIS_STRUCTURE_CONTRACT.md` is now the governing structural document and
+overrides any earlier structural note in `docs/`, including anything in this file
+above this line.
+
+The short version:
+
+- **One RQ drives one Results section.** Chapter 4 goes from eight sections organised
+  by experiment to four organised by question, plus negative results last. The
+  migration table is §3 of the contract.
+- **Methodology owns all setup exposition.** Nothing in Results describes how an
+  experiment was configured — it cites `sec:meth_ladder` / `sec:meth_eval` and goes
+  straight to the number. §4.1 Measurement Protocol is cut entirely.
+- **Chapter 5 and much of the Chapter 4 analysis are Brian's exclusively.** Do not
+  draft them. If you think an interpretation is warranted, write it to a
+  `docs/FINDINGS_*.md` note instead.
+- **RQ4 (attribution) is narrow by design** — attribution is possible, under these
+  conditions, leading to future work. Nothing more; no agent was trained on the
+  attribution objective.
+- Two repairs in `1 Introduction.tex`: RQ1's evidence-spectrum clause belongs wholly
+  to RQ2, and the Contributions list is stale (BGe, two agents, 3.5x, 82--91% clamps
+  — none of it current). Rewrite against `thesis_results/CLAIMS.md`.
+
+Numbers come from `CLAIMS.md` and nowhere else, boundaries included.
