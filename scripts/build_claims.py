@@ -80,39 +80,102 @@ out += ["",
         "and the mean is carried by seed 2. The crossover is between 8 and 12, and 8 is the",
         "cell where it is ambiguous rather than the last cell the myopic rule wins.", ""]
 
-# --- RQ1: agent count ---------------------------------------------------------------------
-out += ["## C2 — The advantage reverses as agents are added", "",
-        "| $K$ | SHD L | SHD M | ratio | ratio excl. seed 2 | seeds |", "|---|---|---|---|---|---|"]
+# --- RQ1: agent count, at the converged budget --------------------------------------------
+# REWRITTEN 2 Sep 23:xx. The previous version of this claim read each run's own
+# `global_hard_shd` at 4,000 episodes and carried an UNRESOLVED banner all day. Both problems
+# are gone: the 12,000-episode sweep is complete and measured properly with
+# scripts/global_shd_paired.py at both checkpoint conventions.
+PRE12 = {"k12s50n05b150": "results/longcheck/shd_n05_12k.json",
+         "k12s75n04b150": "results/longcheck/shd_s75_12k.json",
+         "k12s50n08b150": "results/longcheck/shd_n08_12k.json",
+         "k12s50n10b150": "results/longcheck/shd_n10_12k.json"}
+
+
+def m12(cell, conv="best"):
+    """A 12,000-episode cell, measured. Returns None rather than improvising when absent."""
+    if conv == "best":
+        q = ROOT / PRE12[cell] if cell in PRE12 else ROOT / f"results/sweep12k/shd/{cell}.json"
+    else:
+        q = ROOT / f"results/sweep12k/shd_{conv}/{cell}.json"
+    if not q.exists():
+        return None
+    d = json.loads(q.read_text())
+    return dict(L=np.mean([e["means"]["learned"]["hard"] for e in d]),
+                M=np.mean([e["means"]["greedy"]["hard"] for e in d]),
+                ahead=sum(1 for e in d if e["paired"]["learned-greedy"]["delta"] < 0),
+                sig=sum(1 for e in d if e["paired"]["learned-greedy"]["delta"] < 0
+                        and e["paired"]["learned-greedy"]["significant"]),
+                n=len(d))
+
+
+def rec(cell, budget):
+    d = "results/sweep12k" if budget == 12000 else "results/sweep/oracle"
+    fs = sorted(glob.glob(str(ROOT / d / f"{cell}_s?.json")))
+    if not fs:
+        return None
+    j = [json.loads(open(f).read()) for f in fs]
+    return (np.mean([x["arms"]["learned"]["success"] for x in j]),
+            np.mean([x["arms"]["greedy_uncertainty"]["success"] for x in j]))
+
+
+out += ["## C2 — At a converged budget the agent-count reversal does not exist", "",
+        "| $K$ | SHD L (sel) | SHD L (fin) | SHD M | ratio (sel) | seeds ahead | beyond 2 SE |",
+        "|---|---|---|---|---|---|---|"]
 for n in (2, 3, 4, 5, 8, 10):
-    rows = [r for r in sweep(f"k12s50n{n:02d}b150_s*.json") if wr(r) >= FLOOR]
-    L = [r["arms"]["learned"]["global_hard_shd"] for r in rows]
-    G = [r["arms"]["greedy_uncertainty"]["global_hard_shd"] for r in rows]
-    S = [r.get("seed") for r in rows]
-    L2 = [v for v, s in zip(L, S) if s != 2]
-    G2 = [v for v, s in zip(G, S) if s != 2]
-    r2 = (np.mean(L2) / np.mean(G2)) if L2 else float("nan")
-    out.append(f"| {n} | {np.mean(L):.5f} | {np.mean(G):.5f} | {np.mean(L)/np.mean(G):.2f} | "
-               f"{r2:.2f} | {len(rows)} |")
+    cell = f"k12s50n{n:02d}b150"
+    b, f = m12(cell), m12(cell, "final")
+    if not b or not f:
+        out.append(f"| {n} | *not measured* | | | | | |")
+        continue
+    out.append(f"| {n} | {b['L']:.5f} | {f['L']:.5f} | {b['M']:.5f} | "
+               f"{b['L']/b['M'] if b['M'] else float('nan'):.2f} | {b['ahead']}/{b['n']} | "
+               f"{b['sig']}/{b['n']} |")
 out += ["",
-        "**Boundary.** At $K=5$ the reversal is one seed: 1.65 with all seeds, 0.25 without.",
-        "State the reversal as beginning at eight agents. Both figures must appear.",
-        "**UNRESOLVED 2 Sep 10:5x. A confound was found; see FINDINGS_AGENT_COUNT_2026_09_02.md.**",
-        "The `seed 2 converged` column compares a 4,000-episode FINAL policy against a",
-        "12,000-episode FINAL policy, and the final policy degrades on long runs. Re-measuring",
-        "both from the selected checkpoint. Quote neither column until that lands.",
-        "Earlier note, now suspect: `k12s50n08b150_s2` passed the floor at",
-        "0.838 but was unconverged. Retrained at 12,000 episodes its SHD goes 0.00290 -> 0.00005,",
-        "and the K=8 ratio goes 4.24 (as run) -> 1.82 (excluding it) -> **0.89 (with it",
-        "converged)**. At eight agents the learned policy is BETTER than the myopic rule once",
-        "trained to convergence, and the reversal there is a training-budget artefact.",
-        "`k12s50n10b150_s2` is still retraining. Seed 3 at eight agents and sigma=0.25 also",
-        "went 0.632 FAIL -> 1.000 PASS with learned 1.000 against myopic 0.860.",
-        "**MUST NOT** state an agent-count reversal until K=10 lands. If it also converges away,",
-        "the honest claim is about SAMPLE EFFICIENCY under contention, not achievable accuracy:",
-        "at a fixed 4,000-episode budget the learned policy degrades as agents are added, and",
-        "given adequate training the degradation does not survive.",
+        "12,000 episodes, three seeds per cell, 200 paired episodes per seed, selected and",
+        "final checkpoints, seeded evaluation.",
+        "",
+        "**The reversal reported at 4,000 episodes is gone.** Ratios there ran 0.12, 0.33, 0.10,",
+        "1.65, 4.24, 6.75 and were read as the advantage falling away with coordination load.",
+        "At 12,000 the learned arm leads on the mean at every $K$ except 2, and $K=2$ is a",
+        "single seed (below).",
+        "",
+        "**MUST NOT** state an agent-count reversal. It was a training-budget artefact, the",
+        "third of three structural claims to resolve that way.",
+        "**MUST NOT** quote the $K=2$ ratio of 15.97 without the seed behind it.",
+        "`k12s50n02b150` seed 2 measures **0.07372** at the selected checkpoint and **0.00000**",
+        "at the final update on the same episodes: the MI gate retained a policy 570x worse than",
+        "the one at the last update. That one seed is the whole of the $K=2$ column. Report it",
+        "as a checkpoint-selection failure, which is what it is, not as a two-agent result.",
         "**MUST NOT** claim the myopic rule improves across this axis. Per-pair SHD divides by",
-        "`global_pairs`, which runs 117 -> 525; in raw counts the myopic arm is close to flat.", ""]
+        "`global_pairs`, which runs 117 -> 525; in raw counts the myopic arm is close to flat.",
+        "**MUST NOT** read the significance column as weak evidence of nothing: 1/3 significant",
+        "with 3/3 ahead at $K=5$, $8$ and $10$ reflects errors near zero in both arms, where a",
+        "paired difference has little room to clear 2 SE.", ""]
+
+# --- RQ1: the training budget, which is the headline of the sweep --------------------------
+cells12 = sorted({q.stem for q in (ROOT / "results/sweep12k/shd_final").glob("*.json")})
+a4 = a12 = flip = tie = 0
+for cell in cells12:
+    r4, r12 = rec(cell, 4000), rec(cell, 12000)
+    if not r4 or not r12:
+        continue
+    M = r4[1]
+    a4 += r4[0] > M
+    a12 += r12[0] > M
+    tie += abs(r12[0] - M) < 1e-9
+    flip += (r4[0] <= M) and (r12[0] > M)
+out += ["## C7 — The training budget, not any swept parameter, decides who wins", "",
+        f"* Joint recovery, learned ahead of myopic: **{a4} of {len(cells12)} cells at 4,000",
+        f"  episodes, {a12} of {len(cells12)} at 12,000**.",
+        f"* {flip} cells change winner. {tie} is an exact tie at 12,000.",
+        "* The myopic arm does not train, so its number is identical at both budgets. The",
+        "  comparison is one policy against two, not two experiments.",
+        "",
+        "**Boundary.** This is joint recovery, the criterion the runs record themselves. The",
+        "structural distance tables are measured separately and are not interchangeable with it.",
+        "**MUST NOT** describe this as 15 of 18 cells flipping. It is 14; the fifteenth",
+        "(`k12s50n05b150`) is an exact tie at 0.957 against 0.957 and was miscounted on 2 Sep",
+        "by a comparison that treated a tie as a change of winner.", ""]
 
 # --- RQ1: pair class ----------------------------------------------------------------------
 pc = json.loads((ROOT / "results/shd_by_class_200.json").read_text())

@@ -42,36 +42,51 @@ are -0.00016 (ns), -0.00059 (SIG, learned ahead) and +0.00096 (ns): the seeds di
 and the mean is carried by seed 2. The crossover is between 8 and 12, and 8 is the
 cell where it is ambiguous rather than the last cell the myopic rule wins.
 
-## C2 — The advantage reverses as agents are added
+## C2 — At a converged budget the agent-count reversal does not exist
 
-| $K$ | SHD L | SHD M | ratio | ratio excl. seed 2 | seeds |
-|---|---|---|---|---|---|
-| 2 | 0.00017 | 0.00147 | 0.12 | 0.12 | 2 |
-| 3 | 0.00022 | 0.00067 | 0.33 | 0.33 | 2 |
-| 4 | 0.00008 | 0.00077 | 0.10 | 0.12 | 3 |
-| 5 | 0.00049 | 0.00030 | 1.65 | 0.25 | 3 |
-| 8 | 0.00120 | 0.00028 | 4.24 | 1.82 | 3 |
-| 10 | 0.00086 | 0.00013 | 6.75 | 2.17 | 3 |
+| $K$ | SHD L (sel) | SHD L (fin) | SHD M | ratio (sel) | seeds ahead | beyond 2 SE |
+|---|---|---|---|---|---|---|
+| 2 | 0.02503 | 0.00115 | 0.00157 | 15.97 | 1/3 | 1/3 |
+| 3 | 0.00048 | 0.00063 | 0.00064 | 0.74 | 2/3 | 1/3 |
+| 4 | 0.00065 | 0.00142 | 0.00077 | 0.85 | 2/3 | 1/3 |
+| 5 | 0.00007 | 0.00606 | 0.00030 | 0.25 | 3/3 | 1/3 |
+| 8 | 0.00007 | 0.00007 | 0.00028 | 0.26 | 3/3 | 1/3 |
+| 10 | 0.00010 | 0.00005 | 0.00013 | 0.78 | 2/3 | 1/3 |
 
-**Boundary.** At $K=5$ the reversal is one seed: 1.65 with all seeds, 0.25 without.
-State the reversal as beginning at eight agents. Both figures must appear.
-**UNRESOLVED 2 Sep 10:5x. A confound was found; see FINDINGS_AGENT_COUNT_2026_09_02.md.**
-The `seed 2 converged` column compares a 4,000-episode FINAL policy against a
-12,000-episode FINAL policy, and the final policy degrades on long runs. Re-measuring
-both from the selected checkpoint. Quote neither column until that lands.
-Earlier note, now suspect: `k12s50n08b150_s2` passed the floor at
-0.838 but was unconverged. Retrained at 12,000 episodes its SHD goes 0.00290 -> 0.00005,
-and the K=8 ratio goes 4.24 (as run) -> 1.82 (excluding it) -> **0.89 (with it
-converged)**. At eight agents the learned policy is BETTER than the myopic rule once
-trained to convergence, and the reversal there is a training-budget artefact.
-`k12s50n10b150_s2` is still retraining. Seed 3 at eight agents and sigma=0.25 also
-went 0.632 FAIL -> 1.000 PASS with learned 1.000 against myopic 0.860.
-**MUST NOT** state an agent-count reversal until K=10 lands. If it also converges away,
-the honest claim is about SAMPLE EFFICIENCY under contention, not achievable accuracy:
-at a fixed 4,000-episode budget the learned policy degrades as agents are added, and
-given adequate training the degradation does not survive.
+12,000 episodes, three seeds per cell, 200 paired episodes per seed, selected and
+final checkpoints, seeded evaluation.
+
+**The reversal reported at 4,000 episodes is gone.** Ratios there ran 0.12, 0.33, 0.10,
+1.65, 4.24, 6.75 and were read as the advantage falling away with coordination load.
+At 12,000 the learned arm leads on the mean at every $K$ except 2, and $K=2$ is a
+single seed (below).
+
+**MUST NOT** state an agent-count reversal. It was a training-budget artefact, the
+third of three structural claims to resolve that way.
+**MUST NOT** quote the $K=2$ ratio of 15.97 without the seed behind it.
+`k12s50n02b150` seed 2 measures **0.07372** at the selected checkpoint and **0.00000**
+at the final update on the same episodes: the MI gate retained a policy 570x worse than
+the one at the last update. That one seed is the whole of the $K=2$ column. Report it
+as a checkpoint-selection failure, which is what it is, not as a two-agent result.
 **MUST NOT** claim the myopic rule improves across this axis. Per-pair SHD divides by
 `global_pairs`, which runs 117 -> 525; in raw counts the myopic arm is close to flat.
+**MUST NOT** read the significance column as weak evidence of nothing: 1/3 significant
+with 3/3 ahead at $K=5$, $8$ and $10$ reflects errors near zero in both arms, where a
+paired difference has little room to clear 2 SE.
+
+## C7 — The training budget, not any swept parameter, decides who wins
+
+* Joint recovery, learned ahead of myopic: **2 of 18 cells at 4,000
+  episodes, 16 of 18 at 12,000**.
+* 14 cells change winner. 1 is an exact tie at 12,000.
+* The myopic arm does not train, so its number is identical at both budgets. The
+  comparison is one policy against two, not two experiments.
+
+**Boundary.** This is joint recovery, the criterion the runs record themselves. The
+structural distance tables are measured separately and are not interchangeable with it.
+**MUST NOT** describe this as 15 of 18 cells flipping. It is 14; the fifteenth
+(`k12s50n05b150`) is an exact tie at 0.957 against 0.957 and was miscounted on 2 Sep
+by a comparison that treated a tie as a change of winner.
 
 ## C3 — The learned advantage is entirely on scored pairs
 
