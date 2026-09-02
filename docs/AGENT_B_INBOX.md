@@ -5083,3 +5083,55 @@ cries wolf three times is one nobody reads by the fourth.
 
 Status: **trained 21/21**, transfer 20/21 (rho=0.50_s2 in flight), argmax diagnostic on
 rho=0.95 at ~60%.
+
+## 2 Sep, 17:15 — THE GRID IS COMPLETE. 21/21 cells, 7 rates x 3 seeds.
+
+    rho    n   learned   greedy      delta   seedSE   verdict        per-seed
+    1.00   3   0.05812   0.04846   +0.00966  0.00759  tied           +0.0101 -0.0037 +0.0226
+    0.95   3   0.05144   0.04846   +0.00298  0.00188  tied           +0.0055 +0.0041 -0.0007
+    0.90   3   0.03918   0.04846   -0.00927  0.00071  beats greedy   -0.0105 -0.0093 -0.0080
+    0.85   3   0.03945   0.04846   -0.00901  0.00188  beats greedy   -0.0056 -0.0121 -0.0093
+    0.80   3   0.03555   0.04846   -0.01291  0.00163  beats greedy   -0.0112 -0.0162 -0.0114
+    0.70   3   0.03184   0.04846   -0.01661  0.00032  beats greedy   -0.0164 -0.0172 -0.0162
+    0.50   3   0.03060   0.04846   -0.01785  0.00141  beats greedy   -0.0161 -0.0206 -0.0169
+
+    spread 0.02752, typical seed SE 0.00220 -> 12.5x noise
+    VERDICT: DOSE-RESPONSE SUPPORTED
+
+**15/15 seeds at rho <= 0.90 beat greedy. 0/6 at rho >= 0.95 do.** Perfect separation across
+the entire sweep.
+
+### What the last two rates settle
+
+**The transfer curve is monotone and SATURATING, not peaked.** -0.0166 at 0.70 and -0.0179 at
+0.50: still improving, but the step has shrunk to a fifth of the earlier ones. So there is no
+interior optimum anywhere in the swept range, and the curve is flattening rather than turning.
+**I am not claiming a floor** -- we have not measured below 0.50 and the flattening is
+suggestive, not conclusive.
+
+This retires the "interior optimum" reading I floated at 14:33 and retracted at 15:52. Final
+answer: monotone, saturating, no optimum in range.
+
+**The in-regime curve is U-shaped and rho=0.50 is its worst point** -- 0.333 success, 0.00780
+SHD, worse than the 0.95 cliff. Which means the same rate is simultaneously **the worst arm
+in-regime and the best arm at transfer.** Panel 3 of the figure shows both extremes doing this
+at once: 1.00 top-right, 0.50 bottom-left. The two measures are not merely uncorrelated, they
+are opposed at both ends.
+
+### Figure
+
+`results/power/rho/rho_curve.png` regenerated at 21/21. Three panels: transfer against rho
+with per-seed points, in-regime on the same axis, and the two against each other.
+
+### Caveats unchanged
+
+k=8 only. No matched sampled-trained arm (the 40-60 core-hour experiment we agreed not to
+run). The observation flags are on for every arm including the control, so the curve isolates
+rho cleanly but says nothing about what those flags contribute.
+
+### Outstanding
+
+The argmax diagnostic on rho=0.95 is at ~45% (3 arms rather than learned-only -- I should have
+reused the sampled baselines, since `--sample` does not affect the deterministic arms; noted,
+not worth restarting at this point). It will say whether rho=0.95's failure to win is weak
+policies or something structural about a 5% withhold rate.
