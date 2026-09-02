@@ -33,6 +33,14 @@ def classify(env, pair):
 
 
 def play(env, policies, episodes, seed):
+    # Seed the torch RNG. The learned arm samples its actions from a Categorical, so without
+    # this the same checkpoint draws a different action sequence on every invocation and the
+    # measurement is not reproducible -- greedy and random carry their own seeded generators
+    # and are unaffected, which is what makes the defect invisible in a spot-check.
+    # Same fix as scripts/global_shd_paired.py; numbers produced before 2 Sep 22:00 should
+    # not be expected to match.
+    import torch
+    torch.manual_seed(seed)
     for p in policies.values():
         if hasattr(p, "reset"): p.reset(seed)
     acc = collections.defaultdict(lambda: [0.0, 0])

@@ -112,6 +112,13 @@ def _tally(env: TwoAgentEnv, chosen, private: List[int], total: List[int]) -> No
 
 
 def play(env: TwoAgentEnv, policies, episodes: int, seed: int) -> List[Dict[str, float]]:
+    # Seed the torch RNG. A sampled learned arm draws its actions from a Categorical, so
+    # without this the same checkpoint plays a different action sequence every invocation.
+    # The scripted arms carry their own seeded generators and reproduce regardless, which is
+    # what hides the defect. Same fix as scripts/global_shd_paired.py; attribution counts
+    # produced before 2 Sep 22:00 should not be expected to match.
+    import torch
+    torch.manual_seed(seed)
     for policy in policies.values():
         if hasattr(policy, "reset"):
             policy.reset(seed)
