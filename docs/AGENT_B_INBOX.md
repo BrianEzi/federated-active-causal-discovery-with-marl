@@ -3065,3 +3065,65 @@ edge, and they need redoing on hard SHD.
 * **All of this is k=8.** The headline cells are k=20/k=30.
 * **Which feature earns the result is unknown.** Channels, reprobe-signal, both, or neither --
   the ablation was measured on the wrong instrument. Needs a hard-SHD ablation to answer.
+
+## 2 Sep, 03:00 — the CONTROL exists and it strengthens the transfer result. Plus the honest caveat list.
+
+Brian asked whether the transfer result is real. Attacked it three more ways.
+
+### 1. Is greedy handicapped under sampled evidence? NO -- it is at its best setting
+
+`UncertaintyGreedyAgent` with `bar=1.0` needs `max(f, 1-f) >= 1.0` to call a claim settled.
+That would cripple it on a bootstrap-frequency belief, but this is the FACTORED backend,
+where marginals are exact fractions (1/len(marks)) and a settled pair reads exactly 1.0 --
+so bar=1.0 behaves correctly under sampled evidence. And per `scripts/attr_score.py`'s own
+note, bar=1.0 is worth **+0.233 to greedy** over its 0.7 default because it matches the
+grading. **Greedy is getting its strongest configuration, not a handicapped one.**
+
+### 2. THE MISSING CONTROL -- and it already existed
+
+I had no arm isolating power-limiting as the cause. `transfer_p10` and `transfer_p07` are
+exactly that, and I did not think to read them this way until now. Configs verified field by
+field: **identical except `vs_evidence_power` (1.0 vs 0.7)**. Same budget 35, same 4000
+episodes, no channels, no reprobe, same credit/FedAvg/normalisation settings. Greedy scores
+identically in both (0.06649 hard SHD), confirming the pairing.
+
+    training regime                            learned - greedy (sampled)      verdict
+    power = 1.0  (plain oracle)                 +0.02686 +/- 0.00806           LOSES, 3.3 SE
+    power = 0.7                                 -0.00399 +/- 0.00435           tied
+    power = 0.85 + channels + reprobe, bud 70   -0.01197 +/- 0.00495           WINS, 2.4 SE
+
+**Turning the power dial alone -- changing nothing else -- moves transfer from significantly
+losing to tied, a swing of ~0.031.** That is the causal evidence the claim needed, and it
+independently reproduces `FINDINGS_2026_08_27`'s result that plain oracle-trained policies do
+not transfer. Power-limiting is doing real work; it is not an artefact of the other changes.
+
+Note also this vindicates the ORIGINAL experiment design from the start of the night. The
+p10/p07/p05 arms were declared void because greedy failed the (wrong) success gate. Their
+TRANSFER numbers were never invalid -- and under sampled evidence `_power_rng` is never
+touched (`cb/factored.py` takes the `estimated_reveal_all` path), so the RNG pairing bug
+never affected them either.
+
+### 3. Caveats that remain, stated plainly
+
+* **The winning configuration changes four things at once** versus p10 (power, budget,
+  channels, reprobe, episode count). Power-limiting is isolated by p10-vs-p07; the full
+  -0.012 win is NOT attributable to any single ingredient.
+* **2.0-2.4 SE at 40 episodes.** Real but marginal. More episodes would firm it up cheaply
+  and I would do that before it goes in a chapter.
+* **Seed 0 does not win** (+0.0024, tied). Two of three win, none lose.
+* **The p10-vs-p07 isolation is one seed each.** Clean pairing and a 3.3 SE effect, but one
+  seed.
+* **All k=8.** The headline cells are k=20/k=30 and nothing here tested them.
+* **No sampled-TRAINED policy anywhere at this cell**, so "beats greedy under sampled
+  evidence" is proven and "substitutes for sampled training" is still not.
+* **`_best.pt` is MI-selected on TRAINING rollouts** (legitimate early stopping, not test
+  leakage -- Agent A established this) but greedy gets no equivalent selection. Worth a
+  sentence in the write-up.
+
+### Bottom line
+
+The transfer result is real: it replicates across seeds, it is on the metric the chapter
+quotes, it has paired intervals, greedy is at its strongest setting, and there is now a
+single-variable control showing the power dial itself causes the improvement. What is NOT
+established is the attribution of the full effect size to any one ingredient, and the scale
+generalisation beyond k=8.
