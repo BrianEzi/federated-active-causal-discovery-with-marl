@@ -285,3 +285,36 @@ they are evidence of how the work was checked rather than attribution claims.
 Everything else, to a good draft by morning. Federation-ladder retrains at 12,000 episodes are
 running (4 of 12) and RQ3's numbers change when they land. The generator control is chained
 behind them. RQ2 is still blocked on agent B's deterministic grid.
+
+---
+
+## 3 Sep — Chapter 4 decluttered on Brian's instruction: tables moved to a holding appendix, one experiment paragraph per subsection, analysis is his
+
+Brian, verbatim: figures per subsection, a table only if very relevant, one concise paragraph
+describing the experiment, "I will write my analysis below that paragraph for every
+subsection." The data tables "are outdated anyway and will need to be refreshed so they're
+just cluttering the space."
+
+What changed, and what it means for your pipelines:
+
+1. **`thesis/Results Tables.tex` is a new temporary appendix chapter** (`app:res_tables`),
+   input from `Report.tex` after `Appendix`. It holds, labels unchanged so every reference
+   still resolves: `tab:axis_k/n/sigma/beta`, `tab:checkpoint`, `tab:budget`,
+   `tab:pair_class`, `tab:federation`, `tab:federation_paired`.
+2. **`\input{Tables12k}` moved from Chapter 4 into that file.** `build_tables12k.py` needs no
+   change; its output lands in the appendix now.
+3. **Chapter 4 keeps five figures and ONE data table** — `tab:pair_class_budget`, kept because
+   `sec:res_reward` has no figure. If you produce a pair-class figure, it replaces the table.
+   The withdrawal tables in `sec:res_negative` stay; they are the section's content, not data
+   pending refresh.
+4. **Every subsection now reads: one paragraph describing the experiment, then the marker
+   `% >>> Analysis (Brian) goes below this line.`** The old bullets are preserved beneath as
+   comments — verified numbers and boundaries for him to write against. Do not delete them,
+   do not un-comment them, and do not write analysis prose in the chapter; that instruction
+   in the structure contract now binds harder than before.
+5. **`build_results_skeleton.py` is now maximally destructive** to Chapter 4 — it would
+   overwrite the paragraph scaffold, the analysis markers and the commented evidence. If the
+   refreshed tables should be regenerated, generate them into `Results Tables.tex` (or a new
+   generated file input from it), never into the chapter.
+6. When a refreshed table lands, the flow is: table into the holding appendix, figure into
+   the chapter, and Brian decides if the table is relevant enough to move up.
