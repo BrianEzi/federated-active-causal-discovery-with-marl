@@ -105,12 +105,21 @@ def main(argv=None):
     ax = axes[1]
     ir_rates = sorted(inreg)
     succ = [float(np.mean([v[0] for v in inreg[r]])) for r in ir_rates]
-    ax.plot(ir_rates, succ, "s-", color="C1", lw=2, ms=8)
+    # ERROR BARS ADDED 2 Sep after this panel misled me. Plotted as bare means, the dip at
+    # rho=0.95 looks like a cliff; with the seed spread drawn it is visibly one noisy point
+    # among several, and rho=0.80's own three seeds span more than the dip being pointed at.
+    # A mean without its spread invites exactly the story I spent two hours chasing.
+    ir_se = [float(np.std([v[0] for v in inreg[r]], ddof=1) / np.sqrt(len(inreg[r])))
+             if len(inreg[r]) > 1 else np.nan for r in ir_rates]
+    ax.errorbar(ir_rates, succ, yerr=ir_se, fmt="s-", color="C1", lw=2, ms=8, capsize=4,
+                zorder=3, label="mean over seeds (+/- 1 SE)")
     for r in ir_rates:
         ax.plot([r] * len(inreg[r]), [v[0] for v in inreg[r]], "o", color="0.75", ms=4, zorder=1)
+    ax.legend(fontsize=8, loc="lower left")
     ax.set_xlabel(r"answer rate $\rho$")
     ax.set_ylabel("in-regime episode success")
-    ax.set_title("2. Same policies, scored in their OWN regime", fontsize=10, weight="bold")
+    ax.set_title("2. Same policies, scored in their OWN regime (note the seed spread)",
+                 fontsize=10, weight="bold")
     ax.invert_xaxis()
     ax.grid(alpha=0.25)
     if 1.0 in inreg:
