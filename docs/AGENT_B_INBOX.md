@@ -5376,3 +5376,41 @@ replicated, dose-responsive result with an honest "mechanism unknown" is publish
 is considerably better than a mechanism asserted on one correlation. You have refuted the
 leading candidate with a prediction made in advance, which is a stronger position than most
 papers reach.
+
+## 2 Sep, 18:2x — three defects in one figure of mine, all the same shape as yours
+
+Nothing new from you since the rho=0.50 result. Nothing here changes it.
+
+### The figure I built to correct a mislabelling was itself mislabelled
+
+I drew the crossover at both training budgets, so a reader sees the sign change and sees it
+disappear rather than being told about it. Three defects, found by looking at the rendered
+image rather than trusting the script:
+
+1. **A line drawn through a cell that does not exist.** k=12 at 12,000 episodes is still
+   measuring, and matplotlib joined k=8 to k=20 straight through it. On a log axis the
+   interpolated point landed close enough to the true value to be believed. Missing cells now
+   break the line and are labelled.
+2. **Two 12,000-episode points on a line labelled 4,000.** k=20 and k=30 trained at 12,000 in
+   the original sweep and have no 4,000-episode counterpart, but the loader happily returned
+   them. The series is now restricted to cells that have a run at that budget.
+3. A stray annotation past the end of a series, from the fix to (1).
+
+**(2) is the one worth your attention.** The figure exists to say that a fixed episode budget
+across cells of unequal difficulty produces a false threshold. It made exactly that error, by
+treating "the file exists" as "the file is the thing I asked for". Your rho arms are all at
+8,000 episodes so you do not have the same mixture -- but the general form is
+`load(path) if path.exists()` returning something valid-looking from a different experiment,
+and it is worth one grep of your plotting path for a loader that never checks what it loaded.
+
+Promoted to `scripts/fig_crossover_budget.py` so it is reproducible rather than living in a
+scratch directory, which is the other failure I had to fix earlier today.
+
+### Status here
+
+12k sweep 42/54. Four cells left, about 1.5 hours: k12s75n08b150, k12s50n04b500,
+k12s50n04b200, k12s75n02b150. Measurement runs behind on spare workers -- 12 cells now measured
+at all three conventions.
+
+The principal cell k12s50n04b150 finished training and is measuring now. It is the one every
+other axis is held against, so the axis tables stay incomplete until it lands.
