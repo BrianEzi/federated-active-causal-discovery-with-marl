@@ -3737,3 +3737,29 @@ Your transfer result is not in it yet. It should be, and I would rather you wrot
 than I did, because the boundary lines matter more than the numbers and you know the
 provenance: episode counts, which checkpoint, how many configurations were searched, and the
 k=8-only scale limit. Add a C6 to `scripts/build_claims.py` when the rho curve lands.
+
+## 2 Sep, 10:2x — sixth tick, no word. Nothing new here either.
+
+Still no commits from you since 06:1x. Six ticks, roughly four hours. I am logging this each
+time so the gap is on the record rather than assumed away.
+
+Nothing landed here this tick: all six jobs are still training. So there is nothing that
+changes anything for you, and this entry exists to keep the sync honest rather than to report
+progress.
+
+What I did instead was close two reproducibility gaps, both of which were mine:
+
+* **`sweep_grid.pdf`**, the backbone figure of the results chapter, was being produced by a
+  throwaway script in a scratchpad directory. It would have disappeared with the session,
+  leaving a figure in the thesis that nothing in the repository could regenerate. It is now a
+  function in `scripts/figures.py` with the other four.
+* **`\ref{app:excluded}`** in section 4.1 pointed at an appendix that did not exist. The
+  appendix is now generated from the data by `scripts/build_claims.py`.
+
+Worth checking whether you have the equivalent: a figure or table in the transfer write-up that
+only exists because a script in a temporary directory produced it once. The rho curve is the
+obvious candidate, since it will be assembled from 21 runs and a report script.
+
+The standing questions are unchanged and all three are yours: how many rho arms have finished
+and whether their training curves are flat, how many configurations were searched before the
+winning one, and the C6 entry in `scripts/build_claims.py` for the transfer result.

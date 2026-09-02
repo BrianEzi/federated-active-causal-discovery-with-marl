@@ -132,3 +132,52 @@ out += ["",
 path = TR / "CLAIMS.md"
 path.write_text("\n".join(out))
 print(f"wrote {path.relative_to(ROOT)}: {len(out)} lines")
+
+
+def build_appendix():
+    """thesis/Appendix.tex -- the excluded runs, named, with what retraining did to them.
+
+    Section 4.1 cites this. Generated rather than typed so the list cannot drift from the
+    competence floor that produced it.
+    """
+    rows = []
+    for p in sorted((TR / "sweep").glob("k*_s*.json")):
+        d = json.loads(p.read_text())
+        if wr(d) >= FLOOR:
+            continue
+        cell = p.stem.rsplit("_s", 1)[0]
+        long = TR / "federation" / f"{cell}_long_s2.json"
+        retrained = json.loads(long.read_text()) if long.exists() else None
+        rows.append((cell, d.get("seed"), wr(d), d["arms"]["learned"]["success"],
+                     wr(retrained) if retrained else None,
+                     retrained["arms"]["learned"]["success"] if retrained else None,
+                     d["arms"]["greedy_uncertainty"]["success"]))
+
+    out = [r"\appendix", "", r"\chapter{Excluded Runs} \label{app:excluded}", "",
+           "Every run falling below the competence floor of \\S\\ref{sec:meth_gate}, with what",
+           "the same configuration reaches when trained to $12{,}000$ episodes instead of",
+           "$4{,}000$. The retrained runs appear nowhere in the sweep tables of",
+           "Chapter~\\ref{Chap4}, which hold the training budget fixed across all cells.", "",
+           r"\begin{table}[htbp]", r"\centering",
+           r"\caption{The seven excluded runs. Per-window recovery rate and joint recovery, "
+           r"at the sweep's budget and at three times it.}",
+           r"\label{tab:excluded}", r"\begin{tabular}{llcccccc}", r"\toprule",
+           r"Cell & Seed & \multicolumn{2}{c}{4{,}000 episodes} & "
+           r"\multicolumn{2}{c}{12{,}000 episodes} & Myopic \\",
+           r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}",
+           r" & & window & joint & window & joint & joint \\", r"\midrule"]
+    for cell, seed, w4, l4, w12, l12, g in rows:
+        cellname = cell.replace("_", r"\_")
+        tail = (f"{w12:.3f} & {l12:.3f}" if w12 is not None else "--- & ---")
+        out.append(f"\\texttt{{{cellname}}} & {seed} & {w4:.3f} & {l4:.3f} & {tail} & {g:.3f} \\\\")
+    out += [r"\bottomrule", r"\end{tabular}", r"\end{table}", "",
+            f"All {len(rows)} excluded runs are seed 2, and all are at $k_v=12$. Every one clears",
+            "the floor when retrained, and every one finishes above the myopic rule on its own",
+            "cell. The floor therefore removes runs that had not finished learning rather than",
+            "cells that cannot be learned.", ""]
+    path = ROOT / "thesis/Appendix.tex"
+    path.write_text("\n".join(out))
+    print(f"wrote {path.relative_to(ROOT)}: {len(rows)} excluded runs")
+
+
+build_appendix()

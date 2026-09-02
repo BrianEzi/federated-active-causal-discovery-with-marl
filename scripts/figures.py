@@ -17,6 +17,7 @@ import argparse
 import glob
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -227,6 +228,108 @@ def fig_federation(out: pathlib.Path):
     plt.close(fig)
 
 
+# ---------------------------------------------------------------------------------------
+CELL_RE = re.compile(r"k(\d+)s(\d+)n(\d+)b(\d+)")
+WINDOW_FLOOR, WINDOW_TAIL = 0.70, 10
+
+
+def _sweep_rows():
+    """One row per (cell, seed), with the competence-floor statistic attached."""
+    rows = []
+    for path in sorted((ROOT / "results/sweep/oracle").glob("*.json")):
+        m = CELL_RE.match(path.stem)
+        if not m:
+            continue
+        d = json.loads(path.read_text())
+        if "arms" not in d:
+            continue
+        tail = [h.get("window_rate", 0.0) for h in (d.get("history") or [])[-WINDOW_TAIL:]]
+        rows.append(dict(k=int(m[1]), sigma=int(m[2]) / 100, n=int(m[3]), beta=int(m[4]) / 100,
+                         seed=d.get("seed"),
+                         wr=(sum(tail) / len(tail) if tail else 0.0), arms=d["arms"]))
+    return rows
+
+
+def fig_sweep_grid(out: pathlib.Path):
+    """THE backbone figure: every swept axis against both baselines, on both metrics.
+
+    Positions are evenly spaced rather than linear. Beta runs 1.0 to 5.0 and a linear axis
+    crushes the low end, which is where the cells that separate the arms actually sit.
+    """
+    rows = _sweep_rows()
+    axes_spec = [
+        ("window size $k_v$", "k",
+         lambda r: r["sigma"] == .5 and r["n"] == 4 and r["beta"] == 1.5),
+        ("agents $K$", "n",
+         lambda r: r["k"] == 12 and r["sigma"] == .5 and r["beta"] == 1.5),
+        ("contended fraction $\\sigma$", "sigma",
+         lambda r: r["k"] == 12 and r["n"] == 4 and r["beta"] == 1.5),
+        ("budget multiplier $\\beta$", "beta",
+         lambda r: r["k"] == 12 and r["sigma"] == .5 and r["n"] == 4),
+    ]
+    series = [("learned", "learned", LEARNED, "o", 1.9),
+              ("myopic (greedy)", "greedy_uncertainty", MYOPIC, "s", 1.5),
+              ("random", "random_vary", RANDOM, "^", 1.3)]
+    metrics = [("global_hard_shd", "SHD on committed marks\n(lower is better)", True),
+               ("success", "joint recovery rate\n(higher is better)", False)]
+    floor = 1e-5
+
+    fig, axes = plt.subplots(2, 4, figsize=(12.0, 5.8))
+    for col, (xlabel, key, keep) in enumerate(axes_spec):
+        sel = [r for r in rows if keep(r)]
+        xs = sorted({r[key] for r in sel})
+        pos = list(range(len(xs)))
+        gone = [r for r in sel if r["wr"] < WINDOW_FLOOR]
+        for row, (mkey, ylabel, logy) in enumerate(metrics):
+            ax = axes[row][col]
+            ceiling = [np.mean([r["arms"]["oracle_cover"][mkey] for r in sel
+                                if r[key] == x and "oracle_cover" in r["arms"]] or [np.nan])
+                       for x in xs]
+            ax.plot(pos, [max(v, floor) if logy else v for v in ceiling], ls=":", color=THIRD,
+                    lw=1.2, zorder=2,
+                    label="full-coverage reference" if (row == 0 and col == 0) else None)
+            for label, arm, colour, marker, lw in series:
+                means, seeds = [], []
+                for x in xs:
+                    vals = [r["arms"][arm][mkey] for r in sel
+                            if r[key] == x and r["wr"] >= WINDOW_FLOOR and arm in r["arms"]]
+                    means.append(np.mean(vals) if vals else np.nan)
+                    seeds.append(vals)
+                for p_, vals in zip(pos, seeds):
+                    ax.scatter([p_] * len(vals),
+                               [max(v, floor) if logy else v for v in vals],
+                               s=11, color=colour, alpha=.35, zorder=3)
+                ax.plot(pos, [max(m, floor) if logy else m for m in means], marker=marker,
+                        ls="-", color=colour, lw=lw, ms=4.5, zorder=4,
+                        label=label if (row == 0 and col == 0) else None)
+            if logy:
+                ax.set_yscale("log")
+                ax.set_ylim(floor * .7, 3e-1)
+                ax.axhspan(floor * .7, floor * 1.6, color="black", alpha=.05, zorder=0)
+            else:
+                ax.set_ylim(-.03, 1.05)
+            ax.set_xticks(pos)
+            ax.set_xticklabels([f"{x:g}" for x in xs])
+            ax.set_xlim(-.4, len(xs) - .6)
+            if row == 1:
+                ax.set_xlabel(xlabel)
+            if col == 0:
+                ax.set_ylabel(ylabel)
+        if gone:
+            axes[1][col].text(.98, .06,
+                              f"{len(gone)} seed{'s' if len(gone) > 1 else ''} excluded",
+                              transform=axes[1][col].transAxes, ha="right", fontsize=7,
+                              color="#B00020")
+    axes[0][0].legend(frameon=False, fontsize=7.6, loc="lower left", handlelength=1.6)
+    fig.suptitle("Learned experiment selection against myopic and random baselines, "
+                 "on every swept axis\n"
+                 "Final-policy evaluation, 3 seeds per cell; runs below the competence floor "
+                 "excluded", fontsize=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+    fig.savefig(out / "sweep_grid.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -235,7 +338,8 @@ def main(argv=None) -> int:
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    for name, fn in (("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
+    for name, fn in (("sweep_grid", fig_sweep_grid),
+                     ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
                      ("attribution_law", fig_attribution_law), ("federation", fig_federation)):
         try:
             fn(out)
