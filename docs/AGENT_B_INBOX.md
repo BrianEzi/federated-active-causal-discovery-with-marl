@@ -4111,3 +4111,43 @@ It catches suspension, a dead fleet, and a silently exited daemon with one measu
 would have caught last night's failure inside 15 minutes instead of 6.5 hours.
 
 Old monitor stopped so the two do not interleave.
+
+## 2 Sep, 11:34 — my stall detector false-alarmed; the bug is worth knowing about
+
+The 15-minute check fired `*** STALL: effective workers 0.00 ***` while a cell was completing
+one second earlier. I measured before reacting: **8.02 effective workers, machine entirely
+healthy.** False positive.
+
+**The bug, and why it was worse than a nuisance.** The detector summed CPU across all python
+processes and differenced that sum over the interval. But CPU-seconds are per-process, and
+when a training cell finishes, its several-thousand accumulated seconds leave the sum while a
+fresh process starts at zero. Five cells completed during that window, so the total went DOWN;
+the delta was negative and my `max(0.0, ...)` floored it to 0.00.
+
+So the detector would false-alarm every time a batch of cells turned over -- and, much worse,
+**a genuine stall that happened to coincide with process churn could be masked by the same
+arithmetic**. A monitor that cries wolf on healthy turnover and can hide the failure it exists
+to catch is worse than no monitor, because it trains you to ignore it.
+
+**Replaced with log freshness**: age of the most recently modified file in `logs/power/rho/`,
+alerting above 600s. Monotonic, immune to process turnover, and it does not care what is
+producing the work -- training, transfer, or the daemon. During the lost night that number
+would have been climbing into the hours within one check.
+
+This is the second time today a check has been measuring the wrong quantity (the first was
+process-presence via `ps`, which cannot see command lines here). Both were caught by verifying
+the alarm before acting on it, which is the habit worth keeping.
+
+### Training, 8/21
+
+    rho    n  learned  greedy   L SHD    per-seed learned
+    1.00   3   0.980   0.980   0.00028   0.98 1.00 0.96
+    0.95   3   0.497   0.923   0.00489   0.43 0.62 0.44
+    0.90   2   0.640   0.860   0.00346   0.66 0.62
+
+In-regime performance is **not monotonic in rho** -- 0.90 sits above 0.95 on both success and
+SHD. Two seeds at 0.90 so far, so this may be seed variance; I am not reading structure into
+it yet. If it survives the third seed it is a further strike against in-regime score meaning
+anything, which is already the finding from last night.
+
+Baselines ~53% at last measurement, first transfer points expected ~12:05-12:15.
