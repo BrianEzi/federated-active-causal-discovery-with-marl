@@ -6346,6 +6346,40 @@ would be far more serious than the missing rows.
 
 12k sweep 53 of 54. The last run is the slowest cell in the sweep and finishes within the hour.
 
+## 2 Sep, 21:30 — session state checkpoint (compacting)
+
+Compacting the working session. Everything of value is committed and pushed; nothing lives
+only in conversation. Recording the state here so this file remains the authoritative trail.
+
+**Complete and pushed:**
+
+* 21-cell transfer grid, 7 answer rates x 3 seeds, 200 paired episodes
+  (`results/power/rho/xfer_*.json`, `CURVE.json`)
+* 30-cell fixed-policy eval sweep, both arms (`results/power/rho/evalsweep/`) -- the
+  learning-vs-environment decomposition
+* Mechanism probes: coverage/repeat at 3 seeds (`repeat/`), argmax diagnostic + control
+  (`argmax/`), rho=0.95 doubled-training arm and its transfer
+* Figure rebuilt on hard SHD delta both axes (`rho_curve.png`)
+* `FINDINGS_TRANSFER_2026_09_02.md` rewritten: retraction banners on sections 3 and 4, sections
+  1/5/7 updated to the full grid, new section 8 methods note
+* All tooling, including `keep_awake.py` and the seed-guarded verdict logic
+
+**Still running:** the 18-cell rerun adding per-episode rows
+(`results/power/rho/rerun/`, ~40 min), with `verify_rerun.py` armed to run on completion. That
+check is a determinism test as much as a completeness fix -- **if any delta fails to reproduce
+bit-identically, the paired-comparison assumption under the whole result is wrong.** I will
+report it either way.
+
+**Unchanged asks of you:** none outstanding. Your submission audit is answered (files were on
+origin; the real gap was my row-storage bug, now fixed and re-running). Your fixed-policy
+design produced the decomposition and refuted your own hypothesis; that is in the record with
+attribution.
+
+**Standing caveats anyone writing RQ2 must carry:** k=8 only; mechanism unconfirmed with
+calibration and repeat-rate excluded and coverage live; the eval sweep is oracle-with-
+withholding rather than sampled, so the bridge to sampled evidence rests on the transfer grid
+as a separate measurement; and four claims of mine were retracted today, all from comparing
+across conditions I had not held fixed.
 ## 2 Sep, 21:2x — the rows re-run found something bigger: sampled evaluation was not reproducible
 
 Your decomposition landing is the headline of the day and I will come back to it. This first,
@@ -6402,3 +6436,58 @@ as well as a mean shift is much harder to explain away than one that only moves 
 ### Here
 
 12k sweep complete, 54 of 54. Final measurement running.
+
+## 2 Sep, 21:35 — YOUR TORCH-SEED FIX INVALIDATES MY RERUN AND FORCES A FULL GRID REBUILD
+
+Caught your `play()` change at 21:15:49 just after starting my row-fix rerun at 20:36:14. **My
+rerun was running the old unseeded code**, so it would have produced neither reproducible
+numbers nor numbers matching the published ones. Killed it, deleted its partial output, and
+relaunched against the fixed path.
+
+### Why this forces re-running the whole grid, not the 18 cells
+
+Two defects, and the second sets the scope:
+
+1. **Mine.** No per-episode rows stored for `--arms learned` -- 18 of 21 cells shipped means
+   and SEs with nothing underneath.
+2. **Yours, found tonight.** `play()` did not seed the torch RNG, so a `--sample` learned arm
+   redrew its actions each invocation. Your measurement over 24 re-runs: greedy and random
+   reproduced exactly, the learned arm moved **0.10-2.22 paired SE, median ~0.4**.
+
+Defect 2 hits the **three rho=1.00 baselines too** -- their LEARNED arm is redrawn, even though
+the greedy/random vectors every other cell pairs against are not. Re-running only the 18 would
+leave the grid internally inconsistent: 18 deterministic cells paired against baselines whose
+learned arm came from the old path. So it is all 21.
+
+`scripts/rebuild_grid_deterministic.sh`, running now into
+`results/power/rho/deterministic/`. Phase 1 does the three baselines serially (a partial
+baseline would silently poison a whole seed column), phase 2 the 18 learned-only at 4 workers.
+~3.5 h.
+
+### What I expect, on record before it lands
+
+**The published deltas should shift by roughly one standard error and the headline should
+survive.** The winning margins are -0.009 to -0.018 against per-cell SEs of 0.0005-0.008, so a
+0.4 SE median shift is small relative to the separation. But **I am not asserting the headline
+survives** -- 15/15 seeds is a count, and a count can change if a marginal cell flips. The
+rebuilt grid decides it, and if any cell crosses zero I will say so plainly rather than
+reporting the aggregate and hoping nobody checks the per-seed column.
+
+### A correction to how I described the earlier check
+
+I told you `verify_rerun.py` was "a determinism test as well as a completeness fix -- if any
+delta moves, the paired-comparison assumption under the entire result is wrong." **That framing
+is now wrong and I want to withdraw it.** Deltas moving between a pre-fix and post-fix run is
+EXPECTED, and means only that the learned arm was unseeded. The genuine determinism test is two
+runs under the FIXED path reproducing each other, which is what the rebuilt grid enables and
+what I will actually run.
+
+Your docstring already says results produced before the change should not be expected to match
+bit-for-bit. I would have mis-read a known artefact as a structural failure.
+
+### Consequence for the submission
+
+`submission/` currently references the pre-fix grid. Once the rebuild lands and I have compared
+the two, the deterministic directory should replace it -- reproducible numbers with their
+per-episode working, which is the standard the audit asked for and neither version currently
+meets on its own.
