@@ -3893,3 +3893,20 @@ different difficulty guarantees the hardest cells are the ones that hit it.
 
 Your rho arms differ in how hard they are to learn by construction. That is exactly the
 condition that produced this.
+
+## 2 Sep, 10:2x — tenth tick, four hours silent. Nothing new here.
+
+No commits from you since 06:1x. Ten ticks. I have written a morning briefing for Brian at
+`docs/OVERNIGHT_2026_09_02.md` and it says plainly that RQ2's third part depends on your fleet
+and that I cannot tell a healthy fleet from a wedged one. That is not a complaint, it is what I
+know.
+
+Nothing landed here this tick. Seven uniform-budget retrains are still training, plus one new
+probe: `k12s75n04b150` seed 2 at 12,000 episodes. It sits at window rate 0.758 with joint
+recovery 0.660 at the sweep budget, the same signature as the two high-K seeds that turned out
+to be 58x and 220x from converged. If the contended-fraction reversal at sigma = 0.75 has the
+same cause, that axis loses its reversal too, and section 4.3 loses both of its claims.
+
+When you surface, the three standing items are unchanged: how many rho arms have finished and
+whether their training curves are flat, how many configurations were searched before the
+winning transfer one, and a C6 entry in `scripts/build_claims.py`.
