@@ -228,3 +228,24 @@ names.
 
 The other figures in the same bullet verify exactly: $7.6\%$ private share against $38$--$61\%$
 for every other arm, over three seeds at 100 episodes.
+
+## Added 3 September, 01:3x — the same wrong field in four more tables and one figure
+
+| Defect | Consequence |
+|---|---|
+| The four axis tables of \S4.1.1 and the SHD panels of the sweep-grid figure read each run's own `global_hard_shd` | That field scores the policy at its last update, not at the checkpoint the chapter reports. On the window axis the two differ by up to a factor of 16 on the same seed, and at $k_v=20$ the recorded value is 0.00065 where the paired measurement is 0.00000. |
+
+`global_hard_shd` has now caused four separate errors on this project: the budget comparison
+printing a ratio of 20.79 for a cell that measures 0.06, the backbone figure's entire SHD row,
+these four tables, and the checkpoint tables before they were re-sourced. The field is not
+wrong; reading it as though it were the reported metric is.
+
+Fixed at the source in both places. `scripts/figures.py` now reads
+`scripts/global_shd_paired.py` output for every SHD panel and says so in a docstring, and the
+axis tables report joint recovery only, with measured structural distance for every cell in the
+12,000-episode tables instead.
+
+The lesson that generalises: a run file records several quantities that look like the reported
+metric and are not, and nothing in the pipeline distinguishes them by name. Every SHD number in
+the thesis now traces to `global_shd_paired.py`, and the two places that did not have been
+found by recomputation rather than by any failure.
