@@ -5509,3 +5509,52 @@ at all three conventions.
 
 The principal cell k12s50n04b150 finished training and is measuring now. It is the one every
 other axis is held against, so the axis tables stay incomplete until it lands.
+
+## 2 Sep, 18:50 — REPEAT RATE IS REFUTED. Coverage tracks the slope instead.
+
+You endorsed the repeat test as the only candidate that could explain the slope. It is dead,
+and the probe found a different quantity that does.
+
+    rho    coverage   repeat   moves/ep   privMv   sharedMv   shared%   transfer
+    1.00     0.933     0.750      69.5     59.8       9.7      14.0%    +0.00966
+    0.95     0.908     0.716      67.7     51.1      16.6      24.6%    +0.00298
+    0.90     0.887     0.736      66.5     53.8      12.7      19.1%    -0.00927
+    0.85     0.865     0.749      68.4     55.1      13.3      19.4%    -0.00901
+    0.80     0.869     0.740      67.7     53.4      14.3      21.1%    -0.01291
+    0.70     0.781     0.743      67.9     48.6      19.2      28.3%    -0.01661
+    0.50     0.752     0.750      67.9     48.2      19.8      29.1%    -0.01785
+
+    against transfer delta (7 rates, seed 0):
+      private_coverage      Pearson +0.859   Spearman +0.893   p=0.007
+      private_repeat_rate   Pearson -0.287   Spearman -0.036   p=0.939
+
+**Repeat rate is flat** -- 0.716 to 0.750, not monotone, and rho=1.00 and rho=0.50 are
+*identical* at 0.750. The "withholding makes re-probing pay" story does not appear in the
+behaviour at all. That is a clean negative on the hypothesis we both thought most likely.
+
+**Coverage tracks it strongly and monotonically** (one small inversion at 0.85/0.80). Total
+moves are flat at ~68/episode, so this is not "does less" -- it is a REALLOCATION. Private
+moves fall 59.8 -> 48.2 while **shared-node moves rise 9.7 -> 19.8, from 14% to 29% of
+effort.**
+
+**The readable story: withholding pushes the policy off its own private nodes and onto the
+shared contended surface.** Which is where coordination value lives, and where sampled
+evidence is hardest -- so a policy that has learned to spend there transfers better. That is
+the first mechanism candidate with a monotone quantity behind it.
+
+### Two limits I am holding it to
+
+1. **Seed 0 only.** Seven points, one seed each. I have insisted on 3-seed bars all day and
+   this does not meet that bar. **14 more probes launched** (seeds 1 and 2 across all seven
+   rates); I will not put weight on the correlation until they land.
+2. **Coverage is not independent of rho.** Both are monotone in the dial, so this could be two
+   things co-varying rather than coverage mediating transfer. Distinguishing those needs an
+   intervention on coverage at fixed rho, which I do not have a design for and am not
+   inventing at 19:00.
+
+So: a candidate with a real monotone signal and a plausible reading, not a mechanism claim.
+The honest summary remains that the effect is robust and its cause is unconfirmed -- but the
+space is narrower than this morning, with calibration excluded, repeat rate excluded, MI
+explaining the threshold only, and coverage now the live candidate for the slope.
+
+rho=0.95 doubled-training test still running (~1.5 h remaining).
