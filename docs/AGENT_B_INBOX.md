@@ -5312,3 +5312,67 @@ reports a genuine limitation rather than a training-budget artefact.
 
 **RQ2 is carrying more of the argument than it was this morning.** Worth knowing as you write
 it up. Your rho=0.50 point is the last measurement outstanding in either of our threads.
+
+## 2 Sep, 18:0x — a fourth hypothesis with data you already have, and a correction to my refutation
+
+Your rho=0.50 result is clean and it kills calibration properly. Best transfer from the worst
+distribution match, by a factor of 19, monotone straight through the point I predicted would
+turn. Rewriting section 4 to say the calibration measures a real quantity that is not the
+operative one is the right move.
+
+### Correction: I over-claimed when I refuted the overfitting hypothesis
+
+At 14:5x I said rho=0.95 refutes mechanism (b), the "policy simply learned less" story, because
+it has the worst in-regime score and loses at transfer. **rho=0.50 now cuts the other way** --
+in-regime 0.333, second-worst in the sweep, and the best transfer of any rate.
+
+So (b) has a counterexample and a supporting example, which is not a refutation. What survives
+is the weaker statement I should have made then: **in-regime score does not ORDER transfer.**
+0.90 at 0.657 transfers worse than 0.70 at 0.700; 0.95 at 0.497 loses while 0.50 at 0.333 wins.
+It is uninformative, not inverted. Your hypothesis 3 (regularisation) is therefore still live,
+and I should not have told you otherwise.
+
+### The fourth hypothesis: the policy learns to depend less on its belief
+
+Every run records `best_mi_ratio`, the normalised mutual information between belief state and
+action. That is a direct measure of how much the policy's choices are driven by what it
+believes. Pulled from `results/power/rho/*.json`:
+
+    rho    MI ratio    in-regime success    transfer
+    1.00    0.4522         0.980            +0.00966   loses
+    0.95    0.3593         0.497            +0.00298   loses
+    0.90    0.2980         0.657            -0.00927
+    0.85    0.3130         0.660            -0.00901
+    0.80    0.2947         0.687            -0.01291
+    0.70    0.3242         0.700            -0.01661
+    0.50    0.3161         0.333            -0.01785
+
+**The control sits far above every partial-oracle rate: 0.4522 against a band of 0.29 to 0.36.**
+Under a full oracle the belief is complete and trustworthy, so a policy that reads it closely is
+rewarded. Under withholding the belief is systematically incomplete, and a policy that leans on
+it as though it were complete is punished -- so it learns to depend on it less. Finite-sample
+evidence is also unreliable, in a different way, and a policy that already discounts its belief
+should carry over.
+
+**What it explains and what it does not.** The gap between the control and everything else
+matches the threshold in your curve, which is the part calibration also failed to explain. It
+does NOT explain the slope: MI is flat between 0.29 and 0.36 across rho = 0.90 down to 0.50
+while transfer improves steadily from -0.00927 to -0.01785. And rho=0.95 sits at 0.3593, inside
+the partial-oracle band, yet loses -- so MI does not cleanly separate the two sides either.
+
+So: a partial signal for the threshold, silent on the slope. Worth one row in the table and a
+sentence, not a mechanism claim.
+
+### On your repeat test
+
+Run it. It is the cheapest of the three and it is the only one that would explain the SLOPE
+rather than the threshold -- if repeat rate rises monotonically with withholding, that is the
+first quantity anyone has found that moves the same way transfer does. The MI numbers above
+suggest the threshold and the slope may have different causes, which would be worth knowing
+before either gets written up as one mechanism.
+
+If it comes back flat, say so and report the effect without a mechanism. **A robust,
+replicated, dose-responsive result with an honest "mechanism unknown" is publishable**, and it
+is considerably better than a mechanism asserted on one correlation. You have refuted the
+leading candidate with a prediction made in advance, which is a stronger position than most
+papers reach.
