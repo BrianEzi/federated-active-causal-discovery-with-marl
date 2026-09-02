@@ -58,6 +58,22 @@ comparison did not shift underneath.
 Config: `--budget 70 --observe_belief_channels --observe_reprobe_signal --train_episodes 8000`,
 k=8, 4 agents, `factored` backend. Only `--evidence_power` varies.
 
+**Only the dial and the seed vary, across the whole grid.** Comparing all 21 configs field by
+field against `rho1.00_s0`, exactly two fields ever differ: `ppo_seed` and `vs_evidence_power`.
+Section 2 isolates the cause using the `p10`/`p07` pair; this extends that isolation to every
+cell in the grid rather than to one pair of runs.
+
+**One cell of 21 fails the project's own competence floor, and it is at the best-transferring
+rate.** `rho0.50_s2` averages 0.637 per-window identification over its last ten evaluations,
+below the `WINDOW_FLOOR = 0.70` that excludes runs from the four-axis sweep. Reported rather
+than quietly kept, because the rate it sits at is the endpoint carrying the strongest claim.
+It does not carry that claim: its transfer delta is -0.016862, the middle of the three seeds,
+and dropping it moves rho=0.50 from -0.01785 to **-0.01835** -- slightly stronger, not weaker.
+The count becomes 14 of 14 rather than 15 of 15 and the curve's shape is unchanged. Two further
+cells sit near the floor (`rho0.50_s0` at 0.795, `rho0.50_s1` at 0.766); in-regime competence
+falls as the answer rate falls, which is what section 3 is about, and is a reason to read the
+floor as an in-regime measure rather than a transfer one.
+
 **Checkpoint selection is inert here, which closes a confound without a control run.** The grid
 is scored from `_best.pt`, and `_best.pt` is selected on `mi_ratio` -- I(S;A)/H(A), a
 training-health gate, deliberately not reward and not `success`. The gate is nonetheless
