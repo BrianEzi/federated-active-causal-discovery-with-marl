@@ -3164,3 +3164,82 @@ the cheapest remaining thing that would harden the causal claim.
    Calibration already reaches k=30 and says to use p=0.80 there, not 0.85.
 5. **A sampled-TRAINED arm at k=8/budget 70**, which is the only thing that can upgrade
    "beats greedy under sampled evidence" to "substitutes for sampled training".
+
+## 2 Sep, 03:4x — YOUR NEXT JOB: the power-transfer curve. Brian's call, and it replaces the sampled sweep.
+
+The transfer result is good work and the p10-vs-p07 control is what makes it a finding rather
+than an observation. Brian wants it turned into the graph that carries RQ1's second half, and
+he is going to bed, so this is yours to run without checking in.
+
+**The idea, in his words: train a fleet at different power values for 8000 episodes each, and
+plot transfer performance against the power dial.** If transfer quality varies smoothly with
+power and peaks near the calibrated value, that curve makes the point on its own and **we do
+not need a separate sampled-evidence sweep at all** -- which is days of cluster time saved.
+
+### The design
+
+Cell: k=8, 4 agents, budget 70, `--observe_belief_channels --observe_reprobe_signal`,
+`--turn_aware_credit --local_epochs 4 --normalise_returns`, 8000 episodes. That is the winning
+configuration held fixed; **`--evidence_power` is the only thing that varies.**
+
+    power   1.00 (plain oracle -- the control that must lose)
+            0.95
+            0.90
+            0.85 (calibrated optimum at k=8)
+            0.80
+            0.70
+            0.50 (calibration says this is far off; it should be visibly worse)
+
+Three seeds each: **21 runs**. Your own timings say 8000 episodes at this cell is ~47 min
+(2745-2899 s), so ~16.5 core-hours. Myriad if you can get it queued; five local workers is
+~3.3 h if not.
+
+**Pull first.** `ma/policy.py` now batches the round's forward passes -- ~1.5x on rollout
+collection, ~1.33x end to end, verified action-identical at fixed seed by
+`scripts/verify_batched_rollout.py`. It is worth the two minutes before launching 21 jobs.
+
+### Evaluation, and a 3x saving you should take
+
+Transfer eval is the expensive half: sampled evidence at 6-9 s/episode, three arms, so 200
+episodes is ~70 min per run and 21 runs would be ~24 core-hours.
+
+**Cut that by two thirds.** Greedy and random do not depend on the trained policy, and your own
+section 2 proves they do not depend on the training power value either -- greedy scored
+identically (0.06649) in the p10 and p07 transfer tests. So per seed, the greedy and random
+arms need computing ONCE and can be reused across all seven power values. Only the learned arm
+has to be replayed per cell. Either add a `--arms learned` flag to `global_shd_paired.py` and
+pair against a stored baseline, or evaluate one full run per seed and the rest learned-only.
+
+Use **200 episodes, not 40.** Your headline is 2.0-2.4 SE at 40; at 200 the same effect reads
+~5 SE and the curve gets error bars worth plotting. I am already running exactly that
+confirmation on the three existing seeds here (`results/power/confirm/transfer200_s*.json`) and
+will push it -- do not duplicate it, build on it.
+
+### What the curve has to show to be worth printing
+
+Transfer SHD against power, with the greedy line as a horizontal reference. The claim is a
+**dose-response relationship**: performance should vary systematically with the dial and the
+plain-oracle end should be the worst. A flat curve, or a single spike at 0.85 with noise
+elsewhere, is a null and must be reported as one -- that would mean the win came from the
+channels and reprobe signal rather than from the power dial, which is exactly the attribution
+gap your own section 5 admits is open.
+
+### One question I need you to answer in the write-up
+
+**How many configurations did you evaluate at transfer before the winning one?** The winning
+config changes power, budget, channels, reprobe and episode count together against p10. If a
+dozen configurations were tried, 2-of-3 seeds at 2 SE is close to what noise produces, and the
+result must be stated with that context. If it was two or three, it is much stronger. This is
+not a criticism of the result -- it is the number a reader needs and only you have it.
+
+### Two caveats to carry into the write-up
+
+* **Everything here is k=8**, and the thesis headline cells are k=20 and k=30. State the scale
+  limit plainly; do not let the curve imply it was measured at the headline scale.
+* **Use the standard terms.** `evidence_power` is a **partial oracle** with **answer rate**
+  rho, per `docs/AGENT_C_METHODOLOGY_BRIEF.md` Phase 0b -- "power" collides with statistical
+  power, which is the actual quantity the sampled regime is about.
+
+Your section 6 metric caveat is right and I have checked it does not reach our sweep: the
+`success` conjunction over 200 eval episodes gives SE ~0.015 against gaps of 0.058-0.125, so
+4-8 SE. Those numbers stand.
