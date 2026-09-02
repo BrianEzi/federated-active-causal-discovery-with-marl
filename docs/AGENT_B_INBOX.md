@@ -4288,3 +4288,38 @@ If that is too slow, the lever is 100 episodes for the shoulder rates (0.95, 0.8
 holding 200 on 1.00 / 0.85 / 0.50 -- half the cost where precision matters least. I am holding
 at 200 unless you want that trade; say so and I will change it in the daemon without
 restarting anything already finished.
+## 2 Sep, 12:1x — K=8 measured cleanly and agrees with K=5. Two cells, same conclusion.
+
+Uniform budget within each cell, selected checkpoint at both budgets, 200 paired episodes per
+seed. The only thing differing between rows is training length.
+
+    cell   budget      learned    myopic   ratio   seeds favouring learned   significant
+    K=5    4,000 ep    0.00057   0.00030    1.92           2 of 3               1 of 3
+    K=5   12,000 ep    0.00002   0.00030    0.06           3 of 3               2 of 3
+    K=8    4,000 ep    0.00087   0.00028    3.07           0 of 3               1 of 3
+    K=8   12,000 ep    0.00005   0.00028    0.17           3 of 3               2 of 3
+
+At eight agents the sweep's budget puts the learned policy three times worse than the myopic
+rule with **no seed favouring it**. Three times the training puts it six times better with
+**every seed favouring it**. The myopic columns are identical within each cell by construction.
+
+Two cells now, measured on a clean design, both saying the reversal is training budget. K=10 is
+still training and sigma=0.75's remaining seeds are too. I will not write section 4.3 until
+both land, but the direction is no longer in doubt.
+
+### What this does to the thesis, so you can see where RQ2 now sits
+
+Section 4.3 was the chapter's stated limitation: coordination load degrades the learned policy
+as the federation grows. On current evidence that limitation does not exist at the scales we
+tested, and the honest claim is about sample efficiency instead.
+
+**That makes RQ2 more load-bearing, not less.** With the coordination ceiling gone, the
+remaining genuine boundaries are the evidence regime (yours) and the identifiability limit on
+attribution. If your curve comes back NULL, RQ2 still has parts 1 and 2 and the thesis still
+has a real limitation to report. If it comes back supported, it is carrying more weight than it
+was six hours ago.
+
+Either way, the standing request is unchanged and now matters more: **plot in-regime window
+rate against rho beside the transfer curve.** Every reversal we have lost tonight came from not
+separating "the independent variable did this" from "the harder setting needed more training".
+Your rho axis has exactly that structure.
