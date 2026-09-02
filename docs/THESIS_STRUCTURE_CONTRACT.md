@@ -15,15 +15,20 @@ Nothing else determines the shape of Chapter 4. Sections are not named after axe
 after experiments, or after findings. They are named after the question they settle.
 An experiment that answers no research question is appendix material or is cut.
 
-Four research questions, therefore four Results sections, plus one for what did not
-survive:
+Three research questions, therefore three Results sections:
 
 | § | Research question | Core experiment |
 |---|---|---|
 | 4.1 | **RQ1** Federated active recovery, and how the advantage varies with window size, federation size, contention, budget | The four-axis sweep (18 cells × 3 seeds, 12,000 episodes) |
 | 4.2 | **RQ2** Transfer to a realistic evidence regime | Oracle → sampled evidence; partial oracle at answer rate ρ |
 | 4.3 | **RQ3** The price of this formulation of federation | The federation ladder: centralised → federated, matched cells |
-| 4.4 | Negative and withdrawn results | — |
+
+**The shape of every subsection** (Brian, 3 Sep): the relevant figure or figures, a table only
+when it is very relevant (currently one: `tab:pair_class_budget`, which has no figure), one
+concise paragraph describing the experiment, and Brian's analysis below it — the
+`% >>> Analysis (Brian)` marker in the source is the slot. The data tables sit in
+`app:res_tables` (`thesis/Results Tables.tex`) pending refresh; refreshed tables regenerate
+there, never into the chapter. `Tables12k.tex` is input from that file.
 
 **Attribution is no longer a research question.** Brian's decision, 3 Sep: it was the weakest
 part of the thesis and was taking effort from the three questions the work actually answers.
@@ -37,9 +42,11 @@ objective. Every result is the behaviour of a belief driven by a policy trained 
 else, so nothing may be said about what a trained attributor would achieve. Sound, thin, and
 better as a pointer to future work than as a quarter of the results.
 
-§4.5 is not a research question. It exists because the work retracted claims it had
-already drafted, and reporting that is a mark of the thesis's honesty rather than a
-concession. It stays last.
+**Negative and withdrawn results moved to `app:negative`** (`thesis/Negative Results.tex`),
+condensed to one paragraph, one merged table and one closing paragraph — Brian, 3 Sep. It is
+on the chopping block but not removed; the full record stays in
+`thesis_results/RETRACTIONS.md` either way. (This supersedes the earlier rule that it stays
+last in Chapter 4.)
 
 ---
 
@@ -87,12 +94,14 @@ where a confound is chased down, where a boundary is drawn around a claim. By th
 of Chapter 4, the analysis is *finished*. Chapter 5 has no analytical work left to do.
 
 ### Chapter 5 — Discussion
-**Job: tie it together and say what it means.**
+**Job: discuss the results in conjunction, then the limitations. Two sections, nothing else.**
 
-Not more analysis. Synthesis: what the four answers amount to taken together, what
-they imply for federated causal discovery as a proposition, where the argument is
-load-bearing and where it is thin, how it sits against the related work of Chapter 2.
-The insight chapter.
+Restructured 3 Sep (Brian): with the analysis living per-subsection in Chapter 4, a themed
+Discussion only duplicated it. `sec:disc_synthesis` says what the three answers amount to
+taken together — the one thing no Chapter 4 subsection can — and closes the gap Chapter 2
+opens, in a sentence, rather than re-arguing the positioning. `sec:disc_validity` holds the
+limitations, led by the supplied skeleton. No future work here; that stays in the Conclusion,
+which is what keeps the two chapters from overlapping.
 
 > **Ownership: this chapter is Brian's exclusively.** So is much of the analysis in
 > Chapter 4. Agents do not draft Chapter 5. Agents do not draft interpretive prose in
@@ -123,7 +132,7 @@ follows.
 | §4.5 Transfer to a Realistic Evidence Regime | §4.2 RQ2 |
 | §4.6 The Price of This Formulation of Federation | §4.3 RQ3 |
 | §4.7 Limits of Latent Attribution | **removed** -- `app:attribution` |
-| §4.8 Negative and Withdrawn Results | §4.4, stays last |
+| §4.8 Negative and Withdrawn Results | `app:negative`, condensed |
 
 Moving out of Chapter 4 entirely:
 
