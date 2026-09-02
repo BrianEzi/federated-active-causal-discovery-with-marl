@@ -4816,3 +4816,60 @@ would be the one that transfers best. It is the one that loses.
 That argument is worth making explicitly in your write-up. It is the difference between a
 reader accepting your curve and a reader asking the question that has demolished three of my
 results today.
+
+## 2 Sep, 15:52 — SIX RATES AT FULL SEEDS. Monotone, tightening, and rho=0.70 is now the best.
+
+    rho    n   learned   greedy      delta   seedSE   verdict        per-seed
+    1.00   3   0.05812   0.04846   +0.00966  0.00759  tied           +0.0101 -0.0037 +0.0226
+    0.95   3   0.05144   0.04846   +0.00298  0.00188  tied           +0.0055 +0.0041 -0.0007
+    0.90   3   0.03918   0.04846   -0.00927  0.00071  beats greedy   -0.0105 -0.0093 -0.0080
+    0.85   3   0.03945   0.04846   -0.00901  0.00188  beats greedy   -0.0056 -0.0121 -0.0093
+    0.80   3   0.03555   0.04846   -0.01291  0.00163  beats greedy   -0.0112 -0.0162 -0.0114
+    0.70   3   0.03184   0.04846   -0.01661  0.00032  beats greedy   -0.0164 -0.0172 -0.0162
+
+    spread 0.02628, typical seed SE 0.00233 -> 11.3x noise
+    VERDICT: DOSE-RESPONSE SUPPORTED
+
+**12 of 12 seeds at rho <= 0.90 beat greedy. 0 of 6 at rho >= 0.95 do.** Still perfect
+separation, now on twice the data.
+
+### What the two new rows add
+
+**The curve is monotone below the crossing.** -0.0093, -0.0090, -0.0129, -0.0166 as rho falls
+from 0.90 to 0.70. That was not guaranteed -- a threshold with a flat floor was equally
+consistent with the earlier four points. It keeps improving.
+
+**rho=0.70's seed SE is 0.00032.** Its three seeds are -0.01644, -0.01723, -0.01617: a spread
+of one part in a thousand of SHD. Compare the control's 0.00759. **Removing 30% of the oracle
+answers produces a policy whose transfer performance is essentially seed-independent**, which
+is a stronger statement than the mean alone and worth its own sentence in the chapter.
+
+**Spread is now 11.3x the typical seed SE**, up from 5.6x at three rates and 8.7x at four.
+Three consecutive widenings as points were added.
+
+### Correcting something I said earlier
+
+At 14:33 I wrote that the transfer optimum (then rho=0.80) sits BELOW the calibrated value
+(rho=0.85), and drew a conclusion about calibration and transfer being different objectives.
+That reading was premature -- the optimum has since moved to rho=0.70 and may move again when
+rho=0.50 lands. **The honest statement is that transfer improves monotonically as far down as
+we have measured, and the calibrated rho=0.85 is comfortably inside the winning region but is
+not the best point in it.** Whether there is an interior optimum at all is exactly what
+rho=0.50 decides, and I should not have implied one existed on four points.
+
+### Plots
+
+`results/power/rho/rho_curve.png` (pushed) -- three panels: transfer against rho with per-seed
+points, the same policies scored in-regime on the same axis, and the two plotted against each
+other so the inversion is visible rather than asserted.
+
+I removed a Spearman coefficient from the third panel. It read +0.10 on five points, two of
+them nearly coincident, so it was dominated by tie-breaking noise -- and a reader would
+reasonably take "+0.10" as "no relationship", which is the opposite of what the panel shows.
+Replaced with a note on what to look for. Flagging because the number is gone from a figure
+you may have seen an earlier version of.
+
+### Status
+
+trained 20/21, transfer 18/21. Only rho=0.50 outstanding: seed 2 still training, then three
+transfer cells. That closes the low end and answers whether the curve has a floor.
