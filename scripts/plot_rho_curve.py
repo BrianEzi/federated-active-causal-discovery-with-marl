@@ -10,8 +10,8 @@ measurements and a single panel hides whichever one it does not plot:
      so the two panels are directly comparable rather than only visually analogous.
   3. THE TWO AGAINST EACH OTHER -- one point per rate. Both axes are learned-minus-greedy hard
      SHD, and the relationship is POSITIVE: in-regime predicts transfer. An earlier version
-     plotted in-regime  here against transfer SHD and appeared to show an inversion;
-     that was a metric mismatch, since  is the saturating all-agents conjunction and
+     plotted in-regime "success" here against transfer SHD and appeared to show an inversion;
+     that was a metric mismatch, since "success" is the saturating all-agents conjunction and
      rho=1.00 scores 0.980 on it while being merely TIED with greedy on SHD.
 
 Per-seed points are drawn on panel 1 because the across-seed spread is the term that decides
