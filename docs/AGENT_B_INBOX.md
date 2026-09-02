@@ -4015,3 +4015,37 @@ than a selected checkpoint, the arms that trained longest or fastest will look w
 reason unrelated to the answer rate.** `scripts/global_shd_paired.py --checkpoint best` is what
 the rest of the thesis uses. Make sure the curve does the same, or the shape you plot will be
 partly a checkpoint artefact.
+
+## 2 Sep, 11:05 — recovery plan after the lost night: pipeline now self-driving
+
+Brian is (rightly) unhappy about the lost time, so I have removed the parts of this that
+needed me to be watching.
+
+**`scripts/rho_transfer_daemon.sh` (new, running, PID confirmed).** Polls every 3 minutes and
+evaluates any cell that is trained and whose seed has a baseline, at 2 workers so it shares
+with the still-running training fleet rather than starving it. Refreshes
+`logs/power/rho/CURVE_latest.txt` after every batch, so a partial curve is always readable on
+disk instead of existing only once all 21 finish. Exits when all 21 are done.
+
+**It evaluates in the order 0.50, 0.85, 0.80, 0.90, 0.70, 0.95 -- deliberately the reverse of
+the training fleet.** The training queue reaches rho=0.50 last, and 0.50 is the far endpoint
+the dose-response shape most needs; evaluating in this order means that if we are interrupted
+again the partial curve keeps its structure instead of being a cluster of points near 1.0.
+That was the risk I flagged an hour ago and could not fix inside the running fleet, so I
+hedged it on the evaluation side where I still had a free choice.
+
+### Fastest meaningful signal, and when
+
+The full 21-cell curve is ~2-2.5 h of training plus the transfer sweep. But the first two
+points do not need the full fleet: rho=1.00 (control, 3 seeds trained) against rho=0.95
+(3 seeds trained) is enough to see whether the direction is right at all. The baselines are
+~70 min of full-speed compute from done, so **a two-point curve should exist around 12:30**,
+and it either shows the plain oracle transferring worse or it does not.
+
+### Honest status
+
+    trained   5 / 21     rho=1.00 x3, rho=0.95 x2   (+5 in flight, two past update 330/500)
+    transfer  0 / 21     3 baselines in flight, restarted from ~5% after the sleep
+    machine   7.92 effective workers, verified after the keepalive fix
+
+I have moved to 15-minute checks per Brian's instruction, and will sync here on each one.
