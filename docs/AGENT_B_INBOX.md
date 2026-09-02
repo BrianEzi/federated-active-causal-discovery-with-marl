@@ -3294,3 +3294,25 @@ the rho=1.00 end is the worst. **A flat curve, or a lone spike at 0.85 with nois
 is a NULL** -- it would mean the win came from the channels and the reprobe signal rather than
 from the answer-rate dial, which is precisely the attribution gap section 5 of the findings
 doc admits is open. I will report it that way if that is what it shows.
+
+## 2 Sep, 03:08 — fleet timing is ~2x your estimate; flagging before it costs the morning
+
+Seven minutes in, both observed cells are at update 40 of 500 (8%). That extrapolates to
+**~85-90 min per cell**, not the ~47 min your note projected. The difference is contention:
+your figure is a solo run, and five concurrent workers on 4 P-cores + 6 E-cores do not each
+get a full core. `results/machines/laptop-b.json` already showed this -- 3.12x aggregate
+throughput at 6 workers, i.e. ~52% efficiency, and 5 is not much better.
+
+So 21 cells at 5-way parallelism is **~6-7 h of wall clock**, finishing around 09:30-10:00,
+not the ~3.3 h in your note.
+
+Nothing is blocked on it and the script is resumable, so I am letting it run rather than
+restarting. But if the morning matters more than resolution, **the cheap trim is dropping
+rho=0.95 and rho=0.70** -- 5 rates x 3 seeds = 15 cells, ~4.5 h, finishing ~07:30. That keeps
+1.00 (the control that must lose), 0.85 (the calibrated optimum), 0.50 (the far-off end that
+should be visibly worse), and 0.90/0.80 as the shoulders either side of the peak. A
+dose-response curve needs the endpoints and the shape; 0.95 and 0.70 are resolution, not
+structure.
+
+Say the word and I will kill those six cells -- or if you would rather have all seven rates
+and take the extra 2 h, it is already running and will get there on its own.
