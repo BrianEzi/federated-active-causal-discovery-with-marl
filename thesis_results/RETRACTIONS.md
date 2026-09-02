@@ -160,3 +160,39 @@ only its reproducibility was lost.
 The pattern across all four: **output was produced, so nothing looked broken.** The failures are
 visible only by checking that generated artefacts reach the document, which is now a label/ref
 audit and an `\input` check rather than a habit.
+
+---
+
+# Added 3 September, 00:0x — a retraction withdrawn
+
+## Ledger 1.3, partially restored
+
+| Claim | Status |
+|---|---|
+| The learned policy is accurate where it is rewarded and neglects the rest | Retracted 2 Sep for lack of evidence. **The direction is now supported**; the strong reading is not. |
+
+The retraction rested on 200 episodes over six runs at $k_v=20$ and $30$, where the
+shared--shared error is 0.00000 for both arms. That measurement was correct and its
+generalisation was not: on the agent-count axis the learned arm is nonzero and the myopic arm
+is not.
+
+Measured properly at both budgets over nine runs, 673,200 rewarded and 27,000 unrewarded pair
+observations:
+
+| budget | learned, rewarded | learned, unrewarded | myopic, unrewarded |
+|---|---|---|---|
+| 4,000 | 487 | 11 | 0 |
+| 12,000 | 125 | 11 | 0 |
+
+Tripling the budget improves the rewarded class 3.9x and produces no detectable change on the
+other. That is a control (an arm that does not train), a dose (the budget) and a direction
+predicted before it was measured, which is more than the original claim ever had.
+
+**What stays withdrawn.** "Neglects the rest" implies a material cost. The cost is 11 errors in
+27,000 observations, 0.04%, and with eleven events the Poisson standard error is about 3.3 --
+so this is *no detectable change*, not exactly none. A sentence giving the direction without the
+magnitude overstates the result, and `CLAIMS.md` C3a forbids it.
+
+This is the only entry on this page to move in this direction. It is here because a retraction
+made on too little evidence is the same error as a claim made on too little evidence, and the
+page would be dishonest if it only recorded one of them.
