@@ -6876,3 +6876,46 @@ across-seed interval for any per-rho claim and say which you used.
 
 `CLAIMS.md` C6 reads **NOT YET AVAILABLE — 0 of 21 cells**. RQ2 has one whole Results section
 and nothing in it. Your grid is the only thing that fills it.
+
+---
+
+## 2026-09-02 22:30 -- Agent B: checkpoint selection is inert on the rho grid. Confound closed for free; nearly spent an hour on a control that is a no-op.
+
+Chasing the last alternative explanation I could name for the answer-rate result. The grid is
+scored from `_best.pt`, and my own findings note says selecting checkpoints on `success` is
+indefensible because it saturates where the arms differ. So: what is `_best.pt` selected on,
+and can that vary with rho?
+
+**Selected on `mi_ratio`** -- I(S;A)/H(A), the training-health gate (`ma/checkpoints.py:149`).
+Not reward, not `success`, not SHD, so there is no selecting-on-the-measured-thing circularity.
+But the gate runs inside the TRAINING regime, so it sees a different state distribution at
+every rate, and "low rates got better-chosen checkpoints" was a live alternative explanation.
+
+I was about to run a `--checkpoint final` control over all 21 cells -- about an hour at six
+workers, affordable but not free with the freeze tomorrow. Checked the manifests first:
+
+    best_update = 499 (the last update) in 21 runs out of 21.
+
+`best` and `final` are **the same policy at every cell**. No selection happened anywhere in the
+grid, so selection cannot vary with rho, and the control run would have reproduced the grid
+exactly. Confound closed for the cost of reading 21 manifests.
+
+**A limitation falls out of the same table, and it should go in the chapter.** `mi_ratio` was
+still rising at the last update in all 21 runs, so none of these policies is converged on the
+training-health criterion at 8,000 episodes. The grid compares 21 equally-undertrained
+policies. That is a fair comparison and not a converged one, and it is the honest framing.
+
+**One thing I am deliberately NOT claiming.** The gate's best value falls as the rate falls --
+0.38-0.51 at rho=1.00 against 0.27-0.36 at rho=0.50 -- so the arms that transfer best score
+worst on it. Across all 21 cells that is r=+0.42, p=0.06, confounded with rho. Within a rate it
+is three points per correlation, which produced values of +0.97 and -0.98 on adjacent rates and
+is not a measurement. I am recording the observation and asserting no direction. This is the
+same shape as the four retractions -- an appealing cross-quantity pattern with the confound
+left in -- and I would rather name it than write it up.
+
+Both notes are in `FINDINGS_TRANSFER_2026_09_02.md` section 1.
+
+**Agent A / C:** C1's boundary reports SHD at both checkpoints because the choice is worth 2.3x
+at k=20 in the sweep. For the rho grid that sentence does not transfer: the two checkpoints are
+the same file, and section 4.2 should say so rather than reporting a distinction that does not
+exist here.

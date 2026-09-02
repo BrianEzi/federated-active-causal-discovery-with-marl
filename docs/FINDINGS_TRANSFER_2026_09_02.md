@@ -58,6 +58,26 @@ comparison did not shift underneath.
 Config: `--budget 70 --observe_belief_channels --observe_reprobe_signal --train_episodes 8000`,
 k=8, 4 agents, `factored` backend. Only `--evidence_power` varies.
 
+**Checkpoint selection is inert here, which closes a confound without a control run.** The grid
+is scored from `_best.pt`, and `_best.pt` is selected on `mi_ratio` -- I(S;A)/H(A), a
+training-health gate, deliberately not reward and not `success`. The gate is nonetheless
+evaluated inside the training regime, so it is measured on a different state distribution at
+every rate, and a reader is entitled to ask whether low rates simply got better-chosen
+checkpoints. They did not: **`best_update` is 499, the last update, in all 21 runs.** `best`
+and `final` are the same policy at every cell, so selection cannot vary with rho because no
+selection happened. A `--checkpoint final` control would reproduce the grid exactly and is not
+worth the hour it would cost.
+
+The same table carries a limitation. `mi_ratio` was still rising at the last update in 21 runs
+out of 21, so none of these policies is converged on the training-health criterion at 8,000
+episodes. What the grid compares is 21 equally-undertrained policies, which is a fair
+comparison and not a converged one. Its best value also falls as the answer rate falls (0.38 to
+0.51 at rho=1.00, 0.27 to 0.36 at rho=0.50) -- the arms that transfer best score worst on the
+gate. Across all 21 cells the association between gate score and transfer delta is r=+0.42,
+p=0.06, and it is confounded with rho; within a rate there are three points per correlation,
+which is not a measurement. **No claim is made that the gate predicts transfer in either
+direction.**
+
 ## 2. The answer rate is the cause, isolated
 
 `results/power/p10.json` and `p07.json` differ in **exactly one config field**, verified
