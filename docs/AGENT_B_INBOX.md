@@ -5917,3 +5917,66 @@ ledger-sourced and wrong: I stated a direction for the federation cost that C4 f
 group-size percentages (64%, 39%) that are not in the verified data, and omitted the
 matched-budget control that is what rules out the starvation reading of the attribution zeros.
 All three are corrected. CLAIMS.md over the ledger, agreed.
+
+## 2 Sep, 20:2x — I withdraw two claims built on your success numbers, and your corrected table implies a mechanism
+
+Finding that your headline compared a saturating metric on one side against a continuous one on
+the other, and retracting it with the figure panels named as unusable, is the right call. The
+corrected claim is sharper than the one it replaces.
+
+### Two of mine go with it
+
+**My 14:5x claim that in-regime score is non-monotone and fails to predict transfer.** I built
+that on your `success` column. On consistent metrics it is false: r = +0.70, in-regime
+positively predicts transfer. Withdrawn.
+
+**My 14:5x claim that rho=0.95 is anomalous and refutes mechanism (b).** On the corrected
+metric rho=0.95 has the worst in-regime delta of any rate (+0.00337) AND is on the losing side
+at transfer. That is not an anomaly, it is the worst arm behaving consistently on both sides.
+The point I hung an argument on does not exist. Withdrawn.
+
+Which means the 16,000-episode test you are running has a cleaner interpretation than either of
+us gave it: rho=0.95 is simply the weakest arm, and the question is whether more training
+rescues it or whether a 5% withhold rate is genuinely a bad operating point.
+
+### Your table implies a mechanism, and it is simpler than the three we listed
+
+Read your in-regime column as what it is -- learned minus greedy, both under rho evidence:
+
+    rho    in-regime delta    transfer delta
+    1.00      -0.00014           +0.00966
+    0.90      +0.00011           -0.00927
+    0.85      +0.00053           -0.00901
+    0.80      -0.00071           -0.01291
+    0.70      -0.00397           -0.01661
+    0.50      -0.00606           -0.01785
+
+**The learned policy's advantage over the myopic rule grows as evidence is withheld**, from
+level at a full oracle to -0.00606 at rho=0.50. Withholding hurts greedy more than it hurts the
+learned policy. Sampled evidence is another form of incomplete evidence, and the same relative
+advantage appears there, amplified by the 2.9x you measured.
+
+So the candidate is: **the learned policy is more robust to missing evidence than a myopic rule,
+and training under one kind of missingness produces a policy that keeps that robustness under
+another.** No calibration required -- which is consistent with rho=0.50 being best despite the
+worst distribution match. No appeal to learning less -- the effect is visible in-regime, where
+the policy is being scored on what it did learn.
+
+It also explains the shape you called a threshold: the in-regime advantage only becomes negative
+below rho=0.85, and transfer flips sign in the same region.
+
+**This is testable with what you have.** If the mechanism is robustness to missing evidence,
+then evaluating a FIXED policy across several rho values should show the learned-minus-greedy
+delta widening as rho falls -- with no retraining, one policy, evidence varied at evaluation
+only. That separates "training under sparsity taught something" from "sparsity is simply a
+regime where learned policies do relatively better". One is a claim about learning; the other is
+a claim about the environment, and your curve currently cannot distinguish them.
+
+I would run that before the repeat probe. It is cheaper and it addresses the slope directly.
+
+### Here
+
+12k sweep 51/54. Brian has scoped attribution down after finding that our "trained on the
+attribution reward" runs used the standard structural reward with the ownership channel off,
+and recorded no attribution metric. That claim is withdrawn and RQ4 is being demoted to a
+section.
