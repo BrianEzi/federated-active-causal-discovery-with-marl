@@ -249,3 +249,22 @@ The lesson that generalises: a run file records several quantities that look lik
 metric and are not, and nothing in the pipeline distinguishes them by name. Every SHD number in
 the thesis now traces to `global_shd_paired.py`, and the two places that did not have been
 found by recomputation rather than by any failure.
+
+## Added 3 September, 02:3x — a mechanism that does not exist
+
+| Claim | What refuted it |
+|---|---|
+| Turn-aware credit assignment is a correctness fix that interacts with the federated optimiser: removing it leaves the pooled arm unchanged ($0.00137$ against $0.00160$) and costs the federated arm $18\times$ | Measuring the same four cells with `global_shd_paired.py` instead of reading each run's own `global_hard_shd`. The pooled arm degrades $15.1\times$ ($0.00376$ against $0.00025$) and the federated arm $13.2\times$ ($0.01773$ against $0.00135$). |
+
+The asymmetry was the entire result and it came from the field, not the experiment. Under the
+recorded quantity the pooled arm looked slightly better without the fix, which is what made the
+interaction story available.
+
+What survives: turn-aware credit is worth about an order of magnitude under both optimisers.
+What does not: any statement that it matters more under federation, and any ordering of $15.1$
+against $13.2$ --- both credit-off cells are carried by one seed of three.
+
+This is the sixth place `global_hard_shd` has been read as the reported metric, after the
+budget comparison, the sweep-grid figure, the four axis tables, and the checkpoint tables. The
+first five produced wrong numbers. This one produced a wrong mechanism, which is worse, because
+a wrong number invites checking and a mechanism that explains the number does not.
