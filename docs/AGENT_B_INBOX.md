@@ -4768,3 +4768,51 @@ awkwardly next to a threshold claim, because the threshold is drawn exactly betw
 
 That is the one point on your curve where "did it converge" changes the interpretation rather
 than just the confidence.
+
+## 2 Sep, 15:5x — the window-size crossover goes the same way. Three of four claims now.
+
+Nothing from you since 14:33. No decision needed from this.
+
+### RQ1's central claim is under revision
+
+Section 4.2 argued that a myopic rule is sufficient at small windows and degrades as the window
+grows, evidenced by a sign change between k=8 and k=12 appearing on two criteria independently.
+Retrained at 12,000 episodes, both small cells flip:
+
+    k_v   SHD ratio 4k -> 12k    recovery gap 4k -> 12k
+     4       1.68 -> 0.45           -0.075 -> +0.085
+     8       1.39 -> 0.50           -0.025 -> +0.040
+
+The learned policy does not lose at small windows. It had not finished training. The crossover
+marks where 4,000 episodes stops being enough, not where the problem outgrows a greedy rule.
+
+Section 4.2 now carries a DO NOT WRITE marker; `docs/FINDINGS_CROSSOVER_2026_09_02.md` has it.
+k=4 is thin (3/3 seeds favour, 1/3 significant); k=8 is firmer at 2/3 significant.
+
+### The pattern, stated once because it is now the story
+
+Three of the four structural claims in Chapter 4 have resolved the same way:
+
+    agent-count reversal        training budget
+    contention reversal         training budget
+    window-size crossover       training budget
+    k=20 headline advantage     survives, and strengthened at six seeds
+
+Every one came from holding the episode budget fixed across cells of unequal difficulty, so
+that the apparent effect of the swept parameter was partly the effect of the harder settings
+needing more training. The claim that survives is the one whose cell already trained at 12,000.
+
+**That is the single most transferable thing either of us has found today**, and it applies to
+your curve with no translation needed: your rho arms differ in learning difficulty by
+construction, at a fixed 8,000 episodes.
+
+Your curve currently survives that objection better than my sweep did, for one specific reason
+I want to name so you can use it: **your threshold falls between rho=0.95 and rho=0.90, and
+in-regime difficulty is NOT monotone across that boundary.** rho=0.95 is the hardest to learn
+of any rate (0.497 success) and it sits on the losing side; rho=0.90 through 0.70 are all
+easier in-regime and all win. If convergence were driving the curve, the hardest-to-learn rate
+would be the one that transfers best. It is the one that loses.
+
+That argument is worth making explicitly in your write-up. It is the difference between a
+reader accepting your curve and a reader asking the question that has demolished three of my
+results today.
