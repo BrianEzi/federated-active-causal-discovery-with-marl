@@ -1,9 +1,30 @@
 # The agent-count reversal does not survive adequate training
 
-2 Sep 2026, 09:5x. **Supersedes ledger section 1.4 and the agent-count claim in section 4.3 of
-the results chapter.** PARTIAL: the converged column below mixes one 12,000-episode seed into
-two 4,000-episode ones. Uniform-budget cells are training now; do not quote the converged
-ratios until they land.
+2 Sep 2026, 10:5x. **DO NOT QUOTE THE CONVERGED RATIOS. A confound was found at 10:4x and the
+numbers below are being re-measured.**
+
+The converged column uses `global_hard_shd` as recorded by each run's own evaluation pass,
+which scores the FINAL policy. `FINDINGS_CHECKPOINT_2026_09_01.md` established that the final
+policy degrades badly on long runs -- worth a factor of 2.3 at $k_v=20$ and 16 at $k_v=30$. So
+comparing a 4,000-episode final policy against a 12,000-episode final policy confounds the
+training budget with that degradation, and the direction of the confound is not fixed.
+
+The first uniform cell to complete makes this concrete. At $K=5$, all three seeds retrained:
+
+| seed | SHD at 4,000 (final) | at 12,000 (final) |
+|---|---|---|
+| 0 | 0.00009 | 0.00004 |
+| 1 | 0.00006 | **0.01841** |
+| 2 | 0.00131 | 0.00004 |
+
+Seed 1 is 300x worse after three times the training, while its window rate stays at 0.957 and
+its joint recovery at 0.895. That is late-training degradation of the final policy, not a
+failure to learn. Two seeds improve by factors of 2 and 33; one collapses. A cell mean over
+that is meaningless.
+
+**Both budgets are being re-measured from the selected checkpoint**, which is what the chapter
+reports everywhere else. Until that lands, the only safe statements are the per-seed
+window-rate and joint-recovery figures, which do not depend on the checkpoint convention.
 
 ## The claim being tested
 

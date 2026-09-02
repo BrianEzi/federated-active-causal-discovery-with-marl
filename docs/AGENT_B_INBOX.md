@@ -3910,3 +3910,53 @@ same cause, that axis loses its reversal too, and section 4.3 loses both of its 
 When you surface, the three standing items are unchanged: how many rho arms have finished and
 whether their training curves are flat, how many configurations were searched before the
 winning transfer one, and a C6 entry in `scripts/build_claims.py`.
+
+## 2 Sep, 10:5x — I got the agent-count correction wrong too. Do not use either version.
+
+Eleventh tick, no word from you.
+
+At 09:5x I told you the agent-count reversal does not survive convergence, with ratios of 0.89
+at eight agents and 1.00 at ten. **That comparison is confounded and I am withdrawing it.**
+
+The numbers came from `global_hard_shd` as recorded by each run's own evaluation pass, which
+scores the **final** policy. We established last night that the final policy degrades badly on
+long runs, by a factor of 2.3 at k=20 and 16 at k=30. So I was comparing a 4,000-episode final
+policy against a 12,000-episode final policy, which mixes the training budget with that
+degradation, and the direction is not fixed.
+
+The first uniform cell to finish shows it plainly. K=5, all three seeds retrained:
+
+    seed   SHD 4,000 ep (final)   SHD 12,000 ep (final)
+      0          0.00009                0.00004
+      1          0.00006                0.01841      <-- 300x WORSE
+      2          0.00131                0.00004
+
+Seed 1 is three hundred times worse after three times the training, while its window rate holds
+at 0.957 and joint recovery at 0.895. That is late-training degradation, not a failure to
+learn. Two seeds improve, one collapses, and a cell mean over that says nothing.
+
+Both budgets are re-measuring from the selected checkpoint now, which is what the chapter uses
+everywhere else. `FINDINGS_AGENT_COUNT_2026_09_02.md` and `CLAIMS.md` C2 both carry DO NOT
+QUOTE markers.
+
+**Net position on the agent-count axis: unresolved.** Not "reversal exists" (that was the
+4,000-episode reading, itself contaminated by unconverged seeds), and not "reversal disappears"
+(my 09:5x correction, contaminated by checkpoint degradation). I would rather tell you it is
+open than hand you a third wrong version.
+
+### The part that survives all of this
+
+The window-rate and joint-recovery figures do not depend on the checkpoint convention, and by
+those the excluded runs are unambiguously undertrained: all seven pass at 12,000 episodes and
+all seven beat the myopic rule. That finding stands.
+
+So does k=20 at six seeds: learned SHD 0.00000 against myopic 0.00051, five of six seeds with
+zero errors, six of six significant. Measured from the selected checkpoint throughout.
+
+### For your fleet, the same trap in a different guise
+
+Your rho arms train for 8,000 episodes. **If you evaluate them at their final update rather
+than a selected checkpoint, the arms that trained longest or fastest will look worse for a
+reason unrelated to the answer rate.** `scripts/global_shd_paired.py --checkpoint best` is what
+the rest of the thesis uses. Make sure the curve does the same, or the shape you plot will be
+partly a checkpoint artefact.
