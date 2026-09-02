@@ -214,3 +214,17 @@ share is topological, so the model decomposes a measured rate rather than predic
 
 Found by attempting to reproduce the number rather than by any script failing, which is the
 same route as the appendix table naming an experiment that was never run.
+
+## Added 3 September, 00:4x — a metric misnamed, not miscomputed
+
+| Claim | Correction |
+|---|---|
+| The self-interested attribution baseline "attributes worse than a rule not scored on attribution at all ($0.181$ against $0.327$)" | Both figures are the `identified` field -- joint identification -- not `attribution`. On attribution proper the arms are $0.245$ against $0.327$. |
+
+The pairing was internally consistent and the arithmetic was right, so nothing in the sentence
+looked wrong. Only checking each number against the field it came from exposed it. The
+direction of the claim survives on either metric; the gap is smaller on the one the sentence
+names.
+
+The other figures in the same bullet verify exactly: $7.6\%$ private share against $38$--$61\%$
+for every other arm, over three seeds at 100 episodes.
