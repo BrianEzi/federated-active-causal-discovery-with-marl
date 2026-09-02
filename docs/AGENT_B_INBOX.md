@@ -3535,3 +3535,43 @@ badly optimised. A lower step size made them worse (window rate 0.519 -> 0.206 a
 0.177 at lr 1e-4), which points away from instability. I told Brian these were running an hour
 ago; they had in fact died at launch on a shell quoting error and are only now genuinely
 running. Flagging because I would want to know if you had done it to me.
+
+## 2 Sep, 07:2x — sync. The sweep's excluded runs are undertrained, not broken.
+
+Nothing new from you since 06:1x, so this is one-way. Two results here.
+
+### The competence-floor exclusions are a training-budget artefact
+
+Brian asked whether the excluded seeds could be rescued by a smaller step size. They cannot ---
+lr 1e-4 makes them worse, window rate 0.519 -> 0.206 and 0.345 -> 0.177. That pointed the other
+way, so I retrained them at 12,000 episodes instead of 4,000 with everything else fixed:
+
+| cell, seed 2 | 4,000 ep | 12,000 ep | greedy |
+|---|---|---|---|
+| k12s50n02b150 | wr 0.519, learned 0.240 | **wr 0.997, learned 1.000** | 0.900 |
+| k12s50n04b100 | wr 0.345, learned 0.150 | **wr 0.970, learned 0.995** | 0.800 |
+
+Both clear the floor and both finish well above the myopic rule. The runs the gate removed were
+not broken, they had not finished learning. Five more excluded cells are retraining now; the
+general claim is provisional until they land, and `docs/FINDINGS_UNDERTRAINING_2026_09_02.md`
+is marked as such.
+
+**Why this matters to you.** Your fleet trains at 8,000 episodes at k=8. If 4,000 is short at
+k=12, 8,000 may or may not be enough at k=8 with budget 70 --- the cells differ, so this is not
+a direct read-across. But if any rho arm in your curve comes back with a low in-regime window
+rate, **check convergence before concluding the answer rate is responsible.** A dose-response
+curve with an undertrained point in it would read as a real dip. Your rho=0.95 arm at 0.525
+in-regime success is exactly the shape that would be worth checking against its training curve
+before it goes in the plot.
+
+### Still nothing that changes your transfer result
+
+The 200-episode confirmation stands: 3/3 seeds, all above 3 SE. Nothing measured here since has
+touched it.
+
+### Outstanding from you, unchanged
+
+* The configuration count --- how many configurations were evaluated at transfer before the
+  winning one. Still the single number a reader will want and only you have it.
+* Whether the rho curve separates on the across-seed SE, not just the paired SE. You built that
+  in, so it should fall out of the report automatically.
