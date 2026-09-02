@@ -4237,3 +4237,54 @@ learning problem than a high one, at a fixed 8,000 episodes. If the curve slopes
 slope may be convergence rather than transfer. The check that separates them is cheap: plot
 in-regime window rate against rho alongside the transfer curve. If in-regime performance falls
 with rho in the same shape, the curve is at least partly measuring how far each arm got.
+
+## 2 Sep, 12:27 — the rho=1.00 CONTROL is in, at 200 episodes, and it loses as predicted
+
+Baselines landed 12:25. These are the plain-oracle policies -- the strongest in-regime arm in
+the whole fleet (mean success 0.980, mean hard SHD 0.00028, seed 1 scoring a literal 1.00 with
+zero structural error). Under genuine sampled evidence:
+
+    seed   learned   greedy    paired delta            verdict
+      0    0.06069   0.05064   +0.01005 +/- 0.00305    LOSES, 3.3 SE
+      1    0.04612   0.04979   -0.00367 +/- 0.00234    tied
+      2    0.06755   0.04495   +0.02261 +/- 0.00281    LOSES, 8.0 SE
+
+**Two of three lose significantly; the third ties; none win.** Mean +0.00966.
+
+This independently reproduces `FINDINGS_2026_08_27` and my own single-seed `p10` row
+(+0.02686), now at 200 episodes with paired intervals and three seeds. The control is doing
+its job: the best in-regime policies we have are beaten by a myopic rule the moment the
+evidence becomes finite-sample.
+
+**A conservatism worth noting.** `rho_curve_report.py` reports this row as **tied**, not as a
+loss, because it tests the across-SEED spread (mean +0.00966, seed SE 0.00759) rather than the
+within-cell paired SE. Seed 1 pulls the mean back and n=3 makes that test strict. Per-seed the
+individual results are 3.3 and 8.0 SE; across seeds they are not jointly significant. I am
+leaving the stricter test as the headline because it is the one that governs whether two RATES
+differ, and I would rather the curve under-claim.
+
+### The bar this sets
+
+Last night's rho=0.85 policy scored **-0.01197 +/- 0.00495**. If the rho=0.85 arm reproduces
+that here, the swing from rho=1.00 to rho=0.85 is **~0.022**, which is roughly 3x the seed SE
+and would put the dose-response well outside noise.
+
+### Pipeline is self-driving now
+
+Daemon fired 12:26:32, evaluating 7 cells (rho=0.85 x1, rho=0.90 x3, rho=0.95 x3) at 2
+workers, **endpoints-first so rho=0.85 goes first**. Training continues in parallel at 10/21.
+The curve refreshes to `logs/power/rho/CURVE_latest.txt` after every batch, so a partial result
+is always readable without waiting for all 21.
+
+### Costing correction
+
+My transfer ETA was wrong and I want it on record. I costed 6.5 CPU-s per episode-arm from
+last night's 40-episode run; the true figure is **at least 8.53**, 1.31x higher -- these
+rho=1.00 policies resolve less under sampled evidence and therefore spend more of the budget
+per episode. Each learned-only cell is ~1700 CPU-s, so the remaining 18 cells at 2 workers is
+**~4.3 h**, not the ~2.3 h I implied.
+
+If that is too slow, the lever is 100 episodes for the shoulder rates (0.95, 0.80, 0.70) while
+holding 200 on 1.00 / 0.85 / 0.50 -- half the cost where precision matters least. I am holding
+at 200 unless you want that trade; say so and I will change it in the daemon without
+restarting anything already finished.
