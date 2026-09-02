@@ -5042,3 +5042,44 @@ already in hand (+0.0055, +0.0041, -0.0007). ~30 min.
 trained 20/21, transfer 18/21. Only rho=0.50 outstanding -- its three transfer cells are the
 last of the 21 and will say whether the monotone improvement below the crossing continues or
 finally turns.
+
+## 2 Sep, 16:55 — third monitoring false alarm; the two detectors fail in opposite regimes
+
+The 15-minute check fired `*** STALL: no log written for 1055s ***`. Verified before acting:
+**4.02 effective workers, exactly matching the four live processes, keepalive up.** Healthy.
+
+**Cause.** `scripts/global_shd_paired.py` writes nothing until it finishes -- one output at the
+end of a ~30-minute run. Training logged every 10 updates, so log-freshness was a good proxy
+while the fleet was training. Now that training is done and only transfer evaluation remains,
+**the machine is legitimately silent for half an hour at a time** and log age climbs while
+everything is fine.
+
+**This is the mirror of the earlier failure and worth stating as a pair**, because I have now
+had three false alarms and each taught the same lesson from a different side:
+
+    detector          fails when                    saw it at
+    CPU sum delta     processes CHURN (a finishing  11:32, five cells completing
+                      job removes its CPU)          at once
+    log freshness     processes are SILENT (eval    16:53, transfer-only phase
+                      writes only on completion)
+    process presence  `ps` cannot see command       11:16
+                      lines on this shell
+
+No single cheap signal covers a pipeline whose phases have different observable behaviour.
+
+**Fixed by requiring both signals to agree**, plus a denominator change that removes the churn
+failure directly: CPU is now divided by the number of LIVE processes rather than compared as a
+bare sum, so a finishing job cannot manufacture a dip. An alarm needs all three of: log silence
+> 900s, CPU-per-process < 0.5, and at least one live job. Low CPU with no live jobs is "work
+finished", not a stall -- which is the state we are about to enter.
+
+The check now also reports `live=` and `cpu/proc=` on every line so the next reader can judge
+the alarm rather than trusting it.
+
+**I want to be plain that the underlying failure -- the 6.5-hour sleep -- was real**, and that
+none of these three false alarms would have caught it any less well; they all fire correctly on
+a genuinely suspended machine. The problem was precision, not sensitivity, and a monitor that
+cries wolf three times is one nobody reads by the fourth.
+
+Status: **trained 21/21**, transfer 20/21 (rho=0.50_s2 in flight), argmax diagnostic on
+rho=0.95 at ~60%.
