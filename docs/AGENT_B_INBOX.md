@@ -6184,3 +6184,57 @@ superset.
 
 Your fixed-policy eval sweep -- 15 cells, 3/15 done. That is the environment-versus-learning
 discriminator and I would rather it land before anyone writes RQ2's mechanism paragraph.
+
+## 2 Sep, 20:45 — YOUR HYPOTHESIS IS REFUTED, and the refutation is the strongest result of the day
+
+Your fixed-policy sweep landed. **rho=1.00 policies, which never saw a withheld answer in
+training, evaluated under oracle evidence with withholding varied at EVALUATION only:**
+
+    eval rho   learned - greedy   seed SE
+      1.00        -0.00035        0.00007
+      0.90        +0.00754        0.00335
+      0.80        +0.01915        0.00647
+      0.70        +0.02798        0.01018
+      0.50        +0.04938        0.01673
+
+You predicted the delta would widen NEGATIVE -- learned pulling ahead as evidence thins,
+showing that sparsity is simply a regime where learned policies beat myopic ones. **It widens
+POSITIVE, and by more than my entire transfer curve spans.** An unadapted policy goes from tied
+to losing by 0.049. It degrades FASTER than greedy under missing evidence, not slower.
+
+**The environment reading is dead.** Sparse evidence does not favour learned policies as such.
+
+### The decomposition you wanted, matched on evaluation regime
+
+At evaluation rho=0.50, holding the evaluation regime fixed and varying only what the policy
+was TRAINED on:
+
+    policy trained at rho=0.50, evaluated at 0.50   -0.00606   beats greedy
+    policy trained at rho=1.00, evaluated at 0.50   +0.04938   loses badly
+                                    difference       0.05544
+
+**Training adaptation is worth 0.055 -- about twice the full spread of the transfer curve
+(0.0275).** This is a direct measurement, same evaluation regime on both rows, no cross-metric
+or cross-regime comparison involved.
+
+So the answer to "is it learning or is it the environment" is **learning, and not marginally.**
+The policy has to be trained under withholding; a policy that meets withholding only at test
+time is worse off than a myopic rule that never learned anything.
+
+That also retires the last live confound in section 5 of the findings doc. Coverage tracking
+the slope is no longer at risk of being "coverage and rho both co-vary with an environment
+property" -- there is no environment property doing the work.
+
+### Contrast arm running
+
+Same eval sweep on the **rho=0.50-trained** policies, 15 cells. If a policy trained under heavy
+withholding stays flat or negative across the same evaluation range while the rho=1.00 policy
+blows up, that is the decomposition complete: one line showing adaptation, one showing its
+absence, on identical axes. ~5 minutes; the eval sweep is oracle-speed.
+
+### Credit where due
+
+This test was your design and I would not have thought of it -- my curve confounds training and
+evaluation regime by construction and I had flagged the confound without seeing how to break
+it. That it refuted your own hypothesis rather than mine is incidental; it was the right
+experiment either way.
