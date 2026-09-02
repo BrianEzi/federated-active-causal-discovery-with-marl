@@ -43,7 +43,7 @@ from ma.policy import IndependentPPO                                   # noqa: E
 from scripts.rescore_from_config import env_from_config                # noqa: E402
 
 
-def play(env, policies, episodes: int, seed: int) -> Dict[str, List[float]]:
+def play(env, policies, episodes: int, seed: int, path: int = 0) -> Dict[str, List[float]]:
     """One arm over `episodes` fixed seeds. Returns per-episode hard and soft global SHD.
 
     THE TORCH RNG IS SEEDED HERE, AND IT WAS NOT UNTIL 2026-09-02. A learned policy evaluated
@@ -63,7 +63,16 @@ def play(env, policies, episodes: int, seed: int) -> Dict[str, List[float]]:
     bit-for-bit.
     """
     import torch
-    torch.manual_seed(seed)
+    # `path` selects WHICH sample path, following ma/evaluate.py::run_arm_paths. Seeding makes
+    # an evaluation reproducible; it does NOT make the policy deterministic, and a single path
+    # is one draw from a stochastic policy. The paired standard error computed below is taken
+    # over episodes within one path, so it captures graph variance and EXCLUDES policy
+    # stochasticity. Vary --path with everything else held fixed to measure the part it misses.
+    # path=0 MUST keep the plain `seed`, not `seed * 1_000`. Every measurement taken on the
+    # night of 2 Sep used the plain form, and changing the default formula would silently
+    # invalidate all of them -- while a fleet was mid-run, producing exactly the mixed
+    # pre/post set that this file's history already shows is worse than a stale one.
+    torch.manual_seed(seed if path == 0 else seed * 1_000 + path)
     for policy in policies.values():
         if hasattr(policy, "reset"):
             policy.reset(seed)
@@ -110,6 +119,10 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
+    ap.add_argument("--path", type=int, default=0,
+                    help="policy sample path. Same episodes, different action draws. Holding "
+                         "everything else fixed and varying this measures the variance the "
+                         "within-path paired SE excludes.")
     ap.add_argument("--out", default="results/global_shd_paired.json")
     # THE 3x SAVING, and the identity that licenses it. Greedy and random_vary do not read the
     # trained policy, so for a fixed (cell, seed, episodes, evidence) they replay identical
@@ -163,7 +176,7 @@ def main(argv=None) -> int:
                               for a in env.topology.agents}
             arms["random_vary"] = {a: RandomAgent(a, use_seed, allow_clamp=False)
                                    for a in env.topology.agents}
-        rows = {label: play(env, policies, args.episodes, use_seed)
+        rows = {label: play(env, policies, args.episodes, use_seed, args.path)
                 for label, policies in arms.items()}
 
         if args.arms == "learned":
