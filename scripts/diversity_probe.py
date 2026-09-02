@@ -28,7 +28,14 @@ def build_env(args) -> TwoAgentEnv:
                       belief_backend="factored", policy_arch="gnn_portable",
                       episode_mix="confounded", reward_criterion="claims", claim_bar=1.0,
                       per_agent_reward=True, graph_model=args.graph_model, sf_m=args.sf_m,
-                      vs_evidence=args.vs_evidence, vs_evidence_power=args.evidence_power)
+                      vs_evidence=args.vs_evidence, vs_evidence_power=args.evidence_power,
+                      # THE OBSERVATION FLAGS CHANGE obs_size, so a checkpoint trained with
+                      # them refuses to load into an env built without them -- the error is a
+                      # torch shape mismatch (79 against 77), not anything about evidence.
+                      # Exposed as flags rather than hardcoded because this script is also
+                      # used on older checkpoints that predate both.
+                      observe_belief_channels=args.observe_belief_channels,
+                      observe_reprobe_signal=args.observe_reprobe_signal)
     return TwoAgentEnv(config)
 
 
@@ -81,6 +88,10 @@ def main(argv=None) -> dict:
     ap.add_argument("--sf_m", type=int, default=2)
     ap.add_argument("--vs_evidence", default="sampled", choices=["oracle", "sampled"])
     ap.add_argument("--evidence_power", type=float, default=1.0)
+    ap.add_argument("--observe_belief_channels", action="store_true",
+                    help="must match the checkpoint's training config or load fails on shape")
+    ap.add_argument("--observe_reprobe_signal", action="store_true",
+                    help="must match the checkpoint's training config or load fails on shape")
     ap.add_argument("--policy", default=None, help="a .pt from scripts/ma_train.py; omit for baselines only")
     ap.add_argument("--episodes", type=int, default=60)
     ap.add_argument("--seed", type=int, default=0)

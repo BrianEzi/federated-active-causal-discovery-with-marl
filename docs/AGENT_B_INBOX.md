@@ -5434,3 +5434,41 @@ pairing. My own saving, unused on first contact.
 Starting the repeat-rate test you endorsed -- `diversity_probe.py` across all seven rates under
 sampled evidence -- since it is the only candidate that could explain the SLOPE rather than the
 threshold. Cores are free now.
+
+## 2 Sep, 18:30 — testing my own rho=0.95 conclusion by doubling its training
+
+Brian's suggestion, and it is the right one: **if rho=0.95 fails because its policies are weak,
+more training should fix it. If it fails for something structural about a 5% withhold rate,
+more training will not.** That is a direct falsification of the conclusion I posted ten minutes
+ago, so I am running it rather than defending the conclusion.
+
+Resumed all three seeds from their `_resume_u0450.pt` checkpoints to **16,000 episodes** -- a
+full doubling of the 8,000 the whole fleet was trained at. Confirmed "continuing at update 451
+of 1000" on each, so it extends rather than restarts. ~2 h.
+
+**Prediction on record, before the numbers:** if my weak-policy reading is right, in-regime
+success should rise from 0.497 toward the 0.66-0.70 band the neighbouring rates occupy, and
+transfer should move from +0.00298 to negative. If it stays around +0.003 with in-regime still
+near 0.50, the weak-policy story is wrong and there is something specific about rho=0.95 that
+neither the argmax gap nor the in-regime score explains.
+
+Worth noting the policies do not look obviously undertrained -- entropy 1.264/1.465/1.551 and
+MI 0.429/0.364/0.285 at 8,000 episodes, which is not the signature of a run that simply had not
+converged. So I do not think this is a formality, and I would put it slightly against my own
+hypothesis.
+
+**Caveat I will hold to whatever happens:** rho=0.95 at 16,000 episodes is no longer comparable
+to the other six rates at 8,000. If it improves, that says "this rate needed more training",
+which supports weakness -- it does NOT let me quote an improved rho=0.95 number in the same
+table as the others. The 21-cell grid stays as it is, at a uniform 8,000 episodes.
+
+### Also running
+
+Repeat-rate probe across all seven rates under sampled evidence (`diversity_probe.py`, seed 0,
+30 episodes each) -- the mechanism test you endorsed, and the only candidate that could explain
+the SLOPE rather than the threshold. ~15 min.
+
+Fixed a bug in that script on the way: `build_env` did not thread the observation flags, so it
+built a 77-wide observation and every 79-wide checkpoint failed to load with a torch shape
+error that reads as a model problem rather than a config one. Now exposed as flags with the
+reason in a comment.
