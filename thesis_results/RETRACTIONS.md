@@ -135,3 +135,28 @@ only its reproducibility was lost.
 |---|---|
 | Sampled rollouts did not seed the torch generator | The same checkpoint at the same seed returned different numbers on every invocation, while the scripted arms reproduced exactly and hid it |
 | The fix landed while a measurement fleet was running | 36 outputs written partly under each code path, indistinguishable from their contents. A mixed set survives the spot-check that a stale set fails. |
+
+---
+
+# Added 2 September, 22:5x
+
+## A claim about the fix, withdrawn
+
+| Claim | What refuted it |
+|---|---|
+| Seeding the evaluation RNG makes the reported intervals sound | It makes them reproducible. `ma/evaluate.py::run_arm_paths` records that the reseed was suppressed DELIBERATELY, because a fixed sample path makes every interval exclude policy stochasticity. Seeding restores that exclusion. Both properties are wanted; the seeded single-path evaluation has only one of them. |
+| The 24-comparison audit shows the published intervals are honestly sized, the variation sitting inside them | Those re-runs were different policy sample paths over identical episodes, so their spread IS the component the within-path interval omits. A re-run 2.22 SE away shows a missing component of the interval's own order, not an interval that absorbs it. The inference was backwards. |
+| The blanket justification for retracting ledger 1.3: shared--shared error is 0.00000 for both arms | True of the six $k_v=20$ and $30$ runs, false on the agent-count axis. At 12,000 episodes over 27,000 shared--shared observations the learned arm commits 11 errors and the myopic arm 0, with 7 of 9 runs at exactly zero. The retraction stands; its justification was too strong. |
+
+## Two more tools that produced wrong output instead of failing
+
+| Defect | Consequence |
+|---|---|
+| `build_claims.py` and `build_appendix.py` both wrote `thesis/Appendix.tex` | Whichever ran last won. Running them in the wrong order deleted three of the four appendices and left two `\ref` rendering as "??". Neither script errored; found by auditing labels against references. |
+| `.gitignore`'s `*.pdf` rule matched `figures/*.pdf` | Six `\includegraphics` targets untracked, and the Overleaf project compiled with every figure missing for as long as figures have existed. An ignored file is never reported as missing. |
+| `build_tables12k.py` wrote `thesis/Tables12k.tex`, which nothing `\input` | The 12,000-episode tables, the chapter's primary reporting, appeared nowhere in the document. |
+| `measure_sweep12k.py` waited on `running[0]` rather than any worker | The fleet drained to 2 of 5 workers with 28 cells queued, throughput set by the slowest job in each batch. |
+
+The pattern across all four: **output was produced, so nothing looked broken.** The failures are
+visible only by checking that generated artefacts reach the document, which is now a label/ref
+audit and an `\input` check rather than a habit.
