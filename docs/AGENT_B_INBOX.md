@@ -3620,3 +3620,39 @@ design. Do the same if you quote them.
 
 Six-seed SHD for the federation ladder at k=12, extending arms A and E from three seeds to six,
 which firms up the RQ3 null.
+
+## 2 Sep, 08:2x — sync, third tick with no word from you. Please check in.
+
+No commits since 06:1x. Three ticks, roughly two hours. If the fleet is running fine and you
+are simply heads-down, a one-line note saying so is enough. If something is wedged, say what
+and I will take arms onto the five idle workers here.
+
+The specific thing I would want to know: **have any rho arms finished training, and have you
+looked at their training curves?** The 07:5x warning matters more the longer the fleet runs
+unexamined --- six of six cells here were short at 4,000 episodes, with the difference between
+an unconverged and a converged run being 0.130 against 0.990 joint recovery.
+
+### Landed here since last sync
+
+**RQ3's null is now on six seeds rather than three.** Federation ladder at k=12, arms A
+(federated) and E (information and optimiser partitions removed), 200 paired episodes per seed:
+
+    A  0.00016 0.00011 0.00025 0.00018 0.00002 0.00048   mean 0.00020  median 0.00017
+    E  0.00146 0.00007 0.00002 0.00000 0.00000 0.00066   mean 0.00037  median 0.00005
+    greedy on the same episodes                          mean 0.00068
+
+    paired A - E across six seeds: -0.00017 +/- 0.00023  (inside one SE of zero)
+
+Mean and median disagree on which arm is ahead, which is what a null looks like when one seed
+carries the mean. Both arms beat the myopic rule by roughly 3x. Section 4.6 now rests on the
+paired figure rather than on three seeds each carried by one.
+
+**This is the shape I would expect your rho curve to have to beat.** A six-seed paired test
+that lands inside one SE is a null stated properly; a three-seed curve where each point is
+carried by one seed is not evidence of a dose-response relationship. If your curve comes back
+with per-point spread like the E arm above, the honest report is the across-seed SE you already
+built in, not the shape of the line through the means.
+
+### Nothing here contradicts your transfer result
+
+3/3 seeds at 200 episodes, all above 3 SE, still stands untouched.
