@@ -195,22 +195,46 @@ out += ["", f"6 runs, 200 episodes, `_best.pt`. "
 # properly at 12,000 episodes the effect is real in direction and negligible in size, which
 # is a better defence of the retraction than a blanket zero that does not hold everywhere.
 pc12 = ROOT / "results/shd_by_class_naxis_12k.json"
-if pc12.exists():
-    n12 = json.loads(pc12.read_text())
-    obs = sum(e["arms"]["learned"]["n_shared"] for e in n12)
-    errL = sum(e["arms"]["learned"]["shared_shared"] * e["arms"]["learned"]["n_shared"] for e in n12)
-    errG = sum(e["arms"]["greedy"]["shared_shared"] * e["arms"]["greedy"]["n_shared"] for e in n12)
-    zero = sum(1 for e in n12 if e["arms"]["learned"]["shared_shared"] == 0)
-    out += ["### C3a — the same question at 12,000 episodes, on the agent-count axis", "",
-            f"* {obs:,} shared-shared pair observations over {len(n12)} converged runs",
-            f"* learned commits **{errL:.0f}** errors on them; myopic commits **{errG:.0f}**",
-            f"* {zero} of {len(n12)} runs are at exactly zero; every error sits in one cell",
+pc04 = ROOT / "results/shd_by_class_naxis_det.json"
+if pc12.exists() and pc04.exists():
+    def tally(path):
+        d = json.loads(path.read_text())
+        t = {}
+        for arm in ("learned", "greedy", "random"):
+            t[arm] = (sum(e["arms"][arm]["private_incident"] * e["arms"][arm]["n_private"] for e in d),
+                      sum(e["arms"][arm]["n_private"] for e in d),
+                      sum(e["arms"][arm]["shared_shared"] * e["arms"][arm]["n_shared"] for e in d),
+                      sum(e["arms"][arm]["n_shared"] for e in d))
+        return t, len(d)
+    t4, n4 = tally(pc04)
+    t12, n12 = tally(pc12)
+    out += ["### C3a — training acts on the rewarded class and not on the other", "",
+            "| budget | arm | rewarded errors | unrewarded errors |", "|---|---|---|---|"]
+    for lbl, t in (("4,000", t4), ("12,000", t12)):
+        for arm in ("learned", "greedy"):
+            out.append(f"| {lbl} | {arm} | {t[arm][0]:.0f} / {t[arm][1]:,} | "
+                       f"{t[arm][2]:.0f} / {t[arm][3]:,} |")
+    out += [f"| either | random | {t4['random'][0]:.0f} / {t4['random'][1]:,} | "
+            f"{t4['random'][2]:.0f} / {t4['random'][3]:,} |", "",
+            f"{n12} runs on the agent-count axis, three seeds per cell, 200 episodes each, "
+            "selected checkpoint. The myopic and random arms do not train and are identical at "
+            "both budgets, which is what makes this controlled.", "",
+            f"**Tripling the budget cuts rewarded-class errors {t4['learned'][0]/t12['learned'][0]:.1f}x "
+            f"({t4['learned'][0]:.0f} to {t12['learned'][0]:.0f}) and leaves the unrewarded class "
+            f"at {t12['learned'][2]:.0f}.** At 4,000 episodes the learned arm is worse than the "
+            "myopic rule on both classes; at 12,000 it is better on the class it is scored on "
+            "and unchanged on the class it is not.",
             "",
-            "**Correction to C3's justification.** 'Zero for both arms' holds for the six k=20",
-            "and k=30 runs and does NOT hold on the agent-count axis. The asymmetry exists and",
-            "is in the predicted direction. It is also 11 errors in 27,000 observations, so it",
-            "cannot carry a claim about the policy neglecting what it is not paid for.",
-            "**MUST NOT** revive ledger 1.3 from this. **MUST NOT** state the blanket zero.", ""]
+            "**MUST quote the magnitude with the claim.** 11 errors in 27,000 observations is "
+            "0.04%. The asymmetry is real in direction and immaterial in size, and a sentence "
+            "that gives the direction without the size overstates it.",
+            "**MUST NOT** say the unrewarded class is exactly unchanged. With 11 events the "
+            "Poisson SE is about 3.3, so this is no DETECTABLE change; an effect under roughly "
+            "3 errors would be invisible here.",
+            "**MUST NOT** read anything into which cells carry the errors. The eleven sit in "
+            "entirely different runs at the two budgets.",
+            "**MUST NOT** restore the blanket 'zero for both arms' justification. It holds for "
+            "the six $k_v=20$ and $30$ runs and nowhere else.", ""]
 
 # --- RQ3 ------------------------------------------------------------------------------------
 A = fed("shd_A.json") + fed("shd_A_s345.json")

@@ -114,6 +114,24 @@ def appendix_budget():
                         f"{np.mean(vg):.5f} \\\\")
         note = ("\n\\textbf{Not yet measured:} " +
                 ", ".join(f"\\texttt{{{c}}}" for c in skipped) + ".\n") if skipped else ""
+        # Count the direction of the move so the paragraph beneath the table states what the
+        # table shows rather than what the reader is expected to infer from eighteen rows.
+        better = worse = same = ahead8 = ahead12 = 0
+        for r in rows:
+            f = [c.strip() for c in r.replace("\\\\", "").split("&")]
+            v8, v12, vg = float(f[1]), float(f[2]), float(f[3])
+            better += v12 < v8
+            worse += v12 > v8
+            same += v12 == v8
+            ahead8 += v8 < vg
+            ahead12 += v12 < vg
+        note += (f"\n{better} of the {len(rows)} cells improve between $8{{,}}000$ and "
+                 f"$12{{,}}000$ episodes, {worse} get worse and {same} is unchanged. The count "
+                 f"with the learned mean below the myopic rule moves from {ahead8} to "
+                 f"{ahead12}. Most of the gain over the sweep's $4{{,}}000$ episodes is "
+                 f"therefore already present at $8{{,}}000$, and the last third of training "
+                 f"buys a small net improvement against run-to-run movement of comparable "
+                 f"size. $12{{,}}000$ is reported as sufficient rather than as a threshold.\n")
         eight_tbl = tbl("Structural distance at 8{,}000 against 12{,}000 episodes, same runs, "
                         "same seeds, selected checkpoint throughout.", "tab:eightk", "lccc",
                         r"Cell & 8{,}000 ep & 12{,}000 ep & Myopic \\", rows, note)
@@ -198,9 +216,16 @@ def appendix_ablations():
             + tbl("Turn-aware credit assignment at $k_v=8$, three seeds per cell. The effect "
                   "appears only under federation and does not replicate at $k_v=12$.",
                   "tab:credit", "lcc", r"Configuration & Seeds & SHD \\", body)
-            + "\n" + tbl("Adding an attribution term to the training reward, $k_v=12$, four "
-                         "agents. Joint recovery collapses relative to the myopic rule on the "
-                         "same cell.", "tab:attrreward", "lcc",
+            # CORRECTED 2 Sep 22:xx. This table was captioned "adding an attribution term to
+            # the training reward". It is not that experiment. Every run in results/attr_train
+            # has reward_criterion="claims" and observe_owner_channel=False; the trainer accepts
+            # only "claims" and "u14" and neither scores attribution. What varies here is the
+            # BELIEF BACKEND, component_attributed against the sweep's factored. No policy in
+            # this project was ever trained on an attribution objective.
+            + "\n" + tbl("Training under the attribution belief backend, $k_v=12$, four agents, "
+                         "$4{,}000$ episodes, scored on the structural criterion. The reward is "
+                         "unchanged from the sweep; only the belief representation differs.",
+                         "tab:attrbackend", "lcc",
                          r"Seed & Learned & Myopic \\", arows))
 
 

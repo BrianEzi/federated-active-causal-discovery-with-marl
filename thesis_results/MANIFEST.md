@@ -167,8 +167,8 @@ Regenerate with: `scripts/build_sweep12k.py to generate jobs, then scripts/measu
 | `shd_final__k12s50n04b200.json` | `5b0e70d7e8bd0e4c` | `results/sweep12k/shd_final/k12s50n04b200.json` |
 | `shd_final__k12s50n04b500.json` | `544c8e9a3940cf0e` | `results/sweep12k/shd_final/k12s50n04b500.json` |
 | `shd_final__k12s50n05b150.json` | `43a72825430126f7` | `results/sweep12k/shd_final/k12s50n05b150.json` |
-| `k12s50n08b150.json` | `e02e06957c21b868` | `results/sweep12k/shd_final/k12s50n08b150.json` |
-| `k12s50n10b150.json` | `70548377582aadb2` | `results/sweep12k/shd_final/k12s50n10b150.json` |
+| `shd_final__k12s50n08b150.json` | `e02e06957c21b868` | `results/sweep12k/shd_final/k12s50n08b150.json` |
+| `shd_final__k12s50n10b150.json` | `70548377582aadb2` | `results/sweep12k/shd_final/k12s50n10b150.json` |
 | `shd_final__k12s75n02b150.json` | `286682671e785991` | `results/sweep12k/shd_final/k12s75n02b150.json` |
 | `shd_final__k12s75n04b150.json` | `08896e6c55488d97` | `results/sweep12k/shd_final/k12s75n04b150.json` |
 | `shd_final__k12s75n08b150.json` | `c8e6a0e2ce230d0e` | `results/sweep12k/shd_final/k12s75n08b150.json` |
@@ -185,14 +185,17 @@ Regenerate with: `scripts/build_sweep12k.py to generate jobs, then scripts/measu
 | `shd_u0500__k12s50n04b200.json` | `2ad5ec457eaa956b` | `results/sweep12k/shd_u0500/k12s50n04b200.json` |
 | `shd_u0500__k12s50n04b500.json` | `e9ef89ba1eced374` | `results/sweep12k/shd_u0500/k12s50n04b500.json` |
 | `shd_u0500__k12s50n05b150.json` | `8764eb151a982c5d` | `results/sweep12k/shd_u0500/k12s50n05b150.json` |
+| `shd_u0500__k12s50n08b150.json` | `626c23dc5e696f2c` | `results/sweep12k/shd_u0500/k12s50n08b150.json` |
+| `shd_u0500__k12s50n10b150.json` | `56b49aac8ba90d6e` | `results/sweep12k/shd_u0500/k12s50n10b150.json` |
 | `shd_u0500__k12s75n02b150.json` | `a7bca6d023b69d49` | `results/sweep12k/shd_u0500/k12s75n02b150.json` |
 | `shd_u0500__k12s75n04b150.json` | `85ee3518973509fa` | `results/sweep12k/shd_u0500/k12s75n04b150.json` |
+| `shd_u0500__k12s75n08b150.json` | `2c19065afb8d90d6` | `results/sweep12k/shd_u0500/k12s75n08b150.json` |
 | `shd_n05_12k.json` | `2765890352ab4825` | `results/longcheck/shd_n05_12k.json` |
 | `shd_n08_12k.json` | `e226be006e03aede` | `results/longcheck/shd_n08_12k.json` |
 | `shd_n10_12k.json` | `79711fe5ef3b1d09` | `results/longcheck/shd_n10_12k.json` |
 | `shd_s75_12k.json` | `4fe3ca6da8ae32d2` | `results/longcheck/shd_s75_12k.json` |
 
-105 files.
+108 files.
 
 ## `checkpoint/` — 4.1.1 and 4.2 (RQ1), figure checkpoint
 

@@ -99,17 +99,24 @@ by a comparison that treated a tie as a change of winner.
 6 runs, 200 episodes, `_best.pt`. 1,140,000 private-incident and 90,000 shared-shared observations.
 **MUST NOT** write the reward-alignment asymmetry (ledger 1.3). RETRACTED.
 
-### C3a — the same question at 12,000 episodes, on the agent-count axis
+### C3a — training acts on the rewarded class and not on the other
 
-* 27,000 shared-shared pair observations over 9 converged runs
-* learned commits **11** errors on them; myopic commits **0**
-* 7 of 9 runs are at exactly zero; every error sits in one cell
+| budget | arm | rewarded errors | unrewarded errors |
+|---|---|---|---|
+| 4,000 | learned | 487 / 673,200 | 11 / 27,000 |
+| 4,000 | greedy | 213 / 673,200 | 0 / 27,000 |
+| 12,000 | learned | 125 / 673,200 | 11 / 27,000 |
+| 12,000 | greedy | 213 / 673,200 | 0 / 27,000 |
+| either | random | 18141 / 673,200 | 28 / 27,000 |
 
-**Correction to C3's justification.** 'Zero for both arms' holds for the six k=20
-and k=30 runs and does NOT hold on the agent-count axis. The asymmetry exists and
-is in the predicted direction. It is also 11 errors in 27,000 observations, so it
-cannot carry a claim about the policy neglecting what it is not paid for.
-**MUST NOT** revive ledger 1.3 from this. **MUST NOT** state the blanket zero.
+9 runs on the agent-count axis, three seeds per cell, 200 episodes each, selected checkpoint. The myopic and random arms do not train and are identical at both budgets, which is what makes this controlled.
+
+**Tripling the budget cuts rewarded-class errors 3.9x (487 to 125) and leaves the unrewarded class at 11.** At 4,000 episodes the learned arm is worse than the myopic rule on both classes; at 12,000 it is better on the class it is scored on and unchanged on the class it is not.
+
+**MUST quote the magnitude with the claim.** 11 errors in 27,000 observations is 0.04%. The asymmetry is real in direction and immaterial in size, and a sentence that gives the direction without the size overstates it.
+**MUST NOT** say the unrewarded class is exactly unchanged. With 11 events the Poisson SE is about 3.3, so this is no DETECTABLE change; an effect under roughly 3 errors would be invisible here.
+**MUST NOT** read anything into which cells carry the errors. The eleven sit in entirely different runs at the two budgets.
+**MUST NOT** restore the blanket 'zero for both arms' justification. It holds for the six $k_v=20$ and $30$ runs and nowhere else.
 
 ## C4 — Federating information, reward and optimisation costs nothing measurable
 
