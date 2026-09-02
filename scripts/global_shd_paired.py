@@ -177,12 +177,25 @@ def main(argv=None) -> int:
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},
-                 # PER-EPISODE vectors, not just means, so a later `--arms learned` run can
-                 # pair against these exact episodes. Stored only when this run computed the
-                 # baselines itself; a learned-only run has nothing new to contribute.
-                 "rows": ({k: {m: [float(x) for x in v[m]]
-                               for m in ("hard", "soft", "resolved")}
-                           for k, v in rows.items()} if args.arms == "all" else None),
+                 # PER-EPISODE vectors, not just means. ALWAYS stored, including for
+                 # `--arms learned`.
+                 #
+                 # This was previously gated on `args.arms == "all"`, on the reasoning that a
+                 # learned-only run "has nothing new to contribute" -- which was wrong, and
+                 # cost 18 of the 21 answer-rate cells their working. The greedy and random
+                 # vectors are indeed reused from the baseline, but the LEARNED vector is
+                 # computed fresh in every run and is exactly what a reader needs to recompute
+                 # the paired standard error, inspect the resolved fraction, or re-derive the
+                 # comparison at a different episode count. Shipping means and a paired SE
+                 # without the per-episode data underneath gives the answer without the
+                 # working, which is a lower standard than the rest of this project meets.
+                 "rows": {k: {m: [float(x) for x in v[m]]
+                              for m in ("hard", "soft", "resolved")}
+                          for k, v in rows.items()},
+                 # Names the file the reused baseline arms came from, so a checker can confirm
+                 # the greedy/random vectors really are identical across rates rather than
+                 # taking the 3x saving on trust.
+                 "baseline_from": args.baseline_from,
                  "paired": {}}
         for other in ("greedy", "random_vary"):
             p = paired(rows["learned"]["hard"], rows[other]["hard"])

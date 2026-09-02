@@ -6125,3 +6125,62 @@ research questions meet.
 ### What I am NOT asking for
 
 The 40-60 core-hour matched sampled-training arm. Still the right call not to run it.
+
+## 2 Sep, 20:40 — your gap is REAL but it is my bug, not a missing push. Fixing and re-running.
+
+### First, the files are on origin
+
+Everything you listed is pushed and has been for a while -- please pull:
+
+    results/power/rho/xfer_rho*_s*.json      24 files on origin
+    results/power/rho/CURVE.json             on origin
+    results/power/rho/rho_curve.png          on origin, ALREADY REBUILT on hard SHD delta
+    results/power/rho/repeat/                21 files (coverage + repeat probes, 3 seeds)
+    results/power/rho/argmax/                 6 files (rho=0.95 diagnostic + rho=0.70 control)
+    results/power/rho/rho0.95_long*          12 files (the 16k doubling and its transfer)
+
+`logs/power/rho/` is empty for you because `.gitignore` line 15 excludes `*.log` -- deliberate,
+those are training console output and run to hundreds of MB. The result JSONs are exempted by
+`!results/**/*.json` on line 34.
+
+### But the substance of your complaint is correct, for a different reason
+
+You said CURVE.json gives the answer without the working. **The per-cell files have the same
+problem and I caused it.** `global_shd_paired.py` gated row storage on `args.arms == "all"`:
+
+    xfer_rho1.00_s*.json   rows PRESENT   200 episodes x 3 arms   (the 3 baselines)
+    the other 18 cells     rows: None
+
+I wrote that gate deliberately, with the comment "a learned-only run has nothing new to
+contribute". **That was wrong.** The greedy and random vectors are indeed reused, but the
+LEARNED vector is computed fresh in every run and is precisely what is needed to recompute the
+paired SE. So 18 of 21 cells ship a mean and an SE with nothing underneath them -- exactly the
+standard you are objecting to, one level down from where you looked.
+
+Every specific check you listed is blocked by this, not by CURVE.json:
+
+* recompute or verify a paired SE -- needs the learned per-episode vector
+* inspect the resolved fraction -- stored per-episode, so absent
+* re-derive at a different episode count -- needs the rows
+* confirm greedy is the identical vector across rates -- needs both sides
+
+### Fixed and re-running now
+
+`global_shd_paired.py` now always stores rows, and additionally records `baseline_from` so a
+checker can confirm the reused baseline rather than trusting the 3x saving. 18 cells
+re-emitting at 4 workers, ~2 h, into `results/power/rho/rerun/`.
+
+**The deltas must come back bit-identical** -- same checkpoint, seed, episode seeds and
+baseline. `scripts/verify_rerun.py` checks that, and separately re-derives each paired SE from
+the newly stored rows and compares it to the reported one. So this is a determinism test as
+well as a completeness fix: **if any delta moves, the paired-comparison assumption underneath
+the entire answer-rate result is wrong**, which would matter far more than the missing data.
+
+I will push the rerun directory and the verification output together. If verification passes I
+would suggest the rerun files replace the originals in `submission/`, since they are a strict
+superset.
+
+### Also in flight
+
+Your fixed-policy eval sweep -- 15 cells, 3/15 done. That is the environment-versus-learning
+discriminator and I would rather it land before anyone writes RQ2's mechanism paragraph.
