@@ -97,3 +97,114 @@ wedged one.** Worth a direct message when you wake.
 Seven uniform-budget retrains at K = 5, 8, 10, plus a probe of whether the contended-fraction
 reversal at sigma = 0.75 has the same cause. Its seed 2 sits at window rate 0.758 with joint
 recovery 0.660, which is the same signature as the two above.
+
+---
+
+# 22:00--22:3x — the determinism rebuild, and three defects it turned up
+
+## What the tick was for
+
+Re-measure everything the unseeded evaluation RNG touched, and correct in writing anything I
+had already told Brian or agent B that the new numbers contradict.
+
+## 1. The defect is repo-wide, and my advice about it was wrong
+
+Nineteen scripts load a policy and roll it out. Seventeen were unseeded. `global_shd_paired.py`
+was simply the first place anyone looked.
+
+Worse, I recommended against re-running on the grounds that every number would move by less
+than its own error bar. **That is true and the conclusion does not follow.** At $k_v=30$ all
+three per-seed differences moved by under one standard error, and the claim changed from two
+significant seeds to one. Significance is a threshold; a sub-standard-error shift crosses it.
+The cost estimate was also wrong: three hours, not the wholesale invalidation I assumed.
+
+Corrected in `FINDINGS_DETERMINISM_2026_09_02.md` and `RETRACTIONS.md` rather than edited away.
+
+## 2. What the re-measurement bought
+
+The myopic arm reproduced **to five decimal places at every $k_v$ and both checkpoints**
+(0.00611, 0.00082, 0.00077, 0.00053, 0.00042). Only the learned arm moved. So the episode
+pairing, the graph sequence and the belief update were bit-identical throughout: the paired
+comparison was always sound, and only its reproducibility was lost. That is a stronger appendix
+statement than the calibration argument it replaces.
+
+Agent B independently verified the fix is sufficient — two processes, all 180 per-episode values
+identical including the learned arm.
+
+## 3. Three defects found downstream, in order of how bad they would have been
+
+**No figure had ever reached Overleaf.** `thesis/.gitignore` carries `*.pdf` for build
+artifacts. It also matched `figures/*.pdf`, so all six `\includegraphics` targets were
+untracked and the project has been compiling with every figure missing. Fixed with a
+`!figures/*.pdf` exception; all six pushed. An ignored file never shows as missing in
+`git status`, which is why this survived so long.
+
+**An appendix table named an experiment that does not exist.** "Adding an attribution term to
+the training reward", three runs, 0.400 / 0.355 / 0.205 against the myopic rule's 0.945. Those
+runs have `reward_criterion="claims"` and `observe_owner_channel=False`. The trainer accepts
+`claims` and `u14`; neither scores attribution. Across all 435 runs in the repository, **not one
+was trained on an attribution objective**. What varies is the belief backend. Corrected at the
+generator, relabelled `tab:attrbackend`, and the Chapter 4 bullet carries the correction inline
+rather than being deleted. You raised exactly this objection two days ago; the text had not
+caught up.
+
+**The measurement fleet was mixed, not stale.** The fix landed at 21:15:49 while it was running,
+so 36 outputs were written partly under each code path with nothing in the numbers to tell them
+apart. A stale set announces itself on the first re-run; a mixed set survives a spot-check.
+Quarantined to the scratchpad, not deleted, and the fleet relaunched.
+
+## 4. Results that changed
+
+**$k_v=30$:** one seed of three separates from the myopic rule, not two. `CLAIMS.md` C1 updated
+and the old reading withdrawn.
+
+**$k_v=8$:** a new MUST NOT. The three seeds disagree ($-0.00016$ ns, $-0.00059$ significant,
+$+0.00096$ ns) and the mean is carried by seed 2, so no direction may be claimed there. The
+crossover sits between 8 and 12, and 8 is where it is ambiguous rather than the last cell the
+myopic rule wins.
+
+**RQ3, six seeds, deterministic:** federated 0.00021 mean / 0.00013 median, centralised 0.00058
+/ 0.00008, myopic 0.00068. Paired difference $-0.00037 \pm 0.00043$ across seeds. Five of six
+seeds indistinguishable; the sixth favours federation and is carried by an outlying centralised
+run rather than a strong federated one. At $k_v=20$ both arms are error-free across 600 episodes
+and the cell settles nothing. Per-seed table now in the chapter.
+
+**RQ4, verified and narrowed to your scope:** 14,076 observed latent groups across thirteen
+configurations, **zero incorrect attributions**. The two bounds separate on a single comparison
+— doubling the budget at seven peers moves two-child resolution from 63/1344 to 965/1344 and
+leaves every group of three or more children at exactly zero. A resource bound responds to
+resources; an identifiability bound does not.
+
+One correction to the story we had: `attr_ceiling.py` predicted the cliff would *vanish* at one
+peer, ownership being forced. It moves rather than vanishing — 76/76 at two children, 38/59 at
+three, 29/74 at four, zero from five on. So there is no two-child law. Written up in
+`FINDINGS_ATTRIBUTION_RQ4_2026_09_02.md`.
+
+## 5. Written
+
+* §4.8 negative and withdrawn results, in full — nineteen claims in five tables with the
+  measurement that refuted each. Checked against `WRITING_CRITIQUE.md`: zero tics on the
+  fourteen patterns it names.
+* §4.6 RQ3 updated with the six-seed per-seed table.
+* §4.7 RQ4: three defects corrected, and the by-group-size table added, which is the
+  identifiability evidence and was missing.
+* Introduction: the contributions list claimed BGe scoring, a two-agent partition, a 3.5x margin
+  and an 82--91% clamp allocation. None of that describes this work. Rewritten against
+  `CLAIMS.md`, seven items, every one traceable. **Emphasis is yours to set; I repaired facts.**
+* RQ1's evidence-spectrum clause now points at RQ2 instead of overlapping it.
+
+## 6. Still running at hand-off
+
+* The 12,000-episode fleet, 12 of 18 cells at both conventions. Early and **not to be quoted**:
+  $k_v=4$ appears to favour the learned arm at 12k where it favoured the myopic rule at 4k, and
+  `k12s50n02b150` is an outlier at ratio 16. Both need the complete run.
+* Pair-class at 12k, 8 of 9, plus a deterministic 4k comparator behind it. This tests whether
+  the unrewarded-pair error is undertraining or reward alignment. The partial output points
+  both ways, so I am holding.
+* Agent B's 21-cell answer-rate grid, due about 00:20. `CLAIMS.md` C6 reads NOT YET AVAILABLE
+  and will keep saying so until it lands. **RQ2 is a whole Results section with nothing in it.**
+
+## 7. For you
+
+The structure contract is `docs/THESIS_STRUCTURE_CONTRACT.md`, and agent C has been pointed at
+it. Discussion and the interpretive parts of Results are untouched and left for you.
