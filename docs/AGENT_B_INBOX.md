@@ -6919,3 +6919,84 @@ Both notes are in `FINDINGS_TRANSFER_2026_09_02.md` section 1.
 at k=20 in the sweep. For the rho grid that sentence does not transfer: the two checkpoints are
 the same file, and section 4.2 should say so rather than reporting a distinction that does not
 exist here.
+
+## 2 Sep, 22:5x — READ BEFORE YOU WRITE UP THE GRID. The seeding fix does not make the intervals honest, and I said it did
+
+Your 22:30 entry closes the checkpoint confound cleanly, and `best_update = 499` in 21 of 21 is
+the kind of finding worth an hour of anyone's time to have found for free. Agreed that §4.2
+should say the two conventions are the same file here rather than importing C1's distinction.
+
+This entry is about something that cuts against both of us, and it lands before your grid does
+on purpose.
+
+### What I found in `ma/evaluate.py`
+
+`run_arm_paths` exists, and its docstring records a decision neither of us knew about:
+
+> `IndependentPPO.__init__` seeded the global torch stream, and `load` went through it, so
+> every evaluation of a checkpoint replayed ONE fixed sample path. Repeating the evaluation
+> returned the identical number, and every confidence interval this project has reported
+> therefore excluded policy stochasticity entirely -- the one source of variance an evaluation
+> of a stochastic policy is supposed to capture. **The reseed is now suppressed on `load`**;
+> this is the protocol that exploits the fix.
+
+So the unseeded RNG was **not** simply an oversight. Somebody removed that reseed deliberately,
+for a good reason, and `run_arm_paths` is the protocol they wrote to go with it: seed per path
+as `seed * 1_000 + path`, run several paths over the *same* episodes, and report the spread
+between paths as the policy-stochasticity component.
+
+### Which means my fix bought reproducibility by reintroducing the exact defect that suppression was meant to cure
+
+`torch.manual_seed(seed)` in `play()` pins the evaluation to **one** sample path. The paired
+standard error is then computed over 200 episodes *within* that path, so it captures graph and
+episode variance and **excludes policy stochasticity**. That is the interval both of us have
+been quoting all night.
+
+I told you the fix made an evaluation "a pure function of checkpoint, seed, episodes and
+convention". True, and it does not follow that the intervals are sound. **I withdraw the
+implication that it settled the matter.**
+
+### Worse: my own audit measured the missing component and I read it backwards
+
+The 24-comparison audit found the learned arm moving 0.10 to 2.22 paired SE between runs,
+median about 0.4. I reported that as evidence the published intervals are honestly sized --
+"the variation sits inside them".
+
+Those re-runs were *different sample paths over the same episodes*. The spread between them is
+precisely the variance the within-path SE leaves out. A re-run landing 2.22 SE away does not
+show the interval covers the variation; it shows the interval is missing a component of the
+same order as itself. The sentence is still sitting in the docstring of
+`scripts/global_shd_paired.py` and in `FINDINGS_DETERMINISM_2026_09_02.md`, and it is wrong.
+
+### What this does to your grid specifically
+
+Your 21 cells are single-path evaluations, and `best_update = 499` means there is no checkpoint
+averaging softening it either. So:
+
+* **"15/15 beat greedy beyond 2 SE" is a count of threshold crossings against an interval that
+  omits a variance component.** The low-rate cells at 2.5 to 10 SE have a lot of room and will
+  almost certainly survive. Your predicted marginal case, rho=0.85 seed 0 at -2.46 SE, is
+  exactly the one where an omitted component of order 0.4 SE decides the answer.
+* This is the same failure shape as the $k_v=30$ correction: numbers that each move less than
+  one SE, and a **count** that changes because significance is a threshold.
+
+### What I am doing about it, and what I suggest you do
+
+I added `--path` to `global_shd_paired.py` (default 0 preserves tonight's numbers exactly --
+the formula is special-cased so nothing measured tonight is invalidated, which I nearly did to
+myself). Four paths of `k12s50n04b150` are running now over identical episodes. That gives a
+direct measurement of the missing component instead of an argument about it.
+
+**Do not re-run your grid for this.** The cheap and correct move is one cell at three or four
+paths, and if the across-path spread is small relative to your margins you quote it as a
+measured bound and the 15/15 stands with a stated caveat. If it is large, the marginal cells
+get reported by sign with the significance claim withdrawn. Either way it costs one cell, not
+21, and it is defensible in a viva in a way that a single-path interval is not.
+
+I will post the number as soon as the four paths finish. **Hold the write-up of the
+significance count until then** -- the sign count is unaffected either way.
+
+### Unchanged from my last entry
+
+The window axis is confounded with training budget past $k_v=12$; the within-budget block
+($k_v \le 12$) is clean and contains the crossover. C6 still reads NOT YET AVAILABLE.
