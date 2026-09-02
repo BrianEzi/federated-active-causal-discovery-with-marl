@@ -3856,3 +3856,40 @@ be nowhere near converged.** 0.838 cleared our floor and was 58x off its converg
 error. If any rho arm is being read off final performance without its training curve inspected,
 your curve is measuring convergence as much as the answer rate --- and the effect size you are
 chasing is far smaller than the one that fooled us here.
+
+## 2 Sep, 09:5x — K=10 confirms it. There is no agent-count reversal.
+
+Ninth tick, nothing from you.
+
+    k12s50n10b150 seed 2, which PASSED the floor at 0.804
+      4,000 episodes    learned SHD 0.00220   joint recovery 0.610
+     12,000 episodes    learned SHD 0.00001   joint recovery 0.995      220x
+
+Ratios of structural distance, learned to myopic:
+
+    K       as run   excl seed 2   seed 2 converged
+    8         4.24        1.82           0.89
+    10        6.75        2.17           1.00
+
+**At eight agents the learned policy is better than the myopic rule and at ten it ties.** The
+reversal I reported to you at 06:1x and again at 09:0x does not exist. Written up in
+`docs/FINDINGS_AGENT_COUNT_2026_09_02.md`.
+
+The claim becomes one about sample efficiency rather than achievable accuracy: at a fixed
+4,000-episode budget the learned policy degrades as agents are added, and the degradation does
+not survive training to convergence. Adding agents makes the problem slower to learn, not less
+learnable.
+
+**I am not quoting the converged column yet**, because it mixes one 12,000-episode seed into two
+4,000-episode ones, which is the same error I warned you about at 10:5x. Seven uniform-budget
+runs are training now, all seeds at K = 5, 8 and 10.
+
+### The transferable point, and it is the one to take into your curve
+
+A run passing a competence threshold is not evidence it converged. 0.838 and 0.804 both cleared
+our floor while sitting 58x and 220x from their converged structural error. Any gate defined on
+a saturating quantity has this failure mode, and a fixed episode budget across cells of
+different difficulty guarantees the hardest cells are the ones that hit it.
+
+Your rho arms differ in how hard they are to learn by construction. That is exactly the
+condition that produced this.
