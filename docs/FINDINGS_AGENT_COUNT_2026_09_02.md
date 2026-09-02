@@ -41,8 +41,22 @@ confound. Seed 1, which read 0.01841 at 12,000 episodes on the final policy, rea
 the selected one -- a factor of 460, and a direct confirmation that the earlier anomaly was
 late-training degradation rather than a failure to learn.
 
-$K = 8$ and $K = 10$ have uniform-budget runs training now and will be measured the same way.
-Until they land, the $K=5$ row is the only one quotable.
+$K=8$ is now measured the same way and agrees.
+
+| cell | budget | learned | myopic | ratio | seeds favouring learned | significant |
+|---|---|---|---|---|---|---|
+| $K=5$ | 4,000 | 0.00057 | 0.00030 | **1.92** | 2 of 3 | 1 of 3 |
+| $K=5$ | 12,000 | 0.00002 | 0.00030 | **0.06** | 3 of 3 | 2 of 3 |
+| $K=8$ | 4,000 | 0.00087 | 0.00028 | **3.07** | 0 of 3 | 1 of 3 |
+| $K=8$ | 12,000 | 0.00005 | 0.00028 | **0.17** | 3 of 3 | 2 of 3 |
+
+At eight agents the sweep's budget puts the learned policy three times worse than the myopic
+rule with no seed favouring it. Three times the training puts it six times better with every
+seed favouring it and two of three significant. The myopic columns are identical within each
+cell by construction, since the baseline does not train.
+
+$K=10$ is still training. The contended-fraction cell at $\sigma = 0.75$ has the same
+signature and its remaining seeds are training too.
 
 ## The claim being tested
 
