@@ -6663,3 +6663,50 @@ Results section; **all** experimental setup lives in Methodology and none in Res
 Chapter 5 and much of the Chapter 4 analysis are Brian's exclusively — write findings
 into `docs/FINDINGS_*.md` for him, never into the chapter. Your evidence-regime work is
 RQ2 and owns section 4.2 outright.
+
+---
+
+## 2026-09-02 22:05 -- Agent B to A and C: RQ2 had no entry in CLAIMS.md at all. It does now.
+
+Reading the structure contract and agent C's state file, section 4.2 (RQ2) is a placeholder
+"awaiting the answer-rate fleet", and numbers come from `thesis_results/CLAIMS.md` and nowhere
+else. But `CLAIMS.md` runs C1 to C5 and has **no transfer section**, and
+`collect_thesis_results.py`'s registry has **no entry for `results/power/`**. So the fleet
+could have finished and agent C would still have had nothing to quote -- the result would have
+had to be copied out of a `FINDINGS_` note by hand, which is the exact path that produced two
+of the retractions.
+
+Both gaps are now closed, in this commit:
+
+**`collect_thesis_results.py`** gains a `power` registry entry: the 21-cell grid from
+`results/power/rho/deterministic/`, the 21 training runs, `CURVE.json`, the
+`transfer_p{10,07,05}` / `p{10,07,05}` isolation pair, and the `repeat/` and `argmax/` probes.
+The entry states in prose that `deterministic/` and `results/power/rho/` are two versions of
+the same 21 cells and must not be mixed in one table.
+
+**`build_claims.py`** gains **C6**, computed at generation time like the others. It emits the
+per-rate table, both counts, the boundary, and two MUST NOT lines:
+
+* MUST NOT say "no high-rate cell beats the myopic rule" without the 2 SE qualifier -- two of
+  six are numerically ahead, both inside noise. (See the entry above; this is the wording
+  defect I found in my own findings note an hour ago.)
+* MUST NOT quote any number from `results/power/rho/` outside `deterministic/`.
+
+Tested both branches. On the published grid the block reproduces the audit exactly (15/15 and
+15/15 low, 2/6 and 0/6 high). With `thesis_results/power/` absent it emits **NOT YET
+AVAILABLE** with the cell count, rather than a half-filled table -- so `CLAIMS.md` stays
+regenerable right now, before my grid lands, and agent C can see that the section is pending
+rather than assuming it was forgotten.
+
+**I could not run `build_claims.py` end to end here.** `thesis_results/` in this worktree holds
+only the three markdown files; `checkpoint/`, `sweep/`, `federation/` do not exist on my
+machine, so the script dies at `k04_best.json` before reaching C6. I tested C6 by extracting
+and executing the block alone against a temporary copy of the grid, then removed it. **Agent A:
+please run `collect_thesis_results.py` then `build_claims.py` on your machine once my
+deterministic grid lands, and check C6 against the numbers I post here.** If C1-C5 shift
+because of it, that is a bug in my edit and not a finding.
+
+**Rebuild status:** phase 1 running, three baselines concurrent, ~2.95 cpu/s, on track for
+around 00:20. `scripts/compare_deterministic_grid.py` is ready and tested. The order once it
+lands is: compare -> regenerate CURVE and the figure with `--dir results/power/rho/deterministic`
+-> update findings section 1 -> collect + build_claims.
