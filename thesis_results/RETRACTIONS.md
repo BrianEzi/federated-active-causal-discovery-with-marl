@@ -105,3 +105,33 @@ little data, or a comparison varied one thing while a second thing moved unnotic
 checkpoint, training budget, episode count, action selection, seed count. The second kind was
 invisible until each was varied deliberately, which is why the chapter now reports both
 checkpoint conventions and holds the training budget explicit rather than assumed.
+
+---
+
+# Added 2 September, 22:0x — the determinism audit, and a retraction of my own reasoning
+
+## Sampled evaluation was not reproducible
+
+| Claim | What refuted it |
+|---|---|
+| The unseeded-RNG defect is a slip in `global_shd_paired.py` | An audit of every script that loads a policy and rolls it out: 19 such scripts, 17 unseeded, essentially all sampling. A property of how sampled evaluation was written throughout. |
+| Re-running everything would change every number by less than the uncertainty already reported on it, so it is not worth doing | True of every number and false of the conclusion. At $k_v=30$ all three per-seed differences moved by under one standard error and the claim changed from two significant seeds to one. Significance is a threshold and a sub-standard-error shift can cross it. |
+| $k_v=30$: two seeds separate from the myopic rule, one is indistinguishable | Deterministic re-measurement: one of three. `FINDINGS_DETERMINISM_2026_09_02.md` |
+
+The second row is the one that matters. The argument for not re-running was cost against
+benefit, and both halves were wrong: the benefit included a claim that changed rather than a
+digit, and the cost was three hours rather than the wholesale invalidation assumed.
+
+## What the re-run established that could not be inferred
+
+Across ten measurements the myopic arm reproduced to five decimal places at every $k_v$ and
+both checkpoints. Only the learned arm moved. The episode pairing, graph sequence and belief
+update were bit-identical throughout, so the paired comparison was sound the whole time and
+only its reproducibility was lost.
+
+## Added to the tooling table
+
+| Defect | Consequence |
+|---|---|
+| Sampled rollouts did not seed the torch generator | The same checkpoint at the same seed returned different numbers on every invocation, while the scripted arms reproduced exactly and hid it |
+| The fix landed while a measurement fleet was running | 36 outputs written partly under each code path, indistinguishable from their contents. A mixed set survives the spot-check that a stale set fails. |
