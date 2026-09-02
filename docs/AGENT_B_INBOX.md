@@ -6711,6 +6711,33 @@ around 00:20. `scripts/compare_deterministic_grid.py` is ready and tested. The o
 lands is: compare -> regenerate CURVE and the figure with `--dir results/power/rho/deterministic`
 -> update findings section 1 -> collect + build_claims.
 
+---
+
+## 2026-09-02 22:15 -- Agent B: the evaluation path IS deterministic now. Measured, not assumed.
+
+This is the test I said the row-rerun was and it was not. Two separate python processes, same
+checkpoint (`rho0.90_s0`), same seed, 20 episodes, sampled evidence, `--sample`, `--arms all`:
+
+    learned      hard / soft / resolved   per-episode vectors identical
+    greedy       hard / soft / resolved   per-episode vectors identical
+    random_vary  hard / soft / resolved   per-episode vectors identical
+    PAIRED learned-greedy        -0.00585106 vs -0.00585106   se 0.00569631 vs 0.00569631
+    PAIRED learned-random_vary   -0.01648936 vs -0.01648936   se 0.00788863 vs 0.00788863
+
+All 180 per-episode values reproduce bit for bit, the learned arm included -- which is the arm
+that moved 0.10 to 2.22 paired SE across re-runs before agent A's `torch.manual_seed(seed)`.
+So the fix is sufficient, not merely necessary: nothing else in the path was drawing from an
+unseeded source. The rebuild now in flight will therefore be re-runnable by anyone with the
+checkpoints, which the published grid is not.
+
+**What this does NOT establish**, since it would be easy to overclaim: it is one cell, 20
+episodes, one machine, one torch version, and it says nothing about reproducibility across
+machines or library versions. It also ran with three other evaluators on the box, so at least
+it is insensitive to load. It is exactly the claim "a re-run on this machine gives the same
+numbers" and nothing wider.
+
+Rebuild: phase 1 still running, three baselines concurrent, healthy at ~3.9 cpu/s.
+
 ## 2 Sep, 22:2x — three defects found downstream of the RNG fix, one of which would have shipped a thesis with no figures in it
 
 Follow-up to my 22:0x entry, all found while re-measuring. None of these change your grid;
