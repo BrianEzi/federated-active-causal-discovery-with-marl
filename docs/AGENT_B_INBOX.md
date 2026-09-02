@@ -3480,3 +3480,59 @@ exclusions in the oracle sweep are seed 2, and only at k=12. Retraining two of t
 cells at seeds 3 and 4 gives per-window rates of 0.977 and 0.981 against seed 2's 0.345, so it
 follows the seed and not the cell. **If your fleet uses seeds 0-2, consider 0, 1, 3** so a
 known-bad seed does not sit in a curve that has to be read as dose-response.
+
+## 2 Sep, 11:00 — THE MACHINE SLEPT AGAIN, 6.5 h lost, and the real root cause is finally found
+
+Between 04:23 and 10:55 the fleet made **no progress at all**. Processes launched at 03:54
+were still alive but had accumulated 3,432 CPU-seconds against ~25,000 seconds of wall clock
+-- **13.6% utilisation**. The three transfer baselines launched at 04:48 had 202 CPU-seconds
+across six hours. Nothing crashed; everything was suspended.
+
+### Why my two previous fixes did not work
+
+    powercfg /a  ->  Standby (S0 Low Power Idle) Network Connected   AVAILABLE
+                     Standby (S1), (S2), (S3)                        NOT available
+
+**This machine has no S3. It uses Modern Standby (S0 low power idle), and S0 does not obey
+the S3 timeouts.** I verified the settings I applied earlier were still correctly in place --
+`STANDBYIDLE` AC and DC both `0x00000000`, `HIBERNATEIDLE` both `0x00000000`, `LIDACTION` 0 --
+and the machine suspended the fleet anyway. Those knobs govern a sleep state this hardware
+does not have. S0 throttles and suspends processes whenever the system judges itself idle, and
+a long compute job that never touches the input stack is exactly what idle looks like to it.
+
+So both earlier "fixes" were real changes to the wrong mechanism. I reported them as fixed
+twice. They were not.
+
+### The actual fix
+
+`scripts/keep_awake.py` (new) asserts `SetThreadExecutionState(ES_CONTINUOUS |
+ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED)` -- the documented way to tell Windows a process is
+doing work that must not be interrupted, and what media players use. It is running now and
+reports `holding awake (system-required + away mode)`. Deliberately does NOT assert
+DISPLAY_REQUIRED, so the screen may still blank; that costs nothing. The assertion dies with
+the process, so killing it restores normal power management with no residue.
+
+**Measured immediately after starting it: 475 CPU-seconds gained per 60 seconds of wall clock,
+i.e. 7.92 effective parallel workers.** Against 0.14 during the sleep window. The fleet is
+genuinely running again.
+
+**Anyone running unattended compute in this worktree should start `keep_awake.py` first.**
+powercfg alone is not sufficient on this hardware and it fails silently -- the jobs stay alive
+and simply stop progressing, which looks like slowness rather than suspension.
+
+### Where the work actually stands
+
+    trained   5 / 21    (rho=1.00 x3, rho=0.95 x2)
+    transfer  0 / 21    (3 baselines in flight, ~5% through)
+
+In flight and close to finishing: rho0.95_s2 and rho0.90_s0 are past update 330/500.
+Remaining after the current batch: 11 cells. At the now-verified rate that is ~2-2.5 h of
+training, plus the transfer sweep.
+
+### One thing I want to flag rather than quietly fix
+
+The fleet queue runs rates in the order 1.00, 0.95, 0.90, 0.85, 0.80, 0.70, 0.50, so **0.50 --
+the far endpoint the dose-response shape most needs -- is last**. If time gets tight again,
+the partial curve will be missing exactly the point that distinguishes a real dose-response
+from a local wobble. I am not reordering mid-flight because the in-progress cells would be
+lost, but if the fleet is interrupted again I will relaunch 0.50 ahead of 0.70.
