@@ -434,6 +434,72 @@ def fig_sweep_grid(out: pathlib.Path):
     plt.close(fig)
 
 
+
+def fig_pair_class(out: pathlib.Path):
+    """Errors by pair class at both training budgets, which is what the table said in numbers.
+
+    Counts rather than rates. The unscored class has 27,000 observations against 673,200, so a
+    rate compresses eleven errors and zero errors into two numbers a reader cannot tell apart.
+    The myopic and random arms do not train, so they are drawn as horizontal references: the
+    figure is one arm moving against two that cannot.
+    """
+    src = {4000: ROOT / "results/shd_by_class_naxis_det.json",
+           12000: ROOT / "results/shd_by_class_naxis_12k.json"}
+    if not all(q.exists() for q in src.values()):
+        print("!! pair-class data incomplete; skipping")
+        return
+    tot = {}
+    for budget, q in src.items():
+        d = json.loads(q.read_text())
+        for arm in ("learned", "greedy", "random"):
+            tot[(budget, arm)] = (
+                sum(e["arms"][arm]["private_incident"] * e["arms"][arm]["n_private"] for e in d),
+                sum(e["arms"][arm]["shared_shared"] * e["arms"][arm]["n_shared"] for e in d))
+    n_priv = sum(e["arms"]["learned"]["n_private"]
+                 for e in json.loads(src[12000].read_text()))
+    n_shar = sum(e["arms"]["learned"]["n_shared"]
+                 for e in json.loads(src[12000].read_text()))
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(6.6, 3.1))
+    budgets = [4000, 12000]
+    xs = [0, 1]
+    for ax, idx, title, denom in ((left, 0, f"scored pairs ({n_priv:,} observations)", n_priv),
+                                  (right, 1, f"unscored pairs ({n_shar:,} observations)", n_shar)):
+        # Offsets differ per arm: learned and myopic converge on the scored panel and their
+        # labels would sit on top of each other at a shared offset.
+        # Which arms crowd each other differs between the panels: on the scored panel the
+        # learned and myopic lines converge, on the unscored panel the learned and random
+        # lines do. Offsets are set per panel rather than per arm for that reason.
+        offs = {"learned": 9, "greedy": -14, "random": 9} if idx == 0 else \
+               {"learned": 9, "greedy": 9, "random": -14}
+        for arm, label, colour in (("learned", "learned", LEARNED),
+                                   ("greedy", "myopic", MYOPIC),
+                                   ("random", "random", RANDOM)):
+            dy = offs[arm]
+            ys = [tot[(b, arm)][idx] for b in budgets]
+            style = "o-" if arm == "learned" else "o--"
+            ax.plot(xs, ys, style, color=colour, lw=1.8 if arm == "learned" else 1.1,
+                    ms=5, label=label, zorder=4 if arm == "learned" else 2)
+            for x, y in zip(xs, ys):
+                ax.annotate(f"{y:.0f}", (x, y), fontsize=7.5, color=colour,
+                            xytext=(0, dy), textcoords="offset points", ha="center",
+                            zorder=5)
+        ax.set_xticks(xs)
+        ax.set_xticklabels(["4,000", "12,000"])
+        ax.set_xlim(-0.35, 1.35)
+        ax.set_xlabel("training episodes")
+        ax.set_title(title, fontsize=9)
+        ax.set_yscale("symlog", linthresh=1)
+        ax.set_ylim(-0.5, 1.2e5)
+    left.set_ylabel("errors committed")
+    left.legend(loc="lower left", frameon=False)
+    fig.suptitle("Training moves the class the policy is scored on, and not the other",
+                 fontsize=9.5)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.savefig(out / "pair_class.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -444,7 +510,8 @@ def main(argv=None) -> int:
 
     for name, fn in (("sweep_grid", fig_sweep_grid),
                      ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
-                     ("attribution_law", fig_attribution_law), ("federation", fig_federation)):
+                     ("attribution_law", fig_attribution_law), ("federation", fig_federation),
+                     ("pair_class", fig_pair_class)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")
