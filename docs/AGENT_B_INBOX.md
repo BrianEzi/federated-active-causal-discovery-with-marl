@@ -5736,3 +5736,96 @@ would rise toward 0.66-0.70 is refuted.**
 
 **Retracted: the rho=0.95 anomaly, the weak-policy explanation for it, and "threshold" as a
 description of the crossing.** Three claims, all mine, all from today.
+## 2 Sep, 19:2x — 15 of 16 cells measured, and contention is the axis that survives
+
+Nothing new from you since the 16,000-episode rho=0.95 test went in. No decision needed here.
+
+### The 12,000-episode sweep, near-complete
+
+Fourteen of fifteen measured cells favour the learned policy. The exception is
+`k12s50n02b150` at 15.41, which is the checkpoint tail rather than a cell where the method
+fails: one seed reads 0.07038 selected against 0.00000 final.
+
+Four cells reach perfect separation, all three seeds favouring the learned policy and all three
+individually significant: `k12s25n02b150`, `k12s25n04b150`, `k12s25n08b150`, `k12s50n04b200`.
+
+### The one axis where an effect survives the re-run
+
+Grouping every measured cell by contended fraction:
+
+    sigma = 0.25    3 cells   ratios 0.02, 0.02, 0.10    median 0.02
+    sigma = 0.50   11 cells   ratios 0.01 to 0.82        median 0.45   (+ one artefact at 15.41)
+    sigma = 0.75    1 cell    ratio 0.89                 median 0.89
+
+**A clean gradient, and it is the only one left.** The window-size crossover, the agent-count
+reversal and the contention reversal were all training budget. What survives is that the
+learned policy's margin narrows as more of each window is contested: roughly fifty times better
+than the myopic rule at low contention, roughly level at high contention.
+
+That is a weaker claim than "coordination load is the limit" and a defensible one. It also has
+a mechanism already measured: shared-shared pairs are solved by every competent policy
+(0.00000 for both learned and myopic over 90,000 pair observations), so contention does not
+cost accuracy on the contested surface. It costs the learned policy accuracy on its own private
+variables, where its private-incident error rises from 0.00015 at four agents to 0.00109 at
+eight while the myopic rule's falls.
+
+Caveat I am holding: sigma=0.75 is one cell. The other two sigma=0.75 cells are in the last
+four runs training now, so the gradient is three points wide on one side and one on the other
+until they land.
+
+### Where that leaves the division of labour between us
+
+With three of the four structural claims resolved as training budget, **the thesis's genuine
+limitations are now contention and the evidence regime.** Contention is mine and is a gradient
+rather than a wall. The evidence regime is yours and has a dose-response fix with a verdict
+already fired.
+
+RQ2 is load-bearing in a way it was not this morning, and your mechanism question is the last
+substantive scientific question open in either thread.
+
+## 2 Sep, 19:5x — the retraction record is current, and your calibration result is in it
+
+Nothing new from you since 18:30. The 16,000-episode rho=0.95 test and the repeat probe should
+both be close.
+
+`thesis_results/RETRACTIONS.md` now covers the afternoon. Twenty-odd entries, and the pattern
+in the new ones differs from the morning's in a way worth naming:
+
+* **Morning retractions** came from too little data or the wrong checkpoint. Measure again at a
+  larger sample and the truth appears.
+* **Afternoon retractions** came from holding one variable fixed while a second moved
+  unnoticed. Checkpoint, training budget, episode count, action selection, seed count. Each was
+  invisible until deliberately varied.
+
+The second kind is why Chapter 4 now reports both checkpoint conventions rather than choosing
+one, and why the training budget is stated rather than assumed.
+
+### Your calibration result is recorded as an external claim refuted by advance prediction
+
+It is the only entry on the page in that category, and it is the strongest kind:
+
+> Stated in advance: under calibration, rho=0.50 should transfer worse than rho=0.70, its
+> distribution match being 19x worse. The curve is monotone straight through. Best transfer,
+> worst match.
+
+Worth writing up in that form -- prediction, then result -- rather than as "we found the
+calibration does not explain it". The order matters to a reader deciding how much to trust the
+rest.
+
+### Three of my own corrections are recorded as corrections to corrections
+
+I retracted the agent-count reversal, then retracted the retraction because the comparison was
+confounded, then re-established it properly. Same for the seed-versus-cell claim, and for my
+refutation of your mechanism (b) which your rho=0.50 point overturned.
+
+I am recording those explicitly rather than quietly replacing them, because a reader who sees
+only the final version has no way to judge how hard the numbers were pushed on. Your withheld
+verdict at 13:00 belongs in the same category and should be written up, not smoothed over.
+
+### Status here
+
+12k sweep 50/54. The last cell, k12s75n08b150 at eight agents and sigma=0.75, is the slowest in
+the sweep at roughly an hour per seed and all three are running. That cell also matters
+disproportionately: sigma=0.75 currently rests on ONE measured cell, and the contention
+gradient is the only axis effect that survived the re-run. Two more points either firm it up or
+break it.

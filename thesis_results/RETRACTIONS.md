@@ -45,3 +45,63 @@ at a larger sample or on the correct checkpoint.
 Power-limited oracle evidence was closed at grade D on a replication that had been gated on the
 wrong metric. Re-gated on per-window recovery it passes 6 of 6 rather than 1 of 6, and the
 approach now carries RQ2. A negative result was itself withdrawn.
+
+
+---
+
+# Added 2 September, afternoon and evening
+
+The entries above were written at midday. The following day's work produced more, and the
+pattern in them is different: where the earlier retractions came from too few episodes or the
+wrong checkpoint, these came from **holding one variable fixed while forgetting another**.
+
+## The training budget, three times over
+
+| Claim | What refuted it |
+|---|---|
+| The advantage reverses as agents are added, rising to a ratio of 6.75 at ten | Two of the runs carrying it passed the competence floor at 0.838 and 0.804 while sitting 58x and 220x from their converged structural error. Retrained, the reversal does not survive. |
+| The advantage reverses at high contention ($\sigma = 0.75$) | Same signature, same cause. Window rate 0.758 to 0.980 and joint recovery 0.660 to 0.990 with three times the training. |
+| A myopic rule is sufficient at small windows; the crossover between $k_v=8$ and $k_v=12$ marks where the problem outgrows it | At 12,000 episodes the learned policy wins at $k_v=4$ and $k_v=8$ on both criteria. The crossover marks where 4,000 episodes stopped being enough. |
+
+Three of the four structural claims in Chapter~4. What survived is the one whose cell already
+trained at 12,000 episodes in the original sweep.
+
+## Claims withdrawn about the withdrawals
+
+Correcting a result is not the same as correcting it correctly.
+
+| Claim | What refuted it |
+|---|---|
+| The competence-floor failures follow the seed and not the cell | Written off two of four runs. Seed 3 also falls below the floor at eight agents and $\sigma=0.25$. |
+| The agent-count reversal disappears under convergence (ratios 0.89 and 1.00) | The comparison scored a 4,000-episode FINAL policy against a 12,000-episode FINAL policy, and the final policy degrades on long runs. Direction was right; method was not. Re-measured at a fixed checkpoint it holds. |
+| Mechanism (b) for the transfer effect is refuted, because $\rho=0.95$ has the worst in-regime score and loses | $\rho=0.50$ has the second-worst in-regime score and the best transfer. A counterexample plus a supporting example is not a refutation. The defensible claim is that in-regime score does not ORDER transfer. |
+
+## An external claim refuted by a prediction made in advance
+
+| Claim | What refuted it |
+|---|---|
+| The partial oracle transfers because its belief-resolution trajectory matches genuine finite-sample evidence | Stated in advance: under calibration, $\rho=0.50$ should transfer worse than $\rho=0.70$, its distribution match being 19x worse. The curve is monotone straight through. Best transfer, worst match. The calibration measures a real quantity that is not the operative one; the mechanism is open. |
+
+## Tooling that produced wrong numbers rather than failing
+
+Each of these emitted something plausible instead of refusing.
+
+| Defect | Consequence |
+|---|---|
+| `global_shd_paired.py` skips a seed whose checkpoint is missing, warning into a log nobody read | Three cells measured on two seeds while the report printed "/3" |
+| The results collector copied result files without their checkpoints | Reused cells silently dropped from every measurement |
+| The appendix generator averaged an empty list | `nan` reached Overleaf inside a table |
+| The budget-comparison tool read each run's own `global_hard_shd` | A ratio of 20.79 printed for a cell that reads 0.06 when measured properly |
+| A figure loaded $k_v=20$ and $k_v=30$ into a series labelled 4,000 episodes | Two 12,000-episode points on a line whose purpose was to expose exactly that error |
+| The closed-form residual computed by subtracting rounded printed columns | 0.040 reported where the true value is 0.041 |
+
+All now fail loudly: missing data drops a row and names it, reports print the real sample size,
+and the residual is read from the column that carries it.
+
+## What the pattern says
+
+Every retraction on this page has one of two shapes. Either a quantity was measured on too
+little data, or a comparison varied one thing while a second thing moved unnoticed --
+checkpoint, training budget, episode count, action selection, seed count. The second kind was
+invisible until each was varied deliberately, which is why the chapter now reports both
+checkpoint conventions and holds the training budget explicit rather than assumed.
