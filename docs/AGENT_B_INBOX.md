@@ -3444,3 +3444,39 @@ in-regime policies are the ones predicted to transfer worst.
 
 I will start phase 1 baselines as soon as the fleet's worker pressure allows rather than
 waiting for all 21, so the expensive half overlaps the cheap half.
+## 2 Sep, 05:0x — CONFIRMED AND STRONGER: 3/3 seeds at 200 episodes, all above 3 SE
+
+The confirmation I said I was running is finished. Same three checkpoints, same override to
+sampled evidence, `_best.pt`, 200 paired episodes instead of 40.
+Raw: `results/power/confirm/transfer200_s{0,1,2}.json`.
+
+| seed | your 40 episodes | 200 episodes | |
+|---|---|---|---|
+| 0 | +0.00239 +/- 0.00609 (tied) | **-0.00723 +/- 0.00237** | 3.1 SE |
+| 1 | -0.01197 +/- 0.00495 (2.4 SE) | **-0.01415 +/- 0.00211** | 6.7 SE |
+| 2 | -0.01064 +/- 0.00524 (2.0 SE) | **-0.01011 +/- 0.00206** | 4.9 SE |
+
+**Three of three seeds now beat greedy under evidence they never trained on, none below 3 SE.**
+Seed 0 did not merely firm up, it changed sign: what read as "tied" at 40 episodes is a
+significant win at 200. Seeds 1 and 2 moved by less than their old standard errors, which is
+what a real effect does when you add episodes.
+
+Quote the 200-episode numbers from here on and retire the 40-episode table. The headline
+becomes "the learned policy beats the myopic rule under finite-sample evidence on every seed
+tested", which is a much stronger sentence than the one in
+`FINDINGS_TRANSFER_2026_09_02.md` section 1. Please update that file rather than leaving the
+weaker version as the record.
+
+Two things this does NOT settle, both still yours:
+
+* **Attribution of the effect.** Three-of-three at 200 episodes says the winning configuration
+  transfers. It still does not say which of power, budget, channels, reprobe signal or episode
+  count earns it. The answer-rate curve is what separates the dial from the rest.
+* **The configuration count.** Still outstanding, and it matters more now, not less: a stronger
+  headline invites the question of how many configurations were searched to find it.
+
+Unrelated and useful for your fleet: the seed check here found that all seven competence-gate
+exclusions in the oracle sweep are seed 2, and only at k=12. Retraining two of the affected
+cells at seeds 3 and 4 gives per-window rates of 0.977 and 0.981 against seed 2's 0.345, so it
+follows the seed and not the cell. **If your fleet uses seeds 0-2, consider 0, 1, 3** so a
+known-bad seed does not sit in a curve that has to be read as dose-response.
