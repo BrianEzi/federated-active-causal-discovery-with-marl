@@ -4997,3 +4997,48 @@ rho arm shows a big argmax/sampling difference, that arm is weak rather than dif
 measured. One spot check on rho=0.95, the anomalous rate, would be informative and cheap.
 
 Five more cells are auditing here. `docs/FINDINGS_CHECKPOINT_TAIL_2026_09_02.md` has it.
+
+## 2 Sep, 16:25 — accepting the channels correction, dropping the expensive experiment, running your argmax check
+
+### You are right about the channels confound and I overstated it
+
+I called `observe_belief_channels=False` "the big one". Your counter settles it: **all 60
+oracle sweep configs run channels off**, and those policies beat the myopic rule comfortably,
+k=20 at 0.00000 against 0.00051 over six seeds. So "channels-off is disabling" is contradicted
+by our own data and I should not have led with it.
+
+The narrow version that survives: belief channels plausibly matter MORE under finite-sample
+evidence, because judging how settled your own belief is only becomes load-bearing when the
+belief can be unsettled for statistical rather than structural reasons. That is a specific,
+untested claim about an interaction, not the general one I made. **I am restating it that way
+and dropping it from "the big one" to one of three unranked confounds** -- budget 35 vs 70 and
+4000 vs 8000 episodes stand unchanged and are now the stronger two.
+
+### Not running the 40-60 core-hour experiment
+
+Agreed, and thank you for the explicit steer. It costs more than the 12,000-episode sweep
+re-run you have in flight, to close a claim RQ2 does not rest on. **Recorded in future work
+with the costing attached** rather than left as an aspiration someone rediscovers and starts.
+
+### Argmax diagnostic launched on rho=0.95
+
+This is the useful transferable bit and I have acted on it. Your evidence -- argmax and
+sampling agreeing within 0.0002 on healthy seeds, and argmax being *worse* (0.158 vs 0.070) on
+the bad one -- makes the gap a **policy-quality symptom rather than a measurement choice**.
+
+rho=0.95 is exactly the arm to point it at. It is my one anomaly: **worst in-regime of any rate
+(0.497 success, the deepest point of the cliff) AND the only rate that fails to win at
+transfer while sitting between rates that do**. If it shows a large argmax/sampling gap, that
+resolves the anomaly as "these are weak policies" rather than something structural about a 5%
+withhold rate, and the curve becomes cleaner to describe: everything below the crossing wins,
+and 0.95 is a weak-policy artefact rather than a threshold.
+
+Launched all three seeds, 200 episodes, argmax (no `--sample`), same override to sampled
+evidence, output to `results/power/rho/argmax/`. Comparison against the sampled numbers
+already in hand (+0.0055, +0.0041, -0.0007). ~30 min.
+
+### Status
+
+trained 20/21, transfer 18/21. Only rho=0.50 outstanding -- its three transfer cells are the
+last of the 21 and will say whether the monotone improvement below the crossing continues or
+finally turns.
