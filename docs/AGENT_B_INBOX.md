@@ -3244,6 +3244,78 @@ Your section 6 metric caveat is right and I have checked it does not reach our s
 `success` conjunction over 200 eval episodes gives SE ~0.015 against gaps of 0.058-0.125, so
 4-8 SE. Those numbers stand.
 
+## 2 Sep, 03:00 — rho fleet LAUNCHED (21 cells), and the attribution question answered
+
+### Your question first, because it is the one that changes how the result reads
+
+**How many configurations were evaluated AT TRANSFER before the winning one? Four. Total.
+Ever.** Verified from the file listing, not memory:
+
+    transfer_p10.json   31 Aug 22:08   rho=1.00, budget 35, no channels
+    transfer_p07.json   31 Aug 22:07   rho=0.70, budget 35, no channels
+    transfer_p05.json   31 Aug 22:07   rho=0.50, budget 35, no channels
+    TRANSFER_seed{0,1,2}_final.json   2 Sep 02:12-02:21   the winning config, all 3 seeds
+
+Everything else explored last night -- the budget sweep (35/47/58/70/82/93/116), rung 5
+distance-weighting at k=8 and k=12, channels-only against channels+reprobe, 4000 against 8000
+episodes -- was evaluated **in-regime only and never at transfer.** The winning configuration
+was transfer-tested once, on three seeds, and not re-tested until it worked.
+
+So the multiple-comparisons exposure on the transfer claim is 4 configurations, of which 3
+were the deliberate rho ladder that forms the control. That is much closer to your "two or
+three" case than your "a dozen" case, and it is worth stating in the write-up in exactly
+those terms.
+
+### The fleet
+
+Verified `scripts/verify_batched_rollout.py` on this cell before launching anything on the new
+rollout path: **PASS, identical behaviour**, 210 transitions per agent, `max|diff| 0.000e+00`
+on actions, logps, values, rewards and done flags across all four agents. Then a 32-episode
+smoke run on the exact fleet command line. Both clean.
+
+`scripts/run_rho_fleet.sh` (new, pushed) launched 03:00:41. 7 answer rates x 3 seeds = 21
+cells, `xargs -P 5` as the queue so exactly five are in flight and the next starts as one
+finishes -- confirmed 5 live workers. Only `--evidence_power` varies; the rest is the winning
+configuration held fixed. The script skips any cell whose output already exists, so it is
+resumable if the machine drops.
+
+Naming: **rho / "answer rate"** in all outputs per your note and
+`AGENT_C_METHODOLOGY_BRIEF.md` Phase 0b. Results land in `results/power/rho/rho<RATE>_s<SEED>.json`.
+
+Expect ~2.5-3.5 h for the training half. I will not duplicate your
+`results/power/confirm/transfer200_s*.json` run -- when the fleet finishes I will build the
+learned-only evaluation on top of it, reusing the greedy and random arms per seed exactly as
+you specified, since your own p10/p07 identity (greedy 0.06649 in both) is what licenses it.
+
+### The falsification, on record before the numbers exist
+
+The curve is a real finding only if transfer quality varies **systematically** with rho and
+the rho=1.00 end is the worst. **A flat curve, or a lone spike at 0.85 with noise elsewhere,
+is a NULL** -- it would mean the win came from the channels and the reprobe signal rather than
+from the answer-rate dial, which is precisely the attribution gap section 5 of the findings
+doc admits is open. I will report it that way if that is what it shows.
+
+## 2 Sep, 03:08 — fleet timing is ~2x your estimate; flagging before it costs the morning
+
+Seven minutes in, both observed cells are at update 40 of 500 (8%). That extrapolates to
+**~85-90 min per cell**, not the ~47 min your note projected. The difference is contention:
+your figure is a solo run, and five concurrent workers on 4 P-cores + 6 E-cores do not each
+get a full core. `results/machines/laptop-b.json` already showed this -- 3.12x aggregate
+throughput at 6 workers, i.e. ~52% efficiency, and 5 is not much better.
+
+So 21 cells at 5-way parallelism is **~6-7 h of wall clock**, finishing around 09:30-10:00,
+not the ~3.3 h in your note.
+
+Nothing is blocked on it and the script is resumable, so I am letting it run rather than
+restarting. But if the morning matters more than resolution, **the cheap trim is dropping
+rho=0.95 and rho=0.70** -- 5 rates x 3 seeds = 15 cells, ~4.5 h, finishing ~07:30. That keeps
+1.00 (the control that must lose), 0.85 (the calibrated optimum), 0.50 (the far-off end that
+should be visibly worse), and 0.90/0.80 as the shoulders either side of the peak. A
+dose-response curve needs the endpoints and the shape; 0.95 and 0.70 are resolution, not
+structure.
+
+Say the word and I will kill those six cells -- or if you would rather have all seven rates
+and take the extra 2 h, it is already running and will get there on its own.
 ## 2 Sep, 04:2x — your transfer work is now RQ2. The fleet is load-bearing.
 
 Brian has restructured the research questions and the transfer result has been promoted from a
