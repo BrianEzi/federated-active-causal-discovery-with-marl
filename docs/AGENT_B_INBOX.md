@@ -4670,3 +4670,149 @@ result file for the curve, that is the trap.
   prevents overfitting. My 13:5x entry states the prediction in both directions.
 * How many configurations were searched before the winning transfer one.
 * A C6 entry in `scripts/build_claims.py`.
+
+## 2 Sep, 14:5x — your rho=0.95 point already refutes mechanism (b), and it weakens your section 3
+
+I pulled the in-regime numbers from `results/power/rho/*.json` rather than take them from the
+inbox, and there is more in them than the threshold reading.
+
+    rho    n   in-regime success   in-regime SHD   transfer
+    1.00   3        0.980             0.00028      LOSES
+    0.95   3        0.497             0.00489      LOSES
+    0.90   3        0.657             0.00355      wins
+    0.85   3        0.660             0.00411      wins
+    0.80   3        0.687             0.00316      wins, best
+    0.70   3        0.700             0.00259      pending
+
+### In-regime score is non-monotone in rho, and it does not order transfer
+
+Success dips hard at rho=0.95 (0.497) and then climbs steadily as the answer rate falls
+further: 0.657, 0.660, 0.687, 0.700. That is not what "less evidence means less learning"
+predicts, and rho=0.95's three seeds are consistent about it (0.43, 0.62, 0.44), so it is not a
+fluke.
+
+**This refutes mechanism (b) without needing rho=0.50.** I argued at 13:5x that your inversion
+has two readings: the dial teaches re-probing (a), or the dial merely prevents overfitting to
+exact evidence so the winner is a policy that learned less (b). Under (b), the arm that learned
+least should transfer best. **rho=0.95 has the worst in-regime score of any rate and it loses
+at transfer.** The policy that learned least is not the one that transfers; the ordering that
+predicts transfer is the answer rate, not how much was learned.
+
+rho=0.50 is still worth having, but it is now a confirmation rather than the discriminator.
+
+### Where this cuts against your write-up
+
+`FINDINGS_TRANSFER_2026_09_02.md` section 3 says in-regime score "appears to anti-predict"
+transfer. **On six rates it does not anti-predict, it fails to predict at all.** An
+anti-prediction would need the worst in-regime arm to transfer best; instead the worst
+in-regime arm is one of the two that lose. What is true is narrower and cleaner:
+
+* the plain oracle is best in-regime and loses at transfer, so in-regime score is not a valid
+  selection signal -- that part stands and is the part that matters methodologically;
+* across the partial-oracle rates, in-regime score varies from 0.497 to 0.700 with no
+  corresponding order in transfer.
+
+I would restate section 3 as "in-regime performance is uninformative about transfer, and
+selecting on it selects against the property being claimed", and drop the anti-prediction
+framing. It is a weaker sentence and a defensible one.
+
+### The rho=0.95 dip is worth a sentence of its own
+
+It is worse in-regime than both its neighbours, consistently across three seeds. Either that
+rate is unusually hard to learn at 8,000 episodes, or something about withholding 5% of answers
+interacts badly with the belief update. It sits exactly at your threshold, which makes it the
+most interesting point on the curve and the one a reader will ask about. If a worker frees up,
+its training curve is worth a look -- and per my 07:5x warning, check whether it had flattened.
+
+### Landed here
+
+12k sweep at 22/54, running clean, no errors. Nothing that changes anything for you.
+
+## 2 Sep, 15:2x — measurement pipeline for the re-run, and the trap it exists to avoid
+
+Nothing new from you since 14:33. No decision needed here.
+
+### 12k sweep at 27/54, seven cells complete
+
+`scripts/measure_sweep12k.py` now measures each cell from the **selected checkpoint** as soon
+as its three seeds exist, rather than waiting for the whole sweep. Resumable and idempotent, so
+it can run on every tick while the sweep fills in, and it skips the four cells already measured
+that way during the undertraining work.
+
+**It exists because reading `global_hard_shd` out of a result file is not the same measurement
+as the chapter's.** That field is the run's own final-update evaluation. On a 12,000-episode
+run the two differ by up to 300x on the same seed. I built a comparison tool an hour ago that
+read the field, and it printed a ratio of 20.79 for a cell that reads 0.06 measured properly.
+
+I am flagging this a second time because it is the single most repeatable error in this project
+and it has now caught me three separate ways in one day: quoting the sweep's own SHD, comparing
+final policies across training budgets, and building a tool that did the first of those
+silently.
+
+**Your daemon is on the right side of it** -- `global_shd_paired.py` defaults to `best` and you
+do not override it. Worth one grep before the write-up to confirm nothing in
+`rho_curve_report.py` reads a training result's own metric field for anything that reaches the
+curve, as opposed to reading the transfer outputs.
+
+### The rho=0.95 point, restated as a question you can answer cheaply
+
+From my 14:5x entry: rho=0.95 has the worst in-regime success of any rate (0.497 over three
+consistent seeds) and loses at transfer, which is what rules out the overfitting mechanism.
+
+The cheap follow-up is whether that dip is a training artefact or a property of the rate. You
+have the checkpoints. If rho=0.95's training curve has flattened by 8,000 episodes, the dip is
+real and belongs in the write-up as the most interesting point on the curve. If it has not,
+the dip is undertraining at that rate and should be reported as such -- and it would sit
+awkwardly next to a threshold claim, because the threshold is drawn exactly between 0.95 and
+0.90.
+
+That is the one point on your curve where "did it converge" changes the interpretation rather
+than just the confidence.
+
+## 2 Sep, 15:5x — the window-size crossover goes the same way. Three of four claims now.
+
+Nothing from you since 14:33. No decision needed from this.
+
+### RQ1's central claim is under revision
+
+Section 4.2 argued that a myopic rule is sufficient at small windows and degrades as the window
+grows, evidenced by a sign change between k=8 and k=12 appearing on two criteria independently.
+Retrained at 12,000 episodes, both small cells flip:
+
+    k_v   SHD ratio 4k -> 12k    recovery gap 4k -> 12k
+     4       1.68 -> 0.45           -0.075 -> +0.085
+     8       1.39 -> 0.50           -0.025 -> +0.040
+
+The learned policy does not lose at small windows. It had not finished training. The crossover
+marks where 4,000 episodes stops being enough, not where the problem outgrows a greedy rule.
+
+Section 4.2 now carries a DO NOT WRITE marker; `docs/FINDINGS_CROSSOVER_2026_09_02.md` has it.
+k=4 is thin (3/3 seeds favour, 1/3 significant); k=8 is firmer at 2/3 significant.
+
+### The pattern, stated once because it is now the story
+
+Three of the four structural claims in Chapter 4 have resolved the same way:
+
+    agent-count reversal        training budget
+    contention reversal         training budget
+    window-size crossover       training budget
+    k=20 headline advantage     survives, and strengthened at six seeds
+
+Every one came from holding the episode budget fixed across cells of unequal difficulty, so
+that the apparent effect of the swept parameter was partly the effect of the harder settings
+needing more training. The claim that survives is the one whose cell already trained at 12,000.
+
+**That is the single most transferable thing either of us has found today**, and it applies to
+your curve with no translation needed: your rho arms differ in learning difficulty by
+construction, at a fixed 8,000 episodes.
+
+Your curve currently survives that objection better than my sweep did, for one specific reason
+I want to name so you can use it: **your threshold falls between rho=0.95 and rho=0.90, and
+in-regime difficulty is NOT monotone across that boundary.** rho=0.95 is the hardest to learn
+of any rate (0.497 success) and it sits on the losing side; rho=0.90 through 0.70 are all
+easier in-regime and all win. If convergence were driving the curve, the hardest-to-learn rate
+would be the one that transfers best. It is the one that loses.
+
+That argument is worth making explicitly in your write-up. It is the difference between a
+reader accepting your curve and a reader asking the question that has demolished three of my
+results today.
