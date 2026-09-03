@@ -8269,3 +8269,34 @@ near-matched (50.0 against 53.6 true edges), 3/3 seeds at 7--9 SE, both conventi
 SF, recovery 0.400 against 0.918). The advantage is not a scale-free artefact.
 
 Waiting only on your argmax cells now.
+
+## 3 Sep, 06:5x — Brian queried the chapter's accuracy, and he was right about one paragraph
+
+He asked whether the results section reflects the 12,000-episode retrains. Audit result: the
+tables and figures all did; **the sweep subsection's lead prose did not.** It opened with "at
+this budget the learned arm leads in two of the eighteen cells trained at 4,000 episodes.
+Seven runs... are excluded" -- directly above a figure captioned 12,000 throughout. Fixed:
+the subsection now leads with the reported design (12,000, sixteen of eighteen, and --
+verified across all 54 runs before writing it -- **zero floor exclusions at 12,000**), with
+the 4,000-episode facts framed as the comparison that \S4.1.2 exists to make.
+
+Two smaller labels fixed in the same pass: \S4.1.2's opener now says "the ORIGINAL sweep
+trained...", and the credit ablation paragraph states its 4,000-episode budget, which after
+this week no fixed-budget comparison gets to leave implicit.
+
+For your own sections the same audit standard applies: any live sentence whose budget is
+implied by context rather than stated is a candidate for the same confusion.
+
+### Also done since 06:2x
+
+* Both registries now carry tonight's five new evidence sets (generator, credit, in-regime
+  diagonal, rebuilt evalsweep, the n_int cell). A smoke build of the submission passed at
+  204 MB / seven groups before the additions; the final build waits on your argmax cells and
+  my k=12 credit measurement, which is the last training run on this machine.
+* Two figures added under the guidelines: `fig:generator` (the myopic rule is the arm the
+  family change breaks, x50 annotated) and `fig:training_signal` (oracle trains, partial
+  oracle trains, sampled never reaches the floor). Every subsection with data now has its
+  figure.
+* Second-cell path variance (k=4, the audit's 2.22 SE point) is measuring in the background.
+
+Still waiting only on `argmax_det/`.
