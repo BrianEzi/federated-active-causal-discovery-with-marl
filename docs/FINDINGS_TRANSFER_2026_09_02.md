@@ -13,7 +13,8 @@ withholding fails) still stands.
 
 All cells below are k=8, 4 agents, `factored` backend, `--turn_aware_credit --local_epochs 4
 --normalise_returns`, scale-free graphs. Evaluation is `scripts/global_shd_paired.py` with
-`--sample --override_evidence sampled`, 40 paired episodes, `_best.pt`.
+`--sample --override_evidence sampled` and `_best.pt`. The answer-rate grid of section 1 is
+200 paired episodes; the smaller probes elsewhere in this document state their own counts.
 
 ---
 
@@ -24,27 +25,46 @@ probability `1 - rho`, costing ~0.085 s/episode -- is evaluated under **genuine 
 evidence**, the 6-9 s/episode regime it never saw in training. Hard SHD of the pooled global
 graph, paired per-episode against greedy, **200 episodes, 7 rates x 3 seeds = 21 cells**:
 
+**Rebuilt on the deterministic evaluation path, 3 Sep 01:06.** Every number in this section
+comes from `results/power/rho/deterministic/`, scored after the evaluation RNG was seeded
+(`global_shd_paired.play`, 2 Sep 21:15). The pre-fix grid in `results/power/rho/` is superseded
+and must not be quoted; see section 8.
+
 | rho | n | learned | greedy | delta | seed SE | verdict |
 |---|---|---|---|---|---|---|
-| 1.00 | 3 | 0.05812 | 0.04846 | +0.00966 | 0.00759 | tied (control) |
-| 0.95 | 3 | 0.05144 | 0.04846 | +0.00298 | 0.00188 | tied |
-| 0.90 | 3 | 0.03918 | 0.04846 | -0.00927 | 0.00071 | **beats greedy** |
-| 0.85 | 3 | 0.03945 | 0.04846 | -0.00901 | 0.00188 | **beats greedy** |
-| 0.80 | 3 | 0.03555 | 0.04846 | -0.01291 | 0.00163 | **beats greedy** |
-| 0.70 | 3 | 0.03184 | 0.04846 | -0.01661 | 0.00032 | **beats greedy** |
-| 0.50 | 3 | 0.03060 | 0.04846 | -0.01785 | 0.00141 | **beats greedy** |
+| 1.00 | 3 | 0.05936 | 0.04846 | +0.01090 | 0.00728 | tied (control) |
+| 0.95 | 3 | 0.05041 | 0.04846 | +0.00195 | 0.00122 | tied |
+| 0.90 | 3 | 0.04020 | 0.04846 | -0.00826 | 0.00042 | **beats greedy** |
+| 0.85 | 3 | 0.03910 | 0.04846 | -0.00936 | 0.00207 | **beats greedy** |
+| 0.80 | 3 | 0.03528 | 0.04846 | -0.01317 | 0.00114 | **beats greedy** |
+| 0.70 | 3 | 0.03080 | 0.04846 | -0.01766 | 0.00055 | **beats greedy** |
+| 0.50 | 3 | 0.02989 | 0.04846 | -0.01856 | 0.00179 | **beats greedy** |
 
-**15 of 15 seeds at rho <= 0.90 beat greedy, every one of them beyond 2 paired SE (weakest
--2.46, strongest -10.07). None of the 6 at rho >= 0.95 does.** Spread across rates 0.02752
-against a typical seed SE of 0.00220 -- **12.5x the noise.**
+**15 of 15 seeds at rho <= 0.90 beat greedy, every one beyond 2 paired SE (weakest -2.24 at
+rho=0.85 seed 0, strongest -11.31 at rho=0.50 seed 1). None of the 6 at rho >= 0.95 does.**
+Spread across rates 0.02947 against a typical seed SE of 0.00207 -- **14.2x the noise.**
 
-The separation is stated in terms of significance because the two halves do not separate on
-sign alone, and an earlier draft of this sentence hid that. Two of the six high-rate cells --
-rho=1.00 seed 1 and rho=0.95 seed 2 -- are numerically ahead of greedy, at -1.57 and -0.29
-paired SE. Both are inside noise, and two of the remaining four are significantly BEHIND, so
-"no high-rate cell beats greedy" is true of what was measured and false of the raw sign. The
-low-rate half needs no such qualification: all fifteen are ahead on sign and all fifteen clear
-2 SE. Per-cell deltas, SEs and both counts: `results/power/rho/DETERMINISTIC_COMPARE.json`.
+The separation is stated in terms of significance rather than sign, because the high-rate half
+does not separate on sign: one of its six cells (rho=1.00 seed 1) is numerically ahead at -0.64
+SE, well inside noise, while two others are significantly BEHIND at +3.45 and +7.77. The
+low-rate half needs no such qualification -- all fifteen are ahead on sign and all fifteen clear
+2 SE. An earlier draft said "0 of 6" without the criterion, which was true of significance and
+false of sign; on the pre-fix grid two cells were numerically ahead rather than one.
+
+**What the rebuild cost, and what it did not.** No cell moved more than 1.53 old paired SE and
+none moved past 2. The greedy per-episode vectors reproduce EXACTLY at all 21 cells, which is
+the check that matters: greedy carries its own seeded generator and cannot be touched by the
+torch fix, so identical greedy vectors prove both grids are paired over the same episodes and
+the rebuild is a renumbering rather than a different experiment. One cell changed sign --
+rho=0.95 seed 2, from -0.29 SE to +0.74 SE, noise either way -- and it was named in advance as
+the kind of marginal cell a one-SE shift could flip. Per-cell comparison:
+`results/power/rho/DETERMINISTIC_COMPARE.json`.
+
+**The delta is won on more episodes, not bigger ones.** Splitting each cell's 200 episodes into
+disjoint halves, every cell with an effect keeps its sign in both -- an independent replication,
+since the halves are different worlds from the same generator. At rho=0.90 the learned arm is
+ahead on 102-105 episodes of 200 and behind on 62-74. The top five per cent of episodes carry
+21-55% of the sum: concentration, not dominance. `scripts/delta_robustness.py`.
 
 The curve is **monotone and saturating**: it improves all the way to rho=0.50 but the last
 step is a fifth of the earlier ones. There is no interior optimum in the swept range, and no
@@ -67,9 +87,11 @@ cell in the grid rather than to one pair of runs.
 rate.** `rho0.50_s2` averages 0.637 per-window identification over its last ten evaluations,
 below the `WINDOW_FLOOR = 0.70` that excludes runs from the four-axis sweep. Reported rather
 than quietly kept, because the rate it sits at is the endpoint carrying the strongest claim.
-It does not carry that claim: its transfer delta is -0.016862, the middle of the three seeds,
-and dropping it moves rho=0.50 from -0.01785 to **-0.01835** -- slightly stronger, not weaker.
-The count becomes 14 of 14 rather than 15 of 15 and the curve's shape is unchanged. Two further
+It does not carry that claim: its transfer delta is -0.016596, the WEAKEST of the three seeds
+at that rate, and dropping it moves rho=0.50 from -0.01856 to **-0.01955** -- stronger, not
+weaker. The count becomes 14 of 14 rather than 15 of 15 and the curve's shape is unchanged.
+(On the pre-fix grid this cell was the middle seed at -0.016862; the rebuild made it the
+weakest, which strengthens rather than weakens the case for reporting the exclusion.) Two further
 cells sit near the floor (`rho0.50_s0` at 0.795, `rho0.50_s1` at 0.766); in-regime competence
 falls as the answer rate falls, which is what section 3 is about, and is a reason to read the
 floor as an in-regime measure rather than a transfer one.
@@ -86,17 +108,17 @@ worth the hour it would cost.
 
 **How strong is the baseline being beaten? Weak, in this regime, and that has to be said.**
 All three arms on the same 200 episodes under sampled evidence: random_vary 0.05434, greedy
-0.04846, learned 0.03060 at rho=0.50. **The myopic rule is only 10.8% better than random
-here**, and recovers just 25-40% of the learned policy's gap over random across the winning
-rates (24.8% at rho=0.50, 38.8% at rho=0.90). In the training regime greedy scores 0.00475;
+0.04846, learned 0.02989 at rho=0.50. **The myopic rule is only 10.8% better than random
+here**, and recovers just 24-42% of the learned policy's gap over random across the winning
+rates (24.1% at rho=0.50, 41.6% at rho=0.90). In the training regime greedy scores 0.00475;
 under sampled evidence it degrades by a factor of 10. So "beats the myopic rule" is true and
 paired, and it is a claim about a regime where the myopic rule has largely collapsed. Quoting
 learned against random alongside it is the honest presentation, and it is the stronger number
-anyway (-0.02374 at rho=0.50).
+anyway (-0.02445 at rho=0.50).
 
-**What must NOT be said about the control.** At rho=1.00 the learned arm averages +0.00378
+**What must NOT be said about the control.** At rho=1.00 the learned arm averages +0.00502
 against random, which invites "the full-oracle policy is worse than random at transfer". The
-seeds refuse it: -3.84, +2.29 and +5.20 paired SE, all three individually significant, in
+seeds refuse it: -3.00, +2.38 and +5.19 paired SE, all three individually significant, in
 BOTH directions. The mean is carried by one seed. What the control shows is a policy that has
 not transferred and is unstable across seeds, not one that is systematically worse than random
 -- the same signature as the 240x variance growth reported for the unadapted arm.
@@ -108,8 +130,8 @@ at two rates -- the pivot and a clear winner -- but its result was never written
 
 | rho | argmax delta | sampled delta | argmax per-seed significance |
 |---|---|---|---|
-| 0.95 | +0.02658 +/- 0.00268 | +0.00298 | 3/3 significantly WORSE than greedy |
-| 0.70 | -0.00512 +/- 0.00052 | -0.01661 | 2/3 significantly better (-2.57, -2.06, -1.96) |
+| 0.95 | +0.02658 +/- 0.00268 | +0.00195 | 3/3 significantly WORSE than greedy |
+| 0.70 | -0.00512 +/- 0.00052 | -0.01766 | 2/3 significantly better (-2.57, -2.06, -1.96) |
 
 The direction holds at both rates and the separation between them widens, so the qualitative
 claim is not a convention artefact. The magnitude is: at rho=0.70 the advantage shrinks by a
@@ -156,15 +178,16 @@ Learned-minus-greedy hard SHD on both sides, three seeds per rate:
 
 | rho | in-regime delta | transfer delta | change on moving to sampled |
 |---|---|---|---|
-| 1.00 | -0.00014 | +0.00966 | **+0.00980 WORSE** |
-| 0.95 | +0.00337 | +0.00298 | -0.00039 unchanged |
-| 0.90 | +0.00011 | -0.00927 | -0.00938 better |
-| 0.85 | +0.00053 | -0.00901 | -0.00954 better |
-| 0.80 | -0.00071 | -0.01291 | -0.01220 better |
-| 0.70 | -0.00397 | -0.01661 | -0.01264 better |
-| 0.50 | -0.00606 | -0.01785 | -0.01179 better |
+| 1.00 | -0.00014 | +0.01090 | **+0.01105 WORSE** |
+| 0.95 | +0.00337 | +0.00195 | -0.00142 unchanged |
+| 0.90 | +0.00011 | -0.00826 | -0.00837 better |
+| 0.85 | +0.00053 | -0.00936 | -0.00989 better |
+| 0.80 | -0.00071 | -0.01317 | -0.01246 better |
+| 0.70 | -0.00397 | -0.01766 | -0.01369 better |
+| 0.50 | -0.00606 | -0.01856 | -0.01250 better |
 
-**Pearson +0.703, Spearman +0.786.** In-regime predicts transfer.
+**Pearson +0.690, Spearman +0.750 on the seven rate means; +0.587 (p=0.005) and +0.776
+(p<0.0001) on the 21 individual cells.** In-regime predicts transfer, positively and weakly.
 
 **The finding is the ASYMMETRY, not an inversion.** The full oracle is the only arm that gets
 worse when moved to sampled evidence; every partial-oracle arm gets better relative to greedy,
@@ -189,9 +212,9 @@ selecting on `success` specifically is not, because it saturates exactly where t
 >
 > | rho | MAD vs sampled | transfer delta |
 > |---|---|---|
-> | 0.85 | **0.0042** best match | -0.00901 |
-> | 0.70 | 0.0310 | -0.01661 |
-> | 0.50 | **0.0807** worst match | **-0.01785** best transfer |
+> | 0.85 | **0.0042** best match | -0.00936 |
+> | 0.70 | 0.0310 | -0.01766 |
+> | 0.50 | **0.0807** worst match | **-0.01856** best transfer |
 >
 > If matching the belief-resolution trajectory were the operative mechanism, transfer would
 > peak at rho=0.85 and fall away either side. It does not; it improves monotonically as the
@@ -257,7 +280,7 @@ regime. It does set an absolute floor on achievable SHD for any policy.
     coverage at fixed rho, exactly as this line said before.
 * **The full effect is not attributed to the answer rate alone.** The configuration changes
   rate, budget, channels, reprobe signal and episode count together relative to `p10`. Section
-  2 isolates the rate; the -0.018 win as a whole is not isolated.
+  2 isolates the rate; the -0.0186 win as a whole is not isolated.
 * **"Substitutes for sampled training" is unproven.** Every comparison is against GREEDY under
   sampled evidence. A sampled-TRAINED arm at k=8 exists (`results/sampled_ref/`) and loses to
   greedy on 3/3 seeds -- suggestive that the expensive path is not a free win, but confounded
@@ -293,7 +316,9 @@ cleanly, and resolved a 0.012 effect on 40 episodes.
 
 ## 7. Files
 
-* Transfer grid (21 cells): `results/power/rho/xfer_rho*_s*.json`
+* Transfer grid (21 cells), AUTHORITATIVE: `results/power/rho/deterministic/xfer_rho*_s*.json`
+* Transfer grid, superseded pre-fix copy, do not quote: `results/power/rho/xfer_rho*_s*.json`
+* Deterministic-vs-published comparison: `results/power/rho/DETERMINISTIC_COMPARE.json`
 * Training (21 cells): `results/power/rho/rho*_s*.json`
 * Curve summary: `results/power/rho/CURVE.json`; figure `results/power/rho/rho_curve.png`
 * Answer-rate isolation: `results/power/transfer_p{10,07,05}.json`, `results/power/p{10,07,05}.json`
@@ -305,7 +330,9 @@ cleanly, and resolved a 0.012 effect on 40 episodes.
 * Tooling: `scripts/run_rho_fleet.sh`, `scripts/rho_transfer_daemon.sh`,
   `scripts/rho_curve_report.py`, `scripts/plot_rho_curve.py`,
   `scripts/power_vs_sampled_distribution.py`, `scripts/diversity_probe.py`,
-  `scripts/power_window_rate.py`, `scripts/keep_awake.py`
+  `scripts/power_window_rate.py`, `scripts/keep_awake.py`,
+  `scripts/rebuild_grid_deterministic.sh`, `scripts/compare_deterministic_grid.py`,
+  `scripts/delta_robustness.py`
 
 ## 8. Methods note: how the four wrong claims in this document were made
 

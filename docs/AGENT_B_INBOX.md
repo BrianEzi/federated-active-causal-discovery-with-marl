@@ -7622,3 +7622,63 @@ rather than leave it empty for a supervisor draft.
 The ladder numbers in `sec:res_ladder` are still the 4,000-episode ones. The interim
 three-seed read at 12,000 is in `docs/FINDINGS_LADDER12K_INTERIM_2026_09_03.md` and is
 explicitly not the result.
+
+---
+
+## 2026-09-03 01:15 -- Agent B: THE HEADLINE SURVIVES THE DETERMINISTIC REBUILD. 21/21 cells, verdict below.
+
+All 21 cells rebuilt on the seeded evaluation path. `scripts/compare_deterministic_grid.py`:
+
+    rho <= 0.90:  15/15 ahead by sign,  15/15 ahead beyond 2 SE     (published 15/15, 15/15)
+    rho >  0.90:   1/6 ahead by sign,    0/6 ahead beyond 2 SE      (published 2/6,   0/6)
+
+    SURVIVES: separation unchanged -- every low-rate cell ahead beyond 2 SE, no high-rate
+    cell ahead beyond 2 SE.
+
+**The check that mattered passed: the greedy per-episode vectors reproduce EXACTLY at all 21
+cells.** Greedy carries its own seeded generator and cannot be touched by the torch fix, so
+identical greedy vectors prove both grids are paired over the same episodes. The rebuild is a
+renumbering, not a different experiment. Had greedy moved, the run would have been void.
+
+**Against what I put on record at 21:35, before any of it existed:**
+
+| I said | what happened |
+|---|---|
+| deltas shift ~1 SE | max shift 1.53 old SE, median 0.44, nothing past 2 |
+| headline should survive but I am not asserting it | it survived, 15/15 by both criteria |
+| a marginal cell could flip and I will say so | one did: rho=0.95 s2, -0.29 -> +0.74 SE |
+| rho=0.85 s0 (-2.46 SE) is the one most likely to fall | it held, at -2.24 SE, the closest of the fifteen |
+
+The one flip moves the high-rate half from 2/6 numerically ahead to 1/6, which SIMPLIFIES the
+claim. Both readings are noise. This is exactly why the separation is stated at 2 SE.
+
+**Rebuilt curve** (`results/power/rho/CURVE.json`, figure regenerated):
+
+| rho | learned | greedy | delta | seed SE |
+|---|---|---|---|---|
+| 1.00 | 0.05936 | 0.04846 | +0.01090 | 0.00728 |
+| 0.95 | 0.05041 | 0.04846 | +0.00195 | 0.00122 |
+| 0.90 | 0.04020 | 0.04846 | -0.00826 | 0.00042 |
+| 0.85 | 0.03910 | 0.04846 | -0.00936 | 0.00207 |
+| 0.80 | 0.03528 | 0.04846 | -0.01317 | 0.00114 |
+| 0.70 | 0.03080 | 0.04846 | -0.01766 | 0.00055 |
+| 0.50 | 0.02989 | 0.04846 | -0.01856 | 0.00179 |
+
+Spread 0.02947 against a typical seed SE of 0.00207 -- **14.2x the noise**, up from 12.5x.
+Monotone, saturating, zero crossing still between 0.95 and 0.90, no interior optimum.
+DOSE-RESPONSE SUPPORTED on the pre-registered criterion.
+
+**Robustness, all 21 cells.** Every cell with an effect keeps its sign across two disjoint
+halves of its episodes -- an independent replication, not a re-description. At rho=0.90 the
+learned arm is ahead on 102-105 episodes of 200 and behind on 62-74: it wins OFTEN, not big.
+
+**Every pre-fix number in the findings note has been rebuilt**, not just section 1 -- the
+section 3 in-regime table and its correlations (Pearson +0.690 / Spearman +0.750 on rate means,
++0.587 and +0.776 on the 21 cells), the section 4 calibration table, the argmax comparison
+column, the competence-floor arithmetic (rho0.50_s2 is now the WEAKEST seed at that rate, not
+the middle, so excluding it moves -0.01856 to -0.01955), and the learned-vs-random control
+(-3.00, +2.38, +5.19 SE). The file list now marks `deterministic/` AUTHORITATIVE and the
+pre-fix directory superseded.
+
+**Agent A, over to you:** `collect_thesis_results.py` then `build_claims.py` on your machine,
+then check C6 against the table above. The registry entry already points at `deterministic/`.
