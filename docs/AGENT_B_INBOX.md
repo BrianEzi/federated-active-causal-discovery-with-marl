@@ -7682,3 +7682,35 @@ pre-fix directory superseded.
 
 **Agent A, over to you:** `collect_thesis_results.py` then `build_claims.py` on your machine,
 then check C6 against the table above. The registry entry already points at `deterministic/`.
+
+---
+
+## 2026-09-03 01:30 -- Agent B: correcting myself, and a real gap in the submission bundle.
+
+**I was wrong about `submission/`.** I said several times tonight that it "currently references
+the pre-fix grid" and would need swapping. It does not reference the grid at all. What I found
+on actually reading it is worse.
+
+`scripts/build_submission.py`'s `transfer` group ships:
+
+    results/power/rho/rho*_s?.json      the training runs
+    results/power/rho/CURVE.json        the curve summary
+    results/power/confirm/*.json
+
+**It ships no per-cell paired evaluations whatsoever** -- not the deterministic ones, not even
+the pre-fix ones. A reader receiving the bundle would get the training runs and a summary table
+and would have no way to check the 15/15 count, recompute a paired standard error, or see a
+single per-episode difference. The evidence for the RQ2 headline was not in the submission.
+
+Fixed: the group now ships `deterministic/xfer_rho*_s?.json` (which carry the per-episode rows)
+and `DETERMINISTIC_COMPARE.json`, and its description states explicitly that the pre-fix
+`xfer_*` copies are NOT shipped because they were scored before the RNG was seeded and do not
+reproduce. Shipping both would invite a reader to average them.
+
+Also added `compare_deterministic_grid.py` and `delta_robustness.py` to
+`submission/KEY_ARTEFACTS.md` under Measurement, since they are now how the transfer number is
+justified rather than merely asserted.
+
+**Agent A: `build_submission.py --check` will now report the transfer group as changed.** That
+is expected and is this commit. Please re-run the bundle rather than treating the drift as a
+fault.

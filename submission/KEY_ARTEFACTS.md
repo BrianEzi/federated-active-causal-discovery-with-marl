@@ -10,6 +10,8 @@ number was produced or why a claim is stated the way it is.
 | `scripts/global_shd_paired.py` | **The measurement every structural claim rests on.** Plays each arm over identical episode seeds and reports the standard error of the per-episode *difference*. Takes `--checkpoint best\|final\|u0500` and `--sample`. Its docstring explains why it exists separately from `scripts/shd.py` and how the two disagree in sign. |
 | `scripts/shd_by_pair_class.py` | Splits structural error into pairs the acting agent is scored on and pairs it is not. |
 | `scripts/measure_sweep12k.py` | Measures each 12,000-episode cell at all three conventions as its seeds land. Resumable. |
+| `scripts/compare_deterministic_grid.py` | Compares the answer-rate grid before and after the evaluation RNG was seeded. Reports each cell's shift in units of its own prior standard error, and refuses a verdict on an incomplete grid. Its load-bearing check is whether the *myopic* arm moved: that arm cannot be affected by the fix, so a moved myopic mean means the two grids are not paired over the same episodes. |
+| `scripts/delta_robustness.py` | Asks whether a paired delta is carried by the whole episode set or a handful of episodes: sign agreement across two disjoint halves, and the share of the total contributed by the largest five per cent. |
 | `scripts/attr_model.py` | The closed-form attribution predictor and its residuals. |
 
 ## Engine

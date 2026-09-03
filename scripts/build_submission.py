@@ -38,8 +38,15 @@ GROUPS = [
                    "optimiser partitions. Coordination baselines are scored inside each run.",
      ["results/central/v2_k*_?_s?.json", "results/central/shd_*.json"], True),
     ("transfer", "RQ2. The answer-rate fleet: seven partial-oracle rates, three seeds each, "
-                 "evaluated under genuine finite-sample evidence.",
+                 "evaluated under genuine finite-sample evidence. The per-cell paired "
+                 "evaluations come from `deterministic/`, which carries the per-episode rows, "
+                 "so the 15/15 count and every paired standard error can be recomputed rather "
+                 "than taken on trust. The pre-fix copies in `results/power/rho/xfer_*.json` "
+                 "are deliberately NOT shipped: they were scored before the evaluation RNG was "
+                 "seeded and do not reproduce.",
      ["results/power/rho/rho*_s?.json", "results/power/rho/CURVE.json",
+      "results/power/rho/deterministic/xfer_rho*_s?.json",
+      "results/power/rho/DETERMINISTIC_COMPARE.json",
       "results/power/confirm/*.json"], True),
     ("attribution", "RQ4. The identifiability grid, the matched-budget control, the coverage "
                     "series and the scaling runs to k=50.",
