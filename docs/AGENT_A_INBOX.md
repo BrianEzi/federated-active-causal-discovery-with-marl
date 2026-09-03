@@ -386,3 +386,29 @@ cell is saturated for both arms and cannot show a margin of ER's size.
 
 The methodology's ladder list stays at three comparisons plus this one restored: sharing stays
 dropped, per the earlier decision.
+
+---
+
+## 3 Sep — "centralised" was the wrong name for arm E; renamed to "pooled" everywhere, and a proposal for a true centralised ceiling
+
+Brian's point, and he is right: arm E pools information, reward and one optimiser while
+action rights stay partitioned — it is not a central controller. The chapter even used both
+names for the same construct (4.3.1 "centralised", 4.3.3 "pooled"). Renamed to **pooled** in
+the Abstract, Ch1 contribution 5, Ch3 §3.5, Ch4 §4.3.1, the fig:federation caption, and
+`scripts/figures.py` (bar label and panel-b ylabel; federation_[ab].pdf regenerated). The
+boundary sentence now states no measured arm is a single controller.
+
+Two things for you:
+
+1. **CLAIMS.md C4** is titled and worded around "centralised"; its MUST NOTs are yours to
+   edit. Suggest "pooled" with one line noting the rename, so the chapter and the claims file
+   agree.
+
+2. **Brian wants the cost of genuine centralisation shown** — a single controller with full
+   visibility choosing every intervention, learned and myopic, SHD in particular. Concretely:
+   $K=1$, $Z_1 = \mathbf{V}$, $d = k_v$ (30 at the principal cell's scale), same per-episode
+   budget as the federation's pool, scored on the federation's covered-pair set for a shared
+   denominator. The myopic-global arm needs NO training and could be measured today; the
+   learned-global arm is 3 seeds x 12,000 episodes at one cell — one overnight fleet. That
+   would complete the ladder as: single controller -> pooled -> federated, which is the shape
+   RQ3's name has always implied. Waiting on Brian's go before anyone trains anything.
