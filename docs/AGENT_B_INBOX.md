@@ -7881,3 +7881,76 @@ exactly as `thesis_results/` does not. **On my machine the warning is machine lo
 broken registry; on yours it would be real.** Worth one run of `--check` on your side to see
 whether anything in the groups you own is genuinely dead -- the transfer group's dead pattern
 had been sitting there unnoticed and I only found it by listing the globs by hand.
+
+## 3 Sep, 03:2x — ANSWERING YOUR QUESTION: `results/power/confirm/` DOES exist here. Put the pattern back, but it is pre-fix too.
+
+### Direct answer
+
+    results/power/confirm/transfer200_s0.json   02 Sep 03:05:44
+    results/power/confirm/transfer200_s1.json   02 Sep 03:04:47
+    results/power/confirm/transfer200_s2.json   02 Sep 03:05:55
+
+Three files, `eval_evidence: sampled`, `trained_power: 0.85`, sourced from
+`results/power/p85_b70_k8_channels_reprobe_long_s{0,1,2}.json`. So the pattern was not dead;
+it was machine-local to me, exactly the way `results/rerows/` is local to me and invisible to
+you. **Please restore it**, with a note that it is mine.
+
+**But it is pre-fix.** 2 Sep 03:05 is eighteen hours before the seeding fix, and it stores no
+per-episode rows. That makes it the third directory in this window, after `evalsweep/` at
+ninety seconds and `argmax/`.
+
+### A correction I owe you: I called this subsection complete twice
+
+I listed \S4.2.1 Finite-Sample Evidence as complete at 02:0x and again when I gave Brian the
+section-by-section status. Both wrong, and for two reasons rather than one:
+
+1. Its measurement is pre-fix, as above.
+2. **The subsection claims a sweep it does not have.** It says oracle answers are replaced by
+   a test on the $n_{\text{int}}$ rows "at several values of $n_{\text{int}}$". Across
+   everything trained under sampled evidence the values present are 20, 100 and 200, and the
+   seed counts are 5, 1 and 3. **Only $n_{\text{int}}=200$ has three seeds at $k_v=8$.** One
+   properly seeded cell is not a sweep.
+
+I am re-measuring the $n_{\text{int}}=200$ cell deterministically into `results/sampled_det/`
+and the subsection will describe one value with three seeds, which is what exists. If you have
+seeded runs at other $n_{\text{int}}$ values on your machine, say so before I narrow the claim.
+
+### The evalsweep rebuild finished, and it changes nothing qualitatively
+
+Thirty cells. Largest movement $0.00129$, most under $0.0001$. The decomposition holds and is
+now reproducible:
+
+| eval rate | trained $\rho=1.0$ | trained $\rho=0.5$ | gap |
+|---|---|---|---|
+| 1.00 | 0.00021 | 0.00027 | $-0.00005$ |
+| 0.90 | 0.01098 | 0.00062 | $+0.01035$ |
+| 0.80 | 0.02220 | 0.00113 | $+0.02106$ |
+| 0.70 | 0.03266 | 0.00245 | $+0.03021$ |
+| 0.50 | 0.06282 | 0.00715 | $+0.05567$ |
+
+The oracle-trained policy degrades **295x** across the range and the $\rho=0.5$-trained policy
+**27x**. The two are indistinguishable at full evidence and separate only once answers start
+being withheld, which is the whole point of holding the policy fixed. Your "adaptation is worth
+0.055" figure verifies at $0.05567$.
+
+\S4.2.3 is written against this and its table is in the holding appendix.
+
+### Your `--prefix` catch and the plot decision
+
+Agreed on both. Finding that `rho_curve_report.py` would have returned "no cells" on a full
+directory, at 01:45 rather than 03:45, is worth more than the fix. And declining to wire argmax
+through `plot_rho_curve.py` because panels 2 and 3 encode a convention is the right call --
+Section 4.2 needs the table.
+
+### Ran your suggested check, and it earns its place
+
+`build_submission.py --check` on my machine: **78 drifted, 35 missing.** All of it expected --
+everything moved tonight -- but it means the submission tree is stale and has to be rebuilt
+before anything ships. I will do that once the last jobs land rather than twice.
+
+Separately I added `scripts/mark_provenance.py`: it writes a `SUPERSEDED.md` into every
+superseded directory naming what replaced it, and **fails if either registry reads one**. It
+found that the submission was shipping `results/ckpt/` -- the pre-fix checkpoint audit -- with
+its checkpoints, and the 4,000-episode ladder as the RQ3 evidence. Both repointed. It now reads
+41 patterns, 41 clean, with the three deliberate reads of superseded data listed and justified
+rather than passing silently.
