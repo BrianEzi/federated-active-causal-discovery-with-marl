@@ -8109,3 +8109,46 @@ the rate-level statement later and present it as what I meant all along.
 
 Falsified if 13 or more of the 15 winning cells clear 2 SE under argmax, or if any winning rate
 comes out positive. Due about 03:45.
+
+---
+
+## 2026-09-03 02:35 -- Agent B: MY PREDICTION IS REFUTED, and worse than refuted. Under argmax, rho=0.90 and rho=0.85 do not merely lose significance -- they REVERSE.
+
+Fifteen minutes ago I predicted the argmax deltas at rho=0.90 and rho=0.85 would be about
+-0.0024 and -0.0027: still negative, inside noise. Here is what landed.
+
+| rho | sampled delta | argmax delta | argmax per-seed |
+|---|---|---|---|
+| 1.00 | +0.01090 | **+0.04043** | +8.92, +4.35, +11.68 SE |
+| 0.95 | +0.00195 | **+0.02658** | +9.39, +9.30, +6.88 SE |
+| 0.90 | **-0.00826** | **+0.01656** | +5.82, +6.15, +4.41 SE |
+| 0.85 | **-0.00936** | **+0.01324** (2 of 3 seeds) | +5.73, +3.43 SE |
+
+**rho=0.90 and rho=0.85 lose to the myopic rule under argmax, significantly, on every seed
+measured.** Not inside noise -- three to six SE on the wrong side. My predicted values were
+wrong by roughly 0.019, about eight standard errors.
+
+**Why the prediction failed.** I modelled the argmax penalty as MULTIPLICATIVE on the delta,
+scaling by the 0.29 ratio observed at rho=0.70. It is not multiplicative. The shift from
+sampled to argmax is roughly ADDITIVE and large: +0.0295 at rho=1.00, +0.0246 at 0.95, +0.0248
+at 0.90, +0.0226 at 0.85 -- but only **+0.0125 at rho=0.70**. I took my one data point from the
+rate where the penalty happens to be half what it is everywhere else, and extrapolated from it.
+A single anchor, used as a scaling law, across a quantity whose behaviour I had not established.
+
+**What this does to the result, stated before the last cells land.** If rho=0.80, 0.70 and 0.50
+come in where the additive pattern suggests, the argmax picture is:
+
+* the zero crossing moves from between 0.95/0.90 down to somewhere between 0.85 and 0.70;
+* **"15 of 15 beyond 2 SE" becomes 6 to 9 of 15, and the failures are REVERSALS, not ties;**
+* the dose-response and the ordering of rates survive -- every argmax delta so far is still
+  monotone in rho -- but the claim "beats the myopic rule" holds under argmax only at the
+  lowest rates.
+
+That is a materially smaller result than section 1 currently states, and it is not a
+presentational matter. I registered the prediction so I could not retreat quietly; the honest
+retreat is larger than the one I had prepared for.
+
+**Not yet final.** rho=0.85 has two seeds of three; 0.80, 0.70 and 0.50 are still running, 11
+cells outstanding, due about 03:45. rho=0.70's existing pair of measurements is the reason to
+expect the low rates to survive, and it is also the single point that misled me, so I am
+deliberately not predicting again. I will report what lands.
