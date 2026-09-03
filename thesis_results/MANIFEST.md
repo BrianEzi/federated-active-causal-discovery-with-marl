@@ -447,6 +447,27 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `repeat_rho1.00.json` | `7dc626cdc8e63fed` | `results/power/rho/repeat/repeat_rho1.00.json` |
 | `repeat_rho1.00_s1.json` | `fc70ae80e1b85cbc` | `results/power/rho/repeat/repeat_rho1.00_s1.json` |
 | `repeat_rho1.00_s2.json` | `c0b3eebf3aedbbe6` | `results/power/rho/repeat/repeat_rho1.00_s2.json` |
+| `argmax_rho0.50_s0.json` | `fbf41dfeb90a330a` | `results/power/rho/argmax_det/argmax_rho0.50_s0.json` |
+| `argmax_rho0.50_s1.json` | `0114828f083ea582` | `results/power/rho/argmax_det/argmax_rho0.50_s1.json` |
+| `argmax_rho0.50_s2.json` | `3626f8835ad664d4` | `results/power/rho/argmax_det/argmax_rho0.50_s2.json` |
+| `argmax_rho0.70_s0.json` | `22566834f3562c97` | `results/power/rho/argmax_det/argmax_rho0.70_s0.json` |
+| `argmax_rho0.70_s1.json` | `753ec03789bb80bc` | `results/power/rho/argmax_det/argmax_rho0.70_s1.json` |
+| `argmax_rho0.70_s2.json` | `015260731e558e77` | `results/power/rho/argmax_det/argmax_rho0.70_s2.json` |
+| `argmax_rho0.80_s0.json` | `675bc25269903dfd` | `results/power/rho/argmax_det/argmax_rho0.80_s0.json` |
+| `argmax_rho0.80_s1.json` | `c2d2a9a7efaab353` | `results/power/rho/argmax_det/argmax_rho0.80_s1.json` |
+| `argmax_rho0.80_s2.json` | `a4017bd2dd4848a1` | `results/power/rho/argmax_det/argmax_rho0.80_s2.json` |
+| `argmax_rho0.85_s0.json` | `ba9415e449f7e342` | `results/power/rho/argmax_det/argmax_rho0.85_s0.json` |
+| `argmax_rho0.85_s1.json` | `62a4b3341994c2e2` | `results/power/rho/argmax_det/argmax_rho0.85_s1.json` |
+| `argmax_rho0.85_s2.json` | `4b604ea5a5d9d070` | `results/power/rho/argmax_det/argmax_rho0.85_s2.json` |
+| `argmax_rho0.90_s0.json` | `2decb0f0dcb9c665` | `results/power/rho/argmax_det/argmax_rho0.90_s0.json` |
+| `argmax_rho0.90_s1.json` | `f82b5f7d8bae1ad9` | `results/power/rho/argmax_det/argmax_rho0.90_s1.json` |
+| `argmax_rho0.90_s2.json` | `0ba868b2099685d4` | `results/power/rho/argmax_det/argmax_rho0.90_s2.json` |
+| `argmax_rho0.95_s0.json` | `af21827baaf7e82a` | `results/power/rho/argmax_det/argmax_rho0.95_s0.json` |
+| `argmax_rho0.95_s1.json` | `82a7d1c451b9b802` | `results/power/rho/argmax_det/argmax_rho0.95_s1.json` |
+| `argmax_rho0.95_s2.json` | `3b96fed0259365f6` | `results/power/rho/argmax_det/argmax_rho0.95_s2.json` |
+| `argmax_rho1.00_s0.json` | `080a1a06f9e1db61` | `results/power/rho/argmax_det/argmax_rho1.00_s0.json` |
+| `argmax_rho1.00_s1.json` | `2e42e3400eae1dcf` | `results/power/rho/argmax_det/argmax_rho1.00_s1.json` |
+| `argmax_rho1.00_s2.json` | `b440397a3ad95c17` | `results/power/rho/argmax_det/argmax_rho1.00_s2.json` |
 | `inregime_det__rho0.50_s0.json` | `6d419f9f942610cf` | `results/power/rho/inregime_det/rho0.50_s0.json` |
 | `inregime_det__rho0.50_s1.json` | `0e04cf15ee9b3b73` | `results/power/rho/inregime_det/rho0.50_s1.json` |
 | `inregime_det__rho0.50_s2.json` | `6aa25b83b3dcea0a` | `results/power/rho/inregime_det/rho0.50_s2.json` |
@@ -500,4 +521,4 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `fixed_rho1.00_s2_evalp1.0.json` | `fab91ea24cc72235` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp1.0.json` |
 | `nint200.json` | `5e6f100544385577` | `results/sampled_det/nint200.json` |
 
-127 files.
+148 files.

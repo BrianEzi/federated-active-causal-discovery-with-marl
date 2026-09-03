@@ -87,6 +87,13 @@ structural distance tables are measured separately and are not interchangeable w
 **MUST NOT** describe this as 15 of 18 cells flipping. It is 14; the fifteenth
 (`k12s50n05b150`) is an exact tie at 0.957 against 0.957 and was miscounted on 2 Sep
 by a comparison that treated a tie as a change of winner.
+**The headline cells obey the same law, measured 3 Sep.** The 4,000-episode policies
+at $k_v=20$ and $30$ survived as u0249 checkpoints (episode 4,000 exactly; training is
+horizon-independent; files dated 31 Aug, so they are the original-era policies). At
+4,000 episodes: $k_v=20$ learned 0.00141 against myopic 0.00053, seeds split;
+$k_v=30$ learned 0.00653 against 0.00042, behind on 2 of 3 seeds significantly. At
+4,000 episodes the learned arm trails the myopic rule at every window except
+$k_v=12$; at 12,000 it trails nowhere. `results/rerows/k{20,30}_u0249.json`.
 
 ## C3 — The learned advantage is entirely on scored pairs
 
@@ -194,12 +201,23 @@ State the floor value and the choice; do not quietly take the better number.
 **MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`,
 `inregime_det/` or `evalsweep_det/`. The pre-fix copies are not reproducible (the
 argmax/ directory is the one exception -- argmax never draws from the generator).
-**ARGMAX GRID PENDING (3 Sep 02:35).** Under argmax the mid-rate advantage REVERSES:
-rho=0.90 and 0.85 lose to the myopic rule at 3-6 SE per seed on the cells so far.
-**MUST NOT** write any sentence in 4.2 presenting the mid-rate advantage as
-convention-independent, and MUST NOT finalise the boundary until agent B's full
-argmax grid lands. The sampled convention is the policy PPO trained -- argmax is a
-derived policy -- and that is the defensible framing, stated rather than assumed.
+**THE ARGMAX GRID IS COMPLETE (3 Sep 03:55, verified independently 3 Sep).** Under
+argmax: 6 of 15 low-rate cells ahead by sign, **3 of 15 beyond 2 SE**; rho=0.90 and
+0.85 reverse significantly on every seed; only rho=0.70 and 0.50 keep any advantage.
+The RATE ORDERING is convention-independent (the argmax curve is monotone with spread
+11x its seed SE); the threshold at which the learned policy beats the myopic rule is
+not. 87% of the argmax penalty is pairs left UNDETERMINED (r=0.993 with the
+resolved-fraction drop; the myopic arm's resolved fraction moves by exactly zero),
+which is the measured execution pathology: a deterministic policy cannot leave a
+state whose argmax action has stopped being informative.
+**The framing the chapter must use:** the trained policy is stochastic and sampling
+IS that policy; argmax is a derived policy. Both results are stated: the trained
+policy beats the myopic rule at every rate below 0.95; its deterministic derivative
+keeps that advantage only at the lowest rates, for the measured reason above.
+**MUST NOT** quote 15/15 without naming the sampled convention beside it.
+**MUST NOT** present the argmax reversal as evidence the advantage is illusory: the
+cause is measured and it is an execution pathology, not a scoring artefact -- but
+deployment that requires determinism inherits it, and the chapter says so.
 
 ### C6a — the same policies in their own regimes
 
