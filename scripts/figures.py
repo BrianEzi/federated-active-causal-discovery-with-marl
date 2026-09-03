@@ -196,7 +196,7 @@ def fig_window_budget(out: pathlib.Path):
         top.scatter([k] * len(vals), vals, s=12, color=MYOPIC, alpha=0.4, zorder=2)
         my_rec.append(np.mean(vals))
     top.plot(KS, my_rec, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
-    top.set_ylabel("joint recovery rate")
+    top.set_ylabel(r"joint recovery rate ($\uparrow$)")
     top.set_ylim(0, 1.02)
     top.legend(loc="lower left", frameon=False)
     _title(top, "The sign change belongs to the budget, not the window")
@@ -223,7 +223,7 @@ def fig_window_budget(out: pathlib.Path):
     bot.set_yscale("log")
     bot.set_ylim(7e-6, 2e-1)
     bot.set_xlabel("window size $k_v$")
-    bot.set_ylabel("SHD on committed marks\n(pooled global graph)")
+    bot.set_ylabel("SHD on committed marks ($\\downarrow$)\n(pooled global graph)")
     bot.annotate("0 errors in 600 episodes", xy=(20, 1e-5), xytext=(11.5, 3.3e-5),
                  fontsize=7.5, color=LEARNED,
                  arrowprops=dict(arrowstyle="->", color=LEARNED, lw=0.7))
@@ -231,6 +231,55 @@ def fig_window_budget(out: pathlib.Path):
         ax.set_xticks(KS)
     fig.tight_layout()
     fig.savefig(out / "window_budget.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_nint(out: pathlib.Path):
+    """Transfer to sampled evidence as the interventional sample size grows.
+
+    The k=8 policies trained at 12,000 episodes under oracle evidence, evaluated at the
+    selected checkpoint under SAMPLED evidence with n_int swept from 10 to 10,000 --
+    Brian's request, 3 Sep. Every point is scripts/global_shd_paired.py with
+    --override_n_int, 200 paired episodes, sampled action selection, three seeds. The
+    baselines re-run at every n_int because their beliefs read the same test statistics.
+    """
+    grid = [10, 30, 100, 200, 1000, 3000, 10000]
+    files = {}
+    for n in grid:
+        got = sorted((ROOT / "results/nint_curve").glob(f"nint{n:05d}_s*.json"))
+        if got:
+            files[n] = got
+    if not files:
+        raise FileNotFoundError("no results/nint_curve measurements yet")
+    incomplete = {n: len(v) for n, v in files.items() if len(v) < 3}
+    if incomplete or len(files) < len(grid):
+        # Partial grids have said the opposite of complete ones four times this week; draw
+        # nothing rather than a curve that will be quoted.
+        raise RuntimeError(f"nint grid incomplete: {sorted(files)} of {grid}, "
+                           f"short cells {incomplete} -- not drawing a partial curve")
+    fig, ax = plt.subplots(figsize=(FULL, 3.2))
+    floor = 1e-5
+    for arm, colour, label in (("learned", LEARNED, "learned (oracle-trained, transferred)"),
+                               ("greedy", MYOPIC, "myopic"),
+                               ("random_vary", RANDOM, "random")):
+        means = []
+        for n in grid:
+            vals = [json.loads(f.read_text())[0]["means"][arm]["hard"] for f in files[n]]
+            ax.scatter([n] * len(vals), [max(v, floor) for v in vals],
+                       s=12, color=colour, alpha=0.4, zorder=3)
+            means.append(np.mean(vals))
+        ax.plot(grid, [max(m, floor) for m in means], "o-", color=colour, lw=1.6, ms=5,
+                label=label, zorder=4)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xticks(grid)
+    ax.set_xticklabels([str(n) for n in grid], fontsize=7.5)
+    ax.set_xlabel(r"interventional samples per intervention $n_{\mathrm{int}}$")
+    ax.set_ylabel(r"SHD on committed marks ($\downarrow$)")
+    _title(ax, "Evidence quality is a sample-size dial at evaluation time")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(out / "nint.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -322,7 +371,7 @@ def fig_federation(out: pathlib.Path):
         _title(ax, title)
         ax.annotate(title, xy=(0.04, 0.92), xycoords="axes fraction", fontsize=9)
         ax.set_ylim(0, 1.05)
-    axes[0].set_ylabel("joint recovery rate")
+    axes[0].set_ylabel(r"joint recovery rate ($\uparrow$)")
     fig.tight_layout()
     fig.savefig(out / "federation_a.pdf", bbox_inches="tight")
     plt.close(fig)
@@ -352,7 +401,7 @@ def fig_federation(out: pathlib.Path):
     ax3.set_ylim(-lim, lim)
     ax3.set_xticks(seeds)
     ax3.set_xlabel("seed")
-    ax3.set_ylabel("paired difference in SHD\nfederated $-$ centralised", fontsize=8)
+    ax3.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ centralised", fontsize=8)
     ax3.annotate("above 0: centralising wins", xy=(0.04, 0.92), xycoords="axes fraction",
                  fontsize=8, color="#666666")
     fig.tight_layout()
@@ -450,8 +499,8 @@ def fig_sweep_grid(out: pathlib.Path):
     series = [("learned", "learned", LEARNED, "o", 1.9),
               ("myopic (greedy)", "greedy_uncertainty", MYOPIC, "s", 1.5),
               ("random", "random_vary", RANDOM, "^", 1.3)]
-    metrics = [("global_hard_shd", "SHD on committed marks", True),
-               ("success", "joint recovery rate", False)]
+    metrics = [("global_hard_shd", "SHD on committed\nmarks ($\\downarrow$)", True),
+               ("success", "joint recovery\nrate ($\\uparrow$)", False)]
     floor = 1e-5
 
     for tag, xlabel, key, keep in axes_spec:
@@ -572,7 +621,7 @@ def fig_pair_class(out: pathlib.Path):
         _title(ax, title, fontsize=9)
         ax.set_yscale("symlog", linthresh=1)
         ax.set_ylim(-0.5, 1.2e5)
-    left.set_ylabel("errors committed")
+    left.set_ylabel(r"errors committed ($\downarrow$)")
     left.legend(loc="lower left", frameon=False)
     _suptitle(fig, "Training moves the class the policy is scored on, and not the other",
                  fontsize=9.5)
@@ -626,7 +675,7 @@ def fig_answer_rate(out: pathlib.Path):
         top.scatter([at[r]] * len(per[r]), [v[0] for v in per[r]], s=14, color=LEARNED,
                     alpha=0.4, zorder=3)
     top.plot(pos, means, "o-", color=LEARNED, lw=1.7, ms=5, zorder=4, label="learned")
-    top.set_ylabel("SHD on committed marks")
+    top.set_ylabel(r"SHD on committed marks ($\downarrow$)")
     top.legend(loc="upper left", frameon=False, fontsize=7.5)
     _title(top, "Degrading the training evidence improves transfer")
 
@@ -652,13 +701,13 @@ def fig_answer_rate(out: pathlib.Path):
                     color=MYOPIC, lw=1.2, ms=4.5, zorder=3, label="argmax derivative")
         bottom.legend(loc="upper left", frameon=False, fontsize=7.5)
     bottom.set_xlabel(r"answer rate $\rho$ the policy trained under")
-    bottom.set_ylabel("paired difference in SHD\nlearned $-$ myopic")
+    bottom.set_ylabel("paired difference in SHD ($\\downarrow$)\nlearned $-$ myopic")
     bottom.annotate("filled: ahead beyond 2 SE", xy=(0.52, 0.012), fontsize=7,
                     color="#555555")
     for ax in (top, bottom):
         ax.set_xticks(rhos)
         ax.set_xticklabels([f"{r:g}" for r in rhos], fontsize=7.5)
-        ax.set_xlim(0.46, 1.04)
+        ax.set_xlim(1.04, 0.46)   # oracle on the left, noise increasing rightward
     fig.tight_layout()
     fig.savefig(out / "answer_rate.pdf", bbox_inches="tight")
     plt.close(fig)
@@ -709,7 +758,7 @@ def fig_credit(out: pathlib.Path):
         ax.set_xticklabels(["credit on", "credit off"])
         ax.set_xlim(-0.35, 1.45)
         ax.annotate(title, xy=(0.05, 0.92), xycoords="axes fraction", fontsize=9)
-    axes[0].set_ylabel("SHD on committed marks")
+    axes[0].set_ylabel(r"SHD on committed marks ($\downarrow$)")
     axes[0].legend(loc="lower right", frameon=False)
     fig.tight_layout()
     fig.savefig(out / "credit.pdf", bbox_inches="tight")
@@ -748,7 +797,7 @@ def fig_fixedpolicy(out: pathlib.Path):
                 ms=5, label=label, zorder=4)
     ax.set_yscale("log")
     ax.set_xlabel(r"evaluation answer rate $\rho$")
-    ax.set_ylabel("SHD on committed marks")
+    ax.set_ylabel(r"SHD on committed marks ($\downarrow$)")
     ax.set_xticks(evals)
     ax.invert_xaxis()          # reading left to right = answers progressively withheld
     _title(ax, "Held fixed, the oracle-trained policy degrades $295\\times$\n"
@@ -795,10 +844,11 @@ def fig_inregime(out: pathlib.Path):
     left.set_xticks(rhos)
     left.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else "" for r in rhos])
     left.set_xlabel(r"answer rate $\rho$")
-    left.set_ylabel("paired difference in SHD\nlearned $-$ myopic, in-regime", fontsize=8)
+    left.invert_xaxis()        # oracle on the left, noise increasing rightward
+    left.set_ylabel("paired difference in SHD ($\\downarrow$)\nlearned $-$ myopic, in-regime", fontsize=8)
     left.annotate(r"$\rho=0.95$: worse in-regime" + "\non 3 of 3 seeds",
-                  xy=(0.95, 0.0041), xytext=(0.62, 0.0035), fontsize=8, color="#666666",
-                  arrowprops=dict(arrowstyle="->", color="#666666", lw=0.7))
+                  xy=(0.95, 0.0041), xytext=(0.66, 0.0038), fontsize=8, color="#666666",
+                  ha="center", arrowprops=dict(arrowstyle="->", color="#666666", lw=0.7))
 
     right.axhline(0, color="black", lw=0.7, zorder=1)
     right.axvline(0, color="black", lw=0.7, zorder=1)
@@ -807,8 +857,8 @@ def fig_inregime(out: pathlib.Path):
             if (r, s_) in xfer:
                 right.scatter(inreg[(r, s_)], xfer[(r, s_)], s=16, color=LEARNED,
                               alpha=0.55, zorder=3)
-    right.set_xlabel("paired difference in SHD, in-regime", fontsize=8)
-    right.set_ylabel("paired difference in SHD, transfer", fontsize=8)
+    right.set_xlabel(r"paired difference in SHD, in-regime ($\downarrow$)", fontsize=8)
+    right.set_ylabel(r"paired difference in SHD, transfer ($\downarrow$)", fontsize=8)
     right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.08),
                    xycoords="axes fraction", fontsize=8, color="#666666")
     fig.tight_layout()
@@ -853,7 +903,7 @@ def fig_generator(out: pathlib.Path):
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["scale-free\n(all reported results)", "Erd\u0151s--R\u00e9nyi\n(control)"])
     ax.set_xlim(-0.35, 1.4)
-    ax.set_ylabel("SHD on committed marks")
+    ax.set_ylabel(r"SHD on committed marks ($\downarrow$)")
     ax.legend(loc="center left", frameon=False)
     fig.tight_layout()
     fig.savefig(out / "generator.pdf", bbox_inches="tight")
@@ -893,7 +943,7 @@ def fig_training_signal(out: pathlib.Path):
     ax.set_xticks(range(len(groups)))
     ax.set_xticklabels([g[0] for g in groups], fontsize=8)
     ax.set_ylim(0, 1.05)
-    ax.set_ylabel("per-window solve rate\n(last ten checkpoints)", fontsize=8)
+    ax.set_ylabel("per-window solve rate ($\\uparrow$)\n(last ten checkpoints)", fontsize=8)
     fig.tight_layout()
     fig.savefig(out / "training_signal.pdf", bbox_inches="tight")
     plt.close(fig)
@@ -908,7 +958,7 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     for name, fn in (("sweep_grid_[abcd]", fig_sweep_grid),
-                     ("window_budget", fig_window_budget),
+                     ("window_budget", fig_window_budget), ("nint", fig_nint),
                      ("attribution_law", fig_attribution_law),
                      ("federation_[ab]", fig_federation),
                      ("pair_class", fig_pair_class),
