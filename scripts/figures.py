@@ -252,7 +252,9 @@ def fig_federation(out: pathlib.Path):
               ("myopic, uncoordinated", "greedy_uncertainty", MYOPIC),
               ("learned (federated)", "learned", LEARNED)]
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.4, 3.0), sharey=True)
+    fig = plt.figure(figsize=(9.6, 3.1))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 0.9], wspace=0.32)
+    axes = [fig.add_subplot(gs[0]), fig.add_subplot(gs[1], sharey=None)]
     for ax, (title, pattern) in zip(axes, cells):
         for index, (label, key, colour) in enumerate(series):
             vals = arm(pattern.format(a="A"), key)
@@ -272,9 +274,41 @@ def fig_federation(out: pathlib.Path):
         ax.set_title(title)
         ax.set_ylim(0, 1.05)
     axes[0].set_ylabel("joint recovery rate")
-    fig.suptitle("Learned coordination beats convention; centralising the learner adds nothing",
-                 fontsize=9.5, y=1.02)
-    fig.tight_layout()
+    axes[1].tick_params(labelleft=False)
+    axes[1].set_ylim(0, 1.05)
+
+    # Third panel: the six-seed paired comparison on the primary metric, from the measured
+    # 12,000-episode ladder. This is the RQ3 headline; the bars are the coordination story.
+    lad = {}
+    for k in ("A_best", "E_best"):
+        q = ROOT / f"results/rerows/ladder12k_{k}.json"
+        if q.exists():
+            lad[k] = {r["seed"]: r for r in json.loads(q.read_text())}
+    if len(lad) == 2:
+        ax3 = fig.add_subplot(gs[2])
+        seeds = sorted(lad["A_best"])
+        ds, ses = [], []
+        for sd in seeds:
+            x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
+            y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
+            d = x - y
+            ds.append(d.mean())
+            ses.append(d.std(ddof=1) / np.sqrt(len(d)))
+        ax3.axhline(0, color="black", lw=0.8, zorder=1)
+        ax3.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
+                     ms=4.5, lw=1.1, capsize=2.5, zorder=3)
+        lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.25
+        ax3.set_ylim(-lim, lim)
+        ax3.set_xticks(seeds)
+        ax3.set_xlabel("seed")
+        ax3.set_ylabel("SHD, federated $-$ centralised")
+        ax3.set_title("$k_v=12$, $12{,}000$ episodes,\n200 paired episodes per seed", fontsize=8)
+        ax3.annotate("above 0: centralising wins", xy=(0.03, 0.93), xycoords="axes fraction",
+                     fontsize=6.8, color="#666666")
+        ax3.annotate("no seed separates", xy=(0.03, 0.06), xycoords="axes fraction",
+                     fontsize=6.8, color="#666666")
+    fig.suptitle("Learned coordination beats convention, and partitioning the learner "
+                 "costs nothing a seed can detect", fontsize=9.5, y=1.03)
     fig.savefig(out / "federation.pdf", bbox_inches="tight")
     plt.close(fig)
 
@@ -570,6 +604,96 @@ def fig_answer_rate(out: pathlib.Path):
     plt.close(fig)
 
 
+
+def fig_credit(out: pathlib.Path):
+    """Turn-aware credit at k=8, measured. Two slopes that fall together.
+
+    The recorded-field version of this result showed the pooled arm flat and the federated arm
+    falling 18x -- a federation-specific mechanism. Measured, both fall by an order of
+    magnitude, so the figure's job is to show two parallel slopes and per-seed spread, not an
+    interaction.
+    """
+    cells = {}
+    for lbl, cell in (("pooled", "k08s50n04b150_pooled"), ("federated", "k08s50n04b150_E4")):
+        for state in ("credit", "nocredit"):
+            q = ROOT / f"results/credit/shd/{cell}_{state}.json"
+            if not q.exists():
+                print("!! credit measurement incomplete; skipping figure")
+                return
+            d = json.loads(q.read_text())
+            cells[(lbl, state)] = [e["means"]["learned"]["hard"] for e in d]
+
+    fig, ax = plt.subplots(figsize=(4.4, 3.0))
+    floor = 5e-5
+    xs = {"credit": 0, "nocredit": 1}
+    for lbl, colour, dx in (("pooled", THIRD, -0.045), ("federated", LEARNED, 0.045)):
+        means = [np.mean(cells[(lbl, st)]) for st in ("credit", "nocredit")]
+        ax.plot([0 + dx, 1 + dx], means, "o-", color=colour, lw=1.7, ms=5.5,
+                label=lbl, zorder=4)
+        for st in ("credit", "nocredit"):
+            vals = cells[(lbl, st)]
+            ax.scatter([xs[st] + dx] * len(vals), [max(v, floor) for v in vals],
+                       s=14, color=colour, alpha=0.4, zorder=3)
+        ratio = means[1] / means[0]
+        ax.annotate(f"{ratio:.0f}$\\times$", xy=(1 + dx, means[1]), fontsize=8,
+                    color=colour, xytext=(8, -2), textcoords="offset points")
+    ax.set_yscale("log")
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["turn-aware credit on", "credit off"])
+    ax.set_xlim(-0.35, 1.45)
+    ax.set_ylabel("SHD on committed marks")
+    ax.set_title("Removing turn-aware credit costs an order of magnitude\n"
+                 "under both optimisers", fontsize=9)
+    ax.legend(loc="lower right", frameon=False)
+    fig.tight_layout()
+    fig.savefig(out / "credit.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
+
+def fig_fixedpolicy(out: pathlib.Path):
+    """The fixed-policy decomposition: one policy per training rate, evaluated at every rate.
+
+    Separates an environment property from a learning property. If withheld answers were
+    simply a harder evidence regime, both fixed policies would degrade together; instead the
+    oracle-trained policy degrades 295x across the range and the rho=0.5-trained policy 27x,
+    and the curves are indistinguishable at full evidence. Axis linear in rho, same rule as
+    fig_answer_rate.
+    """
+    per = {}
+    for f in sorted(glob.glob(str(ROOT / "results/power/rho/evalsweep_det/fixed_rho*_s?_evalp*.json"))):
+        m = re.search(r"fixed_rho([\d.]+)_s(\d)_evalp([\d.]+)", pathlib.Path(f).stem)
+        e = json.loads(pathlib.Path(f).read_text())[0]
+        per.setdefault((float(m.group(1)), float(m.group(3))), []).append(
+            e["means"]["learned"]["hard"])
+    if not per:
+        print("!! evalsweep_det absent; skipping")
+        return
+    evals = sorted({k[1] for k in per})
+    fig, ax = plt.subplots(figsize=(4.6, 3.1))
+    floor = 1e-4
+    for trained, colour, label in ((1.0, MYOPIC, r"trained at $\rho=1.0$ (oracle)"),
+                                   (0.5, LEARNED, r"trained at $\rho=0.5$")):
+        means = [np.mean(per[(trained, ev)]) for ev in evals]
+        for ev in evals:
+            vals = per[(trained, ev)]
+            ax.scatter([ev] * len(vals), [max(v, floor) for v in vals], s=13,
+                       color=colour, alpha=0.4, zorder=3)
+        ax.plot(evals, [max(v, floor) for v in means], "o-", color=colour, lw=1.7,
+                ms=5, label=label, zorder=4)
+    ax.set_yscale("log")
+    ax.set_xlabel(r"evaluation answer rate $\rho$")
+    ax.set_ylabel("SHD on committed marks")
+    ax.set_xticks(evals)
+    ax.invert_xaxis()          # reading left to right = answers progressively withheld
+    ax.set_title("Held fixed, the oracle-trained policy degrades $295\\times$\n"
+                 "and the adapted one $27\\times$", fontsize=9)
+    ax.legend(loc="lower right", frameon=False, fontsize=7.5)
+    fig.tight_layout()
+    fig.savefig(out / "fixedpolicy.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -582,7 +706,9 @@ def main(argv=None) -> int:
                      ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
                      ("attribution_law", fig_attribution_law), ("federation", fig_federation),
                      ("pair_class", fig_pair_class),
-                     ("answer_rate", fig_answer_rate)):
+                     ("answer_rate", fig_answer_rate),
+                     ("credit", fig_credit),
+                     ("fixedpolicy", fig_fixedpolicy)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")
