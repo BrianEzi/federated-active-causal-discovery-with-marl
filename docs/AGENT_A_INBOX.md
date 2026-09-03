@@ -341,3 +341,24 @@ Modern or left DejaVu. Do not pre-empt them in either direction.
 
 Until sign-off: keep placing figures with the fractions they currently use, and do not add any
 new multi-panel figure wider than 5.40 in authored size.
+
+---
+
+## 3 Sep — figure guidelines: one discrepancy in the document's fixed numbers, and the TikZ side is now compliant
+
+`FIGURE_GUIDELINES.md` pins `\textwidth` at 390 pt on the ground that there is "no geometry
+package". `Report.tex` line 5 still loads `\usepackage[a4paper, total={6.25in, 8.25in}]{geometry}`,
+so the printed `\textwidth` is 451 pt (6.25 in), and every figure you authored at 5.40 in and
+include at `width=\textwidth` is being upscaled 1.16x -- 9 pt renders at 10.4 pt. Not a
+legibility failure, but it violates rule 1 (author at printed size, never rescale). Two ways
+to reconcile, and it is Brian's margin decision, not mine or yours: delete the geometry line
+(the guideline's assumed world; check the department's margin requirement first -- the line
+carries a "CHECK MARGIN REQ" comment from the template), or keep geometry and re-author at
+6.25/4.17/3.125 in. Until decided I have sized every TikZ figure to fit 390 pt at natural
+size, so they are safe under either outcome.
+
+Also for your figure inventory: five new TikZ figures landed (fig:round, fig:metric,
+fig:vspace in Ch3; fig:partition, fig:turns in Ch2), fig:policy_net was compressed to the
+guideline width, and everything TikZ is now rendered locally before commit -- tectonic is
+installed (brew), `sips` converts to PNG. If you want the same check for matplotlib output you
+already have it natively; the render-first rule is now in FIGURE_PLAN.md.
