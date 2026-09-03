@@ -366,7 +366,7 @@ def fig_federation(out: pathlib.Path):
             ax.scatter([len(series)] * len(central), central, s=13, color="black",
                        alpha=0.55, zorder=4)
         ax.set_xticks(range(len(series) + 1))
-        ax.set_xticklabels([s_[0] for s_ in series] + ["learned (centralised)"],
+        ax.set_xticklabels([s_[0] for s_ in series] + ["learned (pooled)"],
                            rotation=32, ha="right", fontsize=8)
         _title(ax, title)
         ax.annotate(title, xy=(0.04, 0.92), xycoords="axes fraction", fontsize=9)
@@ -401,7 +401,7 @@ def fig_federation(out: pathlib.Path):
     ax3.set_ylim(-lim, lim)
     ax3.set_xticks(seeds)
     ax3.set_xlabel("seed")
-    ax3.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ centralised", fontsize=8)
+    ax3.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ pooled", fontsize=8)
     ax3.annotate("above 0: centralising wins", xy=(0.04, 0.92), xycoords="axes fraction",
                  fontsize=8, color="#666666")
     fig.tight_layout()
@@ -563,72 +563,6 @@ def fig_sweep_grid(out: pathlib.Path):
             panel[1].legend(frameon=False, fontsize=8, loc="center right", handlelength=1.5)
         fig.savefig(out / f"sweep_grid_{tag}.pdf", bbox_inches="tight")
         plt.close(fig)
-
-
-def fig_pair_class(out: pathlib.Path):
-    """Errors by pair class at both training budgets, which is what the table said in numbers.
-
-    Counts rather than rates. The unscored class has 27,000 observations against 673,200, so a
-    rate compresses eleven errors and zero errors into two numbers a reader cannot tell apart.
-    The myopic and random arms do not train, so they are drawn as horizontal references: the
-    figure is one arm moving against two that cannot.
-    """
-    src = {4000: ROOT / "results/shd_by_class_naxis_det.json",
-           12000: ROOT / "results/shd_by_class_naxis_12k.json"}
-    if not all(q.exists() for q in src.values()):
-        print("!! pair-class data incomplete; skipping")
-        return
-    tot = {}
-    for budget, q in src.items():
-        d = json.loads(q.read_text())
-        for arm in ("learned", "greedy", "random"):
-            tot[(budget, arm)] = (
-                sum(e["arms"][arm]["private_incident"] * e["arms"][arm]["n_private"] for e in d),
-                sum(e["arms"][arm]["shared_shared"] * e["arms"][arm]["n_shared"] for e in d))
-    n_priv = sum(e["arms"]["learned"]["n_private"]
-                 for e in json.loads(src[12000].read_text()))
-    n_shar = sum(e["arms"]["learned"]["n_shared"]
-                 for e in json.loads(src[12000].read_text()))
-
-    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9))
-    budgets = [4000, 12000]
-    xs = [0, 1]
-    for ax, idx, title, denom in ((left, 0, f"scored pairs ({n_priv:,} observations)", n_priv),
-                                  (right, 1, f"unscored pairs ({n_shar:,} observations)", n_shar)):
-        # Offsets differ per arm: learned and myopic converge on the scored panel and their
-        # labels would sit on top of each other at a shared offset.
-        # Which arms crowd each other differs between the panels: on the scored panel the
-        # learned and myopic lines converge, on the unscored panel the learned and random
-        # lines do. Offsets are set per panel rather than per arm for that reason.
-        offs = {"learned": 9, "greedy": -14, "random": 9} if idx == 0 else \
-               {"learned": 9, "greedy": 9, "random": -14}
-        for arm, label, colour in (("learned", "learned", LEARNED),
-                                   ("greedy", "myopic", MYOPIC),
-                                   ("random", "random", RANDOM)):
-            dy = offs[arm]
-            ys = [tot[(b, arm)][idx] for b in budgets]
-            style = "o-" if arm == "learned" else "o--"
-            ax.plot(xs, ys, style, color=colour, lw=1.8 if arm == "learned" else 1.1,
-                    ms=5, label=label, zorder=4 if arm == "learned" else 2)
-            for x, y in zip(xs, ys):
-                ax.annotate(f"{y:.0f}", (x, y), fontsize=7.5, color=colour,
-                            xytext=(0, dy), textcoords="offset points", ha="center",
-                            zorder=5)
-        ax.set_xticks(xs)
-        ax.set_xticklabels(["4,000", "12,000"])
-        ax.set_xlim(-0.35, 1.35)
-        ax.set_xlabel("training episodes")
-        _title(ax, title, fontsize=9)
-        ax.set_yscale("symlog", linthresh=1)
-        ax.set_ylim(-0.5, 1.2e5)
-    left.set_ylabel(r"errors committed ($\downarrow$)")
-    left.legend(loc="lower left", frameon=False)
-    _suptitle(fig, "Training moves the class the policy is scored on, and not the other",
-                 fontsize=9.5)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
-    fig.savefig(out / "pair_class.pdf", bbox_inches="tight")
-    plt.close(fig)
-
 
 
 def fig_answer_rate(out: pathlib.Path):
@@ -963,7 +897,6 @@ def main(argv=None) -> int:
                      ("window_budget", fig_window_budget), ("nint", fig_nint),
                      ("attribution_law", fig_attribution_law),
                      ("federation_[ab]", fig_federation),
-                     ("pair_class", fig_pair_class),
                      ("answer_rate", fig_answer_rate),
                      ("credit", fig_credit),
                      ("fixedpolicy", fig_fixedpolicy),
