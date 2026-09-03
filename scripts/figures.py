@@ -500,6 +500,76 @@ def fig_pair_class(out: pathlib.Path):
     plt.close(fig)
 
 
+
+def fig_answer_rate(out: pathlib.Path):
+    """The dose-response curve: transfer against the answer rate the policy trained under.
+
+    The title says "improves transfer" and not "and saturates". The flattening at the left is
+    visible, but the gradient per unit rho is not smooth -- it nearly stops between 0.90 and
+    0.85 and resumes -- and with three seeds per rate the plateau is not established as real.
+
+    Source is results/power/rho/deterministic/, which is authoritative; the sibling directory
+    is the pre-fix grid and is superseded. The myopic arm is one number at every rate by
+    construction -- the same per-episode vectors are reused across rates -- so it is drawn as a
+    single reference line, and its being identical is itself the check that the comparison is
+    paired over the same episodes.
+    """
+    src = sorted(glob.glob(str(ROOT / "results/power/rho/deterministic/xfer_rho*_s?.json")))
+    if not src:
+        print("!! answer-rate grid absent; skipping")
+        return
+    per = {}
+    for f in src:
+        rho = float(re.search(r"rho([\d.]+)_", pathlib.Path(f).stem).group(1))
+        for e in json.loads(pathlib.Path(f).read_text()):
+            per.setdefault(rho, []).append((e["means"]["learned"]["hard"],
+                                            e["means"]["greedy"]["hard"],
+                                            e["paired"]["learned-greedy"]["delta"],
+                                            e["paired"]["learned-greedy"]["significant"]))
+    # LINEAR in rho, not evenly spaced. Even spacing reads better -- the rates are 0.50, 0.70,
+    # 0.80, 0.85, 0.90, 0.95, 1.00 and the upper four crowd -- but it misrepresents the shape.
+    # The 0.70->0.50 step spans four times the rho interval of 0.90->0.85, so even spacing
+    # makes a curve whose gradient per unit rho is NOT smooth look like smooth saturation.
+    # Agent B found the same distortion in the numeric version of this claim on 3 Sep.
+    # Legibility is not worth a false shape on a dose-response figure.
+    rhos = sorted(per)
+    pos = rhos
+    at = {r: r for r in rhos}
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(5.2, 5.0), sharex=True,
+                                      gridspec_kw={"height_ratios": [1, 1]})
+    myopic = np.mean([v[1] for r in rhos for v in per[r]])
+    top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
+                label=f"myopic ({myopic:.4f}, identical at every rate)")
+    means = [np.mean([v[0] for v in per[r]]) for r in rhos]
+    for r in rhos:
+        top.scatter([at[r]] * len(per[r]), [v[0] for v in per[r]], s=14, color=LEARNED,
+                    alpha=0.4, zorder=3)
+    top.plot(pos, means, "o-", color=LEARNED, lw=1.7, ms=5, zorder=4, label="learned")
+    top.set_ylabel("SHD under sampled evidence")
+    top.legend(loc="upper left", frameon=False, fontsize=7.5)
+    top.set_title("Degrading the training evidence improves transfer")
+
+    bottom.axhline(0, color="black", lw=0.8, zorder=2)
+    for r in rhos:
+        for _l, _g, d, sig in per[r]:
+            bottom.scatter([at[r]], [d], s=22, zorder=3,
+                           color=LEARNED if sig else "none",
+                           edgecolors=LEARNED, linewidths=0.9)
+    bottom.plot(pos, [np.mean([v[2] for v in per[r]]) for r in rhos], "-",
+                color=LEARNED, lw=1.5, zorder=4)
+    bottom.set_xlabel(r"answer rate $\rho$ the policy trained under")
+    bottom.set_ylabel("paired difference\nlearned $-$ myopic")
+    bottom.annotate("filled: ahead beyond 2 SE", xy=(0.52, 0.012), fontsize=7,
+                    color="#555555")
+    for ax in (top, bottom):
+        ax.set_xticks(rhos)
+        ax.set_xticklabels([f"{r:g}" for r in rhos], fontsize=7.5)
+        ax.set_xlim(0.46, 1.04)
+    fig.tight_layout()
+    fig.savefig(out / "answer_rate.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -511,7 +581,8 @@ def main(argv=None) -> int:
     for name, fn in (("sweep_grid", fig_sweep_grid),
                      ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
                      ("attribution_law", fig_attribution_law), ("federation", fig_federation),
-                     ("pair_class", fig_pair_class)):
+                     ("pair_class", fig_pair_class),
+                     ("answer_rate", fig_answer_rate)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")
