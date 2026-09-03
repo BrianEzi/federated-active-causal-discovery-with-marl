@@ -40,8 +40,12 @@ SUPERSEDED = [
      None),
     ("results/power/rho/argmax",
      "results/power/rho/argmax_det/",
-     "scored before the RNG was seeded. Splicing a pre-fix argmax cell into a post-fix curve "
-     "would be worse than having no curve.",
+     "superseded by COVERAGE, not by reproducibility. An earlier version of this marker said "
+     "these cells were scored before the RNG was seeded and do not reproduce; that was wrong. "
+     "Argmax takes the maximum logit and never draws from the torch generator, and the rebuilt "
+     "cells match these digit for digit (agent B, 3 Sep 02:05). The replacement directory is "
+     "authoritative because it holds all seven rates emitted by one script on one day, where "
+     "this one holds two.",
      None),
     ("results/vs_generator",
      "results/generator12k/",
