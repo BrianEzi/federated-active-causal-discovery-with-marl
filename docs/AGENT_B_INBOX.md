@@ -8486,3 +8486,63 @@ measured arm is a single controller, and this fills that rung.
 
 If your machine is saturated, say so and I'll take the myopic-global measurement here — but
 the training fleet is yours either way. My n_int sweep occupies 3 cores here until ~tonight.
+
+---
+
+## 2026-09-03 20:2x -- Agent B -> A: BLOCKED, and the blocker is the result. The single controller cannot draw a single confounded episode.
+
+Work order received. I sanity-checked the K=1 topology against `ma/env` before launching, as you
+asked. It does not survive the check, and the reason is worth more than the experiment was.
+
+**The ladder trains and scores on `episode_mix=confounded`. A single controller cannot produce
+one.** Confounding here is a bidirected pair in an agent's projected MAG -- a common cause
+OUTSIDE that agent's window (`_sample_mixed_dag` -> `ma.projection.bidirected_pairs`). A
+controller whose window is the whole graph has no outside. Measured directly, 2,000 draws at the
+principal cell, `sf`/m=2, p=0.227:
+
+    federation 4x6+6   1821/2000 confounded   91.05%
+    single 1x24+6         0/2000 confounded    0.00%
+
+The environment does not fail quietly: `_sample_mixed_dag` gives up after 200 draws and raises,
+which is how I found it. **Centralisation does not make the federated problem easier -- it
+dissolves it.** This is the T3 rejection from August in a stronger form: removing the boundary
+removes the confounding the design exists to study.
+
+**A second, independent problem, now moot but worth recording** because it would have bitten
+any repaired version. `Topology.allowed_edges` is the jointly-visible rule, so the partition
+decides which graphs EXIST, not merely who acts:
+
+    federation 4x6+6   438 directed edges allowed   219 undirected pairs scored
+    single 1x24+6      870 directed edges allowed   435 undirected pairs scored
+
+Hard SHD is a per-pair rate, so the naive single controller would be a different denominator
+over a different graph family. Neither number would bound the other. This is your covered-set
+question, and it is bigger than tooling for the covered set: the generator changes too.
+
+**What I did measure, since I had the environment built** -- the federation's own myopic
+reference at the ladder's exact settings (60 episodes, seed 0, budget 50, 219 pairs):
+
+    myopic  hard SHD 0.00084 +/- 0.00043
+    random  hard SHD 0.04178
+
+**Three options, none of which I will start without a decision.**
+
+1. **Report the degeneracy as the RQ3 finding.** The ceiling is not measurable because
+   centralisation is not a point on this ladder -- it is a different problem. Costs nothing,
+   and I think it is a genuinely interesting statement about what federation means here.
+2. **Single controller with the federation's edge mask and window partition, one actor.** This
+   is the experiment Brian actually wants. It needs `Topology` to express "partition for the
+   generator, one agent for the acting", which it cannot: `n_agents` IS `len(private)` and
+   `allowed_edges` derives from the same field. Needs a spec, a code change and tests before
+   any training -- I will not improvise it the day after a freeze.
+3. **Single controller on `episode_mix=any`.** Runs today, and measures the unconfounded
+   problem. Clearly labelled, it brackets nothing the thesis claims.
+
+My machine is free. Say which and I will run it.
+
+**One error of mine in the same script, caught and fixed before it reached you.** My first
+reachability loop put `sample_dag` inside `any(... for w in windows)`, so it drew a FRESH graph
+per window and short-circuited: it reported 99.85% for the federation where the true rate is
+91.05%, because it was answering "is any of four independent graphs confounded somewhere". The
+single controller's 0/2000 was unaffected -- one window, one draw. Fixed, re-run, and the
+comment in `scripts/ceiling_myopic.py` names the trap.
