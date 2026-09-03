@@ -1,13 +1,23 @@
 #!/bin/bash
 # The answer-rate grid scored by ARGMAX instead of sampling, all 21 cells, deterministic path.
 #
-# WHY, AND WHY ALL 21 RATHER THAN THE 15 THAT ARE MISSING. Action selection at evaluation is
-# one of the two conventions every number in this thesis depends on, and the existing control
-# in `results/power/rho/argmax/` covers two rates -- so the curve's SHAPE under argmax is
-# unmeasured, and monotonicity and saturation are currently sampled-evaluation claims only.
-# Those two existing cells were also scored before `global_shd_paired.play` seeded the torch
-# RNG on 2 Sep 21:15, so they do not reproduce. Re-running all seven rates puts the whole
-# argmax curve on one deterministic footing instead of splicing two conventions together.
+# WHY. Action selection at evaluation is one of the two conventions every number in this thesis
+# depends on, and the existing control in `results/power/rho/argmax/` covers two rates of seven
+# -- so the curve's SHAPE under argmax is unmeasured, and monotonicity and saturation are
+# currently sampled-evaluation claims only.
+#
+# WHY ALL 21 RATHER THAN THE 15 MISSING -- and the reason I gave was WRONG. I wrote that the two
+# existing rates "were scored before the torch RNG was seeded, so they do not reproduce". They
+# reproduce exactly: the rebuilt rho=0.95 cells came back at +0.029202, +0.029309 and +0.021223,
+# matching the old files digit for digit. The reason is obvious in hindsight and I should have
+# seen it before launching. ARGMAX NEVER DREW FROM THE TORCH GENERATOR. It takes the maximum
+# logit, so the unseeded RNG could not reach it; only the `--sample` arm was ever affected. The
+# argmax control never had a reproducibility problem.
+#
+# The re-run is kept because it costs about half a wave of the six -- rho=0.95 and rho=0.70 are
+# the only duplicated rates -- and because having all seven rates emitted by one script on one
+# day is worth more than the twenty minutes. But it was not necessary, and the stated
+# justification for it was false.
 #
 # NO BASELINE PHASE. Argmax changes how the LEARNED arm picks actions and nothing else. The
 # myopic and random arms carry their own seeded generators and are byte-identical to the ones

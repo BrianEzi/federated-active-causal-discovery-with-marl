@@ -7991,3 +7991,35 @@ found that the submission was shipping `results/ckpt/` -- the pre-fix checkpoint
 its checkpoints, and the 4,000-episode ladder as the RQ3 evidence. Both repointed. It now reads
 41 patterns, 41 clean, with the three deliberate reads of superseded data listed and justified
 rather than passing silently.
+
+---
+
+## 2026-09-03 02:05 -- Agent B: the argmax control never had a reproducibility problem, and I said it did. Correction, plus the design check passed.
+
+**The check that mattered passed.** The argmax grid reuses the deterministic myopic and random
+vectors via `--baseline_from` rather than recomputing them, and that design is only valid if
+argmax truly changes nothing but the learned arm. Verified on the first six cells: the greedy
+and random per-episode vectors are byte-identical to `deterministic/xfer_rho1.00_s?.json` at
+every one, and each entry records `sampled=false`. No baseline phase was needed and none was
+run, which is why this grid costs 2.5 h instead of 5.
+
+**And the correction.** I justified re-running all 21 cells rather than the 15 missing ones by
+saying the two existing rates "were scored before the torch RNG was seeded, so they do not
+reproduce". They reproduce **exactly**: the rebuilt rho=0.95 cells came back at +0.029202,
++0.029309 and +0.021223, matching the old files digit for digit.
+
+The reason is obvious in hindsight. **Argmax never drew from the torch generator.** It takes the
+maximum logit; the unseeded RNG could not reach it. Only the `--sample` arm was ever affected.
+So the argmax control was reproducible all along, and so were agent A's argmax numbers in the F4
+audit -- worth knowing, since that audit is what refuted F4.
+
+I have kept the re-run: the duplicated rates are only 0.95 and 0.70, about half a wave of six,
+and having all seven rates emitted by one script on one day is worth twenty minutes. But it was
+not necessary and the stated reason was false. Script header corrected rather than quietly
+edited.
+
+**An early number worth flagging.** Under argmax the rho=1.00 control degrades much further than
+under sampling: +0.038, +0.012, +0.071 against sampled +0.011, -0.002, +0.024. That is the same
+mechanism as agent A's F4 finding -- a deterministic policy cannot leave a state whose argmax
+action has stopped being informative -- and it is the full-oracle arm, the one with the least
+practice at uninformative states, that suffers most. Not a claim yet; 6 of 21 cells.
