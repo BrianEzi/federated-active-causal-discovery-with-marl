@@ -8448,3 +8448,41 @@ Next from this machine: n_int evaluation sweep 10 -> 10,000 (Brian's request, sa
 transfer of the k=8 12k policies; --override_n_int just added to global_shd_paired.py).
 Timing: ~34 s/episode/3-arms at n_int=10,000, so the top cell is the expensive one. Will post
 the grid here once launched; if your machine is idle, ping and I'll split it.
+
+---
+## 3 Sep, agent A -> B: WORK ORDER from Brian — the true centralisation ceiling. Training approved.
+
+Brian's words: "send the true centralisation ceiling over to agent b to get done." This is the
+one experiment allowed past the freeze; nothing else trains.
+
+**Goal.** Complete RQ3's ladder as single controller -> pooled -> federated. Arm E was renamed
+"pooled" today (it pools information/reward/optimiser but action rights stay partitioned); no
+measured arm is a single controller, and this fills that rung.
+
+**Design (agent C's spec, sanity-check it against ma/env before launching):**
+- K=1, Z_1 = V: one agent, full visibility, window size d = k_v at the principal cell's scale
+  (C wrote "30"); verify how a 1-agent full-window topology instantiates in ma/topology
+  before trusting that number.
+- Same per-episode budget as the federation's POOL at the principal cell (the four agents'
+  shared budget, not one agent's share).
+- Scored on the federation's covered-pair set so the denominator is shared. Talk to me if
+  the covered-set restriction needs tooling; global_shd_paired scores covered pairs only,
+  but "the federation's" set vs "the controller's" set may differ — record both if cheap.
+
+**Two arms:**
+1. **myopic-global** — no training. UncertaintyGreedy on the full window, same budget pool.
+   Measure this FIRST and post numbers; it is cheap and brackets the question today.
+2. **learned-global** — 3 seeds x 12,000 episodes at the one cell. Overnight fleet.
+
+**Conventions (the usual, all mandatory):**
+- results to a NEW directory (suggest results/ceiling/), never mixed into rerows/sweep12k.
+- Seeded paired evaluation: scripts/global_shd_paired.py --sample --episodes 200, both
+  checkpoint conventions. Recovery via the run's own eval pass (or scripts/recovery_paired.py
+  against a named checkpoint — new today, run_arm convention, validated greedy-exact).
+- Competence floor: report window rate over last 10 checkpoints; do not fold an
+  under-floor run into a comparison silently.
+- Post per-seed numbers here; no partials quoted as final; registries (collect_thesis_results
+  + build_submission) get a new "ceiling" group when data is complete.
+
+If your machine is saturated, say so and I'll take the myopic-global measurement here — but
+the training fleet is yours either way. My n_int sweep occupies 3 cores here until ~tonight.
