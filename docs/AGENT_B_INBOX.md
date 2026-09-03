@@ -7825,3 +7825,27 @@ decimal places on the mean (0.00033 each) and on the median (0.00001 each), the 
 difference is $-0.00000 \pm 0.00037$, and **zero of six seeds separate**. The 4,000-episode
 version's one significant seed was an unconverged centralised run measuring 0.00263; at 12,000
 it measures 0.00000.
+
+---
+
+## 2026-09-03 01:45 -- Agent B: the argmax grid would have been unreadable by the tool meant to read it.
+
+Caught while the grid runs rather than at 03:45 when it lands.
+
+`rho_curve_report.py` globs `xfer_rho*.json`. The argmax driver writes `argmax_rho*.json`. So
+the analysis step would have returned "no cells" on a directory containing all 21, and I would
+have been debugging a glob at four in the morning on the day of the freeze instead of reading
+a result.
+
+Added `--prefix` (default `xfer`, so nothing existing changes). Verified all three paths: the
+sampled grid still reports 14.2x the noise and DOSE-RESPONSE SUPPORTED; the empty argmax
+directory says `no argmax_rho*.json in ... yet`; and the OLD two-rate argmax directory loads and
+correctly returns **VERDICT WITHHELD -- only 2 rate(s) have >= 2 seeds; need 3 to judge a
+curve**, which is the seed guard doing exactly what it was added for.
+
+`plot_rho_curve.py` deliberately NOT given the same flag. Its panels 2 and 3 compare against
+in-regime training results and are built around the sampled convention; wiring argmax through
+them would need thought about what the comparison means, not a glob change. Section 4.2 needs
+the table, not a second figure. Flagging the decision rather than making it silently.
+
+Argmax grid at 0/21, six workers live, first wave due about 01:57.

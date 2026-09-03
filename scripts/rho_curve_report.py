@@ -31,10 +31,15 @@ import re
 import numpy as np
 
 
-def load(directory: str):
+def load(directory: str, prefix: str = "xfer"):
+    """`prefix` selects the convention: `xfer` for the sampled grid, `argmax` for the
+    action-selection control, which is the same 21 cells scored without `--sample` and is
+    written to `results/power/rho/argmax_det/` under its own filenames. Reading one curve
+    with the other's prefix silently returns nothing, so the caller reports the directory and
+    the prefix it looked for rather than only "no cells"."""
     cells = {}
-    for path in sorted(glob.glob(os.path.join(directory, "xfer_rho*.json"))):
-        m = re.search(r"xfer_rho([0-9.]+)_s(\d+)\.json$", os.path.basename(path))
+    for path in sorted(glob.glob(os.path.join(directory, f"{prefix}_rho*.json"))):
+        m = re.search(rf"{prefix}_rho([0-9.]+)_s(\d+)\.json$", os.path.basename(path))
         if not m:
             continue
         rho, seed = float(m.group(1)), int(m.group(2))
@@ -47,12 +52,14 @@ def load(directory: str):
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dir", default="results/power/rho")
+    ap.add_argument("--prefix", default="xfer",
+                    help="'xfer' for the sampled grid, 'argmax' for the argmax control")
     ap.add_argument("--out", default="results/power/rho/CURVE.json")
     args = ap.parse_args(argv)
 
-    cells = load(args.dir)
+    cells = load(args.dir, args.prefix)
     if not cells:
-        print(f"no xfer_rho*.json in {args.dir} yet")
+        print(f"no {args.prefix}_rho*.json in {args.dir} yet")
         return
 
     rates = sorted({r for r, _ in cells}, reverse=True)
