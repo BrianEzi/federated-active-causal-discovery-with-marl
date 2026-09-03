@@ -366,10 +366,10 @@ def fig_federation(out: pathlib.Path):
     left.set_xticklabels(["federated", "pooled", "federated", "pooled"],
                          rotation=28, ha="right", fontsize=8)
     for gi, (title, _p) in enumerate(cells):
-        left.annotate(title, xy=(gi + 0.2, 0.954), ha="center", fontsize=9)
-    # Axis starts at 0.95 (Brian, 3 Sep): every arm sits in [0.975, 1.0] and wider scales
+        left.annotate(title, xy=(gi + 0.2, 0.9725), ha="center", fontsize=9)
+    # Axis starts at 0.97 (Brian, 3 Sep): every arm sits in [0.975, 1.0] and wider scales
     # hid the comparison. The truncation is stated on the axis, not hidden.
-    left.set_ylim(0.95, 1.005)
+    left.set_ylim(0.97, 1.003)
     left.set_ylabel(r"joint recovery rate ($\uparrow$)")
 
     if len(lad) == 2:
