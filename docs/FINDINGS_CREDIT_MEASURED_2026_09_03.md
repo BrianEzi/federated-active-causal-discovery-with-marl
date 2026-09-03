@@ -39,3 +39,39 @@ A recorded quantity that resembles the reported metric produced a clean, publish
 mechanistically satisfying asymmetry which does not exist. It survived because nobody
 recomputed it. Every SHD figure in the thesis now traces to `global_shd_paired.py`, and the
 remaining risk is any table sourced before that rule was applied.
+
+---
+
+## Update, 3 Sep 07:xx — the k=12 replication lands, and it must not be over-read in either direction
+
+The two missing `E4_nocredit` seeds trained and all four $k_v=12$ cells are measured
+(`results/credit/shd/k12*`), 200 paired episodes per seed, selected checkpoint, 4,000-episode
+runs throughout:
+
+| configuration | mean | per seed |
+|---|---|---|
+| Pooled, credit on | 0.00022 | 0.00000, 0.00066, 0.00000 |
+| Pooled, credit off | 0.00003 | 0.00005, 0.00000, 0.00005 |
+| Federated, credit on | 0.00079 | 0.00046, 0.00002, 0.00189 |
+| Federated, credit off | 0.00683 | 0.00034, 0.00066, **0.01947** |
+
+Ratios read naively: pooled $0.1\times$, federated $8.6\times$ -- which looks like the
+federation-specific interaction this document retracted at $k_v=8$. It is not evidence of it:
+
+* **The pooled cell is uninformative at $k_v=12$.** Both states sit at the floor (differences
+  of $0.0002$ between arms whose $k_v=8$ effect was $0.0035$). A cell with no room to degrade
+  cannot show whether credit matters; absence of effect and absence of headroom are
+  indistinguishable here.
+* **The federated degradation is one seed again.** 0.01947 of the 0.02047 total. Every
+  credit-off degradation measured on this project -- both arms at $k_v=8$, federated at
+  $k_v=12$ -- is carried by a single seed of three.
+
+**What may be written:** removing turn-aware credit costs roughly an order of magnitude
+wherever there is room to lose it (both optimisers at $k_v=8$; the federated arm at
+$k_v=12$), the degradation is seed-concentrated everywhere, and no interaction between the
+fix and the optimiser is established at either window size. All cells at 4,000 episodes,
+stated with the claim.
+
+**What may not:** reading the $k_v=12$ pooled null as the interaction returning. That null is
+a saturated cell, and the $k_v=8$ measurement -- where both arms had headroom -- showed both
+degrading alike.
