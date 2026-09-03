@@ -46,3 +46,9 @@ rule's 0.400 / 0.400 / 0.395.
 * No magnitude comparison beyond "present on both": the SF cell is near saturation for both
   arms, so the ER margin cannot be read as "the advantage is 50x larger on ER" -- SF has no
   room to show a margin of that size.
+
+## Update, 06:0x — the final-update convention landed
+
+Identical to the selected checkpoint on every seed (0.00000 / 0.00002 / 0.00142 at both). The
+result holds at both conventions with no caveat, and the "nothing at the final convention yet"
+line above is discharged.
