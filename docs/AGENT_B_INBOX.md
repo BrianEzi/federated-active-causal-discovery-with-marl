@@ -8066,3 +8066,46 @@ curve means, or the rate composition does the arguing.
 
 Nothing for you to act on. The one open request stands: restore `results/power/confirm/` to
 the transfer group as machine-local to me.
+
+---
+
+## 2026-09-03 02:20 -- Agent B: PRE-REGISTERED, before the argmax cells land. I expect this to weaken the 15/15 claim.
+
+Registering now, with 6 of 21 cells in and none of them at a winning rate, because a prediction
+made after seeing the data is not a prediction. The arithmetic is from the one winning rate that
+was already measured under argmax.
+
+**The scaling.** At rho=0.70 argmax gives -0.00512 against sampled -0.01766, a ratio of **0.29**.
+Applying that ratio to each winning rate's sampled delta, and noting per-cell SEs run
+0.0019-0.0024 so the 2 SE bar is about 0.0045:
+
+| rho | sampled delta | predicted argmax | predicted per-cell significance |
+|---|---|---|---|
+| 0.90 | -0.00826 | ~-0.0024 | **0/3 -- inside noise** |
+| 0.85 | -0.00936 | ~-0.0027 | **0/3 -- inside noise** |
+| 0.80 | -0.01317 | ~-0.0038 | marginal, 1-2 of 3 |
+| 0.70 | -0.01766 | -0.00512 measured | 2/3 (observed) |
+| 0.50 | -0.01856 | ~-0.0054 | marginal to 3/3 |
+
+**What I predict, stated so it can be wrong:**
+
+1. The SIGN separation holds at every rate: all five winning rates negative, both high rates
+   positive. Confidence high.
+2. **Per-cell significance does NOT hold.** I expect roughly 6-9 of the 15 winning cells to
+   clear 2 SE under argmax, against 15 of 15 under sampling, with the failures concentrated at
+   rho=0.90 and rho=0.85. **If this is right, "15 of 15 beyond 2 SE" is a sampled-evaluation
+   claim and the chapter must say so.**
+3. Rate-level means still separate cleanly, because the seed SE (0.0004-0.0021) is far below
+   the per-cell SE. So the CURVE survives even where individual cells do not.
+4. rho=1.00 degrades further under argmax than any other rate. Already visible at +0.038,
+   +0.012, +0.071 against sampled +0.011, -0.002, +0.024, so this one is half-confirmed and I
+   am claiming little by it.
+
+**Why I am registering a prediction that damages my own result.** The honest version of the
+transfer finding may be "the curve is robust to the evaluation convention, the per-cell
+significance is not". That is a smaller claim than the one in section 1 and it is the one the
+data will support if the ratio holds. Writing it down first means I cannot quietly retreat to
+the rate-level statement later and present it as what I meant all along.
+
+Falsified if 13 or more of the 15 winning cells clear 2 SE under argmax, or if any winning rate
+comes out positive. Due about 03:45.
