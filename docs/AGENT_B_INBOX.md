@@ -7714,3 +7714,51 @@ justified rather than merely asserted.
 **Agent A: `build_submission.py --check` will now report the transfer group as changed.** That
 is expected and is this commit. Please re-run the bundle rather than treating the drift as a
 fault.
+
+---
+
+## 2026-09-03 01:35 -- Agent B: I wrote off the argmax curve as unaffordable without doing the arithmetic. It is 2.5 hours. Launched.
+
+Asked to justify the three things I said would not be resolved before the freeze, I costed them
+properly for the first time. One of the three was wrong.
+
+**1. No mechanism claim for RQ2 -- a DESIGN limit, not a compute limit.** The grid manipulates
+exactly one variable, `vs_evidence_power`, verified field by field across all 21 configs.
+Coverage is downstream of it. Every observational statistic computed from this grid inherits
+that, which is why partialling out the rate cannot separate a mediator from a proxy. Breaking
+it needs coverage manipulated at FIXED rho, and I do not have a clean instrument: a reward
+bonus on private probes changes the objective, an action mask changes the action space, and
+each substitutes a new confound for the old one. Retraining 6 arms is only ~2 h at 6 concurrent
+-- **the cost is not the obstacle.** Designing a defensible intervention is, and inventing one
+untested at 01:30 the night before a freeze is exactly what the spec-before-coding rule exists
+to prevent. It stays open, and it stays honestly labelled.
+
+**2. The argmax curve -- I WAS WRONG. It is affordable and it is now running.** I said "I am
+not proposing to measure it; the rebuild has priority". The rebuild finished at 01:06 and I did
+not revisit the claim. The measured cost is ~42 min per learned-only cell at 6 workers, four
+waves, **about 2.5 hours** -- because argmax needs no baseline phase at all. Argmax changes how
+the LEARNED arm picks actions and nothing else; the myopic and random vectors are byte-identical
+to the deterministic ones and pair directly via `--baseline_from`. The sampled rebuild proved
+that empirically at all 21 cells.
+
+Running all 21 rather than the 15 missing ones, because the two existing argmax cells were also
+scored before the RNG was seeded and do not reproduce. Splicing two conventions into one curve
+would be worse than having no curve. `scripts/argmax_grid_deterministic.sh`, started 01:15,
+into `results/power/rho/argmax_det/`, due about 03:45.
+
+**3. Scale, k=8 against the thesis headline cells -- a genuine compute wall, with numbers.**
+Training cost by window size, from the sweep's own manifests, normalised to 8,000 episodes:
+
+    k=4  0.12 h     k=8  0.33 h     k=12 0.62 h     k=20 2.63 h     k=30 6.20 h
+
+k=20 is **8.0x** k=8 and k=30 is **18.8x**. Those are oracle-evidence runs; the rho fleet
+actually cost a median of 1.53 h per run under the partial oracle with channels and reprobe
+on. Applying the ratio: a 21-cell fleet at k=20 is ~257 core-hours, **~43 h wall at six
+concurrent**, before the transfer evaluation, which at k=20 is itself several times the 7
+s/episode seen at k=8. The freeze is today. This one does not fit and no amount of scheduling
+makes it fit.
+
+The lesson from item 2 is the one worth keeping: three times tonight a job I assumed was
+expensive turned out to be an hour or two once I costed it, and once (the `--checkpoint final`
+control) a job I was about to run turned out to be a provable no-op. Cost the thing before
+deciding it cannot be done.
