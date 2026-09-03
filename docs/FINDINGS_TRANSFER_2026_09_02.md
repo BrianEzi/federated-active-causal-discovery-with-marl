@@ -66,10 +66,26 @@ since the halves are different worlds from the same generator. At rho=0.90 the l
 ahead on 102-105 episodes of 200 and behind on 62-74. The top five per cent of episodes carry
 21-55% of the sum: concentration, not dominance. `scripts/delta_robustness.py`.
 
-The curve is **monotone and saturating**: it improves all the way to rho=0.50 but the last
-step is a fifth of the earlier ones. There is no interior optimum in the swept range, and no
-floor is claimed since rho < 0.50 is unmeasured. The zero crossing lies between rho=0.95 and
-rho=0.90.
+The curve is **monotone**: every consecutive step improves, so there is no interior optimum in
+the swept range. The zero crossing lies between rho=0.95 and rho=0.90, and no floor is claimed
+since rho < 0.50 is unmeasured.
+
+It is **saturating overall but not smoothly**, and the rates are unevenly spaced, so the
+gradient has to be read per unit of rho rather than per table row:
+
+| interval | delta per unit rho |
+|---|---|
+| 1.00 -> 0.95 | -0.179 |
+| 0.95 -> 0.90 | -0.204 |
+| 0.90 -> 0.85 | **-0.022** |
+| 0.85 -> 0.80 | -0.076 |
+| 0.80 -> 0.70 | -0.045 |
+| 0.70 -> 0.50 | **-0.0045** |
+
+The final gradient is a fortieth of the steepest, which is the saturation. But the improvement
+does not decay smoothly: it nearly stops between 0.90 and 0.85, resumes, and then decays. Any
+sentence implying a smooth exponential approach to a floor is describing a curve this data does
+not show, and with three seeds per rate the plateau is not itself established as real.
 
 Greedy scores identically (0.04846) at every rate because the baseline arms are the SAME
 per-episode vectors, reused across rates -- an exact pairing, and a correctness check that the
@@ -290,8 +306,10 @@ regime. It does set an absolute floor on achievable SHD for any policy.
   The thesis headline cells are k=20 and k=30.
 * **Which observation feature earns the improvement is unknown.** The channels-vs-reprobe
   ablation was measured on window rate, which cannot resolve it -- see section 6.
-* **rho=0.95 is not a special point.** It sits 1.5 SE from the straight line through its
-  neighbours; the apparent in-regime "cliff" is 2.5 SE, uncorrected for seven comparisons,
+* **rho=0.95 is not a special point**, and the deterministic rebuild makes that clearer, not
+  murkier. It sits **0.16 SE** from the straight line through its neighbours rho=1.00 and
+  rho=0.90 (residual +0.00063 against an SE of 0.00385); on the pre-fix grid the figure was
+  1.5 SE. The apparent in-regime "cliff" is 2.5 SE, uncorrected for seven comparisons,
   against a metric where rho=0.80's own three seeds span twice that. Doubling its training to
   16,000 episodes left in-regime success unchanged (0.497 -> 0.497) while doubling its variance,
   and moved transfer from +0.003 to +0.014 on one seed's collapse. **It is a noisy point near
