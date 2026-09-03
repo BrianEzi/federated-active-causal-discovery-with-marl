@@ -208,3 +208,56 @@ three, 29/74 at four, zero from five on. So there is no two-child law. Written u
 
 The structure contract is `docs/THESIS_STRUCTURE_CONTRACT.md`, and agent C has been pointed at
 it. Discussion and the interpretive parts of Results are untouched and left for you.
+
+---
+
+# Morning summary, 3 Sep 05:3x — where everything stands
+
+## Results, by section
+
+**RQ1 — complete.** Sweep at 12,000 episodes throughout, measured at three checkpoint
+conventions, 2-of-18-to-16-of-18 as the headline (C7). Pair class measured at both budgets:
+training cuts scored-pair errors 3.9x and leaves unscored pairs unchanged (C3a).
+
+**RQ2 — data complete under the sampled convention; one boundary still open.** Agent B's
+deterministic grid landed and verified here to the digit: 15/15 beyond 2 SE at rho<=0.90. The
+fixed-policy decomposition rebuilt (295x against 27x). The in-regime diagonal measured 21/21:
+the dial is a trade, and rho=0.95 is behind the myopic rule in its own regime on 3/3 seeds.
+**Open: agent B's argmax grid shows the mid-rate advantage REVERSING under the deterministic
+derivative of the policy** -- their full grid lands this morning, and C6 forbids finalising
+4.2's boundary until it does. The framing that survives either way: the trained (stochastic)
+policy wins below 0.95; its argmax derivative keeps only the low-rate advantage.
+
+**RQ3 — complete, stronger than the draft ever claimed.** Ladder retrained at 12,000: zero of
+six seeds separate, means and medians identical to five decimals (C4). The 4k version's one
+significant seed was an unconverged run. Credit ablation measured: 15.1x pooled, 13.2x
+federated -- the federation-specific mechanism never existed (the recorded field made it).
+
+**Negative results — grown to its role.** The seventh `global_hard_shd` incident, the credit
+mechanism, the attribution closed form, a misnamed metric, three generator/pipeline silent
+failures: all recorded with what refuted them.
+
+**Attribution — one self-contained appendix, per your instruction.** Three research questions.
+
+## The two systems built tonight
+
+`scripts/mark_provenance.py`: SUPERSEDED markers in every stale directory; both registries
+fail if they read one; three deliberate exceptions listed with reasons. 41 patterns clean.
+
+`thesis/FIGURE_GUIDELINES.md`: applied on your sign-off. Print-true sizes, 8 pt floor, the two
+oversized grids now subfigure panels, titles off behind one switch. Nine chapter figures plus
+the new in-regime one, all regenerated; notebook re-executed clean.
+
+## Still running into the morning
+
+* agent B's argmax grid (11 cells) -- the one thing 4.2's boundary waits on
+* n_int=200 finite-sample re-measurement (slow by nature: CI tests per step)
+* k=12 credit fill (seed 1 training) and its measurement watcher
+* generator control measurement (ER trained 3/3; SF comparator already measured)
+* then one `build_submission.py` rebuild under the provenance check
+
+## Decisions waiting on you
+
+1. §4.2's convention framing once the argmax grid lands (C6 has the MUST NOTs staged).
+2. Figure guideline residuals: caption font `small` or 12 pt; Latin Modern in figures or not.
+3. The analysis slots under every subsection -- the chapter is scaffolded and clean for you.
