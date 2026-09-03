@@ -139,21 +139,41 @@ BOTH directions. The mean is carried by one seed. What the control shows is a po
 not transferred and is unstable across seeds, not one that is systematically worse than random
 -- the same signature as the 240x variance growth reported for the unadapted arm.
 
-**The separation survives argmax evaluation; the effect SIZE does not.** The grid is scored by
-sampling at temperature 1, the project's convention, and the action-selection control was run
-at two rates -- the pivot and a clear winner -- but its result was never written down here.
-200 paired episodes, same checkpoints, learned arm scored by argmax instead:
+**THE RESULT IS A SAMPLED-EVALUATION RESULT. Under argmax it survives at two rates of five.**
+Written 3 Sep 03:50, replacing a paragraph drafted hours earlier from a two-rate control that
+said "the separation survives argmax". That was wrong, and the full 21-cell argmax grid
+(`results/power/rho/argmax_det/`, same checkpoints, same 200 episodes, same myopic and random
+per-episode vectors reused exactly) is why:
 
-| rho | argmax delta | sampled delta | argmax per-seed significance |
-|---|---|---|---|
-| 0.95 | +0.02658 +/- 0.00268 | +0.00195 | 3/3 significantly WORSE than greedy |
-| 0.70 | -0.00512 +/- 0.00052 | -0.01766 | 2/3 significantly better (-2.57, -2.06, -1.96) |
+| rho | sampled | ARGMAX | shift | argmax per-seed SE | ahead beyond 2 SE |
+|---|---|---|---|---|---|
+| 1.00 | +0.01090 | +0.04043 | +0.02952 | +8.92 +4.35 +11.68 | 0/3 |
+| 0.95 | +0.00195 | +0.02658 | +0.02463 | +9.39 +9.30 +6.88 | 0/3 |
+| 0.90 | -0.00826 | **+0.01656** | +0.02482 | +5.82 +6.15 +4.41 | 0/3 |
+| 0.85 | -0.00936 | **+0.01163** | +0.02099 | +5.73 +3.43 +3.18 | 0/3 |
+| 0.80 | -0.01317 | **+0.00371** | +0.01688 | +2.62 +0.93 +0.69 | 0/3 |
+| 0.70 | -0.01766 | -0.00512 | +0.01254 | -2.57 -2.06 -1.96 | **2/3** |
+| 0.50 | -0.01856 | -0.00415 | +0.01441 | -0.51 -3.05 -1.76 | **1/3** |
 
-The direction holds at both rates and the separation between them widens, so the qualitative
-claim is not a convention artefact. The magnitude is: at rho=0.70 the advantage shrinks by a
-factor of 3.2 and one seed of three drops just under the 2 SE bar. **Any effect size quoted
-from this grid is a sampled-evaluation number and must be labelled as one.** The control covers
-2 of 7 rates; the shape of the curve under argmax is unmeasured.
+**15 of 15 beyond 2 SE under sampling becomes 6 of 15 by sign and 3 of 15 beyond 2 SE under
+argmax.** rho=0.90 and rho=0.85 do not merely lose significance -- they REVERSE, significantly,
+on every seed. rho=0.80 crosses to positive but stays inside noise. Only rho=0.70 and rho=0.50
+keep the advantage, and neither keeps it on all three seeds.
+
+**87% of that penalty is pairs left UNDETERMINED, and that is the whole story.** An undetermined
+pair scores a full hard-SHD error, so a policy that stops settling pairs is charged as if it had
+settled them wrongly. Comparing every argmax cell against its sampled twin: mean SHD shift
++0.02499 against a mean resolved-fraction drop of +0.02173, **Pearson r=0.993, p<1e-10**, while
+the myopic arm's resolved fraction differs by exactly 0.0 in all 21 cells. This is the F4
+pathology -- a deterministic policy cannot leave a state whose argmax action has stopped being
+informative -- reproduced here on a second grid at a different window size.
+
+So the reversal is an EXECUTION pathology with a measured cause, not evidence that the transfer
+advantage is illusory: the argmax arm is not showing worse knowledge of the graph, it is showing
+a policy that stopped asking questions. That is why the project's evaluation convention is
+sampling at temperature 1, fixed before this fleet ran and for this documented reason. **But the
+convention is now load-bearing for the headline count, and the chapter must say so rather than
+quoting 15 of 15 unqualified.**
 
 The same table carries a limitation. `mi_ratio` was still rising at the last update in 21 runs
 out of 21, so none of these policies is converged on the training-health criterion at 8,000

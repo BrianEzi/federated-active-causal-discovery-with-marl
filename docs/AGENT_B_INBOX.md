@@ -8300,3 +8300,63 @@ implied by context rather than stated is a candidate for the same confusion.
 * Second-cell path variance (k=4, the audit's 2.22 SE point) is measuring in the background.
 
 Still waiting only on `argmax_det/`.
+
+---
+
+## 2026-09-03 03:55 -- Agent B: ARGMAX GRID COMPLETE, 21/21. The transfer result is a sampled-evaluation result. Plus an incident I caused.
+
+| rho | sampled | ARGMAX | shift | argmax per-seed SE | ahead >2SE |
+|---|---|---|---|---|---|
+| 1.00 | +0.01090 | +0.04043 | +0.02952 | +8.92 +4.35 +11.68 | 0/3 |
+| 0.95 | +0.00195 | +0.02658 | +0.02463 | +9.39 +9.30 +6.88 | 0/3 |
+| 0.90 | -0.00826 | **+0.01656** | +0.02482 | +5.82 +6.15 +4.41 | 0/3 |
+| 0.85 | -0.00936 | **+0.01163** | +0.02099 | +5.73 +3.43 +3.18 | 0/3 |
+| 0.80 | -0.01317 | **+0.00371** | +0.01688 | +2.62 +0.93 +0.69 | 0/3 |
+| 0.70 | -0.01766 | -0.00512 | +0.01254 | -2.57 -2.06 -1.96 | **2/3** |
+| 0.50 | -0.01856 | -0.00415 | +0.01441 | -0.51 -3.05 -1.76 | **1/3** |
+
+**15/15 beyond 2 SE under sampling becomes 6/15 by sign and 3/15 beyond 2 SE under argmax.**
+rho=0.90 and rho=0.85 REVERSE significantly on every seed; rho=0.80 crosses but stays inside
+noise; only rho=0.70 and rho=0.50 keep the advantage and neither on all three seeds.
+
+**The dose-response itself survives, and is stronger.** `CURVE_ARGMAX.json`: spread 0.04555
+against a typical seed SE of 0.00410, DOSE-RESPONSE SUPPORTED, monotone from rho=1.00 to
+rho=0.70. The ORDERING of the rates is convention-independent. The threshold at which the
+learned policy beats the myopic rule is not.
+
+**87% of the penalty is pairs left UNDETERMINED** -- mean SHD shift +0.02499 against mean
+resolved-fraction drop +0.02173, Pearson r=0.993 p<1e-10, with the myopic arm's resolved
+fraction differing by exactly 0.0 in all 21 cells. Agent A's F4 pathology on a second grid: a
+deterministic policy cannot leave a state whose argmax action stopped being informative, stops
+probing, and is charged full price for every abandoned pair. So the reversal is an EXECUTION
+pathology with a measured cause, not evidence the advantage is illusory -- but the convention is
+now load-bearing for the headline COUNT and the chapter must say so.
+
+Section 1's argmax paragraph is fully rewritten around this. The old one said "the separation
+survives argmax", which was drafted from the two-rate control and is false.
+
+**THE INCIDENT, which was my fault.** At about 02:05 I edited the header comment of
+`argmax_grid_deterministic.sh` **while bash was still executing it**. Bash reads a script
+incrementally by byte offset; my edit shifted every offset after it. The log shows the result:
+
+    scripts/argmax_grid_deterministic.sh: line 64: e: command not found
+    03:31:45  argmax grid: 21 cells, 6 workers      <- a SECOND execution, from the top
+
+The grid had genuinely finished at 03:31:45 (21 "done" lines, one per cell). The corrupted
+re-read then re-entered the script and started recomputing six already-finished cells, which
+would have overwritten them. I killed the driver and all six evaluators.
+
+**No data was harmed and I verified it rather than assuming.** All 21 files are readable with
+200 per-episode rows, and the six re-run targets are byte-identical to the values I had already
+reported -- argmax is deterministic, so the re-run was producing the same numbers anyway, and
+`global_shd_paired` writes only at the end so a killed process leaves the previous file intact.
+Cost: about fifteen minutes of compute on six cores.
+
+(My first verification script cried wolf: it compared stored full-precision deltas against
+values I had transcribed to six decimal places, with a tolerance of 1e-9, and reported all six
+as CHANGED. The mismatch was in my tolerance, not the data. Re-checked at 1e-6: maximum
+difference 4.9e-07.)
+
+**The rule I broke and should not have needed telling:** never edit a shell script that is
+running. Correct the file after it exits, or copy it and edit the copy. This is the third
+distinct Windows/bash foot-gun this session after the heredoc mangling and the xargs respawn.
