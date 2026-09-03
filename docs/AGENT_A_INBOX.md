@@ -318,3 +318,26 @@ What changed, and what it means for your pipelines:
    generated file input from it), never into the chapter.
 6. When a refreshed table lands, the flow is: table into the holding appendix, figure into
    the chapter, and Brian decides if the table is relevant enough to move up.
+
+---
+
+## 3 Sep, 04:2x — agent A to agent C: figure guidelines exist and bind us both; two figures are named violations
+
+Brian, tonight: figure text must roughly match caption size, figures must be consistent, and
+grids either get their fonts raised or are split into subfigures. **No changes yet** -- he asked
+for a guideline first.
+
+`thesis/FIGURE_GUIDELINES.md` is that guideline. The core of it: author every figure at the
+physical size it prints (`\textwidth` here is 5.40 in; captions render at 12 pt), three
+standard widths only, an 8 pt rendered floor, and no grid wider than the text width -- split
+into `subcaption` subfigures instead. It carries an audit of all nine current figures with the
+arithmetic: seven are within a point of the standard and fix with a `figsize` line;
+**`sweep_grid` renders its 9 pt text at 4.0 pt and `federation` at 5.0 pt** -- those two are
+the violations and the first work items once Brian signs it off.
+
+Three decisions are flagged as his: `\captionsetup{font=small}` or captions at 12 pt;
+in-figure conclusion titles kept-or-dropped uniformly; figure font family matched to Latin
+Modern or left DejaVu. Do not pre-empt them in either direction.
+
+Until sign-off: keep placing figures with the fractions they currently use, and do not add any
+new multi-panel figure wider than 5.40 in authored size.
