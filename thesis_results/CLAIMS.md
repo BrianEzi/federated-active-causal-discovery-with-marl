@@ -120,14 +120,26 @@ by a comparison that treated a tie as a change of winner.
 
 ## C4 — Federating information, reward and optimisation costs nothing measurable
 
-* federated SHD mean 0.00021, median 0.00013
-* centralised SHD mean 0.00058, median 0.00008
+* federated SHD mean 0.00033, median 0.00001
+* centralised SHD mean 0.00033, median 0.00001
 * myopic on the same episodes 0.00068
-* **paired federated - centralised over 6 seeds: -0.00037 +/- 0.00043 (inside 2 SE)**
+* **paired federated - centralised over 6 seeds: -0.00000 +/- 0.00037**
+* **0 of 6 seeds separate beyond 2 SE**
+* final-update convention: federated 0.00071, centralised 0.00033
 
-**Boundary.** Action rights stay partitioned in both arms. This is the cost of
-partitioning information, reward and optimisation, not of decentralisation entire.
-**MUST NOT** state a direction: mean and median disagree on which arm leads.
+12,000 episodes, four agents, $k_v=12$, 200 paired episodes per seed, seeded
+evaluation, both checkpoint conventions.
+
+**Boundary.** Action rights stay partitioned in both arms. This prices the
+partition of information, reward and optimisation, not decentralisation entire.
+**MUST NOT** state a direction. The two arms agree to five decimal places on the
+mean and on the median at the selected checkpoint, and no seed separates.
+**MUST NOT** carry over the 4,000-episode version of this claim, where mean and
+median disagreed and one seed of six was significant. That seed's centralised run
+measured 0.00263 while every other run sat at 0.00000-0.00066; at 12,000 episodes
+it measures 0.00000. It was an unconverged run, not a cost of centralisation.
+**MUST NOT** read the final-update column as a federation effect: selection helps
+the federated arm and is inert for the pooled one, which is a checkpoint result.
 
 ## C5 — The competence-floor exclusions are undertrained, not broken
 

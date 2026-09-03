@@ -236,23 +236,56 @@ if pc12.exists() and pc04.exists():
             "**MUST NOT** restore the blanket 'zero for both arms' justification. It holds for "
             "the six $k_v=20$ and $30$ runs and nowhere else.", ""]
 
-# --- RQ3 ------------------------------------------------------------------------------------
-A = fed("shd_A.json") + fed("shd_A_s345.json")
-E = fed("shd_E.json") + fed("shd_E_s345.json")
-LA = [x["means"]["learned"]["hard"] for e in A for x in e]
-LE = [x["means"]["learned"]["hard"] for e in E for x in e]
-G = [x["means"]["greedy"]["hard"] for e in A for x in e]
-d = np.array(LA) - np.array(LE)
-se = d.std(ddof=1) / np.sqrt(len(d))
-out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
-        f"* federated SHD mean {np.mean(LA):.5f}, median {np.median(LA):.5f}",
-        f"* centralised SHD mean {np.mean(LE):.5f}, median {np.median(LE):.5f}",
-        f"* myopic on the same episodes {np.mean(G):.5f}",
-        f"* **paired federated - centralised over {len(d)} seeds: {d.mean():+.5f} +/- {se:.5f}"
-        f" ({'inside' if abs(d.mean()) <= 2*se else 'outside'} 2 SE)**", "",
-        "**Boundary.** Action rights stay partitioned in both arms. This is the cost of",
-        "partitioning information, reward and optimisation, not of decentralisation entire.",
-        "**MUST NOT** state a direction: mean and median disagree on which arm leads.", ""]
+# --- RQ3 -------------------------------------------------------------------------------------
+# 12,000 episodes. The six-seed result this claim carried until 3 Sep was measured on
+# 4,000-episode policies, and its one significant seed was an unconverged centralised run whose
+# error was 0.00263 against 0.00000-0.00066 elsewhere. At 12,000 that seed measures 0.00000.
+LAD = {k: {r["seed"]: r for r in json.loads(
+        (ROOT / f"results/rerows/ladder12k_{k}.json").read_text())}
+       for k in ("A_best", "A_final", "E_best", "E_final")
+       if (ROOT / f"results/rerows/ladder12k_{k}.json").exists()}
+if len(LAD) == 4:
+    seeds = sorted(LAD["A_best"])
+    ds = []
+    for sd in seeds:
+        x = np.array(LAD["A_best"][sd]["rows"]["learned"]["hard"])
+        y = np.array(LAD["E_best"][sd]["rows"]["learned"]["hard"])
+        ds.append((x - y).mean())
+    ds = np.array(ds)
+    gv = lambda k: [LAD[k][sd]["means"]["learned"]["hard"] for sd in seeds]
+    myo = [LAD["A_best"][sd]["means"]["greedy"]["hard"] for sd in seeds]
+    sig = sum(1 for sd in seeds
+              if abs((np.array(LAD["A_best"][sd]["rows"]["learned"]["hard"]) -
+                      np.array(LAD["E_best"][sd]["rows"]["learned"]["hard"])).mean())
+              > 2 * (np.array(LAD["A_best"][sd]["rows"]["learned"]["hard"]) -
+                     np.array(LAD["E_best"][sd]["rows"]["learned"]["hard"])).std(ddof=1)
+              / np.sqrt(200))
+    out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
+            f"* federated SHD mean {np.mean(gv('A_best')):.5f}, median {np.median(gv('A_best')):.5f}",
+            f"* centralised SHD mean {np.mean(gv('E_best')):.5f}, median {np.median(gv('E_best')):.5f}",
+            f"* myopic on the same episodes {np.mean(myo):.5f}",
+            f"* **paired federated - centralised over {len(seeds)} seeds: "
+            f"{ds.mean():+.5f} +/- {ds.std(ddof=1)/np.sqrt(len(ds)):.5f}**",
+            f"* **{sig} of {len(seeds)} seeds separate beyond 2 SE**",
+            f"* final-update convention: federated {np.mean(gv('A_final')):.5f}, "
+            f"centralised {np.mean(gv('E_final')):.5f}",
+            "",
+            "12,000 episodes, four agents, $k_v=12$, 200 paired episodes per seed, seeded",
+            "evaluation, both checkpoint conventions.",
+            "",
+            "**Boundary.** Action rights stay partitioned in both arms. This prices the",
+            "partition of information, reward and optimisation, not decentralisation entire.",
+            "**MUST NOT** state a direction. The two arms agree to five decimal places on the",
+            "mean and on the median at the selected checkpoint, and no seed separates.",
+            "**MUST NOT** carry over the 4,000-episode version of this claim, where mean and",
+            "median disagreed and one seed of six was significant. That seed's centralised run",
+            "measured 0.00263 while every other run sat at 0.00000-0.00066; at 12,000 episodes",
+            "it measures 0.00000. It was an unconverged run, not a cost of centralisation.",
+            "**MUST NOT** read the final-update column as a federation effect: selection helps",
+            "the federated arm and is inert for the pooled one, which is a checkpoint result.", ""]
+else:
+    out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
+            f"**NOT YET AVAILABLE** -- {len(LAD)} of 4 ladder measurements at 12,000 episodes.", ""]
 
 # --- Undertraining ---------------------------------------------------------------------------
 out += ["## C5 — The competence-floor exclusions are undertrained, not broken", "",
