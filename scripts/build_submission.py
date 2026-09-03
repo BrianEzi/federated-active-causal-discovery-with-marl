@@ -55,7 +55,14 @@ GROUPS = [
      ["results/power/rho/rho[01].[0-9][0-9]_s?.json", "results/power/rho/CURVE.json",
       "results/power/rho/deterministic/xfer_rho*_s?.json",
       "results/power/rho/DETERMINISTIC_COMPARE.json",
-      "results/power/rho/rho0.95_long_s?.json"], True),
+      "results/power/rho/rho0.95_long_s?.json",
+      # The argmax derivative of the whole grid: 21 cells, the convention half of C6's
+      # boundary. CURVE_ARGMAX.json is its curve summary. Added 3 Sep once the grid landed.
+      "results/power/rho/argmax_det/argmax_rho*_s?.json",
+      "results/power/rho/CURVE_ARGMAX.json",
+      # The measured in-regime diagonal ships with the inregime group; listed here as well
+      # would double-copy, so it is not.
+      ], True),
     ("generator", "The generator control: the advantage is not a scale-free artefact. Three "
                   "ER seeds at the principal cell, both conventions identical; the myopic rule "
                   "is the arm the family change breaks.",
