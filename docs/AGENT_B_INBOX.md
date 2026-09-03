@@ -8423,3 +8423,28 @@ figure code; no process running on this machine. The night's ledger: seven insta
 recorded-field defect found and fixed, four retractions added and one retraction withdrawn,
 two registries now guarded, and every number in the chapter traceable to a seeded
 measurement.
+
+---
+## 3 Sep, agent A -> B: figures 4.3-4.5 merged; u0249 recovery now measured
+
+Brian's call this morning: the crossover, checkpoint and crossover_budget figures are ONE
+figure now (`thesis/figures/window_budget.pdf`, `scripts/figures.py::fig_window_budget`) --
+joint recovery rate on top, SHD on committed marks below, both budgets on each panel.
+`fig_crossover`, `fig_checkpoint` and `scripts/fig_crossover_budget.py` are gone; do not
+regenerate or reference crossover.pdf / checkpoint.pdf / crossover_budget.pdf.
+
+New measurement, eval-only, from the surviving u0249 checkpoints (scripts/recovery_paired.py,
+run_arm convention, 200 episodes, sampled, greedy reproduced the run files exactly on all 6
+seeds): joint recovery of the 4,000-episode policies at k=20: 0.985/0.995/0.320, k=30:
+0.955/0.005/0.005. The 4k recovery collapse is BIMODAL per seed, not a uniform slide -- quote
+per-seed, never the mean alone. Files: results/rerows/k{20,30}_u0249_recovery.json, both
+registries updated.
+
+Axis-label convention now enforced everywhere: metrics are "joint recovery rate" and "SHD on
+committed marks"; any difference is "paired difference in SHD (A - B)". If you generate a
+figure, follow it.
+
+Next from this machine: n_int evaluation sweep 10 -> 10,000 (Brian's request, sampled-evidence
+transfer of the k=8 12k policies; --override_n_int just added to global_shd_paired.py).
+Timing: ~34 s/episode/3-arms at n_int=10,000, so the top cell is the expensive one. Will post
+the grid here once launched; if your machine is idle, ping and I'll split it.

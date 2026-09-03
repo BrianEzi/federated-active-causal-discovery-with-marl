@@ -113,105 +113,124 @@ def _sweep_success(k: int, budget: int = 4000):
 
 
 # ---------------------------------------------------------------------------------------
-def fig_crossover(out: pathlib.Path):
-    """The window axis at both training budgets.
+def _recovery(k: int, budget: int):
+    """Joint recovery per seed: (learned, greedy) pairs on the run_arm convention.
 
-    The 4,000-episode line crosses zero between k=8 and k=12 and the 12,000-episode line does
-    not cross at all. Reporting only the first, which is what this figure used to do, reports
-    the budget as though it were the window. The lower panel is SHD at the selected checkpoint
-    from results/rerows, which is the 4,000-episode design for k<=12 and 12,000 for k=20 and 30;
-    its budget is stated in the caption rather than mixed silently.
+    Recovery comes from the run's own 200-episode eval pass at the FINAL update
+    (ma/evaluate.py::run_arm), because that is the only place it was ever recorded; the
+    paired SHD tool records SHD fields only. Guarded by the recorded train_episodes because
+    results/sweep/oracle mixes designs: k<=12 trained for 4,000 episodes, and the k=20/30
+    run JSONs were overwritten by the 12,000-episode copies on 1 Sep. The 4,000-episode
+    policies at k=20 and 30 therefore have no run file at all; their recovery is measured
+    from the surviving u0249 checkpoints (update 249 = episode 4,000 exactly) by
+    scripts/recovery_paired.py, which calls the same run_arm on the same episode seeds.
     """
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(FULL, 5.2), sharex=True,
-                                      gridspec_kw={"height_ratios": [1, 1.15]})
+    if budget == 4000 and k in (20, 30):
+        path = ROOT / f"results/rerows/k{k}_u0249_recovery.json"
+        if not path.exists():
+            return []
+        return [(e["arms"]["learned"]["success"],
+                 e["arms"]["greedy_uncertainty"]["success"])
+                for e in json.loads(path.read_text())]
+    d = "results/sweep12k" if budget == 12000 else "results/sweep/oracle"
+    paths = sorted(glob.glob(str(ROOT / d / f"k{k:02d}s50n04b150_s*.json")))
+    if not paths and budget == 12000:      # k=20 and 30 live only in the sweep directory
+        paths = sorted(glob.glob(str(ROOT / f"results/sweep/oracle/k{k:02d}s50n04b150_s*.json")))
+    out = []
+    for path in paths:
+        r = json.loads(pathlib.Path(path).read_text())
+        if r.get("config", {}).get("train_episodes") != budget:
+            continue
+        out.append((r["arms"]["learned"]["success"],
+                    r["arms"]["greedy_uncertainty"]["success"]))
+    return out
 
-    top.axhline(0, color="black", lw=0.8)
-    # Two lines, because the sign change is a property of the 4,000-episode budget and not of
-    # the window. At 12,000 the gap is positive at every window and there is no crossing.
-    for budget, colour, style, label in ((4000, MYOPIC, "o--", "4,000 episodes"),
-                                         (12000, LEARNED, "o-", "12,000 episodes")):
-        ks, means = [], []
+
+def _shd4(k: int):
+    """Hard SHD per seed for the policy AFTER 4,000 episodes, one convention along the line:
+    the final update of a 4,000-episode run, which for k=20 and 30 is the u0249 checkpoint."""
+    path = (ROOT / f"results/rerows/k{k}_u0249.json" if k in (20, 30)
+            else ROOT / f"results/rerows/k{k:02d}_final.json")
+    if not path.exists():
+        return []
+    return [e["means"]["learned"]["hard"] for e in json.loads(path.read_text())]
+
+
+def fig_window_budget(out: pathlib.Path):
+    """The window axis at both training budgets: one figure, both reported metrics.
+
+    Replaces the crossover, checkpoint and crossover_budget figures (3 Sep, Brian's call):
+    the recovery-gap panel repeated what this figure's recovery panel shows, the old SHD
+    panel repeated the sweep grid's window panel without the budget comparison that
+    justifies it, and selected-against-final lives in tab:checkpoint. The story is one
+    sentence -- at 4,000 episodes the learned arm trails the myopic rule almost everywhere,
+    at 12,000 it trails nowhere -- and it needs both budgets on the same axes, not three
+    figures.
+
+    CONVENTIONS, stated here because the two panels cannot share one. Recovery is the run's
+    own eval pass at the final update (the only checkpoint it was recorded at). SHD is the
+    seeded paired evaluation: selected checkpoint at 12,000 (the chapter's reporting
+    convention), final update at 4,000 (the policy after exactly 4,000 episodes). The
+    myopic rule does not train, so it is one line per panel, not one per budget.
+    """
+    fig, (top, bot) = plt.subplots(2, 1, figsize=(FULL, 5.6), sharex=True,
+                                   gridspec_kw={"hspace": 0.12})
+    L4 = RANDOM   # grey: the undertrained policy, matching the retired budget figure
+
+    # (a) joint recovery rate
+    for budget, colour, style, label in ((4000, L4, "o--", "learned, 4,000 episodes"),
+                                         (12000, LEARNED, "o-", "learned, 12,000 episodes")):
+        xs, means = [], []
         for k in KS:
-            pairs = _sweep_success(k, budget)
+            pairs = _recovery(k, budget)
             if not pairs:
                 continue
-            gaps = [l - g for l, g in pairs]
-            ks.append(k)
-            means.append(np.mean(gaps))
-            top.scatter([k] * len(gaps), gaps, s=13, color=colour, alpha=0.4, zorder=3)
-        top.plot(ks, means, style, color=colour, lw=1.6, ms=5, zorder=4, label=label)
-    top.set_ylabel("joint recovery rate\nlearned $-$ myopic")
-    _title(top, "The sign change belongs to the budget, not the window")
-    top.legend(loc="lower right", frameon=False, fontsize=8)
-    # The 4,000-episode POLICIES at k=20 and k=30 survived as u0249 checkpoints and their
-    # structural distance is in the budget figure; what was never recorded for them is the
-    # joint-recovery criterion this panel plots, so this line still stops at 12.
-    top.annotate("recovery unrecorded for the 4,000-episode\n$k_v=20$ and $30$ policies "
-                 "(SHD: budget figure)", xy=(15.5, -0.055), fontsize=8, color="#666666")
-
-    for label, arm, colour in (("learned (selected)", "learned", LEARNED),
-                               ("myopic", "greedy", MYOPIC),
-                               ("random", "random_vary", RANDOM)):
-        means, seeds = [], []
-        for k in KS:
-            vals = [r["means"][arm]["hard"] for r in _ckpt(k, "best")]
+            vals = [l for l, _ in pairs]
+            top.scatter([k] * len(vals), vals, s=12, color=colour, alpha=0.4, zorder=3)
+            xs.append(k)
             means.append(np.mean(vals))
-            seeds.append(vals)
-        # 0 cannot be drawn on a log axis; floor it below the smallest non-zero value and
-        # mark it, rather than dropping the point that matters most.
-        floor = 1e-5
-        for x, vals in zip(KS, seeds):
-            bottom.scatter([x] * len(vals), [max(v, floor) for v in vals],
-                           s=12, color=colour, alpha=0.4, zorder=3)
-        bottom.plot(KS, [max(m, floor) for m in means], "o-", color=colour,
-                    lw=1.6, ms=5, label=label, zorder=4)
-    bottom.set_yscale("log")
-    bottom.set_ylim(7e-6, 2e-1)
-    bottom.set_xlabel("window size $k_v$")
-    bottom.set_ylabel("SHD on committed marks\n(pooled global graph)")
-    bottom.annotate("0 errors in 600 episodes", xy=(20, 1e-5), xytext=(11.5, 3.3e-5),
-                    fontsize=7.5, color=LEARNED,
-                    arrowprops=dict(arrowstyle="->", color=LEARNED, lw=0.7))
-    bottom.legend(loc="upper right", frameon=False)
-    for ax in (top, bottom):
+        top.plot(xs, means, style, color=colour, lw=1.6, ms=5, label=label, zorder=4)
+    my_rec = []
+    for k in KS:
+        vals = [g for _, g in _recovery(k, 12000)]
+        top.scatter([k] * len(vals), vals, s=12, color=MYOPIC, alpha=0.4, zorder=2)
+        my_rec.append(np.mean(vals))
+    top.plot(KS, my_rec, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
+    top.set_ylabel("joint recovery rate")
+    top.set_ylim(0, 1.02)
+    top.legend(loc="lower left", frameon=False)
+    _title(top, "The sign change belongs to the budget, not the window")
+
+    # (b) SHD on committed marks
+    floor = 1e-5
+    for getter, colour, style, label in (
+            (_shd4, L4, "o--", "learned, 4,000 episodes"),
+            (lambda k: [r["means"]["learned"]["hard"] for r in _ckpt(k, "best")],
+             LEARNED, "o-", "learned, 12,000 episodes (selected)")):
+        xs, means = [], []
+        for k in KS:
+            vals = getter(k)
+            if not vals:
+                continue
+            bot.scatter([k] * len(vals), [max(v, floor) for v in vals],
+                        s=12, color=colour, alpha=0.4, zorder=3)
+            xs.append(k)
+            means.append(np.mean(vals))
+        bot.plot(xs, [max(m, floor) for m in means], style, color=colour,
+                 lw=1.6, ms=5, label=label, zorder=4)
+    my_shd = [np.mean([r["means"]["greedy"]["hard"] for r in _ckpt(k, "best")]) for k in KS]
+    bot.plot(KS, my_shd, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
+    bot.set_yscale("log")
+    bot.set_ylim(7e-6, 2e-1)
+    bot.set_xlabel("window size $k_v$")
+    bot.set_ylabel("SHD on committed marks\n(pooled global graph)")
+    bot.annotate("0 errors in 600 episodes", xy=(20, 1e-5), xytext=(11.5, 3.3e-5),
+                 fontsize=7.5, color=LEARNED,
+                 arrowprops=dict(arrowstyle="->", color=LEARNED, lw=0.7))
+    for ax in (top, bot):
         ax.set_xticks(KS)
     fig.tight_layout()
-    fig.savefig(out / "crossover.pdf", bbox_inches="tight")
-    plt.close(fig)
-
-
-def fig_checkpoint(out: pathlib.Path):
-    """Selected against final checkpoint, at 12,000 episodes on every window.
-
-    The title used to read "inert below the crossover and decisive above it". At a uniform
-    12,000 episodes there is no crossover to be below, and the earlier reading was confounded:
-    the windows where the conventions agreed were exactly the cells trained for 4,000 episodes
-    and the ones where they diverged were exactly the two trained for 12,000. Selection runs
-    once per checkpoint, so three times the updates give it three times the chances to retain
-    an exploratory policy. That is a budget effect, not a window effect.
-    """
-    fig, ax = plt.subplots(figsize=(FULL, 3.0))
-    floor = 1e-5
-    for which, label, colour, style in (("best", "selected (early-stopped)", LEARNED, "-"),
-                                        ("final", "final update", THIRD, "--")):
-        means = [np.mean([r["means"]["learned"]["hard"] for r in _ckpt(k, which)]) for k in KS]
-        for k in KS:
-            vals = [r["means"]["learned"]["hard"] for r in _ckpt(k, which)]
-            ax.scatter([k] * len(vals), [max(v, floor) for v in vals],
-                       s=12, color=colour, alpha=0.4, zorder=3)
-        ax.plot(KS, [max(m, floor) for m in means], "o" + style, color=colour,
-                lw=1.6, ms=5, label=label, zorder=4)
-    myopic = [np.mean([r["means"]["greedy"]["hard"] for r in _ckpt(k, "best")]) for k in KS]
-    ax.plot(KS, myopic, "-", color=MYOPIC, lw=1.2, label="myopic", zorder=2)
-    ax.set_yscale("log")
-    ax.set_ylim(7e-6, 3e-2)
-    ax.set_xticks(KS)
-    ax.set_xlabel("window size $k_v$")
-    ax.set_ylabel("SHD on committed marks")
-    _title(ax, "Neither checkpoint convention is safe alone at 12,000 episodes")
-    ax.legend(loc="lower left", frameon=False)
-    fig.tight_layout()
-    fig.savefig(out / "checkpoint.pdf", bbox_inches="tight")
+    fig.savefig(out / "window_budget.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -333,7 +352,7 @@ def fig_federation(out: pathlib.Path):
     ax3.set_ylim(-lim, lim)
     ax3.set_xticks(seeds)
     ax3.set_xlabel("seed")
-    ax3.set_ylabel("SHD, federated $-$ centralised", fontsize=8)
+    ax3.set_ylabel("paired difference in SHD\nfederated $-$ centralised", fontsize=8)
     ax3.annotate("above 0: centralising wins", xy=(0.04, 0.92), xycoords="axes fraction",
                  fontsize=8, color="#666666")
     fig.tight_layout()
@@ -607,7 +626,7 @@ def fig_answer_rate(out: pathlib.Path):
         top.scatter([at[r]] * len(per[r]), [v[0] for v in per[r]], s=14, color=LEARNED,
                     alpha=0.4, zorder=3)
     top.plot(pos, means, "o-", color=LEARNED, lw=1.7, ms=5, zorder=4, label="learned")
-    top.set_ylabel("SHD under sampled evidence")
+    top.set_ylabel("SHD on committed marks")
     top.legend(loc="upper left", frameon=False, fontsize=7.5)
     _title(top, "Degrading the training evidence improves transfer")
 
@@ -633,7 +652,7 @@ def fig_answer_rate(out: pathlib.Path):
                     color=MYOPIC, lw=1.2, ms=4.5, zorder=3, label="argmax derivative")
         bottom.legend(loc="upper left", frameon=False, fontsize=7.5)
     bottom.set_xlabel(r"answer rate $\rho$ the policy trained under")
-    bottom.set_ylabel("paired difference\nlearned $-$ myopic")
+    bottom.set_ylabel("paired difference in SHD\nlearned $-$ myopic")
     bottom.annotate("filled: ahead beyond 2 SE", xy=(0.52, 0.012), fontsize=7,
                     color="#555555")
     for ax in (top, bottom):
@@ -776,7 +795,7 @@ def fig_inregime(out: pathlib.Path):
     left.set_xticks(rhos)
     left.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else "" for r in rhos])
     left.set_xlabel(r"answer rate $\rho$")
-    left.set_ylabel("in-regime SHD, learned $-$ myopic", fontsize=8)
+    left.set_ylabel("paired difference in SHD\nlearned $-$ myopic, in-regime", fontsize=8)
     left.annotate(r"$\rho=0.95$: worse in-regime" + "\non 3 of 3 seeds",
                   xy=(0.95, 0.0041), xytext=(0.62, 0.0035), fontsize=8, color="#666666",
                   arrowprops=dict(arrowstyle="->", color="#666666", lw=0.7))
@@ -788,8 +807,8 @@ def fig_inregime(out: pathlib.Path):
             if (r, s_) in xfer:
                 right.scatter(inreg[(r, s_)], xfer[(r, s_)], s=16, color=LEARNED,
                               alpha=0.55, zorder=3)
-    right.set_xlabel("in-regime delta", fontsize=8)
-    right.set_ylabel("transfer delta", fontsize=8)
+    right.set_xlabel("paired difference in SHD, in-regime", fontsize=8)
+    right.set_ylabel("paired difference in SHD, transfer", fontsize=8)
     right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.08),
                    xycoords="axes fraction", fontsize=8, color="#666666")
     fig.tight_layout()
@@ -889,7 +908,7 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     for name, fn in (("sweep_grid_[abcd]", fig_sweep_grid),
-                     ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
+                     ("window_budget", fig_window_budget),
                      ("attribution_law", fig_attribution_law),
                      ("federation_[ab]", fig_federation),
                      ("pair_class", fig_pair_class),

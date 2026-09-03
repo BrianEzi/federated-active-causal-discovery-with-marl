@@ -85,8 +85,13 @@ REGISTRY = [
       # u0249 = the policy at episode 4,000 exactly, from the ORIGINAL 31 Aug runs whose JSONs
       # were overwritten by the seed-coverage copy. Completes the 4,000-episode line at k=20
       # and k=30. Brian spotted that the checkpoints survived.
-      "results/rerows/k20_u0249.json", "results/rerows/k30_u0249.json"],
-     "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}"),
+      "results/rerows/k20_u0249.json", "results/rerows/k30_u0249.json",
+      # Joint recovery of those same u0249 policies (3 Sep): the paired SHD tool records no
+      # recovery, so scripts/recovery_paired.py replays ma/evaluate.py::run_arm on the same
+      # episode seeds. Greedy matched the run files exactly on all six seeds.
+      "results/rerows/k20_u0249_recovery.json", "results/rerows/k30_u0249_recovery.json"],
+     "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}; "
+     "scripts/recovery_paired.py --episodes 200 --checkpoint u0249"),
 
     ("attribution",
      "RQ4. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: "

@@ -127,6 +127,11 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
+    ap.add_argument("--override_n_int", type=int, default=None,
+                    help="evaluate with this many interventional rows per intervention "
+                         "instead of the trained n_int. Only meaningful under sampled "
+                         "evidence, where the test statistic is computed from those rows; "
+                         "under oracle evidence the answers do not read them.")
     ap.add_argument("--path", type=int, default=0,
                     help="policy sample path. Same episodes, different action draws. Holding "
                          "everything else fixed and varying this measures the variance the "
@@ -165,6 +170,8 @@ def main(argv=None) -> int:
             config = dict(config, vs_evidence=args.override_evidence)
         if args.override_power is not None:
             config = dict(config, vs_evidence_power=args.override_power)
+        if args.override_n_int is not None:
+            config = dict(config, n_int=args.override_n_int)
         env = env_from_config(config, seed=use_seed)
 
         if args.checkpoint == "best":
@@ -214,6 +221,7 @@ def main(argv=None) -> int:
         entry = {"source": str(path), "seed": use_seed, "episodes": args.episodes,
                  "checkpoint": args.checkpoint, "sampled": bool(args.sample),
                  "eval_evidence": args.override_evidence or config.get("vs_evidence"),
+                 "eval_n_int": config.get("n_int"),
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},

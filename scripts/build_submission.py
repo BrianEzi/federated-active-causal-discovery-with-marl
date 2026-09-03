@@ -91,6 +91,8 @@ GROUPS = [
                    "`results/rerows/`; `results/ckpt/` holds the same cells scored before the "
                    "evaluation RNG was seeded and is NOT shipped.",
      ["results/rerows/k??_best.json", "results/rerows/k??_final.json",
+      "results/rerows/k20_u0249.json", "results/rerows/k30_u0249.json",
+      "results/rerows/k20_u0249_recovery.json", "results/rerows/k30_u0249_recovery.json",
       "results/sweep12k/shd/*.json",
       "results/sweep12k/shd_final/*.json", "results/sweep12k/shd_argmax/*.json",
       "results/sweep12k/shd_u0500/*.json"], False),

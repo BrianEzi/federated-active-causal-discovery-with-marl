@@ -260,7 +260,7 @@ Regenerate with: `training runs in results/credit/, then scripts/global_shd_pair
 
 Early-stopped against final policy on the window-size axis, 200 paired episodes per seed. Establishes that the checkpoint choice is inert below the crossover and worth 2.3x at k=20 and 16x at k=30 above it.
 
-Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}`
+Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}; scripts/recovery_paired.py --episodes 200 --checkpoint u0249`
 
 | file | sha256 (16) | source |
 |---|---|---|
@@ -276,8 +276,10 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 | `k30_final.json` | `53b5d0ffc704c815` | `results/rerows/k30_final.json` |
 | `k20_u0249.json` | `334b4ab147ccd716` | `results/rerows/k20_u0249.json` |
 | `k30_u0249.json` | `3a0cb52e305f5146` | `results/rerows/k30_u0249.json` |
+| `k20_u0249_recovery.json` | `c296032691ce7172` | `results/rerows/k20_u0249_recovery.json` |
+| `k30_u0249_recovery.json` | `dfdd94f826b82b23` | `results/rerows/k30_u0249_recovery.json` |
 
-12 files.
+14 files.
 
 ## `attribution/` — RQ4, figure attribution_law
 
