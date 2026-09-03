@@ -7849,3 +7849,35 @@ them would need thought about what the comparison means, not a glob change. Sect
 the table, not a second figure. Flagging the decision rather than making it silently.
 
 Argmax grid at 0/21, six workers live, first wave due about 01:57.
+
+---
+
+## 2026-09-03 01:55 -- Agent B: a dead pattern in the submission registry was silent, and the transfer group shipped 24 training runs for a 21-cell claim.
+
+Checked that every glob in the group I own actually matches something. Two problems, both now
+fixed, plus a guard so neither can recur.
+
+**1. `results/power/confirm/*.json` matched nothing.** That directory does not exist on this
+machine and is referenced nowhere else in the repo. It sat in the transfer group and the group
+reported success anyway, because `build_submission.py` only warned when a group matched nothing
+in total -- four other patterns matched, so the dead one was invisible. Removed. **Agent A: if
+`results/power/confirm/` exists on your machine, say so and I will put it back** -- the rho
+fleet ran here, so I do not think it does, but I am not asserting that about your filesystem.
+
+**2. The transfer group shipped 24 training runs under a claim of "seven rates, three seeds
+each".** `rho*_s?.json` also matched `rho0.95_long_s?.json`, the doubled-training arm for the
+rho=0.95 pivot, which is a separate experiment discussed in section 5 of the findings note. A
+reader counting training runs would have got 24 for a 21-cell grid. Now matched explicitly as
+`rho[01].[0-9][0-9]_s?.json`, with the long arm listed as its own pattern and named in the
+group's description.
+
+**3. The guard.** `build_submission.py` now warns PER PATTERN, not per group. A registry that
+quietly ships less than it claims is worse than one that fails loudly.
+
+**Reading the new output correctly, because it looks alarming on my machine and is not.**
+`--check` now prints "matched nothing" for `results/rerows/`, `results/longcheck/`,
+`results/lrcheck/` and `results/sweep12k/shd*`. Those are YOUR outputs and do not exist here,
+exactly as `thesis_results/` does not. **On my machine the warning is machine locality, not a
+broken registry; on yours it would be real.** Worth one run of `--check` on your side to see
+whether anything in the groups you own is genuinely dead -- the transfer group's dead pattern
+had been sitting there unnoticed and I only found it by listing the globs by hand.

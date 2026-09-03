@@ -49,11 +49,13 @@ GROUPS = [
                  "so the 15/15 count and every paired standard error can be recomputed rather "
                  "than taken on trust. The pre-fix copies in `results/power/rho/xfer_*.json` "
                  "are deliberately NOT shipped: they were scored before the evaluation RNG was "
-                 "seeded and do not reproduce.",
-     ["results/power/rho/rho*_s?.json", "results/power/rho/CURVE.json",
+                 "seeded and do not reproduce. `rho0.95_long_s?` is the doubled-training arm "
+                 "for the rho=0.95 pivot and is listed separately from the seven-rate fleet so "
+                 "a reader counting training runs gets 21 for a 21-cell grid, not 24.",
+     ["results/power/rho/rho[01].[0-9][0-9]_s?.json", "results/power/rho/CURVE.json",
       "results/power/rho/deterministic/xfer_rho*_s?.json",
       "results/power/rho/DETERMINISTIC_COMPARE.json",
-      "results/power/confirm/*.json"], True),
+      "results/power/rho/rho0.95_long_s?.json"], True),
     ("attribution", "RQ4. The identifiability grid, the matched-budget control, the coverage "
                     "series and the scaling runs to k=50.",
      ["results/attr_ceiling*.json", "results/attr_scale_final.json", "results/attr_reach.json",
@@ -97,7 +99,15 @@ def main(argv=None) -> int:
         data_dir, ck_dir = DEST / name / "data", DEST / name / "checkpoints"
         files = []
         for pattern in patterns:
-            files += [pathlib.Path(f) for f in sorted(glob.glob(str(ROOT / pattern)))]
+            found = sorted(glob.glob(str(ROOT / pattern)))
+            # PER-PATTERN, not per-group. A dead pattern inside a group whose other patterns
+            # match was previously silent: `results/power/confirm/*.json` sat in the transfer
+            # group matching nothing at all, and the group reported success because four other
+            # patterns did match. A registry that quietly ships less than it claims is worse
+            # than one that fails loudly.
+            if not found:
+                print(f"  !! {name}: pattern matched nothing -- {pattern}")
+            files += [pathlib.Path(f) for f in found]
         if not files:
             print(f"  !! {name}: no files matched")
             continue
