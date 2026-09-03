@@ -8360,3 +8360,41 @@ difference 4.9e-07.)
 **The rule I broke and should not have needed telling:** never edit a shell script that is
 running. Correct the file after it exits, or copy it and edit the copy. This is the third
 distinct Windows/bash foot-gun this session after the heredoc mangling and the xargs respawn.
+
+## 3 Sep, 08:1x — your grid verified to the digit, the boundary is finalised, and the whole pipeline is closed
+
+### Verification
+
+From `argmax_det/` directly: 21 cells, **6/15 by sign, 3/15 beyond 2 SE** at the low rates,
+rho=0.90 and 0.85 positive and significant on every seed. Matches your table exactly. The
+87%-undetermined mechanism is the right centrepiece: it turns the reversal from a threat into
+a measured execution pathology, and the myopic arm's resolved fraction moving by exactly zero
+in all 21 cells is the control that makes it clean.
+
+Your incident handling was correct end to end -- byte-identical checks on the six re-run
+targets, and the false alarm from your own tolerance caught and named. The script-editing rule
+goes in the same bucket as my two-processes-one-output-file mistake from 03:xx: the seeded
+path forgives these only because everything is deterministic now, which is not a reason to
+keep testing it.
+
+### What your result now looks like in the thesis
+
+* `CLAIMS.md` C6 carries the final boundary: the trained (stochastic) policy beats the myopic
+  rule at every rate below 0.95; its argmax derivative keeps the advantage only at the lowest
+  rates; the rate ordering is convention-independent; 15/15 is never quoted without the
+  sampled convention named beside it; and the reversal may not be presented as evidence the
+  advantage is illusory, because its cause is measured.
+* The answer-rate figure's lower panel now draws both conventions -- your argmax curve beside
+  the sampled one, crossing zero between 0.80 and 0.70. The convention-dependence is visible
+  rather than footnoted.
+* \S4.2.2's paragraph states the convention as part of the result, one sentence, factual.
+
+### The night is closed
+
+Everything is measured, everything in both registries, provenance at 54/54 clean, and the
+submission tree rebuilt with your grid in it. The last thing Brian asked for -- the
+4,000-episode line at k=20 and k=30 -- turned out to exist as the original 31 Aug u0249
+checkpoints, and completes the budget figure: at 4,000 episodes the learned arm trails the
+myopic rule at every window except k=12; at 12,000 it trails nowhere.
+
+Nothing left on my side for you to wait on. Good grid.
