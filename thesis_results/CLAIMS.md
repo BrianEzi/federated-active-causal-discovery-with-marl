@@ -161,7 +161,35 @@ confound the axis being varied. Report them beside the sweep as a limitation of 
 
 ## C6 — Training under a partial oracle transfers to sampled evidence
 
-**NOT YET AVAILABLE** -- 0 of 21 cells present in
-`thesis_results/power/`. Chapter 4 may assert nothing here until the grid is
-complete. Do not fill the gap from `docs/FINDINGS_TRANSFER_2026_09_02.md`; that
-note quotes the pre-fix grid.
+| $\rho$ | learned | myopic | paired $\Delta$ | seed SE | ahead beyond 2 SE |
+|---|---|---|---|---|---|
+| 1.00 | 0.05936 | 0.04846 | +0.01090 | 0.00728 | 0/3 |
+| 0.95 | 0.05041 | 0.04846 | +0.00195 | 0.00122 | 0/3 |
+| 0.90 | 0.04020 | 0.04846 | -0.00826 | 0.00042 | 3/3 |
+| 0.85 | 0.03910 | 0.04846 | -0.00936 | 0.00207 | 3/3 |
+| 0.80 | 0.03528 | 0.04846 | -0.01317 | 0.00114 | 3/3 |
+| 0.70 | 0.03080 | 0.04846 | -0.01766 | 0.00055 | 3/3 |
+| 0.50 | 0.02989 | 0.04846 | -0.01856 | 0.00179 | 3/3 |
+
+* $\rho \le 0.9$: 15/15 cells ahead by sign, **15/15 ahead beyond 2 SE**
+* $\rho > 0.9$: 1/6 ahead by sign, **0/6 ahead beyond 2 SE**
+
+**Boundary.** One cell -- $k_v=8$, four agents, budget 70, `factored` backend. The
+curve is monotone and saturating over the swept range; no interior optimum is claimed
+and no floor, since $\rho < 0.50$ was not measured. The myopic column is identical at
+every rate by construction: the baseline arms are the same per-episode vectors reused
+across rates, which is an exact pairing and a check that the comparison did not move.
+**MUST NOT** say "no high-rate cell beats the myopic rule" without the 2 SE
+qualifier. ONE of the six high-rate cells is numerically ahead and it is inside noise;
+the claim is about significance, not sign, and an earlier draft of the findings note
+blurred the two. (That count was TWO on the pre-fix grid. The deterministic rebuild
+moved rho=0.95 seed 2 from -0.29 SE to +0.74 SE. Both readings are noise and the
+2 SE statement is unchanged, which is the point of stating it at 2 SE.)
+**MUST NOT** apply the competence floor to this grid without saying so. One cell,
+`rho0.50_s2`, falls below the 0.70 window-rate floor that excludes runs from the
+four-axis sweep. Excluding it STRENGTHENS the result, moving rho=0.50 from -0.01856
+to -0.01955, which is why the headline is reported WITHOUT the exclusion: a selection
+rule that improves the number it is applied to is the one to be most reluctant about.
+State the floor value and the choice; do not quietly take the better number.
+**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`. The
+pre-fix grid was scored without a seeded torch RNG and is not reproducible.

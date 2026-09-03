@@ -34,9 +34,15 @@ GROUPS = [
     ("sweep4k", "The original 4,000-episode sweep. Reported beside the re-run in the "
                 "training-budget appendix, never mixed into a table with it.",
      ["results/sweep/oracle/k*_s?.json"], True),
-    ("federation", "RQ3. Arm A is the federated system; arm E removes the information and "
-                   "optimiser partitions. Coordination baselines are scored inside each run.",
-     ["results/central/v2_k*_?_s?.json", "results/central/shd_*.json"], True),
+    ("federation", "RQ3 at 12,000 episodes. Arm A is the federated system; arm E removes the "
+                   "information and optimiser partitions. Coordination baselines are scored "
+                   "inside each run. The k=12 arms are the 12,000-episode retrains: the "
+                   "4,000-episode originals in `results/central/` are NOT shipped, because "
+                   "their one significant seed was an unconverged centralised run measuring "
+                   "0.00263 which measures 0.00000 once trained. k=20 comes from "
+                   "`results/central/` because those six runs were always at 12,000.",
+     ["results/central12k/v2_k12_?_s?.json", "results/central/v2_k20_?_s?.json",
+      "results/rerows/ladder12k_?_best.json", "results/rerows/ladder12k_?_final.json"], True),
     ("transfer", "RQ2. The answer-rate fleet: seven partial-oracle rates, three seeds each, "
                  "evaluated under genuine finite-sample evidence. The per-cell paired "
                  "evaluations come from `deterministic/`, which carries the per-episode rows, "
@@ -57,8 +63,11 @@ GROUPS = [
      ["results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/longcheck/shd_*.json", "results/lrcheck/*.json"], True),
     ("checkpoint", "The checkpoint audit: the same cells scored at the selected checkpoint, "
-                   "the final update, and under argmax.",
-     ["results/ckpt/*.json", "results/sweep12k/shd/*.json",
+                   "the final update, and under argmax. The window-axis measurements are "
+                   "`results/rerows/`; `results/ckpt/` holds the same cells scored before the "
+                   "evaluation RNG was seeded and is NOT shipped.",
+     ["results/rerows/k??_best.json", "results/rerows/k??_final.json",
+      "results/sweep12k/shd/*.json",
       "results/sweep12k/shd_final/*.json", "results/sweep12k/shd_argmax/*.json",
       "results/sweep12k/shd_u0500/*.json"], False),
 ]

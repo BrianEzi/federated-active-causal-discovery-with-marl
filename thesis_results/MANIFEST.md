@@ -248,27 +248,28 @@ Regenerate with: `results/central/jobs/*.sh and jobs2/*.sh, then global_shd_pair
 
 | file | sha256 (16) | source |
 |---|---|---|
-| `v2_k12_A_s0.json` | `224100d5e00d9bbb` | `results/central/v2_k12_A_s0.json` |
-| `v2_k12_A_s1.json` | `327c704b4029933d` | `results/central/v2_k12_A_s1.json` |
-| `v2_k12_A_s2.json` | `9b58fbc3f1687107` | `results/central/v2_k12_A_s2.json` |
-| `v2_k12_A_s3.json` | `a19b02b928f3d655` | `results/central/v2_k12_A_s3.json` |
-| `v2_k12_A_s4.json` | `63b1370264960ede` | `results/central/v2_k12_A_s4.json` |
-| `v2_k12_A_s5.json` | `fb5d1d4af592cda3` | `results/central/v2_k12_A_s5.json` |
-| `v2_k12_B_s0.json` | `e73fd97c508bc8e9` | `results/central/v2_k12_B_s0.json` |
-| `v2_k12_B_s1.json` | `57dd04ccf0e63146` | `results/central/v2_k12_B_s1.json` |
-| `v2_k12_B_s2.json` | `e47a1d923f79657c` | `results/central/v2_k12_B_s2.json` |
-| `v2_k12_E_s0.json` | `30ca8a38bae742a6` | `results/central/v2_k12_E_s0.json` |
-| `v2_k12_E_s1.json` | `305074dc4c7a7c69` | `results/central/v2_k12_E_s1.json` |
-| `v2_k12_E_s2.json` | `66c1846446e9bd5c` | `results/central/v2_k12_E_s2.json` |
-| `v2_k12_E_s3.json` | `295e939d0531f30f` | `results/central/v2_k12_E_s3.json` |
-| `v2_k12_E_s4.json` | `96136efb22b7a9b3` | `results/central/v2_k12_E_s4.json` |
-| `v2_k12_E_s5.json` | `9845cb47fc21fed5` | `results/central/v2_k12_E_s5.json` |
+| `v2_k12_A_s0.json` | `410f243de984d341` | `results/central12k/v2_k12_A_s0.json` |
+| `v2_k12_A_s1.json` | `8db90530a1ccd274` | `results/central12k/v2_k12_A_s1.json` |
+| `v2_k12_A_s2.json` | `a03a46259f83bf3c` | `results/central12k/v2_k12_A_s2.json` |
+| `v2_k12_A_s3.json` | `3833f3921952497b` | `results/central12k/v2_k12_A_s3.json` |
+| `v2_k12_A_s4.json` | `767f2439aab52aa0` | `results/central12k/v2_k12_A_s4.json` |
+| `v2_k12_A_s5.json` | `c98dcfc6c4e68cea` | `results/central12k/v2_k12_A_s5.json` |
+| `v2_k12_E_s0.json` | `7e600771d8f54fb8` | `results/central12k/v2_k12_E_s0.json` |
+| `v2_k12_E_s1.json` | `1bca76da074a11ea` | `results/central12k/v2_k12_E_s1.json` |
+| `v2_k12_E_s2.json` | `5991603b58965e2c` | `results/central12k/v2_k12_E_s2.json` |
+| `v2_k12_E_s3.json` | `a77a94f32e405f7e` | `results/central12k/v2_k12_E_s3.json` |
+| `v2_k12_E_s4.json` | `f7c7c60eae6b0100` | `results/central12k/v2_k12_E_s4.json` |
+| `v2_k12_E_s5.json` | `3ad79ba23b2a616d` | `results/central12k/v2_k12_E_s5.json` |
 | `v2_k20_A_s0.json` | `90a4228cdbe9a8ee` | `results/central/v2_k20_A_s0.json` |
 | `v2_k20_A_s1.json` | `4cd4ccd0a0de7d5b` | `results/central/v2_k20_A_s1.json` |
 | `v2_k20_A_s2.json` | `c0505184b28b21ae` | `results/central/v2_k20_A_s2.json` |
 | `v2_k20_E_s0.json` | `da8fee69af83ca4a` | `results/central/v2_k20_E_s0.json` |
 | `v2_k20_E_s1.json` | `49c26918edd99849` | `results/central/v2_k20_E_s1.json` |
 | `v2_k20_E_s2.json` | `fa486406b54162fd` | `results/central/v2_k20_E_s2.json` |
+| `ladder12k_A_best.json` | `56692c1baf4bc49d` | `results/rerows/ladder12k_A_best.json` |
+| `ladder12k_E_best.json` | `d0cc6817478da850` | `results/rerows/ladder12k_E_best.json` |
+| `ladder12k_A_final.json` | `e870b110a3eef2f6` | `results/rerows/ladder12k_A_final.json` |
+| `ladder12k_E_final.json` | `889ea06c98a25858` | `results/rerows/ladder12k_E_final.json` |
 | `shd_A.json` | `a97e605d7fc07b4d` | `results/rerows/shd_A.json` |
 | `shd_E.json` | `bc7606b933ba2a2e` | `results/rerows/shd_E.json` |
 | `shd_A_s345.json` | `1cbc0ba29c83d4f5` | `results/rerows/shd_A_s345.json` |
@@ -300,7 +301,7 @@ Regenerate with: `results/central/jobs/*.sh and jobs2/*.sh, then global_shd_pair
 | `k12s50n02b150_lr1e4_s2.json` | `2686569d21866b15` | `results/lrcheck/k12s50n02b150_lr1e4_s2.json` |
 | `k12s50n04b100_lr1e4_s2.json` | `92c6e90b2d308950` | `results/lrcheck/k12s50n04b100_lr1e4_s2.json` |
 
-51 files.
+52 files.
 
 ## `power/` — 4.2 (RQ2), figure rho_curve
 
@@ -310,6 +311,27 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 
 | file | sha256 (16) | source |
 |---|---|---|
+| `xfer_rho0.50_s0.json` | `0ba0500f6deb4b18` | `results/power/rho/deterministic/xfer_rho0.50_s0.json` |
+| `xfer_rho0.50_s1.json` | `d575add3c8d60fef` | `results/power/rho/deterministic/xfer_rho0.50_s1.json` |
+| `xfer_rho0.50_s2.json` | `e41dd38155c5938a` | `results/power/rho/deterministic/xfer_rho0.50_s2.json` |
+| `xfer_rho0.70_s0.json` | `d3fc2cbcca241323` | `results/power/rho/deterministic/xfer_rho0.70_s0.json` |
+| `xfer_rho0.70_s1.json` | `c63754e31695c639` | `results/power/rho/deterministic/xfer_rho0.70_s1.json` |
+| `xfer_rho0.70_s2.json` | `31af894a0c9e8ea0` | `results/power/rho/deterministic/xfer_rho0.70_s2.json` |
+| `xfer_rho0.80_s0.json` | `ac2b29d033dce334` | `results/power/rho/deterministic/xfer_rho0.80_s0.json` |
+| `xfer_rho0.80_s1.json` | `29a16b2bc164eaad` | `results/power/rho/deterministic/xfer_rho0.80_s1.json` |
+| `xfer_rho0.80_s2.json` | `8fe06e4701f0fe84` | `results/power/rho/deterministic/xfer_rho0.80_s2.json` |
+| `xfer_rho0.85_s0.json` | `c69763650ca03621` | `results/power/rho/deterministic/xfer_rho0.85_s0.json` |
+| `xfer_rho0.85_s1.json` | `c969cf44f3188c20` | `results/power/rho/deterministic/xfer_rho0.85_s1.json` |
+| `xfer_rho0.85_s2.json` | `92172c30e0341442` | `results/power/rho/deterministic/xfer_rho0.85_s2.json` |
+| `xfer_rho0.90_s0.json` | `300c783d6031db77` | `results/power/rho/deterministic/xfer_rho0.90_s0.json` |
+| `xfer_rho0.90_s1.json` | `973099139554249e` | `results/power/rho/deterministic/xfer_rho0.90_s1.json` |
+| `xfer_rho0.90_s2.json` | `b3c5dc3e85af6a12` | `results/power/rho/deterministic/xfer_rho0.90_s2.json` |
+| `xfer_rho0.95_s0.json` | `88347059de38df70` | `results/power/rho/deterministic/xfer_rho0.95_s0.json` |
+| `xfer_rho0.95_s1.json` | `d87b526ac75563c4` | `results/power/rho/deterministic/xfer_rho0.95_s1.json` |
+| `xfer_rho0.95_s2.json` | `9fd2932f19438c06` | `results/power/rho/deterministic/xfer_rho0.95_s2.json` |
+| `xfer_rho1.00_s0.json` | `3a20c6ab520421a5` | `results/power/rho/deterministic/xfer_rho1.00_s0.json` |
+| `xfer_rho1.00_s1.json` | `4e9e089e7cf6e685` | `results/power/rho/deterministic/xfer_rho1.00_s1.json` |
+| `xfer_rho1.00_s2.json` | `8c10d0da829755f2` | `results/power/rho/deterministic/xfer_rho1.00_s2.json` |
 | `rho0.50_s0.json` | `ca356dcc6b230da5` | `results/power/rho/rho0.50_s0.json` |
 | `rho0.50_s1.json` | `cb10d3d190c59167` | `results/power/rho/rho0.50_s1.json` |
 | `rho0.50_s2.json` | `52ed21d8f5614c68` | `results/power/rho/rho0.50_s2.json` |
@@ -334,7 +356,7 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `rho1.00_s0.json` | `97d2ce2354d1ec81` | `results/power/rho/rho1.00_s0.json` |
 | `rho1.00_s1.json` | `94cc7e902db40ca8` | `results/power/rho/rho1.00_s1.json` |
 | `rho1.00_s2.json` | `9a1bb76b22a5b54e` | `results/power/rho/rho1.00_s2.json` |
-| `CURVE.json` | `29b6b29a926498cd` | `results/power/rho/CURVE.json` |
+| `CURVE.json` | `33f53c9c2a7f0571` | `results/power/rho/CURVE.json` |
 | `transfer_p05.json` | `20562fd96445592b` | `results/power/transfer_p05.json` |
 | `transfer_p07.json` | `24bb4fc9aae931af` | `results/power/transfer_p07.json` |
 | `transfer_p10.json` | `acd0a97250b37eca` | `results/power/transfer_p10.json` |
@@ -364,11 +386,5 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `repeat_rho1.00.json` | `7dc626cdc8e63fed` | `results/power/rho/repeat/repeat_rho1.00.json` |
 | `repeat_rho1.00_s1.json` | `fc70ae80e1b85cbc` | `results/power/rho/repeat/repeat_rho1.00_s1.json` |
 | `repeat_rho1.00_s2.json` | `c0b3eebf3aedbbe6` | `results/power/rho/repeat/repeat_rho1.00_s2.json` |
-| `argmax_rho0.70_s0.json` | `9d6645b775cc736b` | `results/power/rho/argmax/argmax_rho0.70_s0.json` |
-| `argmax_rho0.70_s1.json` | `d8729d49959eb23e` | `results/power/rho/argmax/argmax_rho0.70_s1.json` |
-| `argmax_rho0.70_s2.json` | `48ca40a80a5ea393` | `results/power/rho/argmax/argmax_rho0.70_s2.json` |
-| `argmax_rho0.95_s0.json` | `63d30685fddc6d8c` | `results/power/rho/argmax/argmax_rho0.95_s0.json` |
-| `argmax_rho0.95_s1.json` | `1108f5e1fd29191b` | `results/power/rho/argmax/argmax_rho0.95_s1.json` |
-| `argmax_rho0.95_s2.json` | `9de55fd96017a624` | `results/power/rho/argmax/argmax_rho0.95_s2.json` |
 
-60 files.
+75 files.

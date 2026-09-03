@@ -93,7 +93,11 @@ REGISTRY = [
      "rule. lrcheck/*: the same runs at lr 1e-4, which makes them worse and rules out an "
      "unstable step size.",
      "4.4 (RQ3), figure federation",
-     ["results/central/v2_k12_?_s?.json", "results/central/v2_k20_?_s?.json",
+     # central12k, not central: the k=12 ladder at 4,000 episodes is superseded, and its one
+     # significant seed was an unconverged centralised run. k=20 stays in central/ because
+     # those six runs trained at 12,000 and exist nowhere else.
+     ["results/central12k/v2_k12_?_s?.json", "results/central/v2_k20_?_s?.json",
+      "results/rerows/ladder12k_?_best.json", "results/rerows/ladder12k_?_final.json",
       "results/rerows/shd_A.json", "results/rerows/shd_E.json",
       "results/rerows/shd_A_s345.json", "results/rerows/shd_E_s345.json",
       "results/rerows/shd_k20_A.json", "results/rerows/shd_k20_E.json",
@@ -116,7 +120,7 @@ REGISTRY = [
       "results/power/rho/rho[01].[0-9]*_s?.json",
       "results/power/rho/CURVE.json",
       "results/power/transfer_p[0-9][0-9].json", "results/power/p[0-9][0-9].json",
-      "results/power/rho/repeat/*.json", "results/power/rho/argmax/*.json"],
+      "results/power/rho/repeat/*.json", "results/power/rho/argmax_det/*.json"],
      "scripts/run_rho_fleet.sh, then scripts/rebuild_grid_deterministic.sh, then "
      "scripts/rho_curve_report.py --dir results/power/rho/deterministic"),
 ]
