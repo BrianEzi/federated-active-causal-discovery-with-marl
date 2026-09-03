@@ -776,6 +776,89 @@ def fig_inregime(out: pathlib.Path):
     plt.close(fig)
 
 
+
+def fig_generator(out: pathlib.Path):
+    """The generator control: SF against ER at the principal cell, per arm.
+
+    The learned arm holds near zero on both families; the myopic rule degrades fifty-fold on
+    Erdos-Renyi. Densities are near-matched (50.0 against 53.6 true edges, same prior_p), so
+    the family is the operative difference. Same visual shape as fig_credit on purpose: two
+    conditions, the interesting fact being which line moves.
+    """
+    sf = ROOT / "results/sweep12k/shd/k12s50n04b150.json"
+    er = ROOT / "results/generator12k/shd_er_best.json"
+    if not (sf.exists() and er.exists()):
+        print("!! generator measurements absent; skipping")
+        return
+    data = {"scale-free": json.loads(sf.read_text()), "Erd\u0151s--R\u00e9nyi": json.loads(er.read_text())}
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, 3.1))
+    floor = 5e-5
+    xs = {k: i for i, k in enumerate(data)}
+    arm_map = [("learned", "learned", LEARNED, 0.045),
+               ("myopic", "greedy", MYOPIC, -0.045),
+               ("random", "random_vary", RANDOM, 0.0)]
+    for label, key, colour, dx in arm_map:
+        means = []
+        for fam, d in data.items():
+            vals = [max(e["means"][key]["hard"], floor) for e in d]
+            ax.scatter([xs[fam] + dx] * len(vals), vals, s=14, color=colour, alpha=0.4,
+                       zorder=3)
+            means.append(np.mean([e["means"][key]["hard"] for e in d]))
+        ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means], "o-", color=colour,
+                lw=1.7 if key == "learned" else 1.2, ms=5, label=label, zorder=4)
+        if key == "greedy":
+            ax.annotate(f"$\\times${means[1]/means[0]:.0f}", xy=(1 + dx, means[1]),
+                        xytext=(7, -1), textcoords="offset points", fontsize=8, color=colour)
+    ax.set_yscale("log")
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["scale-free\n(all reported results)", "Erd\u0151s--R\u00e9nyi\n(control)"])
+    ax.set_xlim(-0.35, 1.4)
+    ax.set_ylabel("SHD on committed marks")
+    ax.legend(loc="center left", frameon=False)
+    fig.tight_layout()
+    fig.savefig(out / "generator.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_training_signal(out: pathlib.Path):
+    """What each evidence regime is like to TRAIN under, at the k=8 cell.
+
+    Motivates the partial oracle as a measurement rather than a convenience: genuine
+    finite-sample evidence never reaches the competence floor at the sweep's budget, while the
+    partial oracle trains and (Figure answer_rate) transfers. Window rate over the last ten
+    checkpoints, one dot per seed, the exclusion floor drawn.
+    """
+    def wr(path):
+        d = json.loads(pathlib.Path(path).read_text())
+        h = d.get("history") or []
+        return float(np.mean([u["window_rate"] for u in h[-10:]]))
+
+    # Budgets differ between the groups and are stated in the caption, not squeezed into
+    # tick labels that collide at TWOTHIRD width.
+    groups = [
+        ("oracle", "results/sweep12k/k08s50n04b150_s?.json", LEARNED),
+        ("partial oracle\n$\\rho=0.85$", "results/power/rho/rho0.85_s?.json", THIRD),
+        ("sampled\n$n_{\\mathrm{int}}=200$", "results/sampled_ref/k08s50n04b150i0200_s?.json", MYOPIC),
+    ]
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, 2.9))
+    for i, (label, pat, colour) in enumerate(groups):
+        vals = [wr(f) for f in sorted(glob.glob(str(ROOT / pat)))]
+        if not vals:
+            print(f"!! no runs for {pat}"); continue
+        ax.scatter([i] * len(vals), vals, s=26, color=colour, zorder=3)
+        ax.plot([i - 0.14, i + 0.14], [np.mean(vals)] * 2, color=colour, lw=1.6, zorder=4)
+    ax.axhline(WINDOW_FLOOR, color="#B00020", lw=1.0, ls="--", zorder=2)
+    ax.annotate("competence floor", xy=(1.62, WINDOW_FLOOR), xytext=(0, 4),
+                textcoords="offset points", fontsize=8, color="#B00020")
+    ax.set_xticks(range(len(groups)))
+    ax.set_xticklabels([g[0] for g in groups], fontsize=8)
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("per-window solve rate\n(last ten checkpoints)", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out / "training_signal.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -792,7 +875,9 @@ def main(argv=None) -> int:
                      ("answer_rate", fig_answer_rate),
                      ("credit", fig_credit),
                      ("fixedpolicy", fig_fixedpolicy),
-                     ("inregime", fig_inregime)):
+                     ("inregime", fig_inregime),
+                     ("generator", fig_generator),
+                     ("training_signal", fig_training_signal)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")
