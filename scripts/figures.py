@@ -173,8 +173,7 @@ def fig_window_budget(out: pathlib.Path):
     convention), final update at 4,000 (the policy after exactly 4,000 episodes). The
     myopic rule does not train, so it is one line per panel, not one per budget.
     """
-    fig, (top, bot) = plt.subplots(2, 1, figsize=(FULL, 5.6), sharex=True,
-                                   gridspec_kw={"hspace": 0.12})
+    fig, (top, bot) = plt.subplots(1, 2, figsize=(FULL, 3.0))
     L4 = RANDOM   # grey: the undertrained policy, matching the retired budget figure
 
     # (a) joint recovery rate
@@ -222,7 +221,8 @@ def fig_window_budget(out: pathlib.Path):
     bot.plot(KS, my_shd, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
     bot.set_yscale("log")
     bot.set_ylim(7e-6, 2e-1)
-    bot.set_xlabel("window size $k_v$")
+    for ax in (top, bot):
+        ax.set_xlabel("window size $k_v$")
     bot.set_ylabel("SHD on committed marks ($\\downarrow$)\n(pooled global graph)")
     bot.annotate("0 errors in 600 episodes", xy=(20, 1e-5), xytext=(11.5, 3.3e-5),
                  fontsize=7.5, color=LEARNED,
@@ -665,18 +665,17 @@ def fig_answer_rate(out: pathlib.Path):
     rhos = sorted(per)
     pos = rhos
     at = {r: r for r in rhos}
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(FULL, 5.2), sharex=True,
-                                      gridspec_kw={"height_ratios": [1, 1]})
+    fig, (top, bottom) = plt.subplots(1, 2, figsize=(FULL, 2.9))
     myopic = np.mean([v[1] for r in rhos for v in per[r]])
     top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
-                label=f"myopic ({myopic:.4f}, identical at every rate)")
+                label=f"myopic ({myopic:.4f}, all rates)")
     means = [np.mean([v[0] for v in per[r]]) for r in rhos]
     for r in rhos:
         top.scatter([at[r]] * len(per[r]), [v[0] for v in per[r]], s=14, color=LEARNED,
                     alpha=0.4, zorder=3)
     top.plot(pos, means, "o-", color=LEARNED, lw=1.7, ms=5, zorder=4, label="learned")
     top.set_ylabel(r"SHD on committed marks ($\downarrow$)")
-    top.legend(loc="upper left", frameon=False, fontsize=7.5)
+    top.legend(loc="upper right", frameon=False, fontsize=7)
     _title(top, "Degrading the training evidence improves transfer")
 
     bottom.axhline(0, color="black", lw=0.8, zorder=2)
@@ -686,7 +685,7 @@ def fig_answer_rate(out: pathlib.Path):
                            color=LEARNED if sig else "none",
                            edgecolors=LEARNED, linewidths=0.9)
     bottom.plot(pos, [np.mean([v[2] for v in per[r]]) for r in rhos], "-",
-                color=LEARNED, lw=1.5, zorder=4, label="sampled (the trained policy)")
+                color=LEARNED, lw=1.5, zorder=4, label="sampled (trained policy)")
     # The argmax derivative of the same policies, drawn because the convention is part of the
     # claim: the ordering of rates survives it, the threshold does not, and 87% of the shift
     # is pairs left undetermined once the policy cannot sample its way out of a state.
@@ -699,14 +698,17 @@ def fig_answer_rate(out: pathlib.Path):
         bottom.plot([at[r] for r in rhos if r in am],
                     [np.mean(am[r]) for r in rhos if r in am], "^--",
                     color=MYOPIC, lw=1.2, ms=4.5, zorder=3, label="argmax derivative")
-        bottom.legend(loc="upper left", frameon=False, fontsize=7.5)
-    bottom.set_xlabel(r"answer rate $\rho$ the policy trained under")
+        bottom.legend(loc="upper right", frameon=False, fontsize=7)
+    top.set_xlabel(r"answer rate $\rho$ trained under")
+    bottom.set_xlabel(r"answer rate $\rho$ trained under")
     bottom.set_ylabel("paired difference in SHD ($\\downarrow$)\nlearned $-$ myopic")
-    bottom.annotate("filled: ahead beyond 2 SE", xy=(0.52, 0.012), fontsize=7,
-                    color="#555555")
+    bottom.annotate("filled: ahead beyond 2 SE", xy=(0.04, 0.05),
+                    xycoords="axes fraction", fontsize=7, color="#555555")
     for ax in (top, bottom):
         ax.set_xticks(rhos)
-        ax.set_xticklabels([f"{r:g}" for r in rhos], fontsize=7.5)
+        # labels on alternate ticks: linear in rho without 0.80-1.00 overprinting at half width
+        ax.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else ""
+                            for r in rhos], fontsize=7.5)
         ax.set_xlim(1.04, 0.46)   # oracle on the left, noise increasing rightward
     fig.tight_layout()
     fig.savefig(out / "answer_rate.pdf", bbox_inches="tight")
@@ -859,8 +861,8 @@ def fig_inregime(out: pathlib.Path):
                               alpha=0.55, zorder=3)
     right.set_xlabel(r"paired difference in SHD, in-regime ($\downarrow$)", fontsize=8)
     right.set_ylabel(r"paired difference in SHD, transfer ($\downarrow$)", fontsize=8)
-    right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.08),
-                   xycoords="axes fraction", fontsize=8, color="#666666")
+    right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.95),
+                   xycoords="axes fraction", va="top", fontsize=8, color="#666666")
     fig.tight_layout()
     fig.savefig(out / "inregime.pdf", bbox_inches="tight")
     plt.close(fig)
