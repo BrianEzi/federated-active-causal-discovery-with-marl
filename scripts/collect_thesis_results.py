@@ -81,7 +81,11 @@ REGISTRY = [
      # RNG was seeded (2 Sep 21:15) and does not reproduce. The rerows set is the same
      # measurement under the fixed path, and its myopic arm matches ckpt/ to five decimals
      # at every k, which is what confirms only the learned arm was ever affected.
-     ["results/rerows/k??_best.json", "results/rerows/k??_final.json"],
+     ["results/rerows/k??_best.json", "results/rerows/k??_final.json",
+      # u0249 = the policy at episode 4,000 exactly, from the ORIGINAL 31 Aug runs whose JSONs
+      # were overwritten by the seed-coverage copy. Completes the 4,000-episode line at k=20
+      # and k=30. Brian spotted that the checkpoints survived.
+      "results/rerows/k20_u0249.json", "results/rerows/k30_u0249.json"],
      "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}"),
 
     ("attribution",

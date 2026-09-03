@@ -116,3 +116,24 @@ includes the crossover, and the last two cannot be appended to it. The axis is b
 $k_v \le 12$ rather than uninterpretable. `CLAIMS.md` C1 now carries that as the surviving
 claim beside the MUST NOT, and `Tables12k.tex` reports all five windows at a uniform 12,000
 episodes, which is the version that removes the bound entirely.
+
+---
+
+## Resolution, 3 Sep 07:xx — the missing 4,000-episode points existed as checkpoints
+
+Brian asked whether the $k_v=20$ and $30$ runs' intermediate checkpoints could supply the
+missing 4,000-episode points. They can, exactly: update $249$ is episode $4{,}000$, training
+is horizon-independent (episode seeds derive from the update index; nothing anneals against
+the total), and the `u0249.pt` files on disk are dated 31 August -- they are the original
+4,000-episode-era policies themselves, all three seeds of both cells, surviving the 1 Sep
+JSON overwrite. Measured with the seeded evaluation:
+
+| cell | learned after 4,000 ep | learned at 12,000 (selected) | myopic |
+|---|---|---|---|
+| $k_v=20$ | 0.00141 (seeds $-0.00048^*$, $-0.00031$, $+0.00344^*$) | 0.00000 | 0.00053 |
+| $k_v=30$ | 0.00653 (seeds $-0.00051^*$, $+0.00904^*$, $+0.00980^*$) | 0.00024 | 0.00042 |
+
+The 4,000-episode line in `crossover_budget.pdf` is now complete at all five windows, and it
+shows the learned arm trailing the myopic rule at every window except $k_v=12$. The
+large-window advantage was always a converged-budget result; this note's original complaint
+-- that the axis could not be read at a uniform budget -- is now answered at BOTH budgets.

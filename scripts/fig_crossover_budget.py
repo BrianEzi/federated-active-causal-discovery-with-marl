@@ -12,8 +12,16 @@ import matplotlib.pyplot as plt
 
 ROOT = pathlib.Path("/Users/brianezinwoke/Workspace/federated-active-causal-discovery-with-marl")
 KS = [4, 8, 12, 20, 30]
-PRE = {"k12s50n04b150": "results/sweep12k/shd/k12s50n04b150.json"}
-LEG = {20: "results/ckpt/k20_best.json", 30: "results/ckpt/k30_best.json"}
+# Every path below is a seeded-evaluation measurement. results/ckpt/ (the pre-fix set this
+# script read until 3 Sep) is superseded and marked so on disk; the provenance check guards
+# the registries but not figure scripts, which is how it survived here.
+LEG = {20: "results/rerows/k20_best.json", 30: "results/rerows/k30_best.json"}
+# The 4,000-episode policies at k=20 and k=30. The run JSONs were overwritten by the
+# 12,000-episode seed-coverage copy on 1 Sep, but the u0249 checkpoints -- update 249 is
+# episode 4,000 exactly -- survived from the ORIGINAL 31 Aug runs, all three seeds. Training
+# is horizon-independent (episode seeds derive from the update index; nothing anneals against
+# the total), so these are the genuine 4,000-episode policies. Brian spotted this.
+U0249 = {20: "results/rerows/k20_u0249.json", 30: "results/rerows/k30_u0249.json"}
 plt.rcParams.update({"font.family": "serif", "font.serif": ["DejaVu Serif"], "font.size": 9,
                      "axes.spines.top": False, "axes.spines.right": False})
 L4, L12, MY = "#999999", "#0072B2", "#D55E00"
@@ -33,13 +41,17 @@ def series12(k):
 
 
 fig, ax = plt.subplots(figsize=(5.40, 3.4))   # FIGURE_GUIDELINES: author at print size
+def series4(k):
+    # One convention along the whole line: the policy AFTER 4,000 episodes (the final update
+    # of a 4,000-episode run; u0249 is that same policy for the two long cells).
+    if k in U0249:
+        return load(U0249[k])
+    return load(f"results/rerows/k{k:02d}_final.json")
+
+
 for label, getter, colour, ls in (
-        # k=20 and k=30 were trained at 12,000 episodes in the ORIGINAL sweep, so they have no
-        # 4,000-episode counterpart. Loading them here would put two 12,000-episode points on a
-        # line labelled 4,000 -- the mislabelling this whole figure exists to correct.
-        ("learned, 4{,}000 episodes",
-         lambda k: load(f"results/ckpt/k{k:02d}_best.json") if k <= 12 else None, L4, "--"),
-        ("learned, 12{,}000 episodes", series12, L12, "-")):
+        ("learned, policy after 4{,}000 episodes", series4, L4, "--"),
+        ("learned, 12{,}000 episodes (selected)", series12, L12, "-")):
     # A missing cell BREAKS the line rather than being interpolated across. Joining k=8 to
     # k=20 through an unmeasured k=12 draws a point that does not exist, and on a log axis it
     # lands close enough to the real value to be believed.
@@ -63,11 +75,10 @@ for label, getter, colour, ls in (
             ax.annotate("not yet\nmeasured", (x, 3e-4), fontsize=6.5, ha="center",
                         color=colour, alpha=.8)
 
-my = [np.mean([e["means"]["greedy"]["hard"] for e in load(f"results/ckpt/k{k:02d}_best.json")])
+my = [np.mean([e["means"]["greedy"]["hard"] for e in load(f"results/rerows/k{k:02d}_best.json")])
       for k in KS]
 ax.plot(KS, my, "-", color=MY, lw=1.5, label="myopic", zorder=2)
 ax.set_yscale("log"); ax.set_ylim(FLOOR * .7, 3e-2); ax.set_xticks(KS)
-ax.axvspan(8, 12, color="black", alpha=.05, zorder=0)
 ax.set_xlabel("window size $k_v$")
 ax.set_ylabel("SHD on committed marks")
 # Title dropped per FIGURE_GUIDELINES rule 7; the caption carries the message.

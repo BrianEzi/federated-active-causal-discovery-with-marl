@@ -238,6 +238,7 @@ Regenerate with: `training runs in results/credit/, then scripts/global_shd_pair
 | `k12s50n04b150_E4_credit_s2.json` | `168424e77567a055` | `results/credit/k12s50n04b150_E4_credit_s2.json` |
 | `k12s50n04b150_E4_nocredit_s0.json` | `6011972ab8c33c06` | `results/credit/k12s50n04b150_E4_nocredit_s0.json` |
 | `k12s50n04b150_E4_nocredit_s1.json` | `8766af8a62d3b044` | `results/credit/k12s50n04b150_E4_nocredit_s1.json` |
+| `k12s50n04b150_E4_nocredit_s2.json` | `8df0bffb73cbbfd4` | `results/credit/k12s50n04b150_E4_nocredit_s2.json` |
 | `k12s50n04b150_pooled_credit_s0.json` | `5dc2820676fd950b` | `results/credit/k12s50n04b150_pooled_credit_s0.json` |
 | `k12s50n04b150_pooled_credit_s1.json` | `ec6b1653b3f29ff3` | `results/credit/k12s50n04b150_pooled_credit_s1.json` |
 | `k12s50n04b150_pooled_credit_s2.json` | `795147e5835d986b` | `results/credit/k12s50n04b150_pooled_credit_s2.json` |
@@ -248,8 +249,12 @@ Regenerate with: `training runs in results/credit/, then scripts/global_shd_pair
 | `k08s50n04b150_E4_nocredit.json` | `a305b9e35e08fa4a` | `results/credit/shd/k08s50n04b150_E4_nocredit.json` |
 | `k08s50n04b150_pooled_credit.json` | `9337cdd7d54785f9` | `results/credit/shd/k08s50n04b150_pooled_credit.json` |
 | `k08s50n04b150_pooled_nocredit.json` | `8bfa6b32e424f3a0` | `results/credit/shd/k08s50n04b150_pooled_nocredit.json` |
+| `k12s50n04b150_E4_credit.json` | `f1e43674a531c3b0` | `results/credit/shd/k12s50n04b150_E4_credit.json` |
+| `k12s50n04b150_E4_nocredit.json` | `bf866220c8ee663e` | `results/credit/shd/k12s50n04b150_E4_nocredit.json` |
+| `k12s50n04b150_pooled_credit.json` | `287fbc423b93b390` | `results/credit/shd/k12s50n04b150_pooled_credit.json` |
+| `k12s50n04b150_pooled_nocredit.json` | `f8bba6baa402d24d` | `results/credit/shd/k12s50n04b150_pooled_nocredit.json` |
 
-27 files.
+32 files.
 
 ## `checkpoint/` — 4.1.1 and 4.2 (RQ1), figure checkpoint
 
@@ -269,8 +274,10 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 | `k12_final.json` | `207afe020cc42188` | `results/rerows/k12_final.json` |
 | `k20_final.json` | `eee0667433e2bdb9` | `results/rerows/k20_final.json` |
 | `k30_final.json` | `53b5d0ffc704c815` | `results/rerows/k30_final.json` |
+| `k20_u0249.json` | `334b4ab147ccd716` | `results/rerows/k20_u0249.json` |
+| `k30_u0249.json` | `3a0cb52e305f5146` | `results/rerows/k30_u0249.json` |
 
-10 files.
+12 files.
 
 ## `attribution/` — RQ4, figure attribution_law
 
