@@ -197,6 +197,60 @@ Regenerate with: `scripts/build_sweep12k.py to generate jobs, then scripts/measu
 
 108 files.
 
+## `generator/` — RQ1, figure generator
+
+The generator control: three Erdos-Renyi seeds at the principal cell, 12,000 episodes, current engine, measured at both conventions (identical). Densities near-matched to the scale-free comparator. The advantage holds on 3/3 seeds at 7-9 SE; the myopic rule degrades fifty-fold. Replaces results/vs_generator/ (superseded belief backend).
+
+Regenerate with: `results/generator12k/run_generator12k.sh, then global_shd_paired.py at both conventions`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `er_s0.json` | `601b0230090866d3` | `results/generator12k/er_s0.json` |
+| `er_s1.json` | `aa927ec8758ca0e4` | `results/generator12k/er_s1.json` |
+| `er_s2.json` | `36b0383e69c467f7` | `results/generator12k/er_s2.json` |
+| `shd_er_best.json` | `233157ab440d9b97` | `results/generator12k/shd_er_best.json` |
+| `shd_er_final.json` | `03989ec3bcde6a3e` | `results/generator12k/shd_er_final.json` |
+
+5 files.
+
+## `credit/` — RQ3, figure credit, tab:credit
+
+Turn-aware credit at k=8 (and k=12 when the fill lands), measured with global_shd_paired.py. The recorded-field version showed a federation-specific 18x interaction that does not exist; measured, removing credit costs 15.1x pooled and 13.2x federated.
+
+Regenerate with: `training runs in results/credit/, then scripts/global_shd_paired.py per 4-cell`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `k08s50n04b150_E4_credit_s0.json` | `27f0198d8e7b22cb` | `results/credit/k08s50n04b150_E4_credit_s0.json` |
+| `k08s50n04b150_E4_credit_s1.json` | `161fdbf176873c85` | `results/credit/k08s50n04b150_E4_credit_s1.json` |
+| `k08s50n04b150_E4_credit_s2.json` | `ec8afeedfed90e18` | `results/credit/k08s50n04b150_E4_credit_s2.json` |
+| `k08s50n04b150_E4_nocredit_s0.json` | `f297e7def76a2d61` | `results/credit/k08s50n04b150_E4_nocredit_s0.json` |
+| `k08s50n04b150_E4_nocredit_s1.json` | `1137b444005a4982` | `results/credit/k08s50n04b150_E4_nocredit_s1.json` |
+| `k08s50n04b150_E4_nocredit_s2.json` | `a58e14ed7fb9917a` | `results/credit/k08s50n04b150_E4_nocredit_s2.json` |
+| `k08s50n04b150_pooled_credit_s0.json` | `e1e474af234394d2` | `results/credit/k08s50n04b150_pooled_credit_s0.json` |
+| `k08s50n04b150_pooled_credit_s1.json` | `4cecb274d1be5f0b` | `results/credit/k08s50n04b150_pooled_credit_s1.json` |
+| `k08s50n04b150_pooled_credit_s2.json` | `bc5c0546d4bf279c` | `results/credit/k08s50n04b150_pooled_credit_s2.json` |
+| `k08s50n04b150_pooled_nocredit_s0.json` | `edaf934d7ffdc9fc` | `results/credit/k08s50n04b150_pooled_nocredit_s0.json` |
+| `k08s50n04b150_pooled_nocredit_s1.json` | `2189dacb33dd795f` | `results/credit/k08s50n04b150_pooled_nocredit_s1.json` |
+| `k08s50n04b150_pooled_nocredit_s2.json` | `d4b7dcc720549b4a` | `results/credit/k08s50n04b150_pooled_nocredit_s2.json` |
+| `k12s50n04b150_E4_credit_s0.json` | `5829a45e2d36e0b9` | `results/credit/k12s50n04b150_E4_credit_s0.json` |
+| `k12s50n04b150_E4_credit_s1.json` | `48102b34b595191d` | `results/credit/k12s50n04b150_E4_credit_s1.json` |
+| `k12s50n04b150_E4_credit_s2.json` | `168424e77567a055` | `results/credit/k12s50n04b150_E4_credit_s2.json` |
+| `k12s50n04b150_E4_nocredit_s0.json` | `6011972ab8c33c06` | `results/credit/k12s50n04b150_E4_nocredit_s0.json` |
+| `k12s50n04b150_E4_nocredit_s1.json` | `8766af8a62d3b044` | `results/credit/k12s50n04b150_E4_nocredit_s1.json` |
+| `k12s50n04b150_pooled_credit_s0.json` | `5dc2820676fd950b` | `results/credit/k12s50n04b150_pooled_credit_s0.json` |
+| `k12s50n04b150_pooled_credit_s1.json` | `ec6b1653b3f29ff3` | `results/credit/k12s50n04b150_pooled_credit_s1.json` |
+| `k12s50n04b150_pooled_credit_s2.json` | `795147e5835d986b` | `results/credit/k12s50n04b150_pooled_credit_s2.json` |
+| `k12s50n04b150_pooled_nocredit_s0.json` | `bcbd9e7eb0294787` | `results/credit/k12s50n04b150_pooled_nocredit_s0.json` |
+| `k12s50n04b150_pooled_nocredit_s1.json` | `57eb0b477ad4f8bb` | `results/credit/k12s50n04b150_pooled_nocredit_s1.json` |
+| `k12s50n04b150_pooled_nocredit_s2.json` | `8a27c9977f0e1602` | `results/credit/k12s50n04b150_pooled_nocredit_s2.json` |
+| `k08s50n04b150_E4_credit.json` | `4a0433af3368dcd8` | `results/credit/shd/k08s50n04b150_E4_credit.json` |
+| `k08s50n04b150_E4_nocredit.json` | `a305b9e35e08fa4a` | `results/credit/shd/k08s50n04b150_E4_nocredit.json` |
+| `k08s50n04b150_pooled_credit.json` | `9337cdd7d54785f9` | `results/credit/shd/k08s50n04b150_pooled_credit.json` |
+| `k08s50n04b150_pooled_nocredit.json` | `8bfa6b32e424f3a0` | `results/credit/shd/k08s50n04b150_pooled_nocredit.json` |
+
+27 files.
+
 ## `checkpoint/` — 4.1.1 and 4.2 (RQ1), figure checkpoint
 
 Early-stopped against final policy on the window-size axis, 200 paired episodes per seed. Establishes that the checkpoint choice is inert below the crossover and worth 2.3x at k=20 and 16x at k=30 above it.
@@ -332,30 +386,30 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `xfer_rho1.00_s0.json` | `3a20c6ab520421a5` | `results/power/rho/deterministic/xfer_rho1.00_s0.json` |
 | `xfer_rho1.00_s1.json` | `4e9e089e7cf6e685` | `results/power/rho/deterministic/xfer_rho1.00_s1.json` |
 | `xfer_rho1.00_s2.json` | `8c10d0da829755f2` | `results/power/rho/deterministic/xfer_rho1.00_s2.json` |
-| `rho0.50_s0.json` | `ca356dcc6b230da5` | `results/power/rho/rho0.50_s0.json` |
-| `rho0.50_s1.json` | `cb10d3d190c59167` | `results/power/rho/rho0.50_s1.json` |
-| `rho0.50_s2.json` | `52ed21d8f5614c68` | `results/power/rho/rho0.50_s2.json` |
-| `rho0.70_s0.json` | `88cdad49a6c71128` | `results/power/rho/rho0.70_s0.json` |
-| `rho0.70_s1.json` | `2468a9e38af9e61c` | `results/power/rho/rho0.70_s1.json` |
-| `rho0.70_s2.json` | `986ec7f3d0cb3b05` | `results/power/rho/rho0.70_s2.json` |
-| `rho0.80_s0.json` | `60ec6406ec7944d4` | `results/power/rho/rho0.80_s0.json` |
-| `rho0.80_s1.json` | `1e282ddaba1562d7` | `results/power/rho/rho0.80_s1.json` |
-| `rho0.80_s2.json` | `14710e4b90832f4b` | `results/power/rho/rho0.80_s2.json` |
-| `rho0.85_s0.json` | `897d65ba24a7291c` | `results/power/rho/rho0.85_s0.json` |
-| `rho0.85_s1.json` | `284c68abeba10946` | `results/power/rho/rho0.85_s1.json` |
-| `rho0.85_s2.json` | `8ccc4414a6e50dc7` | `results/power/rho/rho0.85_s2.json` |
-| `rho0.90_s0.json` | `6bffbc0597d645c3` | `results/power/rho/rho0.90_s0.json` |
-| `rho0.90_s1.json` | `fae22d360147cfbe` | `results/power/rho/rho0.90_s1.json` |
-| `rho0.90_s2.json` | `a63deb40664eb522` | `results/power/rho/rho0.90_s2.json` |
+| `rho__rho0.50_s0.json` | `ca356dcc6b230da5` | `results/power/rho/rho0.50_s0.json` |
+| `rho__rho0.50_s1.json` | `cb10d3d190c59167` | `results/power/rho/rho0.50_s1.json` |
+| `rho__rho0.50_s2.json` | `52ed21d8f5614c68` | `results/power/rho/rho0.50_s2.json` |
+| `rho__rho0.70_s0.json` | `88cdad49a6c71128` | `results/power/rho/rho0.70_s0.json` |
+| `rho__rho0.70_s1.json` | `2468a9e38af9e61c` | `results/power/rho/rho0.70_s1.json` |
+| `rho__rho0.70_s2.json` | `986ec7f3d0cb3b05` | `results/power/rho/rho0.70_s2.json` |
+| `rho__rho0.80_s0.json` | `60ec6406ec7944d4` | `results/power/rho/rho0.80_s0.json` |
+| `rho__rho0.80_s1.json` | `1e282ddaba1562d7` | `results/power/rho/rho0.80_s1.json` |
+| `rho__rho0.80_s2.json` | `14710e4b90832f4b` | `results/power/rho/rho0.80_s2.json` |
+| `rho__rho0.85_s0.json` | `897d65ba24a7291c` | `results/power/rho/rho0.85_s0.json` |
+| `rho__rho0.85_s1.json` | `284c68abeba10946` | `results/power/rho/rho0.85_s1.json` |
+| `rho__rho0.85_s2.json` | `8ccc4414a6e50dc7` | `results/power/rho/rho0.85_s2.json` |
+| `rho__rho0.90_s0.json` | `6bffbc0597d645c3` | `results/power/rho/rho0.90_s0.json` |
+| `rho__rho0.90_s1.json` | `fae22d360147cfbe` | `results/power/rho/rho0.90_s1.json` |
+| `rho__rho0.90_s2.json` | `a63deb40664eb522` | `results/power/rho/rho0.90_s2.json` |
 | `rho0.95_long_s0.json` | `8289c20caf78372e` | `results/power/rho/rho0.95_long_s0.json` |
 | `rho0.95_long_s1.json` | `78be49ca24e4a948` | `results/power/rho/rho0.95_long_s1.json` |
 | `rho0.95_long_s2.json` | `66db49bd1d3de60b` | `results/power/rho/rho0.95_long_s2.json` |
-| `rho0.95_s0.json` | `b982a980bbb551b8` | `results/power/rho/rho0.95_s0.json` |
-| `rho0.95_s1.json` | `5cbbb20b41a07510` | `results/power/rho/rho0.95_s1.json` |
-| `rho0.95_s2.json` | `2a5f25ac3336ca9e` | `results/power/rho/rho0.95_s2.json` |
-| `rho1.00_s0.json` | `97d2ce2354d1ec81` | `results/power/rho/rho1.00_s0.json` |
-| `rho1.00_s1.json` | `94cc7e902db40ca8` | `results/power/rho/rho1.00_s1.json` |
-| `rho1.00_s2.json` | `9a1bb76b22a5b54e` | `results/power/rho/rho1.00_s2.json` |
+| `rho__rho0.95_s0.json` | `b982a980bbb551b8` | `results/power/rho/rho0.95_s0.json` |
+| `rho__rho0.95_s1.json` | `5cbbb20b41a07510` | `results/power/rho/rho0.95_s1.json` |
+| `rho__rho0.95_s2.json` | `2a5f25ac3336ca9e` | `results/power/rho/rho0.95_s2.json` |
+| `rho__rho1.00_s0.json` | `97d2ce2354d1ec81` | `results/power/rho/rho1.00_s0.json` |
+| `rho__rho1.00_s1.json` | `94cc7e902db40ca8` | `results/power/rho/rho1.00_s1.json` |
+| `rho__rho1.00_s2.json` | `9a1bb76b22a5b54e` | `results/power/rho/rho1.00_s2.json` |
 | `CURVE.json` | `33f53c9c2a7f0571` | `results/power/rho/CURVE.json` |
 | `transfer_p05.json` | `20562fd96445592b` | `results/power/transfer_p05.json` |
 | `transfer_p07.json` | `24bb4fc9aae931af` | `results/power/transfer_p07.json` |
@@ -386,5 +440,57 @@ Regenerate with: `scripts/run_rho_fleet.sh, then scripts/rebuild_grid_determinis
 | `repeat_rho1.00.json` | `7dc626cdc8e63fed` | `results/power/rho/repeat/repeat_rho1.00.json` |
 | `repeat_rho1.00_s1.json` | `fc70ae80e1b85cbc` | `results/power/rho/repeat/repeat_rho1.00_s1.json` |
 | `repeat_rho1.00_s2.json` | `c0b3eebf3aedbbe6` | `results/power/rho/repeat/repeat_rho1.00_s2.json` |
+| `inregime_det__rho0.50_s0.json` | `6d419f9f942610cf` | `results/power/rho/inregime_det/rho0.50_s0.json` |
+| `inregime_det__rho0.50_s1.json` | `0e04cf15ee9b3b73` | `results/power/rho/inregime_det/rho0.50_s1.json` |
+| `inregime_det__rho0.50_s2.json` | `6aa25b83b3dcea0a` | `results/power/rho/inregime_det/rho0.50_s2.json` |
+| `inregime_det__rho0.70_s0.json` | `d442c159cbd74a5d` | `results/power/rho/inregime_det/rho0.70_s0.json` |
+| `inregime_det__rho0.70_s1.json` | `15fd3c9634693c4b` | `results/power/rho/inregime_det/rho0.70_s1.json` |
+| `inregime_det__rho0.70_s2.json` | `e9dde5226b1aa17c` | `results/power/rho/inregime_det/rho0.70_s2.json` |
+| `inregime_det__rho0.80_s0.json` | `bd3e646cfafcafc7` | `results/power/rho/inregime_det/rho0.80_s0.json` |
+| `inregime_det__rho0.80_s1.json` | `615d6813730d651a` | `results/power/rho/inregime_det/rho0.80_s1.json` |
+| `inregime_det__rho0.80_s2.json` | `3491eb2aa3477c5c` | `results/power/rho/inregime_det/rho0.80_s2.json` |
+| `inregime_det__rho0.85_s0.json` | `c324dea380fac143` | `results/power/rho/inregime_det/rho0.85_s0.json` |
+| `inregime_det__rho0.85_s1.json` | `1a751096b516670b` | `results/power/rho/inregime_det/rho0.85_s1.json` |
+| `inregime_det__rho0.85_s2.json` | `dfdaee602e9b27ee` | `results/power/rho/inregime_det/rho0.85_s2.json` |
+| `inregime_det__rho0.90_s0.json` | `d96f1ef2fe71b28d` | `results/power/rho/inregime_det/rho0.90_s0.json` |
+| `inregime_det__rho0.90_s1.json` | `970413ee1dcd046c` | `results/power/rho/inregime_det/rho0.90_s1.json` |
+| `inregime_det__rho0.90_s2.json` | `5b68bbf32dd483fc` | `results/power/rho/inregime_det/rho0.90_s2.json` |
+| `inregime_det__rho0.95_s0.json` | `8462c975935707aa` | `results/power/rho/inregime_det/rho0.95_s0.json` |
+| `inregime_det__rho0.95_s1.json` | `28aff7d6018b7aa3` | `results/power/rho/inregime_det/rho0.95_s1.json` |
+| `inregime_det__rho0.95_s2.json` | `eaa3352a77a68a90` | `results/power/rho/inregime_det/rho0.95_s2.json` |
+| `inregime_det__rho1.00_s0.json` | `a4a21aa47e685b75` | `results/power/rho/inregime_det/rho1.00_s0.json` |
+| `inregime_det__rho1.00_s1.json` | `49f359d14ead04a0` | `results/power/rho/inregime_det/rho1.00_s1.json` |
+| `inregime_det__rho1.00_s2.json` | `fab91ea24cc72235` | `results/power/rho/inregime_det/rho1.00_s2.json` |
+| `fixed_rho0.50_s0_evalp0.5.json` | `6d419f9f942610cf` | `results/power/rho/evalsweep_det/fixed_rho0.50_s0_evalp0.5.json` |
+| `fixed_rho0.50_s0_evalp0.7.json` | `893518112fcc2462` | `results/power/rho/evalsweep_det/fixed_rho0.50_s0_evalp0.7.json` |
+| `fixed_rho0.50_s0_evalp0.8.json` | `f97168e261442f4a` | `results/power/rho/evalsweep_det/fixed_rho0.50_s0_evalp0.8.json` |
+| `fixed_rho0.50_s0_evalp0.9.json` | `fa3a5b9a6ca14b9c` | `results/power/rho/evalsweep_det/fixed_rho0.50_s0_evalp0.9.json` |
+| `fixed_rho0.50_s0_evalp1.0.json` | `e0f2f1e074929882` | `results/power/rho/evalsweep_det/fixed_rho0.50_s0_evalp1.0.json` |
+| `fixed_rho0.50_s1_evalp0.5.json` | `0e04cf15ee9b3b73` | `results/power/rho/evalsweep_det/fixed_rho0.50_s1_evalp0.5.json` |
+| `fixed_rho0.50_s1_evalp0.7.json` | `c3df0b7bb08ff81e` | `results/power/rho/evalsweep_det/fixed_rho0.50_s1_evalp0.7.json` |
+| `fixed_rho0.50_s1_evalp0.8.json` | `0ce80b4bfe5e7d71` | `results/power/rho/evalsweep_det/fixed_rho0.50_s1_evalp0.8.json` |
+| `fixed_rho0.50_s1_evalp0.9.json` | `58444f2595a18a92` | `results/power/rho/evalsweep_det/fixed_rho0.50_s1_evalp0.9.json` |
+| `fixed_rho0.50_s1_evalp1.0.json` | `1c1e196de9b7c9eb` | `results/power/rho/evalsweep_det/fixed_rho0.50_s1_evalp1.0.json` |
+| `fixed_rho0.50_s2_evalp0.5.json` | `6aa25b83b3dcea0a` | `results/power/rho/evalsweep_det/fixed_rho0.50_s2_evalp0.5.json` |
+| `fixed_rho0.50_s2_evalp0.7.json` | `b855001e9c6c7662` | `results/power/rho/evalsweep_det/fixed_rho0.50_s2_evalp0.7.json` |
+| `fixed_rho0.50_s2_evalp0.8.json` | `a2bfb8a9896c1727` | `results/power/rho/evalsweep_det/fixed_rho0.50_s2_evalp0.8.json` |
+| `fixed_rho0.50_s2_evalp0.9.json` | `4e40e18980621d4a` | `results/power/rho/evalsweep_det/fixed_rho0.50_s2_evalp0.9.json` |
+| `fixed_rho0.50_s2_evalp1.0.json` | `6506a2c0a82f8b41` | `results/power/rho/evalsweep_det/fixed_rho0.50_s2_evalp1.0.json` |
+| `fixed_rho1.00_s0_evalp0.5.json` | `d4025212f10414c1` | `results/power/rho/evalsweep_det/fixed_rho1.00_s0_evalp0.5.json` |
+| `fixed_rho1.00_s0_evalp0.7.json` | `4add85d7e0c27456` | `results/power/rho/evalsweep_det/fixed_rho1.00_s0_evalp0.7.json` |
+| `fixed_rho1.00_s0_evalp0.8.json` | `7b52c443bfab65ae` | `results/power/rho/evalsweep_det/fixed_rho1.00_s0_evalp0.8.json` |
+| `fixed_rho1.00_s0_evalp0.9.json` | `9e0b60dc739d993d` | `results/power/rho/evalsweep_det/fixed_rho1.00_s0_evalp0.9.json` |
+| `fixed_rho1.00_s0_evalp1.0.json` | `a4a21aa47e685b75` | `results/power/rho/evalsweep_det/fixed_rho1.00_s0_evalp1.0.json` |
+| `fixed_rho1.00_s1_evalp0.5.json` | `870ab35b45cc05b3` | `results/power/rho/evalsweep_det/fixed_rho1.00_s1_evalp0.5.json` |
+| `fixed_rho1.00_s1_evalp0.7.json` | `c795af0d798eb223` | `results/power/rho/evalsweep_det/fixed_rho1.00_s1_evalp0.7.json` |
+| `fixed_rho1.00_s1_evalp0.8.json` | `74d7e54330e1fc80` | `results/power/rho/evalsweep_det/fixed_rho1.00_s1_evalp0.8.json` |
+| `fixed_rho1.00_s1_evalp0.9.json` | `d567eeb2deb7e398` | `results/power/rho/evalsweep_det/fixed_rho1.00_s1_evalp0.9.json` |
+| `fixed_rho1.00_s1_evalp1.0.json` | `49f359d14ead04a0` | `results/power/rho/evalsweep_det/fixed_rho1.00_s1_evalp1.0.json` |
+| `fixed_rho1.00_s2_evalp0.5.json` | `e00c3514660eab45` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp0.5.json` |
+| `fixed_rho1.00_s2_evalp0.7.json` | `3ae327328f24c1b3` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp0.7.json` |
+| `fixed_rho1.00_s2_evalp0.8.json` | `257bc6c357462d12` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp0.8.json` |
+| `fixed_rho1.00_s2_evalp0.9.json` | `0296a04aaeef06ca` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp0.9.json` |
+| `fixed_rho1.00_s2_evalp1.0.json` | `fab91ea24cc72235` | `results/power/rho/evalsweep_det/fixed_rho1.00_s2_evalp1.0.json` |
+| `nint200.json` | `5e6f100544385577` | `results/sampled_det/nint200.json` |
 
-75 files.
+127 files.

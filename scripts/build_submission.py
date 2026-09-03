@@ -56,6 +56,21 @@ GROUPS = [
       "results/power/rho/deterministic/xfer_rho*_s?.json",
       "results/power/rho/DETERMINISTIC_COMPARE.json",
       "results/power/rho/rho0.95_long_s?.json"], True),
+    ("generator", "The generator control: the advantage is not a scale-free artefact. Three "
+                  "ER seeds at the principal cell, both conventions identical; the myopic rule "
+                  "is the arm the family change breaks.",
+     ["results/generator12k/er_s?.json", "results/generator12k/shd_er_*.json"], True),
+    ("credit", "Turn-aware credit under pooled and federated optimisation, measured. The "
+               "recorded-field interaction (18x, federation-only) does not exist: 15.1x pooled "
+               "against 13.2x federated.",
+     ["results/credit/k*_s?.json", "results/credit/shd/*.json"], True),
+    ("inregime", "The answer-rate grid's second reading: each policy measured in its own "
+                 "regime (21/21), plus the rebuilt fixed-policy sweep and the finite-sample "
+                 "cell. All seeded-path measurements.",
+     ["results/power/rho/inregime_det/rho*_s?.json",
+      "results/power/rho/evalsweep_det/fixed_rho*_s?_evalp*.json",
+      "results/sampled_det/nint200.json",
+      "results/sampled_ref/k08s50n04b150i0200_s?.json"], True),
     ("attribution", "RQ4. The identifiability grid, the matched-budget control, the coverage "
                     "series and the scaling runs to k=50.",
      ["results/attr_ceiling*.json", "results/attr_scale_final.json", "results/attr_reach.json",

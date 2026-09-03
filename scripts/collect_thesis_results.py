@@ -54,6 +54,24 @@ REGISTRY = [
      "scripts/build_sweep12k.py to generate jobs, then scripts/measure_sweep12k.py "
      "--conventions best,final,u0500"),
 
+    ("generator",
+     "The generator control: three Erdos-Renyi seeds at the principal cell, 12,000 episodes, "
+     "current engine, measured at both conventions (identical). Densities near-matched to the "
+     "scale-free comparator. The advantage holds on 3/3 seeds at 7-9 SE; the myopic rule "
+     "degrades fifty-fold. Replaces results/vs_generator/ (superseded belief backend).",
+     "RQ1, figure generator",
+     ["results/generator12k/er_s?.json", "results/generator12k/shd_er_*.json"],
+     "results/generator12k/run_generator12k.sh, then global_shd_paired.py at both conventions"),
+
+    ("credit",
+     "Turn-aware credit at k=8 (and k=12 when the fill lands), measured with "
+     "global_shd_paired.py. The recorded-field version showed a federation-specific 18x "
+     "interaction that does not exist; measured, removing credit costs 15.1x pooled and 13.2x "
+     "federated.",
+     "RQ3, figure credit, tab:credit",
+     ["results/credit/k*_s?.json", "results/credit/shd/*.json"],
+     "training runs in results/credit/, then scripts/global_shd_paired.py per 4-cell"),
+
     ("checkpoint",
      "Early-stopped against final policy on the window-size axis, 200 paired episodes per "
      "seed. Establishes that the checkpoint choice is inert below the crossover and worth "
@@ -120,7 +138,13 @@ REGISTRY = [
       "results/power/rho/rho[01].[0-9]*_s?.json",
       "results/power/rho/CURVE.json",
       "results/power/transfer_p[0-9][0-9].json", "results/power/p[0-9][0-9].json",
-      "results/power/rho/repeat/*.json", "results/power/rho/argmax_det/*.json"],
+      "results/power/rho/repeat/*.json", "results/power/rho/argmax_det/*.json",
+      # Added 3 Sep: the measured in-regime diagonal, the rebuilt fixed-policy sweep, and the
+      # finite-sample cell. Each replaces a recorded-field or pre-fix source named in its
+      # findings note.
+      "results/power/rho/inregime_det/rho*_s?.json",
+      "results/power/rho/evalsweep_det/fixed_rho*_s?_evalp*.json",
+      "results/sampled_det/nint200.json"],
      "scripts/run_rho_fleet.sh, then scripts/rebuild_grid_deterministic.sh, then "
      "scripts/rho_curve_report.py --dir results/power/rho/deterministic"),
 ]
