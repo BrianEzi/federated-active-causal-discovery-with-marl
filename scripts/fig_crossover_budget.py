@@ -32,7 +32,7 @@ def series12(k):
     return load(f"results/sweep12k/shd/{cell}.json")
 
 
-fig, ax = plt.subplots(figsize=(5.2, 3.4))
+fig, ax = plt.subplots(figsize=(5.40, 3.4))   # FIGURE_GUIDELINES: author at print size
 for label, getter, colour, ls in (
         # k=20 and k=30 were trained at 12,000 episodes in the ORIGINAL sweep, so they have no
         # 4,000-episode counterpart. Loading them here would put two 12,000-episode points on a
@@ -70,7 +70,7 @@ ax.set_yscale("log"); ax.set_ylim(FLOOR * .7, 3e-2); ax.set_xticks(KS)
 ax.axvspan(8, 12, color="black", alpha=.05, zorder=0)
 ax.set_xlabel("window size $k_v$")
 ax.set_ylabel("SHD on committed marks")
-ax.set_title("The crossover is a training budget, not a complexity threshold", fontsize=9.5)
+# Title dropped per FIGURE_GUIDELINES rule 7; the caption carries the message.
 ax.legend(frameon=False, loc="lower left", fontsize=8)
 ax.grid(alpha=.25, lw=.5)
 fig.tight_layout()

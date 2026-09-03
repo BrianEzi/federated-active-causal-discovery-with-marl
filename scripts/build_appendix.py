@@ -418,7 +418,7 @@ def appendix_attribution():
           "resolve there.\n\n"
           "\\begin{figure}[htbp]\n"
           "\\centering\n"
-          "\\includegraphics[width=0.98\\textwidth]{figures/attribution_law.pdf}\n"
+          "\\includegraphics[width=0.667\\textwidth]{figures/attribution_law.pdf}\n"
           "\\caption{Measured attribution against the two-factor decomposition, with the "
           "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
           "\\label{fig:attribution_law}\n"

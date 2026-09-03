@@ -30,18 +30,42 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 # Serif to sit beside LaTeX body text without looking pasted in. Colours are the Okabe-Ito
 # colourblind-safe set; the greys carry the un-emphasised arms.
+# FIGURE_GUIDELINES.md, applied 3 Sep. Author at PRINT size: \textwidth is 5.40 in, so every
+# figure is authored at FULL, TWOTHIRD or HALF and included at 1.0, 0.667 or 0.5 \textwidth
+# with no scaling. Fonts below are therefore rendered sizes: 9 pt labels, 8 pt ticks, nothing
+# under 8 pt on the page. Grids wider than FULL do not exist; they are split into subfigure
+# panels (sweep_grid_[abcd].pdf, federation_[ab].pdf).
+FULL, TWOTHIRD, HALF = 5.40, 3.60, 2.70
+
+# In-figure titles are off: the caption carries the message, per standard practice and rule 7
+# of the guidelines. One switch rather than deleted calls, so Brian can reverse it in one line.
+SHOW_TITLES = False
+
+
+def _title(ax, text, **kw):
+    if SHOW_TITLES:
+        ax.set_title(text, **kw)
+
+
+def _suptitle(fig, text, **kw):
+    if SHOW_TITLES:
+        fig.suptitle(text, **kw)
+
+
 plt.rcParams.update({
     "font.family": "serif",
     "font.serif": ["DejaVu Serif"],
     "font.size": 9,
     "axes.titlesize": 9.5,
     "axes.labelsize": 9,
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
     "legend.fontsize": 8,
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes.grid": True,
     "grid.alpha": 0.25,
-    "grid.linewidth": 0.5,
+    "grid.linewidth": 0.6,
     "figure.dpi": 150,
 })
 LEARNED, MYOPIC, RANDOM, THIRD = "#0072B2", "#D55E00", "#999999", "#009E73"
@@ -98,7 +122,7 @@ def fig_crossover(out: pathlib.Path):
     from results/rerows, which is the 4,000-episode design for k<=12 and 12,000 for k=20 and 30;
     its budget is stated in the caption rather than mixed silently.
     """
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(5.0, 5.2), sharex=True,
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(FULL, 5.2), sharex=True,
                                       gridspec_kw={"height_ratios": [1, 1.15]})
 
     top.axhline(0, color="black", lw=0.8)
@@ -117,7 +141,7 @@ def fig_crossover(out: pathlib.Path):
             top.scatter([k] * len(gaps), gaps, s=13, color=colour, alpha=0.4, zorder=3)
         top.plot(ks, means, style, color=colour, lw=1.6, ms=5, zorder=4, label=label)
     top.set_ylabel("joint recovery rate\nlearned $-$ myopic")
-    top.set_title("The sign change belongs to the budget, not the window")
+    _title(top, "The sign change belongs to the budget, not the window")
     top.legend(loc="lower right", frameon=False, fontsize=8)
     top.annotate("no 4,000-episode runs\nexist at $k_v=20$ or $30$", xy=(19, -0.05),
                  fontsize=7, color="#666666")
@@ -163,7 +187,7 @@ def fig_checkpoint(out: pathlib.Path):
     once per checkpoint, so three times the updates give it three times the chances to retain
     an exploratory policy. That is a budget effect, not a window effect.
     """
-    fig, ax = plt.subplots(figsize=(5.0, 2.9))
+    fig, ax = plt.subplots(figsize=(FULL, 3.0))
     floor = 1e-5
     for which, label, colour, style in (("best", "selected (early-stopped)", LEARNED, "-"),
                                         ("final", "final update", THIRD, "--")):
@@ -181,7 +205,7 @@ def fig_checkpoint(out: pathlib.Path):
     ax.set_xticks(KS)
     ax.set_xlabel("window size $k_v$")
     ax.set_ylabel("SHD on committed marks")
-    ax.set_title("Neither checkpoint convention is safe alone at 12,000 episodes")
+    _title(ax, "Neither checkpoint convention is safe alone at 12,000 episodes")
     ax.legend(loc="lower left", frameon=False)
     fig.tight_layout()
     fig.savefig(out / "checkpoint.pdf", bbox_inches="tight")
@@ -204,7 +228,7 @@ def fig_attribution_law(out: pathlib.Path):
         print("!! attr_model.py produced no parseable rows; skipping the law figure")
         return
 
-    fig, ax = plt.subplots(figsize=(4.3, 4.0))
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, TWOTHIRD))
     lim = 0.95
     ax.plot([0, lim], [0, lim], color="black", lw=0.8, zorder=1)
     applies = [r for r in rows if r[1] > 1]
@@ -221,7 +245,7 @@ def fig_attribution_law(out: pathlib.Path):
     ax.set_aspect("equal")
     ax.set_xlabel(r"predicted: $0.76 \times$ share of single-pair latents")
     ax.set_ylabel("measured share attributed")
-    ax.set_title(f"Closed form predicts attribution\nlargest residual {resid:.3f} where the "
+    _title(ax, f"Closed form predicts attribution\nlargest residual {resid:.3f} where the "
                  f"model applies", fontsize=9)
     ax.legend(loc="upper left", frameon=False)
     fig.tight_layout()
@@ -230,7 +254,12 @@ def fig_attribution_law(out: pathlib.Path):
 
 
 def fig_federation(out: pathlib.Path):
-    """RQ3: coordination strategies, and the cost of partitioning the learner."""
+    """RQ3, split per FIGURE_GUIDELINES.md rule 4 into two print-true subfigure panels.
+
+    (a) coordination strategies at both cells, authored FULL; (b) the six-seed paired
+    comparison on the primary metric, authored HALF. The old 9.6-inch three-panel version
+    printed its text at 5.0 pt.
+    """
     def arm(pattern, key):
         vals = []
         for path in sorted(glob.glob(str(ROOT / pattern))):
@@ -239,10 +268,8 @@ def fig_federation(out: pathlib.Path):
                 vals.append(arms[key]["success"])
         return vals
 
-    # BUDGETS DIFFER BETWEEN THESE ROWS AND THE FIGURE SAYS SO. The k=12 ladder trained for
-    # 4,000 episodes and the k=20 ladder for 12,000. Retrains of the k=12 arms at 12,000 are
-    # in results/central12k/ and this function switches to them automatically once all twelve
-    # exist, so the figure cannot silently keep reporting the shorter budget.
+    # BUDGETS DIFFER BETWEEN THESE ROWS AND THE FIGURE SAYS SO. The k=12 ladder is the
+    # 12,000-episode retrain set once all twelve exist; the k=20 ladder was always at 12,000.
     twelve = sorted((ROOT / "results/central12k").glob("v2_k12_?_s?.json"))
     k12 = ("results/central12k/v2_k12_{a}_s?.json" if len(twelve) >= 12
            else "results/central/v2_k12_{a}_s*.json")
@@ -252,9 +279,8 @@ def fig_federation(out: pathlib.Path):
               ("myopic, uncoordinated", "greedy_uncertainty", MYOPIC),
               ("learned (federated)", "learned", LEARNED)]
 
-    fig = plt.figure(figsize=(9.6, 3.1))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 0.9], wspace=0.32)
-    axes = [fig.add_subplot(gs[0]), fig.add_subplot(gs[1], sharey=None)]
+    # (a) coordination strategies.
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.2), sharey=True)
     for ax, (title, pattern) in zip(axes, cells):
         for index, (label, key, colour) in enumerate(series):
             vals = arm(pattern.format(a="A"), key)
@@ -269,47 +295,46 @@ def fig_federation(out: pathlib.Path):
             ax.scatter([len(series)] * len(central), central, s=13, color="black",
                        alpha=0.55, zorder=4)
         ax.set_xticks(range(len(series) + 1))
-        ax.set_xticklabels([s[0] for s in series] + ["learned (centralised)"],
-                           rotation=32, ha="right")
-        ax.set_title(title)
+        ax.set_xticklabels([s_[0] for s_ in series] + ["learned (centralised)"],
+                           rotation=32, ha="right", fontsize=8)
+        _title(ax, title)
+        ax.annotate(title, xy=(0.04, 0.92), xycoords="axes fraction", fontsize=9)
         ax.set_ylim(0, 1.05)
     axes[0].set_ylabel("joint recovery rate")
-    axes[1].tick_params(labelleft=False)
-    axes[1].set_ylim(0, 1.05)
+    fig.tight_layout()
+    fig.savefig(out / "federation_a.pdf", bbox_inches="tight")
+    plt.close(fig)
 
-    # Third panel: the six-seed paired comparison on the primary metric, from the measured
-    # 12,000-episode ladder. This is the RQ3 headline; the bars are the coordination story.
+    # (b) the six-seed paired panel, from the measured 12,000-episode ladder.
     lad = {}
     for k in ("A_best", "E_best"):
         q = ROOT / f"results/rerows/ladder12k_{k}.json"
         if q.exists():
             lad[k] = {r["seed"]: r for r in json.loads(q.read_text())}
-    if len(lad) == 2:
-        ax3 = fig.add_subplot(gs[2])
-        seeds = sorted(lad["A_best"])
-        ds, ses = [], []
-        for sd in seeds:
-            x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
-            y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
-            d = x - y
-            ds.append(d.mean())
-            ses.append(d.std(ddof=1) / np.sqrt(len(d)))
-        ax3.axhline(0, color="black", lw=0.8, zorder=1)
-        ax3.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
-                     ms=4.5, lw=1.1, capsize=2.5, zorder=3)
-        lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.25
-        ax3.set_ylim(-lim, lim)
-        ax3.set_xticks(seeds)
-        ax3.set_xlabel("seed")
-        ax3.set_ylabel("SHD, federated $-$ centralised")
-        ax3.set_title("$k_v=12$, $12{,}000$ episodes,\n200 paired episodes per seed", fontsize=8)
-        ax3.annotate("above 0: centralising wins", xy=(0.03, 0.93), xycoords="axes fraction",
-                     fontsize=6.8, color="#666666")
-        ax3.annotate("no seed separates", xy=(0.03, 0.06), xycoords="axes fraction",
-                     fontsize=6.8, color="#666666")
-    fig.suptitle("Learned coordination beats convention, and partitioning the learner "
-                 "costs nothing a seed can detect", fontsize=9.5, y=1.03)
-    fig.savefig(out / "federation.pdf", bbox_inches="tight")
+    if len(lad) != 2:
+        print("!! ladder measurements absent; federation_b skipped")
+        return
+    fig, ax3 = plt.subplots(figsize=(HALF, 2.9))
+    seeds = sorted(lad["A_best"])
+    ds, ses = [], []
+    for sd in seeds:
+        x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
+        y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
+        d = x - y
+        ds.append(d.mean())
+        ses.append(d.std(ddof=1) / np.sqrt(len(d)))
+    ax3.axhline(0, color="black", lw=0.8, zorder=1)
+    ax3.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
+                 ms=4.5, lw=1.1, capsize=2.5, zorder=3)
+    lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.3
+    ax3.set_ylim(-lim, lim)
+    ax3.set_xticks(seeds)
+    ax3.set_xlabel("seed")
+    ax3.set_ylabel("SHD, federated $-$ centralised", fontsize=8)
+    ax3.annotate("above 0: centralising wins", xy=(0.04, 0.92), xycoords="axes fraction",
+                 fontsize=8, color="#666666")
+    fig.tight_layout()
+    fig.savefig(out / "federation_b.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -380,37 +405,42 @@ def _measured_shd(cell: str, seed):
 
 
 def fig_sweep_grid(out: pathlib.Path):
-    """THE backbone figure: every swept axis against both baselines, on both metrics.
+    """The backbone result, split into four half-width subfigure panels, one per swept axis.
+
+    FIGURE_GUIDELINES.md rule 4: the old single 12-inch grid printed its 9 pt text at 4.0 pt.
+    Each panel is authored at HALF (2.70 in), the width it prints in a 2x2 subcaption block,
+    so its fonts are print-true. Panel (a) carries the legend for all four.
 
     Positions are evenly spaced rather than linear. Beta runs 1.0 to 5.0 and a linear axis
     crushes the low end, which is where the cells that separate the arms actually sit.
     """
     rows = _sweep_rows()
     axes_spec = [
-        ("window size $k_v$", "k",
+        ("a", "window size $k_v$", "k",
          lambda r: r["sigma"] == .5 and r["n"] == 4 and r["beta"] == 1.5),
-        ("agents $K$", "n",
+        ("b", "agents $K$", "n",
          lambda r: r["k"] == 12 and r["sigma"] == .5 and r["beta"] == 1.5),
-        ("contended fraction $\\sigma$", "sigma",
+        ("c", "contended fraction $\\sigma$", "sigma",
          lambda r: r["k"] == 12 and r["n"] == 4 and r["beta"] == 1.5),
-        ("budget multiplier $\\beta$", "beta",
+        ("d", "budget multiplier $\\beta$", "beta",
          lambda r: r["k"] == 12 and r["sigma"] == .5 and r["n"] == 4),
     ]
     series = [("learned", "learned", LEARNED, "o", 1.9),
               ("myopic (greedy)", "greedy_uncertainty", MYOPIC, "s", 1.5),
               ("random", "random_vary", RANDOM, "^", 1.3)]
-    metrics = [("global_hard_shd", "SHD on committed marks\n(lower is better)", True),
-               ("success", "joint recovery rate\n(higher is better)", False)]
+    metrics = [("global_hard_shd", "SHD on committed marks", True),
+               ("success", "joint recovery rate", False)]
     floor = 1e-5
 
-    fig, axes = plt.subplots(2, 4, figsize=(12.0, 5.8))
-    for col, (xlabel, key, keep) in enumerate(axes_spec):
+    for tag, xlabel, key, keep in axes_spec:
         sel = [r for r in rows if keep(r)]
         xs = sorted({r[key] for r in sel})
         pos = list(range(len(xs)))
         gone = [r for r in sel if r["wr"] < WINDOW_FLOOR]
+        fig, panel = plt.subplots(2, 1, figsize=(HALF, 3.9), sharex=True,
+                                  gridspec_kw={"hspace": 0.14})
         for row, (mkey, ylabel, logy) in enumerate(metrics):
-            ax = axes[row][col]
+            ax = panel[row]
             # The full-coverage reference exists only as a run-recorded field, so it is drawn
             # on the recovery row and omitted from the SHD row rather than mixing a recorded
             # number into a panel of measured ones.
@@ -418,9 +448,8 @@ def fig_sweep_grid(out: pathlib.Path):
                 ceiling = [np.mean([r["arms"]["oracle_cover"][mkey] for r in sel
                                     if r[key] == x and "oracle_cover" in r["arms"]] or [np.nan])
                            for x in xs]
-                ax.plot(pos, [max(v, floor) if logy else v for v in ceiling], ls=":",
-                        color=THIRD, lw=1.2, zorder=2,
-                        label="full-coverage reference" if col == 0 else None)
+                ax.plot(pos, ceiling, ls=":", color=THIRD, lw=1.2, zorder=2,
+                        label="full coverage" if (row == 1 and tag == "a") else None)
             for label, arm, colour, marker, lw in series:
                 means, seeds = [], []
                 for x in xs:
@@ -435,10 +464,10 @@ def fig_sweep_grid(out: pathlib.Path):
                 for p_, vals in zip(pos, seeds):
                     ax.scatter([p_] * len(vals),
                                [max(v, floor) if logy else v for v in vals],
-                               s=11, color=colour, alpha=.35, zorder=3)
+                               s=10, color=colour, alpha=.35, zorder=3)
                 ax.plot(pos, [max(m, floor) if logy else m for m in means], marker=marker,
-                        ls="-", color=colour, lw=lw, ms=4.5, zorder=4,
-                        label=label if (row == 0 and col == 0) else None)
+                        ls="-", color=colour, lw=lw, ms=4,
+                        label=label if (row == 1 and tag == "a") else None, zorder=4)
             if logy:
                 ax.set_yscale("log")
                 ax.set_ylim(floor * .7, 3e-1)
@@ -448,25 +477,21 @@ def fig_sweep_grid(out: pathlib.Path):
             ax.set_xticks(pos)
             ax.set_xticklabels([f"{x:g}" for x in xs])
             ax.set_xlim(-.4, len(xs) - .6)
-            if row == 1:
-                ax.set_xlabel(xlabel)
-            if col == 0:
-                ax.set_ylabel(ylabel)
+            # Every panel prints alone, so every panel is self-describing: no shared-edge
+            # label suppression across subfigures.
+            ax.set_ylabel(ylabel, fontsize=8)
+        panel[1].set_xlabel(xlabel)
         if gone:
-            axes[1][col].text(.98, .06,
-                              f"{len(gone)} seed{'s' if len(gone) > 1 else ''} excluded",
-                              transform=axes[1][col].transAxes, ha="right", fontsize=7,
-                              color="#B00020")
-    axes[0][0].legend(frameon=False, fontsize=7.6, loc="lower left", handlelength=1.6)
-    fig.suptitle("Learned experiment selection against myopic and random baselines, "
-                 "on every swept axis\n"
-                 "12,000 training episodes throughout, 3 seeds per cell. SHD from 200 paired "
-                 "episodes at the selected checkpoint; recovery from the final policy.",
-                 fontsize=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    fig.savefig(out / "sweep_grid.pdf", bbox_inches="tight")
-    plt.close(fig)
-
+            panel[1].text(.97, .07,
+                          f"{len(gone)} seed{'s' if len(gone) > 1 else ''} excluded",
+                          transform=panel[1].transAxes, ha="right", fontsize=8,
+                          color="#B00020")
+        if tag == "a":
+            # In the recovery panel's empty middle band: random sits near zero and the other
+            # arms above 0.8, so the centre of that panel is the one region nothing crosses.
+            panel[1].legend(frameon=False, fontsize=8, loc="center right", handlelength=1.5)
+        fig.savefig(out / f"sweep_grid_{tag}.pdf", bbox_inches="tight")
+        plt.close(fig)
 
 
 def fig_pair_class(out: pathlib.Path):
@@ -494,7 +519,7 @@ def fig_pair_class(out: pathlib.Path):
     n_shar = sum(e["arms"]["learned"]["n_shared"]
                  for e in json.loads(src[12000].read_text()))
 
-    fig, (left, right) = plt.subplots(1, 2, figsize=(6.6, 3.1))
+    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9))
     budgets = [4000, 12000]
     xs = [0, 1]
     for ax, idx, title, denom in ((left, 0, f"scored pairs ({n_priv:,} observations)", n_priv),
@@ -522,12 +547,12 @@ def fig_pair_class(out: pathlib.Path):
         ax.set_xticklabels(["4,000", "12,000"])
         ax.set_xlim(-0.35, 1.35)
         ax.set_xlabel("training episodes")
-        ax.set_title(title, fontsize=9)
+        _title(ax, title, fontsize=9)
         ax.set_yscale("symlog", linthresh=1)
         ax.set_ylim(-0.5, 1.2e5)
     left.set_ylabel("errors committed")
     left.legend(loc="lower left", frameon=False)
-    fig.suptitle("Training moves the class the policy is scored on, and not the other",
+    _suptitle(fig, "Training moves the class the policy is scored on, and not the other",
                  fontsize=9.5)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     fig.savefig(out / "pair_class.pdf", bbox_inches="tight")
@@ -569,7 +594,7 @@ def fig_answer_rate(out: pathlib.Path):
     rhos = sorted(per)
     pos = rhos
     at = {r: r for r in rhos}
-    fig, (top, bottom) = plt.subplots(2, 1, figsize=(5.2, 5.0), sharex=True,
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(FULL, 5.2), sharex=True,
                                       gridspec_kw={"height_ratios": [1, 1]})
     myopic = np.mean([v[1] for r in rhos for v in per[r]])
     top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
@@ -581,7 +606,7 @@ def fig_answer_rate(out: pathlib.Path):
     top.plot(pos, means, "o-", color=LEARNED, lw=1.7, ms=5, zorder=4, label="learned")
     top.set_ylabel("SHD under sampled evidence")
     top.legend(loc="upper left", frameon=False, fontsize=7.5)
-    top.set_title("Degrading the training evidence improves transfer")
+    _title(top, "Degrading the training evidence improves transfer")
 
     bottom.axhline(0, color="black", lw=0.8, zorder=2)
     for r in rhos:
@@ -623,7 +648,7 @@ def fig_credit(out: pathlib.Path):
             d = json.loads(q.read_text())
             cells[(lbl, state)] = [e["means"]["learned"]["hard"] for e in d]
 
-    fig, ax = plt.subplots(figsize=(4.4, 3.0))
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, 3.1))
     floor = 5e-5
     xs = {"credit": 0, "nocredit": 1}
     for lbl, colour, dx in (("pooled", THIRD, -0.045), ("federated", LEARNED, 0.045)):
@@ -642,7 +667,7 @@ def fig_credit(out: pathlib.Path):
     ax.set_xticklabels(["turn-aware credit on", "credit off"])
     ax.set_xlim(-0.35, 1.45)
     ax.set_ylabel("SHD on committed marks")
-    ax.set_title("Removing turn-aware credit costs an order of magnitude\n"
+    _title(ax, "Removing turn-aware credit costs an order of magnitude\n"
                  "under both optimisers", fontsize=9)
     ax.legend(loc="lower right", frameon=False)
     fig.tight_layout()
@@ -670,7 +695,7 @@ def fig_fixedpolicy(out: pathlib.Path):
         print("!! evalsweep_det absent; skipping")
         return
     evals = sorted({k[1] for k in per})
-    fig, ax = plt.subplots(figsize=(4.6, 3.1))
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, 3.1))
     floor = 1e-4
     for trained, colour, label in ((1.0, MYOPIC, r"trained at $\rho=1.0$ (oracle)"),
                                    (0.5, LEARNED, r"trained at $\rho=0.5$")):
@@ -686,7 +711,7 @@ def fig_fixedpolicy(out: pathlib.Path):
     ax.set_ylabel("SHD on committed marks")
     ax.set_xticks(evals)
     ax.invert_xaxis()          # reading left to right = answers progressively withheld
-    ax.set_title("Held fixed, the oracle-trained policy degrades $295\\times$\n"
+    _title(ax, "Held fixed, the oracle-trained policy degrades $295\\times$\n"
                  "and the adapted one $27\\times$", fontsize=9)
     ax.legend(loc="lower right", frameon=False, fontsize=7.5)
     fig.tight_layout()
@@ -702,9 +727,10 @@ def main(argv=None) -> int:
     out = ROOT / args.out
     out.mkdir(parents=True, exist_ok=True)
 
-    for name, fn in (("sweep_grid", fig_sweep_grid),
+    for name, fn in (("sweep_grid_[abcd]", fig_sweep_grid),
                      ("crossover", fig_crossover), ("checkpoint", fig_checkpoint),
-                     ("attribution_law", fig_attribution_law), ("federation", fig_federation),
+                     ("attribution_law", fig_attribution_law),
+                     ("federation_[ab]", fig_federation),
                      ("pair_class", fig_pair_class),
                      ("answer_rate", fig_answer_rate),
                      ("credit", fig_credit),
