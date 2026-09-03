@@ -8152,3 +8152,51 @@ retreat is larger than the one I had prepared for.
 cells outstanding, due about 03:45. rho=0.70's existing pair of measurements is the reason to
 expect the low rates to survive, and it is also the single point that misled me, so I am
 deliberately not predicting again. I will report what lands.
+
+---
+
+## 2026-09-03 02:50 -- Agent B: the argmax reversal is 87% pairs left UNDETERMINED. It is agent A's F4 pathology, reproduced on a second grid.
+
+Before rewriting section 1 around the reversal, I asked what the reversal is MADE of. The
+answer is nearly all of it, and it changes the interpretation without making the reversal go
+away.
+
+An undetermined pair scores a **full** hard-SHD error -- `ma/evaluate.py::pooled_global_belief`
+sets hard = 1 whenever the pooled set is not exactly the true mark, which agent C verified
+empirically over 1,875 pooled pairs. So a policy that stops settling pairs is penalised exactly
+as if it had settled them wrongly. Comparing each argmax cell against its sampled twin, over the
+12 cells built so far:
+
+    pooled mean SHD shift        +0.02499
+    pooled mean resolved drop    +0.02173
+    -> 86.9% of the entire argmax penalty is pairs left undetermined
+    Pearson r = 0.993, p < 1e-10 between the SHD shift and the resolved-fraction drop
+
+**And the control is exact.** The myopic arm's resolved fraction differs by precisely 0.0 in
+every one of the 12 cells -- argmax cannot touch it, and does not.
+
+This is the mechanism agent A found in the F4 audit (determined fraction 0.807 argmax against
+0.971 sampled, baselines unmoved) reproduced independently on a different grid, at a different
+window size, with a different policy family. **A deterministic policy cannot leave a state whose
+argmax action has stopped being informative**, so it stops probing, and the metric charges it
+full price for every pair it abandoned.
+
+**What this does and does not license.**
+
+* It does NOT make the reversal disappear. Under argmax, rho=0.90 and rho=0.85 lose to the
+  myopic rule significantly on every seed. That is a true statement about that convention and
+  it goes in the chapter.
+* It DOES identify the reversal as an execution pathology with a measured cause rather than
+  evidence that the transfer advantage is illusory. The argmax arm is not showing worse
+  knowledge of the graph; it is showing a policy that stopped asking questions.
+* It is why the project reports sampled evaluation, a convention fixed before this fleet ran
+  and for this documented reason -- not chosen after seeing which one flattered the result.
+
+**One pattern worth watching, not yet a claim.** The resolved drop tends to grow with the answer
+rate: 0.0173 at rho=0.85, 0.0210 at 0.95, 0.0212 at 0.90, 0.0275 at rho=1.00. Policies trained
+under more withholding may suffer less from the argmax pathology, which would fit the transfer
+story -- more practice at states where the obvious action yields nothing. But 0.90 and 0.95 are
+indistinguishable on three seeds and I am not claiming monotonicity from four points.
+
+Nine cells outstanding (0.80, 0.70, 0.50), due about 03:45. Section 1's argmax paragraph, which
+I wrote tonight from the two-rate control, will need a full rewrite around this.
