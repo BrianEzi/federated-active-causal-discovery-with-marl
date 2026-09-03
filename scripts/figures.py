@@ -440,7 +440,7 @@ def fig_sweep_grid(out: pathlib.Path):
         xs = sorted({r[key] for r in sel})
         pos = list(range(len(xs)))
         gone = [r for r in sel if r["wr"] < WINDOW_FLOOR]
-        fig, panel = plt.subplots(2, 1, figsize=(HALF, 3.9), sharex=True,
+        fig, panel = plt.subplots(2, 1, figsize=(HALF, 3.45), sharex=True,
                                   gridspec_kw={"hspace": 0.14})
         for row, (mkey, ylabel, logy) in enumerate(metrics):
             ax = panel[row]
@@ -618,7 +618,20 @@ def fig_answer_rate(out: pathlib.Path):
                            color=LEARNED if sig else "none",
                            edgecolors=LEARNED, linewidths=0.9)
     bottom.plot(pos, [np.mean([v[2] for v in per[r]]) for r in rhos], "-",
-                color=LEARNED, lw=1.5, zorder=4)
+                color=LEARNED, lw=1.5, zorder=4, label="sampled (the trained policy)")
+    # The argmax derivative of the same policies, drawn because the convention is part of the
+    # claim: the ordering of rates survives it, the threshold does not, and 87% of the shift
+    # is pairs left undetermined once the policy cannot sample its way out of a state.
+    am = {}
+    for f in sorted(glob.glob(str(ROOT / "results/power/rho/argmax_det/argmax_rho*_s?.json"))):
+        rho = float(re.search(r"rho([\d.]+)_", pathlib.Path(f).stem).group(1))
+        for e in json.loads(pathlib.Path(f).read_text()):
+            am.setdefault(rho, []).append(e["paired"]["learned-greedy"]["delta"])
+    if am:
+        bottom.plot([at[r] for r in rhos if r in am],
+                    [np.mean(am[r]) for r in rhos if r in am], "^--",
+                    color=MYOPIC, lw=1.2, ms=4.5, zorder=3, label="argmax derivative")
+        bottom.legend(loc="upper left", frameon=False, fontsize=7.5)
     bottom.set_xlabel(r"answer rate $\rho$ the policy trained under")
     bottom.set_ylabel("paired difference\nlearned $-$ myopic")
     bottom.annotate("filled: ahead beyond 2 SE", xy=(0.52, 0.012), fontsize=7,
