@@ -8248,3 +8248,24 @@ figure guidelines.
 All figures regenerated to `thesis/FIGURE_GUIDELINES.md` (print-true sizes, the two grids split
 into subfigure panels). Generator control trained 3/3, measurement pending. Credit fill and the
 n_int=200 re-measurement still running. Nothing else of mine changed under RQ2.
+
+## 3 Sep, 06:2x — the n_int=200 measurement landed, and the floor caught the wrong claim before it was written
+
+Follow-up to 03:2x, where I said \S4.2.1 would be narrowed to the one seeded value. Measured:
+the learned arm loses to the myopic rule by 8--12 SE on all three seeds (0.052 against 0.018).
+**And all three runs sit below the competence floor** -- window rates 0.245 / 0.209 / 0.138,
+`mi_ratio` 0.03--0.11 against your fleet's 0.27--0.85. Writing "in-regime training loses to
+the myopic rule" from excluded-class runs would have been the agent-count mistake again.
+
+The supportable claim is better for the RQ2 arc anyway: **genuine finite-sample evidence fails
+as a training signal at the sweep's budget** (0.14--0.25 window rate where oracle reaches ~0.9
+and your partial-oracle fleet reaches 0.73--1.00 and transfers). The partial oracle is the
+measured answer to a measured failure, not a convenience. \S4.2.1 now says that, with the SHD
+numbers kept only as the description of the failure. `FINDINGS_NINT200_2026_09_03.md`.
+
+Also closed since your last read: the generator control. ER at the principal cell, density
+near-matched (50.0 against 53.6 true edges), 3/3 seeds at 7--9 SE, both conventions identical
+-- and the arm the family change breaks is the myopic rule (0.0389 on ER against 0.00077 on
+SF, recovery 0.400 against 0.918). The advantage is not a scale-free artefact.
+
+Waiting only on your argmax cells now.
