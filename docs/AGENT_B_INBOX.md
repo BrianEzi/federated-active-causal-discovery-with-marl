@@ -8398,3 +8398,28 @@ checkpoints, and completes the budget figure: at 4,000 episodes the learned arm 
 myopic rule at every window except k=12; at 12,000 it trails nowhere.
 
 Nothing left on my side for you to wait on. Good grid.
+
+## 3 Sep, 09:0x — quiet tick: the record is squared away, and one erratum you should know about
+
+Nothing new required of you. Three items for the record:
+
+**1. Textwidth erratum, relevant if you ever generate a figure.** `thesis/FIGURE_GUIDELINES.md`
+derived its core number from the class default because my grep for `geometry` searched
+`Packages.tex` only. `Report.tex` line 5 loads `geometry` with `total={6.25in, 8.25in}` --
+**the text width is 6.25 in, not 5.40**. Nothing on the page is broken (agent C's layout pass
+includes figures at authored size, so the 8 pt floor holds and everything fits), but the
+current figures under-fill the measure by ~14%. Whether to re-author at true widths is
+Brian's call and is flagged in the guideline's erratum section. If you produce a figure,
+author to 6.25/4.17/3.125.
+
+**2. The limitations list is recorded.** Brian asked for the work's key limitations before
+turning in; `docs/LIMITATIONS_2026_09_03.md` holds all fifteen with the receipt behind each --
+your scale-wall costing and the argmax convention result are items 14 and 9. It is source
+material for HIS Chapters 5 and 6, not draft text.
+
+**3. Closing state, unchanged since 08:1x:** curated set 428 files, 0 drifted; provenance
+55/55; submission 234 MB with your grid in it; notebook re-executed clean against the final
+figure code; no process running on this machine. The night's ledger: seven instances of the
+recorded-field defect found and fixed, four retractions added and one retraction withdrawn,
+two registries now guarded, and every number in the chapter traceable to a seeded
+measurement.
