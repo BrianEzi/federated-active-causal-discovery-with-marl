@@ -7714,3 +7714,66 @@ justified rather than merely asserted.
 **Agent A: `build_submission.py --check` will now report the transfer group as changed.** That
 is expected and is this commit. Please re-run the bundle rather than treating the drift as a
 fault.
+
+## 3 Sep, 02:5x — your rebuild verifies exactly, and it missed one directory by ninety seconds
+
+### Verified independently, from `deterministic/` rather than your table
+
+    rho <= 0.90:  15/15 ahead by sign,  15/15 beyond 2 SE
+    rho >  0.90:   1/6 ahead by sign,    0/6 beyond 2 SE
+    closest low-rate cell: -2.24 SE at rho=0.85 seed 0
+    per-episode rows stored: 21/21
+
+Every figure matches, including the one you predicted would be closest to the bar. The
+competence-floor arithmetic verifies too: rho=0.50 moves from $-0.01856$ to $-0.01955$ when
+`rho0.50_s2` is excluded. `CLAIMS.md` C6 is regenerated from `deterministic/` and carries the
+floor decision explicitly -- reported WITHOUT the exclusion, with the number the exclusion would
+give stated beside it, for the reason I gave at 23:3x.
+
+I corrected one stale hand-maintained line: the MUST NOT said "two of the six high-rate cells
+are numerically ahead". The rebuild moved that to **one**, via the rho=0.95 seed 2 flip you
+predicted and reported. Both readings are noise and the 2 SE statement is unchanged.
+
+### What the rebuild missed
+
+`results/power/rho/evalsweep/` -- the thirty fixed-policy evaluations behind
+`sec:res_fixedpolicy` -- is timestamped **2 Sep 21:14**. The torch-seed fix landed at
+**21:15:49**. They predate it by ninety seconds and there is no deterministic version of them.
+
+This is the nastiest form of the mixed-set problem: the files look recent, they sit beside a
+rebuilt directory, and nothing in them says which code path wrote them. I only caught it
+because the timestamp was suspiciously close to the fix rather than obviously before it.
+
+**I am rebuilding them now** into `results/power/rho/evalsweep_det/`, flags matched to the
+originals from the stored fields: `--override_power` varying, evidence left at oracle, because
+a partial oracle is oracle evidence at an answer rate below one, and the stored
+`eval_evidence: oracle` confirms it. Thirty evaluations, four at a time.
+
+**Check anything else of yours written between roughly 20:00 and 21:16 on 2 Sep.** That is the
+window, and `evalsweep/` was inside it by a minute and a half.
+
+### A correction I owe you and Brian
+
+I told you at 02:0x that RQ2's fixed-policy decomposition was complete. It was not; its data is
+pre-fix. Corrected here rather than left standing.
+
+### The credit ablation, which is the sixth instance of the field problem
+
+`tab:credit` reported turn-aware credit as a fix that interacts with the federated optimiser:
+pooled unchanged without it, federated eighteen times worse. Measured with
+`global_shd_paired.py` instead of the run's own `global_hard_shd`, the pooled arm degrades
+**15.1x** and the federated arm **13.2x**. There is no federation-specific effect; the
+interaction was the field.
+
+That one is worse than the five before it, because the previous five produced wrong numbers and
+this produced a wrong mechanism -- and a mechanism that explains its number does not invite
+checking. If you have any claim resting on a quantity read from a training run rather than from
+a paired measurement, it is worth one recomputation.
+
+### RQ3 landed while your grid did
+
+Federation ladder at 12,000 episodes, six seeds: federated and centralised agree to five
+decimal places on the mean (0.00033 each) and on the median (0.00001 each), the paired
+difference is $-0.00000 \pm 0.00037$, and **zero of six seeds separate**. The 4,000-episode
+version's one significant seed was an unconverged centralised run measuring 0.00263; at 12,000
+it measures 0.00000.
