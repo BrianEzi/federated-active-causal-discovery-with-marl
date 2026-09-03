@@ -8200,3 +8200,51 @@ indistinguishable on three seeds and I am not claiming monotonicity from four po
 
 Nine cells outstanding (0.80, 0.70, 0.50), due about 03:45. Section 1's argmax paragraph, which
 I wrote tonight from the two-rate control, will need a full rewrite around this.
+
+## 3 Sep, 05:2x — on the argmax reversal: hold two framings apart, and the in-regime diagonal landed with something for your 0.95 file
+
+### Your 02:35 entry, assessed
+
+The result is serious and the handling is the best entry of the night: prediction registered,
+refuted at eight SE, and the failure of the prediction diagnosed (a multiplicative model built
+on the one rate where the additive shift is half its value everywhere else). Nothing in the
+method to argue with. Two things to keep apart when the last eleven cells land:
+
+**1. What reverses is the derived policy, not the trained one.** PPO trains a stochastic
+policy; sampling at temperature one IS that policy, and argmax is a different policy read off
+its logits. So the honest structure of the claim is not "the advantage is fragile to a
+convention" but: *the trained policy beats the myopic rule at every rate below 0.95; its
+deterministic derivative keeps that advantage only at the lowest rates.* Both halves get
+stated; neither gets to stand for the other. `CLAIMS.md` C6 now carries a MUST NOT against any
+sentence presenting the mid-rate advantage as convention-independent, pending your grid.
+
+**2. Do not let the additive shift become the next single-anchor law.** Four rates at ~+0.025
+and one at +0.0125 is a pattern, and it is one data point away from the mistake it corrects.
+When 0.80/0.70/0.50 land, the additive model gets tested the same way the multiplicative one
+was; if it holds at all seven, that is a finding in its own right about what determinism costs.
+
+### The in-regime diagonal is measured, 21 of 21, and your 0.95 anomaly is back with evidence
+
+`results/power/rho/inregime_det/`: every policy in its own regime, `global_shd_paired.py`,
+seeded. Highlights, full table in `FINDINGS_INREGIME_DIAGONAL_2026_09_03.md` and C6a:
+
+* Your recorded-field in-regime numbers were the benign case: Pearson **+0.956** against the
+  measurement, because `best_update == final` on this grid. The correlations survive:
+  measured-vs-measured is Pearson +0.609 / Spearman +0.795.
+* **rho=0.95 is behind the myopic rule in its own regime on 3 of 3 seeds** (+0.00489, +0.00245,
+  +0.00500, each beyond 2 SE) -- the only rate with that property. You retracted the 0.95
+  anomaly for want of a mechanism and insisted it stay visible in the table. It is now three
+  measured quantities singling out the same rate: this, the window-rate dip, and your argmax
+  shift being largest around the high rates. Still no mechanism. But it has stopped being a
+  wobble.
+* The "~2.9x amplification" from the old panel 3 does not survive: measured, the ratio is
+  x10.2 / x5.2 / x2.7 at 0.80/0.70/0.50 and undefined mid-range. C6a forbids the single factor.
+
+The thesis now has `fig:inregime` beside the transfer curve, built from these files under the
+figure guidelines.
+
+### Status
+
+All figures regenerated to `thesis/FIGURE_GUIDELINES.md` (print-true sizes, the two grids split
+into subfigure panels). Generator control trained 3/3, measurement pending. Credit fill and the
+n_int=200 re-measurement still running. Nothing else of mine changed under RQ2.
