@@ -143,8 +143,11 @@ def fig_crossover(out: pathlib.Path):
     top.set_ylabel("joint recovery rate\nlearned $-$ myopic")
     _title(top, "The sign change belongs to the budget, not the window")
     top.legend(loc="lower right", frameon=False, fontsize=8)
-    top.annotate("no 4,000-episode runs\nexist at $k_v=20$ or $30$", xy=(19, -0.05),
-                 fontsize=7, color="#666666")
+    # The 4,000-episode POLICIES at k=20 and k=30 survived as u0249 checkpoints and their
+    # structural distance is in the budget figure; what was never recorded for them is the
+    # joint-recovery criterion this panel plots, so this line still stops at 12.
+    top.annotate("recovery unrecorded for the 4,000-episode\n$k_v=20$ and $30$ policies "
+                 "(SHD: budget figure)", xy=(15.5, -0.055), fontsize=8, color="#666666")
 
     for label, arm, colour in (("learned (selected)", "learned", LEARNED),
                                ("myopic", "greedy", MYOPIC),
@@ -631,49 +634,54 @@ def fig_answer_rate(out: pathlib.Path):
 
 
 def fig_credit(out: pathlib.Path):
-    """Turn-aware credit at k=8, measured. Two slopes that fall together.
+    """Turn-aware credit, measured, at both window sizes.
 
-    The recorded-field version of this result showed the pooled arm flat and the federated arm
-    falling 18x -- a federation-specific mechanism. Measured, both fall by an order of
-    magnitude, so the figure's job is to show two parallel slopes and per-seed spread, not an
-    interaction.
+    k=8: both optimisers degrade about an order of magnitude without the fix -- the
+    recorded-field version's federation-specific interaction does not exist. k=12: the pooled
+    cell sits at the floor in both states and is uninformative; the federated arm degrades,
+    one seed carrying it, as one seed carries every credit-off degradation measured. All runs
+    4,000 episodes; per-seed dots are the caveat drawn.
     """
-    cells = {}
-    for lbl, cell in (("pooled", "k08s50n04b150_pooled"), ("federated", "k08s50n04b150_E4")):
-        for state in ("credit", "nocredit"):
-            q = ROOT / f"results/credit/shd/{cell}_{state}.json"
-            if not q.exists():
-                print("!! credit measurement incomplete; skipping figure")
-                return
-            d = json.loads(q.read_text())
-            cells[(lbl, state)] = [e["means"]["learned"]["hard"] for e in d]
+    panels = [("$k_v=8$", "k08s50n04b150"), ("$k_v=12$", "k12s50n04b150")]
+    data = {}
+    for _, cell in panels:
+        for arm in ("pooled", "E4"):
+            for state in ("credit", "nocredit"):
+                q = ROOT / f"results/credit/shd/{cell}_{arm}_{state}.json"
+                if not q.exists():
+                    print("!! credit measurement incomplete; skipping figure")
+                    return
+                data[(cell, arm, state)] = [e["means"]["learned"]["hard"]
+                                            for e in json.loads(q.read_text())]
 
-    fig, ax = plt.subplots(figsize=(TWOTHIRD, 3.1))
-    floor = 5e-5
-    xs = {"credit": 0, "nocredit": 1}
-    for lbl, colour, dx in (("pooled", THIRD, -0.045), ("federated", LEARNED, 0.045)):
-        means = [np.mean(cells[(lbl, st)]) for st in ("credit", "nocredit")]
-        ax.plot([0 + dx, 1 + dx], means, "o-", color=colour, lw=1.7, ms=5.5,
-                label=lbl, zorder=4)
-        for st in ("credit", "nocredit"):
-            vals = cells[(lbl, st)]
-            ax.scatter([xs[st] + dx] * len(vals), [max(v, floor) for v in vals],
-                       s=14, color=colour, alpha=0.4, zorder=3)
-        ratio = means[1] / means[0]
-        ax.annotate(f"{ratio:.0f}$\\times$", xy=(1 + dx, means[1]), fontsize=8,
-                    color=colour, xytext=(8, -2), textcoords="offset points")
-    ax.set_yscale("log")
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(["turn-aware credit on", "credit off"])
-    ax.set_xlim(-0.35, 1.45)
-    ax.set_ylabel("SHD on committed marks")
-    _title(ax, "Removing turn-aware credit costs an order of magnitude\n"
-                 "under both optimisers", fontsize=9)
-    ax.legend(loc="lower right", frameon=False)
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.0), sharey=True)
+    floor = 3e-5
+    for ax, (title, cell) in zip(axes, panels):
+        for arm, label, colour, dx in (("pooled", "pooled", THIRD, -0.045),
+                                       ("E4", "federated", LEARNED, 0.045)):
+            means = [np.mean(data[(cell, arm, st)]) for st in ("credit", "nocredit")]
+            ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means], "o-", color=colour,
+                    lw=1.7, ms=5.5, label=label if cell.startswith("k08") else None, zorder=4)
+            for k_, st in enumerate(("credit", "nocredit")):
+                vals = data[(cell, arm, st)]
+                ax.scatter([k_ + dx] * len(vals), [max(v, floor) for v in vals],
+                           s=14, color=colour, alpha=0.4, zorder=3)
+            # Annotate the ratio only where BOTH states are off the floor: a saturated cell
+            # has no headroom, and a ratio of two floor values reads as a finding it is not.
+            if min(means) > 10 * floor:
+                ax.annotate(f"{means[1]/means[0]:.0f}$\\times$", xy=(1 + dx, means[1]),
+                            xytext=(7, -2), textcoords="offset points", fontsize=8,
+                            color=colour)
+        ax.set_yscale("log")
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels(["credit on", "credit off"])
+        ax.set_xlim(-0.35, 1.45)
+        ax.annotate(title, xy=(0.05, 0.92), xycoords="axes fraction", fontsize=9)
+    axes[0].set_ylabel("SHD on committed marks")
+    axes[0].legend(loc="lower right", frameon=False)
     fig.tight_layout()
     fig.savefig(out / "credit.pdf", bbox_inches="tight")
     plt.close(fig)
-
 
 
 def fig_fixedpolicy(out: pathlib.Path):

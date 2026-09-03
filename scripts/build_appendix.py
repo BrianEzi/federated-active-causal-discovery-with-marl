@@ -195,10 +195,14 @@ def appendix_checkpoint():
 # --- D: supporting ablations ----------------------------------------------------------------
 def appendix_ablations():
     body = []
-    for label, pat in (("Pooled, credit on", "k08s50n04b150_pooled_credit"),
-                       ("Pooled, credit off", "k08s50n04b150_pooled_nocredit"),
-                       ("Federated, credit on", "k08s50n04b150_E4_credit"),
-                       ("Federated, credit off", "k08s50n04b150_E4_nocredit")):
+    for label, pat in (("$k_v=8$, pooled, credit on", "k08s50n04b150_pooled_credit"),
+                       ("$k_v=8$, pooled, credit off", "k08s50n04b150_pooled_nocredit"),
+                       ("$k_v=8$, federated, credit on", "k08s50n04b150_E4_credit"),
+                       ("$k_v=8$, federated, credit off", "k08s50n04b150_E4_nocredit"),
+                       ("$k_v=12$, pooled, credit on", "k12s50n04b150_pooled_credit"),
+                       ("$k_v=12$, pooled, credit off", "k12s50n04b150_pooled_nocredit"),
+                       ("$k_v=12$, federated, credit on", "k12s50n04b150_E4_credit"),
+                       ("$k_v=12$, federated, credit off", "k12s50n04b150_E4_nocredit")):
         # MEASURED, not recorded. This read each run's own `global_hard_shd` until 3 Sep and
         # the two disagree enough to invert the comparison: recorded, the pooled arm looked
         # unaffected by removing credit (0.00137 against 0.00160); measured, it degrades 15x
@@ -213,9 +217,11 @@ def appendix_ablations():
         body.append(f"{label} & {len(v)} & {np.mean(v):.5f} & {per} \\\\")
 
     return ("\\chapter{Supporting Ablations} \\label{app:ablations}\n\n"
-            + tbl("Turn-aware credit assignment at $k_v=8$, three seeds per cell, measured "
-                  "over 200 paired episodes per seed at the selected checkpoint. Per-seed "
-                  "values are given because both credit-off cells are carried by one seed.",
+            + tbl("Turn-aware credit assignment at both window sizes, three seeds per cell, "
+                  "4,000-episode runs, measured over 200 paired episodes per seed at the "
+                  "selected checkpoint. Per-seed values are given because every credit-off "
+                  "degradation is carried by one seed. The $k_v=12$ pooled pair sits at the "
+                  "floor in both states and supports no ratio in either direction.",
                   "tab:credit", "lccl",
                   r"Configuration & Seeds & SHD & Per seed \\", body))
 
@@ -433,6 +439,16 @@ def appendix_attribution():
           "past the sizes the chapter reports: 21, 33 and 27 correct attributions at $k_v = 30$,\n"
           "$40$ and $50$ over 30 episodes each, with no incorrect attribution and no contradiction\n"
           "raised at any size.\n\n"
+          "\\paragraph{Sensitivity to the interventional scale.} The moved-pair detector\n"
+          "responds to a change in association, and under the randomised mode that change is a\n"
+          "variance contrast: detection measured against the scale is V-shaped -- 63\\% at\n"
+          "$\\sigma_{\\text{int}}=0.5$, 22\\% at $1.0$ (the natural scale, the uninformative\n"
+          "case), 92.5\\% at the reported $2.0$ -- while the atomic mode detects 90.5\\% at any\n"
+          "scale, for the structural reason that the association vanishes. Every attribution\n"
+          "figure in this appendix therefore carries $\\sigma_{\\text{int}}^2 = 4.0$ as a\n"
+          "condition, per the constraint stated in \\S\\ref{sec:meth_interventions}, and the\n"
+          "atomic mode reaching the same signal structurally is part of the future-work case\n"
+          "rather than a defect in these results.\n\n"
           "\\paragraph{What is not established.} Nothing here says what a policy trained to\n"
           "attribute would achieve, because none was trained. The comparison that would answer it\n"
           "requires an attribution term in the reward and an owner channel in the observation,\n"
