@@ -34,7 +34,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 # figure is authored at FULL, TWOTHIRD or HALF and included at 1.0, 0.667 or 0.5 \textwidth
 # with no scaling. Fonts below are therefore rendered sizes: 9 pt labels, 8 pt ticks, nothing
 # under 8 pt on the page. Grids wider than FULL do not exist; they are split into subfigure
-# panels (sweep_grid_[abcd].pdf, federation_[ab].pdf).
+# panels (sweep_grid_[abcd].pdf; ladder.pdf + coordination.pdf).
 FULL, TWOTHIRD, HALF = 5.40, 3.60, 2.70
 
 # In-figure titles are off: the caption carries the message, per standard practice and rule 7
@@ -325,11 +325,12 @@ def fig_attribution_law(out: pathlib.Path):
 
 
 def fig_federation(out: pathlib.Path):
-    """RQ3, split per FIGURE_GUIDELINES.md rule 4 into two print-true subfigure panels.
+    """RQ3, one figure per subsection so each graph sits under the heading it answers.
 
-    (a) coordination strategies at both cells, authored FULL; (b) the six-seed paired
-    comparison on the primary metric, authored HALF. The old 9.6-inch three-panel version
-    printed its text at 5.0 pt.
+    ladder.pdf       (4.3.1) federated against pooled only: joint recovery at both cells,
+                     and the six-seed paired panel on the primary metric.
+    coordination.pdf (4.3.2) the myopic coordination comparison: random, fixed partition,
+                     uncoordinated. No learned arm -- that comparison is 4.3.1's.
     """
     def arm(pattern, key):
         vals = []
@@ -339,74 +340,82 @@ def fig_federation(out: pathlib.Path):
                 vals.append(arms[key]["success"])
         return vals
 
-    # BUDGETS DIFFER BETWEEN THESE ROWS AND THE FIGURE SAYS SO. The k=12 ladder is the
-    # 12,000-episode retrain set once all twelve exist; the k=20 ladder was always at 12,000.
     twelve = sorted((ROOT / "results/central12k").glob("v2_k12_?_s?.json"))
     k12 = ("results/central12k/v2_k12_{a}_s?.json" if len(twelve) >= 12
            else "results/central/v2_k12_{a}_s*.json")
     cells = [("$k_v=12$", k12), ("$k_v=20$", "results/central/v2_k20_{a}_s*.json")]
-    series = [("random", "random_vary", RANDOM),
-              ("myopic, fixed partition", "greedy_partitioned", THIRD),
-              ("myopic, uncoordinated", "greedy_uncertainty", MYOPIC),
-              ("learned (federated)", "learned", LEARNED)]
 
-    # (a) coordination strategies.
-    fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.2), sharey=True)
-    for ax, (title, pattern) in zip(axes, cells):
-        for index, (label, key, colour) in enumerate(series):
-            vals = arm(pattern.format(a="A"), key)
-            if not vals:
-                continue
-            ax.bar(index, np.mean(vals), 0.62, color=colour, alpha=0.85, zorder=2)
-            ax.scatter([index] * len(vals), vals, s=13, color="black", alpha=0.55, zorder=4)
-        central = arm(pattern.format(a="E"), "learned")
-        if central:
-            ax.bar(len(series), np.mean(central), 0.62, color=LEARNED, alpha=0.4,
-                   hatch="//", edgecolor=LEARNED, zorder=2)
-            ax.scatter([len(series)] * len(central), central, s=13, color="black",
-                       alpha=0.55, zorder=4)
-        ax.set_xticks(range(len(series) + 1))
-        ax.set_xticklabels([s_[0] for s_ in series] + ["learned (pooled)"],
-                           rotation=32, ha="right", fontsize=8)
-        _title(ax, title)
-        ax.annotate(title, xy=(0.04, 0.92), xycoords="axes fraction", fontsize=9)
-        ax.set_ylim(0, 1.05)
-    axes[0].set_ylabel(r"joint recovery rate ($\uparrow$)")
-    fig.tight_layout()
-    fig.savefig(out / "federation_a.pdf", bbox_inches="tight")
-    plt.close(fig)
-
-    # (b) the six-seed paired panel, from the measured 12,000-episode ladder.
+    # ---- 4.3.1: the ladder ----
     lad = {}
     for k in ("A_best", "E_best"):
         q = ROOT / f"results/rerows/ladder12k_{k}.json"
         if q.exists():
             lad[k] = {r["seed"]: r for r in json.loads(q.read_text())}
-    if len(lad) != 2:
-        print("!! ladder measurements absent; federation_b skipped")
-        return
-    fig, ax3 = plt.subplots(figsize=(HALF, 2.9))
-    seeds = sorted(lad["A_best"])
-    ds, ses = [], []
-    for sd in seeds:
-        x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
-        y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
-        d = x - y
-        ds.append(d.mean())
-        ses.append(d.std(ddof=1) / np.sqrt(len(d)))
-    ax3.axhline(0, color="black", lw=0.8, zorder=1)
-    ax3.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
-                 ms=4.5, lw=1.1, capsize=2.5, zorder=3)
-    lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.3
-    ax3.set_ylim(-lim, lim)
-    ax3.set_xticks(seeds)
-    ax3.set_xlabel("seed")
-    ax3.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ pooled", fontsize=8)
-    ax3.annotate("above 0: centralising wins", xy=(0.04, 0.92), xycoords="axes fraction",
-                 fontsize=8, color="#666666")
+    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9),
+                                      gridspec_kw={"width_ratios": [1.0, 1.15]})
+    for gi, (title, pattern) in enumerate(cells):
+        fed, pool = arm(pattern.format(a="A"), "learned"), arm(pattern.format(a="E"), "learned")
+        for off, vals, hatch, alpha in ((0.0, fed, None, 0.85), (0.4, pool, "//", 0.4)):
+            if not vals:
+                continue
+            left.bar(gi + off, np.mean(vals), 0.36, color=LEARNED, alpha=alpha,
+                     hatch=hatch, edgecolor=LEARNED, zorder=2)
+            left.scatter([gi + off] * len(vals), vals, s=13, color="black", alpha=0.55,
+                         zorder=4)
+    left.set_xticks([0, 0.4, 1, 1.4])
+    left.set_xticklabels(["federated", "pooled", "federated", "pooled"],
+                         rotation=28, ha="right", fontsize=8)
+    for gi, (title, _p) in enumerate(cells):
+        left.annotate(title, xy=(gi + 0.2, 0.06), ha="center", fontsize=9)
+    left.set_ylim(0, 1.05)
+    left.set_ylabel(r"joint recovery rate ($\uparrow$)")
+
+    if len(lad) == 2:
+        seeds = sorted(lad["A_best"])
+        ds, ses = [], []
+        for sd in seeds:
+            x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
+            y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
+            d = x - y
+            ds.append(d.mean())
+            ses.append(d.std(ddof=1) / np.sqrt(len(d)))
+        right.axhline(0, color="black", lw=0.8, zorder=1)
+        right.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
+                       ms=4.5, lw=1.1, capsize=2.5, zorder=3)
+        lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.3
+        right.set_ylim(-lim, lim)
+        right.set_xticks(seeds)
+        right.set_xlabel("seed")
+        right.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ pooled",
+                         fontsize=8)
+        right.annotate("above 0: pooling wins", xy=(0.04, 0.92), xycoords="axes fraction",
+                       fontsize=8, color="#666666")
     fig.tight_layout()
-    fig.savefig(out / "federation_b.pdf", bbox_inches="tight")
+    fig.savefig(out / "ladder.pdf", bbox_inches="tight")
     plt.close(fig)
+    print("  wrote ladder.pdf")
+
+    # ---- 4.3.2: coordination without communication ----
+    series = [("random", "random_vary", RANDOM),
+              ("myopic,\nfixed partition", "greedy_partitioned", THIRD),
+              ("myopic,\nuncoordinated", "greedy_uncertainty", MYOPIC)]
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.8), sharey=True)
+    for ax, (title, pattern) in zip(axes, cells):
+        for index, (label, key, colour) in enumerate(series):
+            vals = arm(pattern.format(a="A"), key)
+            if not vals:
+                continue
+            ax.bar(index, np.mean(vals), 0.6, color=colour, alpha=0.85, zorder=2)
+            ax.scatter([index] * len(vals), vals, s=13, color="black", alpha=0.55, zorder=4)
+        ax.set_xticks(range(len(series)))
+        ax.set_xticklabels([s_[0] for s_ in series], fontsize=8, rotation=15, ha="center")
+        ax.annotate(title, xy=(0.05, 0.92), xycoords="axes fraction", fontsize=9)
+        ax.set_ylim(0, 1.05)
+    axes[0].set_ylabel(r"joint recovery rate ($\uparrow$)")
+    fig.tight_layout()
+    fig.savefig(out / "coordination.pdf", bbox_inches="tight")
+    plt.close(fig)
+    print("  wrote coordination.pdf")
 
 
 # ---------------------------------------------------------------------------------------
@@ -896,7 +905,7 @@ def main(argv=None) -> int:
     for name, fn in (("sweep_grid_[abcd]", fig_sweep_grid),
                      ("window_budget", fig_window_budget), ("nint", fig_nint),
                      ("attribution_law", fig_attribution_law),
-                     ("federation_[ab]", fig_federation),
+                     ("ladder+coordination", fig_federation),
                      ("answer_rate", fig_answer_rate),
                      ("credit", fig_credit),
                      ("fixedpolicy", fig_fixedpolicy),
