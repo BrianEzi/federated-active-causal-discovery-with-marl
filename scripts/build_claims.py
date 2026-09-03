@@ -356,11 +356,52 @@ else:
         "every rate by construction: the baseline arms are the same per-episode vectors reused",
         "across rates, which is an exact pairing and a check that the comparison did not move.",
         "**MUST NOT** say \"no high-rate cell beats the myopic rule\" without the 2 SE",
-        "qualifier. Two of the six high-rate cells are numerically ahead and both are inside",
-        "noise; the claim is about significance, not sign, and an earlier draft of the findings",
-        "note blurred the two.",
-        "**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`. The",
-        "pre-fix grid was scored without a seeded torch RNG and is not reproducible.", ""]
+        "qualifier. ONE of the six high-rate cells is numerically ahead and it is inside noise;",
+        "the claim is about significance, not sign, and an earlier draft of the findings note",
+        "blurred the two. (That count was TWO on the pre-fix grid. The deterministic rebuild",
+        "moved rho=0.95 seed 2 from -0.29 SE to +0.74 SE. Both readings are noise and the",
+        "2 SE statement is unchanged, which is the point of stating it at 2 SE.)",
+        "**MUST NOT** apply the competence floor to this grid without saying so. One cell,",
+        "`rho0.50_s2`, falls below the 0.70 window-rate floor that excludes runs from the",
+        "four-axis sweep. Excluding it STRENGTHENS the result, moving rho=0.50 from -0.01856",
+        "to -0.01955, which is why the headline is reported WITHOUT the exclusion: a selection",
+        "rule that improves the number it is applied to is the one to be most reluctant about.",
+        "State the floor value and the choice; do not quietly take the better number.",
+        "**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`,",
+        "`inregime_det/` or `evalsweep_det/`. The pre-fix copies are not reproducible (the",
+        "argmax/ directory is the one exception -- argmax never draws from the generator).",
+        "**ARGMAX GRID PENDING (3 Sep 02:35).** Under argmax the mid-rate advantage REVERSES:",
+        "rho=0.90 and 0.85 lose to the myopic rule at 3-6 SE per seed on the cells so far.",
+        "**MUST NOT** write any sentence in 4.2 presenting the mid-rate advantage as",
+        "convention-independent, and MUST NOT finalise the boundary until agent B's full",
+        "argmax grid lands. The sampled convention is the policy PPO trained -- argmax is a",
+        "derived policy -- and that is the defensible framing, stated rather than assumed.", ""]
+
+# --- RQ2: the in-regime diagonal, measured --------------------------------------------------
+inr = sorted((ROOT / "results/power/rho/inregime_det").glob("rho*_s?.json"))
+if len(inr) == 21:
+    import re as _re
+    vals = {}
+    for q in inr:
+        m = _re.search(r"rho([\d.]+)_s(\d)", q.stem)
+        e = json.loads(q.read_text())[0]
+        vals.setdefault(float(m.group(1)), []).append(e["paired"]["learned-greedy"])
+    out += ["### C6a — the same policies in their own regimes", "",
+            "| $\\rho$ | in-regime $\\Delta$ | seeds beyond 2 SE |", "|---|---|---|"]
+    for rho in sorted(vals, reverse=True):
+        v = vals[rho]
+        worse = sum(1 for x in v if x["significant"] and x["delta"] > 0)
+        better = sum(1 for x in v if x["significant"] and x["delta"] < 0)
+        tag = f"{better} better, {worse} worse" if (worse or better) else "none"
+        out.append(f"| {rho:g} | {np.mean([x['delta'] for x in v]):+.5f} | {tag} |")
+    out += ["",
+            "Measured with `global_shd_paired.py` in each policy's own regime (21/21 cells,",
+            "`inregime_det/`). Against measured transfer: Pearson +0.609, Spearman +0.795.",
+            "**MUST NOT** quote a single amplification factor between in-regime and transfer:",
+            "measured, it runs x10.2 at rho=0.80, x5.2 at 0.70, x2.7 at 0.50 and is undefined",
+            "at the mid rates where the in-regime delta is inside noise.",
+            "**MAY** state that rho=0.95 is behind the myopic rule in its own regime on 3 of 3",
+            "seeds -- the only rate with that property -- with no mechanism offered.", ""]
 
 path = TR / "CLAIMS.md"
 path.write_text("\n".join(out))

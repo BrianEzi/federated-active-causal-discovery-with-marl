@@ -191,5 +191,32 @@ four-axis sweep. Excluding it STRENGTHENS the result, moving rho=0.50 from -0.01
 to -0.01955, which is why the headline is reported WITHOUT the exclusion: a selection
 rule that improves the number it is applied to is the one to be most reluctant about.
 State the floor value and the choice; do not quietly take the better number.
-**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`. The
-pre-fix grid was scored without a seeded torch RNG and is not reproducible.
+**MUST NOT** quote any number from `results/power/rho/` outside `deterministic/`,
+`inregime_det/` or `evalsweep_det/`. The pre-fix copies are not reproducible (the
+argmax/ directory is the one exception -- argmax never draws from the generator).
+**ARGMAX GRID PENDING (3 Sep 02:35).** Under argmax the mid-rate advantage REVERSES:
+rho=0.90 and 0.85 lose to the myopic rule at 3-6 SE per seed on the cells so far.
+**MUST NOT** write any sentence in 4.2 presenting the mid-rate advantage as
+convention-independent, and MUST NOT finalise the boundary until agent B's full
+argmax grid lands. The sampled convention is the policy PPO trained -- argmax is a
+derived policy -- and that is the defensible framing, stated rather than assumed.
+
+### C6a — the same policies in their own regimes
+
+| $\rho$ | in-regime $\Delta$ | seeds beyond 2 SE |
+|---|---|---|
+| 1 | -0.00021 | none |
+| 0.95 | +0.00411 | 0 better, 3 worse |
+| 0.9 | +0.00005 | none |
+| 0.85 | +0.00009 | 1 better, 1 worse |
+| 0.8 | -0.00129 | 2 better, 0 worse |
+| 0.7 | -0.00340 | 3 better, 0 worse |
+| 0.5 | -0.00686 | 3 better, 0 worse |
+
+Measured with `global_shd_paired.py` in each policy's own regime (21/21 cells,
+`inregime_det/`). Against measured transfer: Pearson +0.609, Spearman +0.795.
+**MUST NOT** quote a single amplification factor between in-regime and transfer:
+measured, it runs x10.2 at rho=0.80, x5.2 at 0.70, x2.7 at 0.50 and is undefined
+at the mid rates where the in-regime delta is inside noise.
+**MAY** state that rho=0.95 is behind the myopic rule in its own regime on 3 of 3
+seeds -- the only rate with that property -- with no mechanism offered.

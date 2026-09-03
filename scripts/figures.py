@@ -719,6 +719,63 @@ def fig_fixedpolicy(out: pathlib.Path):
     plt.close(fig)
 
 
+
+def fig_inregime(out: pathlib.Path):
+    """The answer-rate grid read a second way: the same policies in their own regimes.
+
+    Left: the in-regime paired delta by rate -- the cost or gain of the dial where the policy
+    actually lives. Right: measured in-regime against measured transfer, one point per cell.
+    Both axes are global_shd_paired.py output (results/power/rho/inregime_det/ and
+    deterministic/); the recorded-field version of this comparison is superseded.
+    """
+    inreg, xfer = {}, {}
+    for f in sorted(glob.glob(str(ROOT / "results/power/rho/inregime_det/rho*_s?.json"))):
+        m = re.search(r"rho([\d.]+)_s(\d)", pathlib.Path(f).stem)
+        e = json.loads(pathlib.Path(f).read_text())[0]
+        inreg[(float(m.group(1)), int(m.group(2)))] = e["paired"]["learned-greedy"]["delta"]
+    for f in sorted(glob.glob(str(ROOT / "results/power/rho/deterministic/xfer_rho*_s?.json"))):
+        m = re.search(r"rho([\d.]+)_s(\d)", pathlib.Path(f).stem)
+        e = json.loads(pathlib.Path(f).read_text())[0]
+        xfer[(float(m.group(1)), int(m.group(2)))] = e["paired"]["learned-greedy"]["delta"]
+    if not inreg or not xfer:
+        print("!! in-regime or transfer measurements absent; skipping")
+        return
+    rhos = sorted({k[0] for k in inreg})
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9),
+                                      gridspec_kw={"width_ratios": [1.15, 1]})
+    left.axhline(0, color="black", lw=0.8, zorder=1)
+    means = [np.mean([inreg[(r, s_)] for s_ in (0, 1, 2)]) for r in rhos]
+    for r in rhos:
+        left.scatter([r] * 3, [inreg[(r, s_)] for s_ in (0, 1, 2)], s=13, color=LEARNED,
+                     alpha=0.4, zorder=3)
+    left.plot(rhos, means, "o-", color=LEARNED, lw=1.7, ms=4.5, zorder=4)
+    # Ticks at every rate, labels on alternate ones: the axis stays linear in rho (the
+    # truthful shape) without the 0.80-1.00 labels overprinting at panel width.
+    left.set_xticks(rhos)
+    left.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else "" for r in rhos])
+    left.set_xlabel(r"answer rate $\rho$")
+    left.set_ylabel("in-regime SHD, learned $-$ myopic", fontsize=8)
+    left.annotate(r"$\rho=0.95$: worse in-regime" + "\non 3 of 3 seeds",
+                  xy=(0.95, 0.0041), xytext=(0.62, 0.0035), fontsize=8, color="#666666",
+                  arrowprops=dict(arrowstyle="->", color="#666666", lw=0.7))
+
+    right.axhline(0, color="black", lw=0.7, zorder=1)
+    right.axvline(0, color="black", lw=0.7, zorder=1)
+    for r in rhos:
+        for s_ in (0, 1, 2):
+            if (r, s_) in xfer:
+                right.scatter(inreg[(r, s_)], xfer[(r, s_)], s=16, color=LEARNED,
+                              alpha=0.55, zorder=3)
+    right.set_xlabel("in-regime delta", fontsize=8)
+    right.set_ylabel("transfer delta", fontsize=8)
+    right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.08),
+                   xycoords="axes fraction", fontsize=8, color="#666666")
+    fig.tight_layout()
+    fig.savefig(out / "inregime.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -734,7 +791,8 @@ def main(argv=None) -> int:
                      ("pair_class", fig_pair_class),
                      ("answer_rate", fig_answer_rate),
                      ("credit", fig_credit),
-                     ("fixedpolicy", fig_fixedpolicy)):
+                     ("fixedpolicy", fig_fixedpolicy),
+                     ("inregime", fig_inregime)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")
