@@ -523,9 +523,13 @@ def main() -> int:
     parts.append("")
     parts.append(appendix_attribution())
     parts.append("")
-    # One diagnostics chapter, five short sections: Brian capped the appendix count at four
-    # (Results Tables, Attribution, this, Negative Results) and asked for brief.
+    # One diagnostics chapter, six short sections: Brian capped the appendix count at four
+    # (Results Tables, Attribution, this, Negative Results) and asked for brief. Auxiliary
+    # Metrics.tex is hand-maintained (metrics moved out of the methodology, 4 Sep) and opens
+    # the chapter because the excluded-runs section gates on the per-window rate it defines.
     parts.append("\\chapter{Training Diagnostics and Ablations} \\label{app:diagnostics}\n")
+    parts.append((ROOT / "thesis/Auxiliary Metrics.tex").read_text())
+    parts.append("")
     for fn in (appendix_excluded, appendix_budget, appendix_checkpoint,
                appendix_ablations, appendix_mode):
         parts.append(fn())
