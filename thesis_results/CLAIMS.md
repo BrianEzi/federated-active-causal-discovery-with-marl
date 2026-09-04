@@ -153,8 +153,9 @@ the federated arm and is inert for the pooled one, which is a checkpoint result.
 
 ## C9 — The learned policy is not a dithered myopic rule
 
-* k12: recovery myopic 0.918, eps-greedy best-eps 0.955, learned 0.985 (every learned seed above its cell's best eps-greedy seed at k30)
-* k30: recovery myopic 0.843, eps-greedy best-eps 0.877, learned 0.968 (every learned seed above its cell's best eps-greedy seed at k30)
+* k12: recovery myopic 0.918, eps-greedy best-eps 0.955, learned 0.985
+* k30: recovery myopic 0.843, eps-greedy best-eps 0.877, learned 0.968
+* at k30 every learned seed sits above its cell's best eps-greedy seed
 
 Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per
 seed quoted -- the selection favours the control and is stated wherever quoted.

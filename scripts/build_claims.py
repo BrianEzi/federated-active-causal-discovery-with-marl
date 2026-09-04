@@ -318,8 +318,8 @@ if len(EPS) == 2:
             if sc > best.get(e["seed"], 0.0):
                 best[e["seed"]] = sc
         out += [f"* {cell}: recovery myopic {np.mean(g):.3f}, eps-greedy best-eps "
-                f"{np.mean(list(best.values())):.3f}, learned {np.mean(l):.3f} "
-                f"(every learned seed above its cell's best eps-greedy seed at k30)"]
+                f"{np.mean(list(best.values())):.3f}, learned {np.mean(l):.3f}"]
+    out += ["* at k30 every learned seed sits above its cell's best eps-greedy seed"]
     out += ["",
             "Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per",
             "seed quoted -- the selection favours the control and is stated wherever quoted.",
