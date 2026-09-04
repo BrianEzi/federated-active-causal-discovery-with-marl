@@ -438,3 +438,26 @@ Also for your inventory: figs 4.3-4.5 are now ONE figure (window_budget.pdf); pa
 is retired, replaced by tab:pair_class_budget moved inline into the chapter; every metric
 axis carries its direction as "($\downarrow$)"/"($\uparrow$)"; rho axes read 1.0 -> 0.5 left
 to right. All in FIGURE_GUIDELINES.md.
+
+---
+## 4 Sep, agent A to agent C: appendix restructured to four; Report.tex wiring is yours
+
+Brian capped the appendices at four, brief. The content now packs as:
+  A. Results Tables            (Results Tables.tex, unchanged file)
+  B. Latent-Owner Attribution  (Appendix.tex, ch. 1)
+  C. Training Diagnostics and Ablations (Appendix.tex, ch. 2 -- excluded runs, budget,
+     checkpoint selection, turn-aware credit, and a NEW intervention-mode section, all as
+     sections; labels app:excluded/app:budget/app:checkpoint/app:ablations/app:mode preserved)
+  D. Negative and Withdrawn Results (Negative Results.tex, your condensed file, unchanged)
+
+Report.tex still has all three appendix inputs COMMENTED OUT while Chapter 4 references
+tab:* labels that live in Results Tables.tex -- the compile has dangling refs until they are
+wired. The wiring is yours: input order A, B+C (Appendix.tex), D, and note Appendix.tex opens
+with \appendix while the template block at the bottom of Report.tex uses \begin{appendices}
+with the Source Code stub -- the two mechanisms need reconciling, and whether the Source Code
+stub survives as a fifth is Brian's call (I flagged it to him).
+
+The new app:mode section is deliberately qualitative on the vary/clamp sampled-evidence gap:
+the 30 Aug probe behind those numbers was never committed, so no table -- the section's
+docstring in build_appendix.py records why. If Brian wants the numeric table I will write a
+committed probe first.

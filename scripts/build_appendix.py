@@ -59,7 +59,7 @@ def appendix_excluded():
     body = [f"\\texttt{{{c.replace('_', chr(92) + '_')}}} & {s} & {w4:.3f} & {l4:.3f} & "
             f"{f'{w12:.3f} & {l12:.3f}' if w12 is not None else '--- & ---'} & {g:.3f} \\\\"
             for c, s, w4, l4, w12, l12, g in rows]
-    return ("\\chapter{Excluded Runs} \\label{app:excluded}\n\n"
+    return ("\\section{Excluded Runs} \\label{app:excluded}\n\n"
             "Every run falling below the competence floor of \\S\\ref{sec:meth_gate}, with what\n"
             "the same configuration reaches at $12{,}000$ episodes. The retrained runs appear in\n"
             "no sweep table; they are reported here and in Appendix~\\ref{app:budget}.\n\n"
@@ -139,7 +139,7 @@ def appendix_budget():
         eight_tbl = ("\\textbf{PENDING.} The 8{,}000-episode comparison is measuring. Do not "
                      "write this paragraph until it lands.\n")
 
-    return ("\\chapter{Training Budget and Convergence} \\label{app:budget}\n\n"
+    return ("\\section{Training Budget and Convergence} \\label{app:budget}\n\n"
             "The sweep trains every cell for $4{,}000$ episodes. Three of the four structural\n"
             "claims in Chapter~\\ref{Chap4} were artefacts of that budget applied across cells of\n"
             "unequal difficulty, so that the apparent effect of a swept parameter was partly the\n"
@@ -175,7 +175,7 @@ def appendix_checkpoint():
             am.append(f"\\texttt{{{cell}}} & {a['seed']} & "
                       f"{s['means']['learned']['hard']:.5f} & "
                       f"{a['means']['learned']['hard']:.5f} \\\\")
-    return ("\\chapter{Checkpoint Selection} \\label{app:checkpoint}\n\n"
+    return ("\\section{Checkpoint Selection} \\label{app:checkpoint}\n\n"
             "At $12{,}000$ episodes neither checkpoint convention is safe alone. Selection on\n"
             "mutual information occasionally retains an exploratory policy; the final update\n"
             "occasionally retains a drifted one. The two fail on different cells, which is why\n"
@@ -216,7 +216,7 @@ def appendix_ablations():
         per = ", ".join(f"{x:.5f}" for x in v)
         body.append(f"{label} & {len(v)} & {np.mean(v):.5f} & {per} \\\\")
 
-    return ("\\chapter{Supporting Ablations} \\label{app:ablations}\n\n"
+    return ("\\section{Turn-Aware Credit} \\label{app:ablations}\n\n"
             + tbl("Turn-aware credit assignment at both window sizes, three seeds per cell, "
                   "4,000-episode runs, measured over 200 paired episodes per seed at the "
                   "selected checkpoint. Per-seed values are given because every credit-off "
@@ -224,6 +224,51 @@ def appendix_ablations():
                   "floor in both states and supports no ratio in either direction.",
                   "tab:credit", "lccl",
                   r"Configuration & Seeds & SHD & Per seed \\", body))
+
+
+
+def appendix_mode():
+    """The intervention-mode ablation, consolidated. Qualitative on the sampled-evidence gap
+    BY DESIGN: the 30 Aug probe that measured the vary/clamp table (soft-SHD ratios 3.3-5.5x,
+    flat from n_int=20 to 1,000) was never committed, and this thesis does not print a table
+    whose numbers cannot be regenerated -- docs/FINDINGS_CLAMP_2026_08_30.md records both the
+    measurements and that lesson. The mechanism statements below are code properties and are
+    cited as such; the V-curve numbers ship in the attribution appendix with their own source.
+    """
+    return (
+        "\\section{Intervention Mode: Randomised Against Atomic} \\label{app:mode}\n\n"
+        "Both intervention modes of \\S\\ref{sec:meth_interventions} are implemented; every "
+        "sweep run restricts the action space to the randomised mode. Three grounds, "
+        "consolidated from \\S\\ref{sec:meth_regimes}, and one limitation.\n\n"
+        "\\paragraph{Under oracle evidence the choice is inert.} The belief update is a "
+        "function of the intervened set and the true graph; the mode is not an argument to "
+        "it, and identical seeds return identical results to every reported digit whichever "
+        "mode acts. The ablation is therefore undefined in the regime the sweep reports.\n\n"
+        "\\paragraph{Under sampled evidence the atomic mode is structurally weaker for edge "
+        "discovery, and the gap is not statistical.} A node held at a constant has zero "
+        "variance and no detectable association with its descendants at any sample size, and "
+        "the ancestry channel of \\S\\ref{sec:meth_regimes} is built on exactly that "
+        "association. The measured gap between the modes does not close between "
+        "$n_{\\text{int}} = 20$ and $1{,}000$: fifty times the data, an unchanged deficit, "
+        "which rules out the power explanation once given for it.\n\n"
+        "\\paragraph{The one channel the atomic mode wins is one this backend cannot read.} "
+        "Setting a confounder to a constant is the only move that cuts a confounding path; a "
+        "randomised intervention leaves the node an active variance source. The factored "
+        "backend builds its belief entirely from the ancestry channel, so the advantage is "
+        "unreachable by construction. That is a limitation of the backend rather than a fact "
+        "about the problem, and a belief that consumed both channels would have a strictly "
+        "larger effective action repertoire; it is future work rather than an ablation this "
+        "design can run.\n\n"
+        "\\paragraph{The randomised mode's detection signal is a variance contrast, and its "
+        "strength is a design choice.} The moved-pair detector behind "
+        "Appendix~\\ref{app:attribution} responds to a change in correlation, which the "
+        "randomised mode produces only insofar as the interventional scale differs from the "
+        "natural one: detection falls to its minimum exactly where the two coincide and "
+        "recovers on both sides, the V-curve reported there. The interventional scale must "
+        "therefore sit outside the natural noise range -- the constraint, and the "
+        "identifiability argument behind it, are stated with the intervention design in "
+        "\\S\\ref{sec:meth_interventions}.\n"
+    )
 
 
 MACHINERY = r"""
@@ -470,8 +515,13 @@ def main() -> int:
     parts = [r"\appendix", "",
              "% Generated by scripts/build_appendix.py. Do not edit tables by hand.",
              ""]
-    for fn in (appendix_excluded, appendix_attribution, appendix_budget, appendix_checkpoint,
-               appendix_ablations):
+    parts.append(appendix_attribution())
+    parts.append("")
+    # One diagnostics chapter, five short sections: Brian capped the appendix count at four
+    # (Results Tables, Attribution, this, Negative Results) and asked for brief.
+    parts.append("\\chapter{Training Diagnostics and Ablations} \\label{app:diagnostics}\n")
+    for fn in (appendix_excluded, appendix_budget, appendix_checkpoint,
+               appendix_ablations, appendix_mode):
         parts.append(fn())
         parts.append("")
     out.write_text("\n".join(parts))
