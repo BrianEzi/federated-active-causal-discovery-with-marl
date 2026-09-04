@@ -195,6 +195,15 @@ def fig_window_budget(out: pathlib.Path):
         top.scatter([k] * len(vals), vals, s=12, color=MYOPIC, alpha=0.4, zorder=2)
         my_rec.append(np.mean(vals))
     top.plot(KS, my_rec, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
+    # The random anchor (Brian, 4 Sep: every absolute-performance plot carries it). Random
+    # reads no belief, so its number is identical at either training budget: one line.
+    rd_rec = []
+    for k in KS:
+        paths = sorted(glob.glob(str(ROOT / f"results/sweep/oracle/k{k:02d}s50n04b150_s*.json")))
+        vals = [json.loads(pathlib.Path(q).read_text())["arms"]["random_vary"]["success"]
+                for q in paths]
+        rd_rec.append(np.mean(vals))
+    top.plot(KS, rd_rec, "-", color=RANDOM, lw=1.2, label="random", zorder=1)
     top.set_ylabel(r"joint recovery rate ($\uparrow$)")
     top.set_ylim(0, 1.02)
     top.legend(loc="lower left", frameon=False)
@@ -219,13 +228,18 @@ def fig_window_budget(out: pathlib.Path):
                  lw=1.6, ms=5, label=label, zorder=4)
     my_shd = [np.mean([r["means"]["greedy"]["hard"] for r in _ckpt(k, "best")]) for k in KS]
     bot.plot(KS, my_shd, "-", color=MYOPIC, lw=1.4, label="myopic", zorder=2)
+    rd_shd = [np.mean([r["means"]["random_vary"]["hard"] for r in _ckpt(k, "best")])
+              for k in KS]
+    # No second legend: the series are the left panel's, and the SHD checkpoint nuance
+    # (12k = selected) is the caption's job.
+    bot.plot(KS, rd_shd, "-", color=RANDOM, lw=1.2, zorder=1)
     bot.set_yscale("log")
     bot.set_ylim(7e-6, 2e-1)
     for ax in (top, bot):
         ax.set_xlabel("window size $k_v$")
     bot.set_ylabel("SHD on committed marks ($\\downarrow$)\n(pooled global graph)")
-    bot.annotate("0 errors in 600 episodes", xy=(20, 1e-5), xytext=(11.5, 3.3e-5),
-                 fontsize=7.5, color=LEARNED,
+    bot.annotate("0 errors in\n600 episodes", xy=(20, 1e-5), xytext=(13, 2.6e-5),
+                 fontsize=7, color=LEARNED, ha="center",
                  arrowprops=dict(arrowstyle="->", color=LEARNED, lw=0.7))
     for ax in (top, bot):
         ax.set_xticks(KS)
@@ -614,6 +628,10 @@ def fig_answer_rate(out: pathlib.Path):
     myopic = np.mean([v[1] for r in rhos for v in per[r]])
     top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
                 label=f"myopic ({myopic:.4f}, all rates)")
+    rnd = np.mean([json.loads(pathlib.Path(f).read_text())[0]["means"]["random_vary"]["hard"]
+                   for f in src])
+    top.axhline(rnd, color=RANDOM, lw=1.2, ls=":", zorder=1,
+                label=f"random ({rnd:.4f}, all rates)")
     means = [np.mean([v[0] for v in per[r]]) for r in rhos]
     for r in rhos:
         top.scatter([at[r]] * len(per[r]), [v[0] for v in per[r]], s=14, color=LEARNED,
@@ -700,6 +718,14 @@ def fig_credit(out: pathlib.Path):
                 ax.annotate(f"{means[1]/means[0]:.0f}$\\times$", xy=(1 + dx, means[1]),
                             xytext=(7, -2), textcoords="offset points", fontsize=8,
                             color=colour)
+        # The random anchor: identical in both credit states (it reads no reward), so a
+        # single line per cell. From the same measurement files.
+        rnd = np.mean([np.mean([e["means"]["random_vary"]["hard"] for e in
+                       json.loads((ROOT / f"results/credit/shd/{cell}_{arm_}_{st}.json")
+                                  .read_text())])
+                       for arm_ in ("pooled", "E4") for st in ("credit", "nocredit")])
+        ax.axhline(rnd, color=RANDOM, lw=1.2, ls=":", zorder=1,
+                   label="random" if cell.startswith("k08") else None)
         ax.set_yscale("log")
         ax.set_xticks([0, 1])
         ax.set_xticklabels(["credit on", "credit off"])
@@ -742,6 +768,12 @@ def fig_fixedpolicy(out: pathlib.Path):
                        color=colour, alpha=0.4, zorder=3)
         ax.plot(evals, [max(v, floor) for v in means], "o-", color=colour, lw=1.7,
                 ms=5, label=label, zorder=4)
+    rnd = np.mean([np.mean([json.loads(pathlib.Path(f).read_text())[0]
+                            ["means"]["random_vary"]["hard"]
+                            for f in glob.glob(str(ROOT /
+                            "results/power/rho/evalsweep_det/fixed_rho*_s?_evalp*.json"))])])
+    ax.axhline(rnd, color=RANDOM, lw=1.2, ls=":", zorder=1,
+               label=f"random ({rnd:.4f})")
     ax.set_yscale("log")
     ax.set_xlabel(r"evaluation answer rate $\rho$")
     ax.set_ylabel(r"SHD on committed marks ($\downarrow$)")
