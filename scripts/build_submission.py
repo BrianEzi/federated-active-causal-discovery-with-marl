@@ -86,6 +86,9 @@ GROUPS = [
                "probe that ruled out an unstable step size.",
      ["results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/longcheck/shd_*.json", "results/lrcheck/*.json"], True),
+    ("epsgreedy", "The epsilon-greedy control at k=12 and k=30: is the learned policy "
+                  "dithered greedy. Grid eps 0.05-0.3, 200 paired episodes per seed.",
+     ["results/epsgreedy/*.json"], False),
     ("nint_curve", "The sample-size axis: k=8 12,000-episode policies under sampled "
                    "evidence, n_int swept 10 to 10,000, three arms re-scored per value.",
      ["results/nint_curve/nint*.json"], False),

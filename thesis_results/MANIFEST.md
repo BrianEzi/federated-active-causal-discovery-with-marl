@@ -281,6 +281,19 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 
 14 files.
 
+## `epsgreedy/` — RQ1, table tab:epsgreedy, CLAIMS C9
+
+The epsilon-greedy control: myopic with probability 1-eps, uniform vary otherwise, grid eps 0.05-0.3, same paired episodes as the stored learned/greedy rows.
+
+Regenerate with: `scripts/eps_greedy_paired.py --episodes 200`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `k12.json` | `16ed89f35aa13ece` | `results/epsgreedy/k12.json` |
+| `k30.json` | `7e83ce2601459b74` | `results/epsgreedy/k30.json` |
+
+2 files.
+
 ## `nint_curve/` — RQ2, figure nint, subsection sec:res_nint
 
 The sample-size axis. The k=8 12k oracle-trained policies evaluated under sampled evidence with n_int swept 10..10,000; every arm re-scored per n_int because the baselines read the same tests.

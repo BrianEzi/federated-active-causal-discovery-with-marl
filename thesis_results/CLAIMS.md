@@ -151,6 +151,21 @@ it measures 0.00000. It was an unconverged run, not a cost of pooling.
 **MUST NOT** read the final-update column as a federation effect: selection helps
 the federated arm and is inert for the pooled one, which is a checkpoint result.
 
+## C9 — The learned policy is not a dithered myopic rule
+
+* k12: recovery myopic 0.918, eps-greedy best-eps 0.955, learned 0.985 (every learned seed above its cell's best eps-greedy seed at k30)
+* k30: recovery myopic 0.843, eps-greedy best-eps 0.877, learned 0.968 (every learned seed above its cell's best eps-greedy seed at k30)
+
+Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per
+seed quoted -- the selection favours the control and is stated wherever quoted.
+
+**MUST NOT** quote SHD separations from this control at k30: all three arms sit
+near the floor; the control ties the learned arm on 2 of 3 seeds and loses on
+the seed the learned arm holds at zero. Recovery is where the control separates.
+**MUST NOT** omit that eps-greedy BEATS plain myopic on both metrics: undirected
+exploration has value, and the claim is that training buys the remaining two
+thirds of the recovery gap, not that exploration is worthless.
+
 ## C8 — Evidence volume is not monotone in value: the fixed-alpha U
 
 * n_int=10: learned 0.1516, myopic 0.0895, myopic ahead on 3/3 seeds

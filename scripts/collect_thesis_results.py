@@ -93,6 +93,13 @@ REGISTRY = [
      "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}; "
      "scripts/recovery_paired.py --episodes 200 --checkpoint u0249"),
 
+    ("epsgreedy",
+     "The epsilon-greedy control: myopic with probability 1-eps, uniform vary otherwise, "
+     "grid eps 0.05-0.3, same paired episodes as the stored learned/greedy rows.",
+     "RQ1, table tab:epsgreedy, CLAIMS C9",
+     ["results/epsgreedy/k12.json", "results/epsgreedy/k30.json"],
+     "scripts/eps_greedy_paired.py --episodes 200"),
+
     ("nint_curve",
      "The sample-size axis. The k=8 12k oracle-trained policies evaluated under sampled "
      "evidence with n_int swept 10..10,000; every arm re-scored per n_int because the "

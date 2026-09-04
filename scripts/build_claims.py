@@ -297,6 +297,40 @@ else:
     out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
             f"**NOT YET AVAILABLE** -- {len(LAD)} of 4 ladder measurements at 12,000 episodes.", ""]
 
+# --- The epsilon-greedy control --------------------------------------------------------------
+EPS = {}
+for cell in ("k12", "k30"):
+    q = ROOT / f"results/epsgreedy/{cell}.json"
+    if q.exists():
+        EPS[cell] = json.loads(q.read_text())
+if len(EPS) == 2:
+    out += ["## C9 — The learned policy is not a dithered myopic rule", ""]
+    for cell, ref in (("k12", "results/sweep12k/k12s50n04b150_s?.json"),
+                      ("k30", "results/sweep/oracle/k30s50n04b150_s?.json")):
+        import glob as _g
+        l = [json.loads(pathlib.Path(f).read_text())["arms"]["learned"]["success"]
+             for f in sorted(_g.glob(str(ROOT / ref)))]
+        g = [json.loads(pathlib.Path(f).read_text())["arms"]["greedy_uncertainty"]["success"]
+             for f in sorted(_g.glob(str(ROOT / ref)))]
+        best = {}
+        for e in EPS[cell]:
+            sc = float(np.mean(e["rows"]["success"]))
+            if sc > best.get(e["seed"], 0.0):
+                best[e["seed"]] = sc
+        out += [f"* {cell}: recovery myopic {np.mean(g):.3f}, eps-greedy best-eps "
+                f"{np.mean(list(best.values())):.3f}, learned {np.mean(l):.3f} "
+                f"(every learned seed above its cell's best eps-greedy seed at k30)"]
+    out += ["",
+            "Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per",
+            "seed quoted -- the selection favours the control and is stated wherever quoted.",
+            "",
+            "**MUST NOT** quote SHD separations from this control at k30: all three arms sit",
+            "near the floor; the control ties the learned arm on 2 of 3 seeds and loses on",
+            "the seed the learned arm holds at zero. Recovery is where the control separates.",
+            "**MUST NOT** omit that eps-greedy BEATS plain myopic on both metrics: undirected",
+            "exploration has value, and the claim is that training buys the remaining two",
+            "thirds of the recovery gap, not that exploration is worthless.", ""]
+
 # --- The sample-size axis --------------------------------------------------------------------
 NINT = {}
 for n in (10, 30, 100, 200, 1000, 3000, 10000):

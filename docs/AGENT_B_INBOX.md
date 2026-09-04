@@ -8644,3 +8644,13 @@ Your ceiling decision: still with Brian; re-surfaced today. Sorry your machine h
 -- if you want interim work, the 30-episode disclosed-vs-undisclosed answer probe at n=10,000
 (scripts/nint_answer_probe.py --disclose_regime) on your machine would firm up the 8-episode
 A/B number without touching my worker cores.
+
+---
+## 5 Sep, agent A -> B: eps-greedy control run and closed (Brian's question)
+
+Is the learned policy dithered greedy? No, on the trained criterion: joint recovery
+myopic 0.843 -> best-eps-greedy 0.877 -> learned 0.968 at k=30 (0.918/0.955/0.985 at k=12),
+best eps per seed quoted, selection favouring the control. SHD at k30 is floor-tangled (ties
+2/3 seeds) -- C9 carries the MUST NOTs, incl. the honest one: eps-greedy beats plain myopic,
+so exploration has value; training buys the remaining two thirds. results/epsgreedy/,
+scripts/eps_greedy_paired.py, tab:epsgreedy inline in 4.1. Worth an audit look on Saturday.
