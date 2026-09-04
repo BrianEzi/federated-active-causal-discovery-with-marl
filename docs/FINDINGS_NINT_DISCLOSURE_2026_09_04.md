@@ -12,9 +12,10 @@ grows. It does not, and the reason is now measured, not hypothesised.
    greedy-only seeded episodes. False-detection rate GROWS with n: 3.1% (n=100) -> 4.5%
    (1,000) -> 17.3% (10,000) against nominal alpha 0.001. Powered-miss rate falls to ~0.
    The U is the false-positive channel.
-3. Full-graph split: NONE of the false detections are real full-graph ancestries invisible
-   to the window projection (0 of 26 at n=200; 0 of 42 at n=1,000 in the A/B). Not a
-   projection artefact.
+3. Full-graph split, final (30 episodes, results/nint_curve/answer_probe_split.json):
+   NONE of 1,100 false detections across n=100/1,000/10,000 (137/208/755) are real
+   full-graph ancestries invisible to the window projection -- zero at every n. Not a
+   projection artefact; entirely the contamination channel.
 4. The A/B that closes it: same episodes, same seeds, n=1,000 --
        disclose_regime=False   false detects 40/1232  (3.25%)
        disclose_regime=True    false detects  2/1239  (0.16%)
