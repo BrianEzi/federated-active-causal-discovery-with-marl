@@ -151,6 +151,30 @@ it measures 0.00000. It was an unconverged run, not a cost of pooling.
 **MUST NOT** read the final-update column as a federation effect: selection helps
 the federated arm and is inert for the pooled one, which is a checkpoint result.
 
+## C8 — Evidence volume is not monotone in value: the fixed-alpha U
+
+* n_int=10: learned 0.1516, myopic 0.0895, myopic ahead on 3/3 seeds
+* n_int=30: learned 0.0666, myopic 0.0499, myopic ahead on 3/3 seeds
+* n_int=100: learned 0.0266, myopic 0.0259, myopic ahead on 0/3 seeds
+* n_int=200: learned 0.0279, myopic 0.0181, myopic ahead on 3/3 seeds
+* n_int=1000: learned 0.0658, myopic 0.0147, myopic ahead on 3/3 seeds
+* n_int=3000: learned 0.1082, myopic 0.0225, myopic ahead on 3/3 seeds
+* n_int=10000: learned 0.1385, myopic 0.0399, myopic ahead on 3/3 seeds
+
+k_v=8, 12,000-episode oracle-trained policies at the selected checkpoint,
+evaluated under sampled evidence, 200 paired episodes per seed, seeded, sampled
+action selection; every arm re-scored per n_int.
+
+**MUST NOT** claim a mechanism. The fixed-alpha arithmetic (power grows in n,
+effect sizes do not) is stated as arithmetic; the wrong-confident-marks account
+is UNVERIFIED until test answers are compared against oracle answers per query.
+**MUST NOT** generalise to in-regime training: these are transferred oracle
+policies, and no trained-in-regime policy exists above n_int=200.
+**MUST NOT** read n_int=100 as parity: it is one point, 0/3 seeds separate,
+bracketed by 3/3 separations on both sides.
+**MUST NOT** say 'more data hurts' without 'under fixed-alpha tests at
+evaluation time'; nothing here varies the training data.
+
 ## C5 — The competence-floor exclusions are undertrained, not broken
 
 | cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |

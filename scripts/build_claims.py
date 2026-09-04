@@ -297,6 +297,37 @@ else:
     out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
             f"**NOT YET AVAILABLE** -- {len(LAD)} of 4 ladder measurements at 12,000 episodes.", ""]
 
+# --- The sample-size axis --------------------------------------------------------------------
+NINT = {}
+for n in (10, 30, 100, 200, 1000, 3000, 10000):
+    fs = sorted((ROOT / "results/nint_curve").glob(f"nint{n:05d}_s*.json"))
+    if len(fs) == 3:
+        NINT[n] = [json.loads(f.read_text())[0] for f in fs]
+if len(NINT) == 7:
+    out += ["## C8 — Evidence volume is not monotone in value: the fixed-alpha U", ""]
+    for n, es in NINT.items():
+        l = np.mean([e["means"]["learned"]["hard"] for e in es])
+        g = np.mean([e["means"]["greedy"]["hard"] for e in es])
+        sig = sum(e["paired"]["learned-greedy"]["significant"] for e in es)
+        out += [f"* n_int={n}: learned {l:.4f}, myopic {g:.4f}, myopic ahead on {sig}/3 seeds"]
+    out += ["",
+            "k_v=8, 12,000-episode oracle-trained policies at the selected checkpoint,",
+            "evaluated under sampled evidence, 200 paired episodes per seed, seeded, sampled",
+            "action selection; every arm re-scored per n_int.",
+            "",
+            "**MUST NOT** claim a mechanism. The fixed-alpha arithmetic (power grows in n,",
+            "effect sizes do not) is stated as arithmetic; the wrong-confident-marks account",
+            "is UNVERIFIED until test answers are compared against oracle answers per query.",
+            "**MUST NOT** generalise to in-regime training: these are transferred oracle",
+            "policies, and no trained-in-regime policy exists above n_int=200.",
+            "**MUST NOT** read n_int=100 as parity: it is one point, 0/3 seeds separate,",
+            "bracketed by 3/3 separations on both sides.",
+            "**MUST NOT** say 'more data hurts' without 'under fixed-alpha tests at",
+            "evaluation time'; nothing here varies the training data.", ""]
+else:
+    out += ["## C8 — The sample-size axis", "",
+            f"**NOT YET AVAILABLE** -- {len(NINT)} of 7 grid values complete.", ""]
+
 # --- Undertraining ---------------------------------------------------------------------------
 out += ["## C5 — The competence-floor exclusions are undertrained, not broken", "",
         "| cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |",

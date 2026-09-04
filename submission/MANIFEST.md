@@ -60,6 +60,12 @@ The retrained cells behind the training-budget finding, and the learning-rate pr
 
 32 result files, 68 checkpoints
 
+## `nint_curve/`
+
+The sample-size axis: k=8 12,000-episode policies under sampled evidence, n_int swept 10 to 10,000, three arms re-scored per value.
+
+21 result files (engine output; no policy checkpoint needed)
+
 ## `checkpoint/`
 
 The checkpoint audit: the same cells scored at the selected checkpoint, the final update, and under argmax. The window-axis measurements are `results/rerows/`; `results/ckpt/` holds the same cells scored before the evaluation RNG was seeded and is NOT shipped.

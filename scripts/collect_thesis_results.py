@@ -45,7 +45,7 @@ REGISTRY = [
      "`sweep` folder is retained because Chapter 4 reports what that budget did to three "
      "structural claims, not because it is the headline. Joint recovery has the learned arm "
      "ahead of the myopic rule in 2 of 18 cells at 4,000 episodes and 16 of 18 at 12,000.",
-     "RQ1, tables tab:12k_*, figure crossover_budget",
+     "RQ1, tables tab:12k_*, figure window_budget",
      ["results/sweep12k/k*s*n*b*_s?.json",
       "results/sweep12k/shd/*.json", "results/sweep12k/shd_final/*.json",
       "results/sweep12k/shd_u0500/*.json",
@@ -92,6 +92,15 @@ REGISTRY = [
       "results/rerows/k20_u0249_recovery.json", "results/rerows/k30_u0249_recovery.json"],
      "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}; "
      "scripts/recovery_paired.py --episodes 200 --checkpoint u0249"),
+
+    ("nint_curve",
+     "The sample-size axis. The k=8 12k oracle-trained policies evaluated under sampled "
+     "evidence with n_int swept 10..10,000; every arm re-scored per n_int because the "
+     "baselines read the same tests.",
+     "RQ2, figure nint, subsection sec:res_nint",
+     ["results/nint_curve/nint*.json"],
+     "scripts/global_shd_paired.py --checkpoint best --sample --episodes 200 "
+     "--override_evidence sampled --override_n_int {10..10000}"),
 
     ("attribution",
      "RQ4. attr_ceiling: recovery by group size and peer count. attr_ceiling_matched_budget: "

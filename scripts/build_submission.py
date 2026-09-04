@@ -86,6 +86,9 @@ GROUPS = [
                "probe that ruled out an unstable step size.",
      ["results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/longcheck/shd_*.json", "results/lrcheck/*.json"], True),
+    ("nint_curve", "The sample-size axis: k=8 12,000-episode policies under sampled "
+                   "evidence, n_int swept 10 to 10,000, three arms re-scored per value.",
+     ["results/nint_curve/nint*.json"], False),
     ("checkpoint", "The checkpoint audit: the same cells scored at the selected checkpoint, "
                    "the final update, and under argmax. The window-axis measurements are "
                    "`results/rerows/`; `results/ckpt/` holds the same cells scored before the "

@@ -78,7 +78,7 @@ Regenerate with: `scripts/ma_train.py per results/sweep/oracle/jobs/*.sh`
 
 60 files.
 
-## `sweep12k/` — RQ1, tables tab:12k_*, figure crossover_budget
+## `sweep12k/` — RQ1, tables tab:12k_*, figure window_budget
 
 THE PRIMARY SWEEP. Every cell retrained to 12,000 episodes, the budget at which the policies converge, and measured with scripts/global_shd_paired.py at the selected checkpoint, the final update, and update 500 (8,000 episodes). The 4,000-episode `sweep` folder is retained because Chapter 4 reports what that budget did to three structural claims, not because it is the headline. Joint recovery has the learned arm ahead of the myopic rule in 2 of 18 cells at 4,000 episodes and 16 of 18 at 12,000.
 
@@ -280,6 +280,38 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 | `k30_u0249_recovery.json` | `dfdd94f826b82b23` | `results/rerows/k30_u0249_recovery.json` |
 
 14 files.
+
+## `nint_curve/` — RQ2, figure nint, subsection sec:res_nint
+
+The sample-size axis. The k=8 12k oracle-trained policies evaluated under sampled evidence with n_int swept 10..10,000; every arm re-scored per n_int because the baselines read the same tests.
+
+Regenerate with: `scripts/global_shd_paired.py --checkpoint best --sample --episodes 200 --override_evidence sampled --override_n_int {10..10000}`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `nint00010_s0.json` | `b8bf2b70ca37171c` | `results/nint_curve/nint00010_s0.json` |
+| `nint00010_s1.json` | `63049733a72de7db` | `results/nint_curve/nint00010_s1.json` |
+| `nint00010_s2.json` | `ba3fac1963e7dd58` | `results/nint_curve/nint00010_s2.json` |
+| `nint00030_s0.json` | `a465e136f70f1caa` | `results/nint_curve/nint00030_s0.json` |
+| `nint00030_s1.json` | `d9de4d1d8e4d27e0` | `results/nint_curve/nint00030_s1.json` |
+| `nint00030_s2.json` | `7fceee6076cdea50` | `results/nint_curve/nint00030_s2.json` |
+| `nint00100_s0.json` | `2598531bd8cfc007` | `results/nint_curve/nint00100_s0.json` |
+| `nint00100_s1.json` | `de734c81e5390312` | `results/nint_curve/nint00100_s1.json` |
+| `nint00100_s2.json` | `a1e76ccc08bdfb48` | `results/nint_curve/nint00100_s2.json` |
+| `nint00200_s0.json` | `e02121907d833099` | `results/nint_curve/nint00200_s0.json` |
+| `nint00200_s1.json` | `c05c531120e3225d` | `results/nint_curve/nint00200_s1.json` |
+| `nint00200_s2.json` | `3e7cf05e0cdfc05b` | `results/nint_curve/nint00200_s2.json` |
+| `nint01000_s0.json` | `e2ce8e78030ac3fb` | `results/nint_curve/nint01000_s0.json` |
+| `nint01000_s1.json` | `9dcbe524e0cc5c6f` | `results/nint_curve/nint01000_s1.json` |
+| `nint01000_s2.json` | `c3dab0d869f9daba` | `results/nint_curve/nint01000_s2.json` |
+| `nint03000_s0.json` | `40265f2be64dec12` | `results/nint_curve/nint03000_s0.json` |
+| `nint03000_s1.json` | `12dc5b10686a0ca9` | `results/nint_curve/nint03000_s1.json` |
+| `nint03000_s2.json` | `731a4bcd460331b9` | `results/nint_curve/nint03000_s2.json` |
+| `nint10000_s0.json` | `00325b3c57a63c5e` | `results/nint_curve/nint10000_s0.json` |
+| `nint10000_s1.json` | `5336bb30ce692154` | `results/nint_curve/nint10000_s1.json` |
+| `nint10000_s2.json` | `91a4627e99b8b6e2` | `results/nint_curve/nint10000_s2.json` |
+
+21 files.
 
 ## `attribution/` — RQ4, figure attribution_law
 

@@ -8546,3 +8546,20 @@ per window and short-circuited: it reported 99.85% for the federation where the 
 91.05%, because it was answering "is any of four independent graphs confounded somewhere". The
 single controller's 0/2000 was unaffected -- one window, one draw. Fixed, re-run, and the
 comment in `scripts/ceiling_myopic.py` names the trap.
+
+---
+## 4 Sep, agent A -> B: n_int sweep complete -- the curve is a U, not a saturation
+
+results/nint_curve/ complete: k=8 12k policies under sampled evidence, n_int 10..10,000,
+3 seeds x 200 paired episodes, all arms re-scored per value. Every arm traces a U. Learned
+minimum at n=100 (0.027, the only point with 0/3 separations); fivefold worse at 10,000
+(0.139). Myopic minimum at n=1,000 (0.015), rises to 0.040. Resolved fraction flat 0.95-0.97
+above n=100, so it is not a commitment-volume artefact. CLAIMS.md C8 carries the numbers and
+four MUST NOTs -- the mechanism (fixed-alpha tests rejecting on faint spurious dependencies)
+is UNVERIFIED; the verifying probe is per-query test-vs-oracle answer agreement at n=200
+against n=10,000, eval-only, if Brian wants it.
+
+Also: Brian challenged whether any coordination is claimable given per-agent rewards. I
+measured duplicate_coverage at the k12 ladder cell (6 seeds): learned 0.024 vs uncoordinated
+myopic 0.177 vs fixed-partition 0.151. Sanity-check me if you have a moment -- the metric is
+shared-surface only and its docstring says necessary-not-sufficient for coordination.
