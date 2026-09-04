@@ -30,6 +30,7 @@ import numpy as np                                                      # noqa: 
 
 from ma.baselines import make_baselines, RandomAgent                    # noqa: E402
 from ma.evaluate import evaluate_episode, global_graph_report           # noqa: E402
+from ma.policy import IndependentPPO                                    # noqa: E402
 from scripts.rescore_from_config import env_from_config                 # noqa: E402
 
 
@@ -56,6 +57,13 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("results", nargs="+", help="run JSONs supplying config+seed per cell")
     ap.add_argument("--eps", default="0.05,0.1,0.2,0.3")
+    ap.add_argument("--base", default="greedy", choices=["greedy", "argmax", "sampled"],
+                    help="the arm under the epsilon treatment. 'greedy' is the original "
+                         "control; 'argmax'/'sampled' load the run's learned policy at "
+                         "--checkpoint and dither IT -- the 5 Sep follow-up: if argmax+eps "
+                         "recovers sampled performance, the policy is its own argmax plus "
+                         "noise; if not, the sampled distribution's shape is load-bearing.")
+    ap.add_argument("--checkpoint", default="best")
     ap.add_argument("--episodes", type=int, default=200)
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
@@ -67,8 +75,23 @@ def main(argv=None) -> int:
         config, seed = report["config"], report.get("seed", 0)
         for eps in (float(v) for v in args.eps.split(",")):
             env = env_from_config(config, seed=seed)
-            builders = {a: make_baselines(env, a, seed) for a in env.topology.agents}
-            policies = {a: EpsilonGreedy(builders[a]["greedy_uncertainty"],
+            if args.base == "greedy":
+                builders = {a: make_baselines(env, a, seed) for a in env.topology.agents}
+                base = {a: builders[a]["greedy_uncertainty"] for a in env.topology.agents}
+            else:
+                import torch
+                if args.checkpoint == "best":
+                    ck = path.with_name(path.stem + "_best.pt")
+                elif args.checkpoint == "final":
+                    ck = path.with_suffix(".pt")
+                else:
+                    ck = path.with_name(f"{path.stem}_{args.checkpoint}.pt")
+                ppo = IndependentPPO.load(str(ck), env)
+                # Seeded like global_shd_paired.play: the evaluation is a pure function of
+                # (checkpoint, seed, episodes, convention).
+                torch.manual_seed(seed)
+                base = ppo.policies(deterministic=(args.base == "argmax"))
+            policies = {a: EpsilonGreedy(base[a],
                                          RandomAgent(a, seed, allow_clamp=False),
                                          eps, seed + a)
                         for a in env.topology.agents}
@@ -87,14 +110,15 @@ def main(argv=None) -> int:
                 resolved.append(g["global_resolved_fraction"])
                 succ.append(float(evaluate_episode(env)["success"]))
             payload.append({
-                "source": str(path), "seed": seed, "eps": eps,
+                "source": str(path), "seed": seed, "eps": eps, "base": args.base,
+                "checkpoint": args.checkpoint if args.base != "greedy" else None,
                 "episodes": args.episodes, "eval_evidence": config.get("vs_evidence"),
                 "means": {"hard": float(np.mean(hard)), "soft": float(np.mean(soft)),
                           "resolved": float(np.mean(resolved)),
                           "success": float(np.mean(succ))},
                 "rows": {"hard": hard, "soft": soft, "resolved": resolved,
                          "success": succ}})
-            print(f"{path.stem} eps={eps:.2f}  hard {np.mean(hard):.5f}  "
+            print(f"{path.stem} base={args.base} eps={eps:.2f}  hard {np.mean(hard):.5f}  "
                   f"success {np.mean(succ):.3f}  resolved {np.mean(resolved):.3f}",
                   flush=True)
     out = ROOT / args.out
