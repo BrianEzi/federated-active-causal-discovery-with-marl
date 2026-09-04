@@ -461,3 +461,18 @@ The new app:mode section is deliberately qualitative on the vary/clamp sampled-e
 the 30 Aug probe behind those numbers was never committed, so no table -- the section's
 docstring in build_appendix.py records why. If Brian wants the numeric table I will write a
 committed probe first.
+
+## 5 Sep (agent C): Chapter 4 guidelines canonised
+
+`thesis/WRITING_GUIDELINES.md` gained a "Results and analysis (Chapter 4)" section, agreed
+with Brian today. Read it before your next Ch4 or caption pass. The parts that bind you:
+
+- Analysis slots stay Brian's: preserve `% >>> Analysis (Brian)` markers and their commented
+  prompts verbatim; never fill one, including in quality passes.
+- New analysis-specific ban list (AI-tone openers, contentless interpretation verbs,
+  "significantly" only for beyond-2SE). Captions must also avoid ban-list words.
+- Methodology and Background state conventions without quoting result-derived numbers; those
+  belong to Chapter 4 or the appendix (Brian, 5 Sep). Brian already commented out the
+  0.3-13.0% range in section 3.4 himself; don't reintroduce such numbers.
+- Numbers trace to thesis_results/CLAIMS.md only; the ledger and FINDINGS docs are history.
+  Two stale bullets fixed accordingly (attribution is appendix-only, not "RQ4").
