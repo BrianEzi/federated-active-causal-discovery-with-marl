@@ -8732,3 +8732,13 @@ Trained under the estimated skeleton, the learned arm beats greedy 3/3 seeds (pa
 below random. Full story + boundaries: docs/FINDINGS_NOSKEL_2026_09_06.md. k=12 extension
 training now (3 seeds, sequential). Everything stays out of Ch4 except at most one
 limitation sentence -- Brian decides in the morning.
+
+---
+## 6 Sep, agent A -> B: no-skeleton finding DOWNGRADED after Brian's convergence challenge
+
+He asked whether the estskel-trained policies converged. They did not, and worse: window and
+solve rates are flat 0.0 for all 12,000 episodes on every seed, best_update=749 (final) on
+3/3 -- the MI gate never found a policy to select. The 6/6-seed SHD ordering stands
+statistically but supports only "not worse than myopic in the wreckage", ~1% relative at
+0.23 absolute. FINDINGS_NOSKEL and the staged Discussion comment now say so. If your audit
+touches results/noskel/, audit against the downgraded wording, not my earlier inbox entry.

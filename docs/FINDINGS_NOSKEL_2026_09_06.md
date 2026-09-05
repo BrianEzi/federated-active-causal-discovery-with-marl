@@ -24,13 +24,22 @@ estimated (per-episode estimation from the 60 observational rows), seeded paired
    the answer, not excluded. The measurable objective in this regime is committed-marks
    error, where the ordering above lives.
 
-## Reading, and its boundaries
+## Reading, DOWNGRADED 6 Sep after Brian's convergence challenge
 
-The supplied-skeleton assumption is load-bearing for the TRAINED POLICY (off-assumption it
-is anti-calibrated, worse than blind targeting) but not for the METHOD: retrained under the
-estimated skeleton, learned selection still buys a small significant edge over the myopic
-rule on the errors that remain measurable. The extension direction this points at is
-training against skeleton UNCERTAINTY, not merely without the skeleton.
+CONVERGENCE: none demonstrable, and no learning visible at all on the recorded diagnostics.
+Window and solve rates are flat 0.0 across all 12,000 episodes on every seed, and checkpoint
+selection is degenerate (best_update = 749, the final update, on 3/3 seeds -- the MI gate
+never found a distinguishable policy). Whatever produced the SHD ordering came through the
+dense claim-mass signal alone.
+
+What survives: the transfer HALF is unaffected (assumption-trained policies invert below
+random -- that is a robustness fact about trained policies, not about these runs). The
+trained-without half supports only: "policies trained in-regime are NOT WORSE than the
+myopic rule on the errors that remain measurable" -- 6/6 seeds ordered ahead at 3-5 SE, but
+~1% relative at ~0.23 absolute error, from policies with no visible training progress. No
+advantage is claimed. The real extension experiment is a longer budget under a DENSER
+signal (or training against skeleton uncertainty); these runs cannot answer whether more
+episodes would converge.
 
 EXTENSION, k=12 (landed later the same night): the finding replicates. Trained under the
 estimated skeleton, learned 0.1911/0.1908/0.1872 vs greedy 0.1933/0.1928/0.1892 vs random
