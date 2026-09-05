@@ -157,6 +157,18 @@ the federated arm and is inert for the pooled one, which is a checkpoint result.
 * k30: recovery myopic 0.843, eps-greedy best-eps 0.877, learned 0.968
 * at k30 every learned seed sits above its cell's best eps-greedy seed
 
+**The same treatment applied to the learned policy itself (k30):**
+* pure argmax per seed: 0.00493, 0.00033, 0.00222
+* argmax + best eps:    0.00328, 0.00001, 0.00051
+* sampled (anchor):     0.00045, 0.00000, 0.00026
+* Dither recovers most of the argmax deficit on two seeds and FULLY on one,
+  but on seed 0 the best eps is still 7x the sampled level: whether the
+  sampled distribution is replaceable by noise is a PER-POLICY property.
+* Extra eps on the SAMPLED policy is neutral to harmful at every eps --
+  no evidence of under-exploration; the trained stochasticity is calibrated.
+**MUST NOT** average the three seeds into one argmax+eps claim; the
+heterogeneity is the finding.
+
 Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per
 seed quoted -- the selection favours the control and is stated wherever quoted.
 

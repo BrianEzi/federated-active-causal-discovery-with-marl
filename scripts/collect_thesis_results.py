@@ -97,7 +97,9 @@ REGISTRY = [
      "The epsilon-greedy control: myopic with probability 1-eps, uniform vary otherwise, "
      "grid eps 0.05-0.3, same paired episodes as the stored learned/greedy rows.",
      "RQ1, table tab:epsgreedy, CLAIMS C9",
-     ["results/epsgreedy/k12.json", "results/epsgreedy/k30.json"],
+     ["results/epsgreedy/k12.json", "results/epsgreedy/k30.json",
+      "results/epsgreedy/k30_argmax_eps.json", "results/epsgreedy/k30_sampled_eps.json",
+      "results/epsgreedy/k30_argmax_pure.json"],
      "scripts/eps_greedy_paired.py --episodes 200"),
 
     ("nint_curve",

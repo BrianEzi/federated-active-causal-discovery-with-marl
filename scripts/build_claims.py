@@ -320,6 +320,33 @@ if len(EPS) == 2:
         out += [f"* {cell}: recovery myopic {np.mean(g):.3f}, eps-greedy best-eps "
                 f"{np.mean(list(best.values())):.3f}, learned {np.mean(l):.3f}"]
     out += ["* at k30 every learned seed sits above its cell's best eps-greedy seed"]
+    # The learned-policy eps treatments (5 Sep): the 2x2 corner data at k30.
+    extra = {}
+    for tag in ("argmax_eps", "sampled_eps", "argmax_pure"):
+        q = ROOT / f"results/epsgreedy/k30_{tag}.json"
+        if q.exists():
+            extra[tag] = json.loads(q.read_text())
+    if len(extra) == 3:
+        pure = {e["seed"]: e["means"]["learned"]["hard"] for e in extra["argmax_pure"]}
+        besta = {}
+        for e in extra["argmax_eps"]:
+            h = e["means"]["hard"]
+            if h < besta.get(e["seed"], (9, 0))[0]:
+                besta[e["seed"]] = (h, e["eps"])
+        out += ["",
+                "**The same treatment applied to the learned policy itself (k30):**",
+                "* pure argmax per seed: " + ", ".join(
+                    f"{pure[sd]:.5f}" for sd in sorted(pure)),
+                "* argmax + best eps:    " + ", ".join(
+                    f"{besta[sd][0]:.5f}" for sd in sorted(besta)),
+                "* sampled (anchor):     0.00045, 0.00000, 0.00026",
+                "* Dither recovers most of the argmax deficit on two seeds and FULLY on one,",
+                "  but on seed 0 the best eps is still 7x the sampled level: whether the",
+                "  sampled distribution is replaceable by noise is a PER-POLICY property.",
+                "* Extra eps on the SAMPLED policy is neutral to harmful at every eps --",
+                "  no evidence of under-exploration; the trained stochasticity is calibrated.",
+                "**MUST NOT** average the three seeds into one argmax+eps claim; the",
+                "heterogeneity is the finding.",]
     out += ["",
             "Grid eps in {0.05, 0.1, 0.2, 0.3}, 200 paired episodes per seed, best eps per",
             "seed quoted -- the selection favours the control and is stated wherever quoted.",

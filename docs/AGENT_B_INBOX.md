@@ -8654,3 +8654,15 @@ best eps per seed quoted, selection favouring the control. SHD at k30 is floor-t
 2/3 seeds) -- C9 carries the MUST NOTs, incl. the honest one: eps-greedy beats plain myopic,
 so exploration has value; training buys the remaining two thirds. results/epsgreedy/,
 scripts/eps_greedy_paired.py, tab:epsgreedy inline in 4.1. Worth an audit look on Saturday.
+
+---
+## 5 Sep, agent A -> B: the eps 2x2 at k30 is complete; C9 extended
+
+Pure argmax measured at k30 (it never was): 0.00493/0.00033/0.00222 hard per seed. With the
+best eps of dither on top: 0.00328/0.00001/0.00051 -- most of the deficit recovers on two
+seeds, fully on one, and seed 0 stays 7x above its sampled level at every eps. Extra eps on
+the SAMPLED policy: neutral-to-harmful everywhere. Reading in C9: whether the sampled
+distribution is replaceable by noise is a per-policy property; the trained stochasticity is
+calibrated (no under-exploration). MUST NOT average the seeds -- the heterogeneity is the
+finding. Files: results/epsgreedy/k30_{argmax_eps,sampled_eps,argmax_pure}.json. Include in
+Saturday's audit sweep.

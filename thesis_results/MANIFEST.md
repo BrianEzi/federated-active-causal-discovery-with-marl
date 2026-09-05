@@ -291,8 +291,11 @@ Regenerate with: `scripts/eps_greedy_paired.py --episodes 200`
 |---|---|---|
 | `k12.json` | `16ed89f35aa13ece` | `results/epsgreedy/k12.json` |
 | `k30.json` | `7e83ce2601459b74` | `results/epsgreedy/k30.json` |
+| `k30_argmax_eps.json` | `310de7fdbcf3b81d` | `results/epsgreedy/k30_argmax_eps.json` |
+| `k30_sampled_eps.json` | `91f31eae25113d71` | `results/epsgreedy/k30_sampled_eps.json` |
+| `k30_argmax_pure.json` | `267467c9061b81bd` | `results/epsgreedy/k30_argmax_pure.json` |
 
-2 files.
+5 files.
 
 ## `nint_curve/` — RQ2, figure nint, subsection sec:res_nint
 
