@@ -60,10 +60,19 @@ def env_from_config(config: dict, seed: int = 0) -> TwoAgentEnv:
     )
     # Only pass the sampled-evidence knobs when the saved run recorded them, so this stays
     # loadable against results written before those fields existed.
-    for key in ("vs_evidence", "vs_evidence_alpha", "vs_evidence_power"):
+    # skeleton_* added 5 Sep: --override_skeleton in global_shd_paired silently did
+    # NOTHING without this passthrough -- the first no-skeleton "measurement" re-measured
+    # the supplied skeleton while stamping eval_skeleton="estimated" in its own metadata.
+    # A dropped config key must never be silent again, hence the assert below.
+    for key in ("vs_evidence", "vs_evidence_alpha", "vs_evidence_power",
+                "skeleton_source", "skeleton_alpha", "skeleton_max_cond"):
         if key in config:
             kwargs[key] = config[key]
-    return TwoAgentEnv(MAConfig(**kwargs), seed=seed)
+    env = TwoAgentEnv(MAConfig(**kwargs), seed=seed)
+    for key in ("skeleton_source",):
+        if key in config:
+            assert getattr(env.config, key) == config[key], key
+    return env
 
 
 def play_paired(env: TwoAgentEnv, policies, episodes: int, seed: int) -> List[float]:
