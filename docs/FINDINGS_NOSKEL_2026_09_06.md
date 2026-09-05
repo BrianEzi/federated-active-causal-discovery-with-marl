@@ -32,7 +32,12 @@ estimated skeleton, learned selection still buys a small significant edge over t
 rule on the errors that remain measurable. The extension direction this points at is
 training against skeleton UNCERTAINTY, not merely without the skeleton.
 
-Boundaries: one cell (k=12 extension training as of this writing); the edge is ~1% relative
+EXTENSION, k=12 (landed later the same night): the finding replicates. Trained under the
+estimated skeleton, learned 0.1911/0.1908/0.1872 vs greedy 0.1933/0.1928/0.1892 vs random
+0.2055/0.2043/0.1998; paired learned-greedy -0.0021/-0.0020/-0.0020 at 4-5 SE. Two cells,
+6 of 6 seeds.
+
+Boundaries: two cells (k=8, k=12), same topology family; the edge is ~1% relative
 at enormous absolute error (0.23); joint recovery separates nothing (all zero); the
 window-rate floor fails for every arm, so no run here would be admitted to a sweep table --
 none is. Exploratory, post-freeze by Brian's explicit order; at most one limitation/future-
