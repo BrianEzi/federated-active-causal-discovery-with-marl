@@ -26,11 +26,17 @@ estimated (per-episode estimation from the 60 observational rows), seeded paired
 
 ## Reading, DOWNGRADED 6 Sep after Brian's convergence challenge
 
-CONVERGENCE: none demonstrable, and no learning visible at all on the recorded diagnostics.
-Window and solve rates are flat 0.0 across all 12,000 episodes on every seed, and checkpoint
-selection is degenerate (best_update = 749, the final update, on 3/3 seeds -- the MI gate
-never found a distinguishable policy). Whatever produced the SHD ordering came through the
-dense claim-mass signal alone.
+CONVERGENCE: definitively NOT converged -- the runs were stopped mid-climb (amended after
+Brian asked for the MI trajectory; the first version of this paragraph said "no learning
+visible", which was true only of the task-success diagnostics). Window and solve rates are
+flat 0.0 for all 12,000 episodes (nothing is ever solved), BUT mi_ratio climbs steadily the
+whole run with no plateau -- 0 -> 0.446 / 0.428 / 0.299 at the final update, still rising
+over the last 50 updates on every seed -- and entropy is still falling in the final eighth.
+best_update = 749 on 3/3 seeds is the signature of a policy still improving at cutoff, not
+of degenerate selection. Healthy supplied-skeleton runs sit at mi 0.27-0.85; the failed
+sampled-evidence runs at 0.03-0.11; these are mid-range and mid-climb. The measured gap is
+therefore a snapshot of UNFINISHED training; a longer budget is the obvious next run and
+Brian's original intuition stands.
 
 What survives: the transfer HALF is unaffected (assumption-trained policies invert below
 random -- that is a robustness fact about trained policies, not about these runs). The
