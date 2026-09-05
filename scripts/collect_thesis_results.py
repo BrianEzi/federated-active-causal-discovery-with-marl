@@ -107,7 +107,8 @@ REGISTRY = [
      "evidence with n_int swept 10..10,000; every arm re-scored per n_int because the "
      "baselines read the same tests.",
      "RQ2, figure nint, subsection sec:res_nint",
-     ["results/nint_curve/nint*.json"],
+     ["results/nint_curve/nint*.json", "results/nint_curve/answer_probe.json",
+      "results/nint_curve/answer_probe_split.json", "results/nint_disclose/nint*.json"],
      "scripts/global_shd_paired.py --checkpoint best --sample --episodes 200 "
      "--override_evidence sampled --override_n_int {10..10000}"),
 

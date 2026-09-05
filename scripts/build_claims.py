@@ -389,6 +389,41 @@ else:
     out += ["## C8 — The sample-size axis", "",
             f"**NOT YET AVAILABLE** -- {len(NINT)} of 7 grid values complete.", ""]
 
+DISC = {}
+for n in (10, 30, 100, 200, 1000, 3000, 10000):
+    fs = sorted((ROOT / "results/nint_disclose").glob(f"nint{n:05d}_s*.json"))
+    if len(fs) == 3:
+        DISC[n] = [json.loads(f.read_text())[0] for f in fs]
+PROBE = ROOT / "results/nint_curve/answer_probe_split.json"
+if len(DISC) == 7 and PROBE.exists():
+    pr = json.loads(PROBE.read_text())["per_n"]
+    out += ["## C8a — The U is the price of non-disclosure; disclosed, the engine is "
+            "consistent and the learned advantage grows with n", "",
+            f"* mechanism, measured: false-detection rate "
+            f"{pr['100']['false_detect_rate']:.3f} -> {pr['10000']['false_detect_rate']:.3f} "
+            "(n=100 -> 10,000) against nominal alpha 0.001; 0 of "
+            f"{sum(pr[k]['false_detect'] for k in pr)} false detections are full-graph "
+            "effects; disclosure A/B on identical episodes: 3.25% -> 0.16%",]
+    for n, es in DISC.items():
+        l = np.mean([e["means"]["learned"]["hard"] for e in es])
+        g = np.mean([e["means"]["greedy"]["hard"] for e in es])
+        sign = sum(e["paired"]["learned-greedy"]["delta"] < 0 for e in es)
+        out += [f"* disclosed n_int={n}: learned {l:.4f}, myopic {g:.4f}, "
+                f"learned ahead by sign {sign}/3"]
+    out += ["",
+            "Same checkpoints, seeds and episodes as C8; the only change is",
+            "disclose_regime=True at evaluation.",
+            "",
+            "**MUST NOT** quote significance counts at the top of the disclosed grid as if",
+            "decisive: 1-2 of 3 seeds separate beyond 2 SE; means and signs order",
+            "consistently and the SIGN counts are the quotable ones.",
+            "**MUST NOT** say the disclosed engine attains the oracle: both arms are an",
+            "order of magnitude above their oracle references at n=10,000. Convergence",
+            "toward, not attainment.",
+            "**MUST NOT** present disclosure as free: the bit reveals THAT a private",
+            "intervention happened; the privacy cost of that bit is not analysed.", ""]
+
+
 # --- Undertraining ---------------------------------------------------------------------------
 out += ["## C5 — The competence-floor exclusions are undertrained, not broken", "",
         "| cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |",

@@ -305,29 +305,52 @@ Regenerate with: `scripts/global_shd_paired.py --checkpoint best --sample --epis
 
 | file | sha256 (16) | source |
 |---|---|---|
-| `nint00010_s0.json` | `b8bf2b70ca37171c` | `results/nint_curve/nint00010_s0.json` |
-| `nint00010_s1.json` | `63049733a72de7db` | `results/nint_curve/nint00010_s1.json` |
-| `nint00010_s2.json` | `ba3fac1963e7dd58` | `results/nint_curve/nint00010_s2.json` |
-| `nint00030_s0.json` | `a465e136f70f1caa` | `results/nint_curve/nint00030_s0.json` |
-| `nint00030_s1.json` | `d9de4d1d8e4d27e0` | `results/nint_curve/nint00030_s1.json` |
-| `nint00030_s2.json` | `7fceee6076cdea50` | `results/nint_curve/nint00030_s2.json` |
-| `nint00100_s0.json` | `2598531bd8cfc007` | `results/nint_curve/nint00100_s0.json` |
-| `nint00100_s1.json` | `de734c81e5390312` | `results/nint_curve/nint00100_s1.json` |
-| `nint00100_s2.json` | `a1e76ccc08bdfb48` | `results/nint_curve/nint00100_s2.json` |
-| `nint00200_s0.json` | `e02121907d833099` | `results/nint_curve/nint00200_s0.json` |
-| `nint00200_s1.json` | `c05c531120e3225d` | `results/nint_curve/nint00200_s1.json` |
-| `nint00200_s2.json` | `3e7cf05e0cdfc05b` | `results/nint_curve/nint00200_s2.json` |
-| `nint01000_s0.json` | `e2ce8e78030ac3fb` | `results/nint_curve/nint01000_s0.json` |
-| `nint01000_s1.json` | `9dcbe524e0cc5c6f` | `results/nint_curve/nint01000_s1.json` |
-| `nint01000_s2.json` | `c3dab0d869f9daba` | `results/nint_curve/nint01000_s2.json` |
-| `nint03000_s0.json` | `40265f2be64dec12` | `results/nint_curve/nint03000_s0.json` |
-| `nint03000_s1.json` | `12dc5b10686a0ca9` | `results/nint_curve/nint03000_s1.json` |
-| `nint03000_s2.json` | `731a4bcd460331b9` | `results/nint_curve/nint03000_s2.json` |
-| `nint10000_s0.json` | `00325b3c57a63c5e` | `results/nint_curve/nint10000_s0.json` |
-| `nint10000_s1.json` | `5336bb30ce692154` | `results/nint_curve/nint10000_s1.json` |
-| `nint10000_s2.json` | `91a4627e99b8b6e2` | `results/nint_curve/nint10000_s2.json` |
+| `nint_curve__nint00010_s0.json` | `b8bf2b70ca37171c` | `results/nint_curve/nint00010_s0.json` |
+| `nint_curve__nint00010_s1.json` | `63049733a72de7db` | `results/nint_curve/nint00010_s1.json` |
+| `nint_curve__nint00010_s2.json` | `ba3fac1963e7dd58` | `results/nint_curve/nint00010_s2.json` |
+| `nint_curve__nint00030_s0.json` | `a465e136f70f1caa` | `results/nint_curve/nint00030_s0.json` |
+| `nint_curve__nint00030_s1.json` | `d9de4d1d8e4d27e0` | `results/nint_curve/nint00030_s1.json` |
+| `nint_curve__nint00030_s2.json` | `7fceee6076cdea50` | `results/nint_curve/nint00030_s2.json` |
+| `nint_curve__nint00100_s0.json` | `2598531bd8cfc007` | `results/nint_curve/nint00100_s0.json` |
+| `nint_curve__nint00100_s1.json` | `de734c81e5390312` | `results/nint_curve/nint00100_s1.json` |
+| `nint_curve__nint00100_s2.json` | `a1e76ccc08bdfb48` | `results/nint_curve/nint00100_s2.json` |
+| `nint_curve__nint00200_s0.json` | `e02121907d833099` | `results/nint_curve/nint00200_s0.json` |
+| `nint_curve__nint00200_s1.json` | `c05c531120e3225d` | `results/nint_curve/nint00200_s1.json` |
+| `nint_curve__nint00200_s2.json` | `3e7cf05e0cdfc05b` | `results/nint_curve/nint00200_s2.json` |
+| `nint_curve__nint01000_s0.json` | `e2ce8e78030ac3fb` | `results/nint_curve/nint01000_s0.json` |
+| `nint_curve__nint01000_s1.json` | `9dcbe524e0cc5c6f` | `results/nint_curve/nint01000_s1.json` |
+| `nint_curve__nint01000_s2.json` | `c3dab0d869f9daba` | `results/nint_curve/nint01000_s2.json` |
+| `nint_curve__nint03000_s0.json` | `40265f2be64dec12` | `results/nint_curve/nint03000_s0.json` |
+| `nint_curve__nint03000_s1.json` | `12dc5b10686a0ca9` | `results/nint_curve/nint03000_s1.json` |
+| `nint_curve__nint03000_s2.json` | `731a4bcd460331b9` | `results/nint_curve/nint03000_s2.json` |
+| `nint_curve__nint10000_s0.json` | `00325b3c57a63c5e` | `results/nint_curve/nint10000_s0.json` |
+| `nint_curve__nint10000_s1.json` | `5336bb30ce692154` | `results/nint_curve/nint10000_s1.json` |
+| `nint_curve__nint10000_s2.json` | `91a4627e99b8b6e2` | `results/nint_curve/nint10000_s2.json` |
+| `answer_probe.json` | `5720a6ee29d08b3a` | `results/nint_curve/answer_probe.json` |
+| `answer_probe_split.json` | `33c65f15b29a1d26` | `results/nint_curve/answer_probe_split.json` |
+| `nint_disclose__nint00010_s0.json` | `809c88cd96a96ce3` | `results/nint_disclose/nint00010_s0.json` |
+| `nint_disclose__nint00010_s1.json` | `35e816ff871ac1ea` | `results/nint_disclose/nint00010_s1.json` |
+| `nint_disclose__nint00010_s2.json` | `8b86116d1f9421a9` | `results/nint_disclose/nint00010_s2.json` |
+| `nint_disclose__nint00030_s0.json` | `93348490d79672d6` | `results/nint_disclose/nint00030_s0.json` |
+| `nint_disclose__nint00030_s1.json` | `4d7808d2f44cf83d` | `results/nint_disclose/nint00030_s1.json` |
+| `nint_disclose__nint00030_s2.json` | `19d6078cae247e54` | `results/nint_disclose/nint00030_s2.json` |
+| `nint_disclose__nint00100_s0.json` | `58fd1e1ae433c115` | `results/nint_disclose/nint00100_s0.json` |
+| `nint_disclose__nint00100_s1.json` | `3ff1b0946499d085` | `results/nint_disclose/nint00100_s1.json` |
+| `nint_disclose__nint00100_s2.json` | `21d5124657c9a23a` | `results/nint_disclose/nint00100_s2.json` |
+| `nint_disclose__nint00200_s0.json` | `4d41fc40ab969e38` | `results/nint_disclose/nint00200_s0.json` |
+| `nint_disclose__nint00200_s1.json` | `ced16e4703fb64a1` | `results/nint_disclose/nint00200_s1.json` |
+| `nint_disclose__nint00200_s2.json` | `816e2d734ea736a6` | `results/nint_disclose/nint00200_s2.json` |
+| `nint_disclose__nint01000_s0.json` | `b1e8e7f5ecb16119` | `results/nint_disclose/nint01000_s0.json` |
+| `nint_disclose__nint01000_s1.json` | `e4a697c3f0d9fa5e` | `results/nint_disclose/nint01000_s1.json` |
+| `nint_disclose__nint01000_s2.json` | `cb4ebed3c0118ba2` | `results/nint_disclose/nint01000_s2.json` |
+| `nint_disclose__nint03000_s0.json` | `7980e525343e4edc` | `results/nint_disclose/nint03000_s0.json` |
+| `nint_disclose__nint03000_s1.json` | `85280f9f6e776f52` | `results/nint_disclose/nint03000_s1.json` |
+| `nint_disclose__nint03000_s2.json` | `1a0db9adf53b12e1` | `results/nint_disclose/nint03000_s2.json` |
+| `nint_disclose__nint10000_s0.json` | `a625e86c1f749671` | `results/nint_disclose/nint10000_s0.json` |
+| `nint_disclose__nint10000_s1.json` | `f38bd9f2f11947de` | `results/nint_disclose/nint10000_s1.json` |
+| `nint_disclose__nint10000_s2.json` | `12a7f42eca847fb8` | `results/nint_disclose/nint10000_s2.json` |
 
-21 files.
+44 files.
 
 ## `attribution/` — RQ4, figure attribution_law
 

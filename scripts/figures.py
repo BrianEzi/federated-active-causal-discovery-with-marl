@@ -249,53 +249,63 @@ def fig_window_budget(out: pathlib.Path):
 
 
 def fig_nint(out: pathlib.Path):
-    """Transfer to sampled evidence as the interventional sample size grows.
+    """The sample-size axis, twice: the undisclosed engine and the calibrated one.
 
-    The k=8 policies trained at 12,000 episodes under oracle evidence, evaluated at the
-    selected checkpoint under SAMPLED evidence with n_int swept from 10 to 10,000 --
-    Brian's request, 3 Sep. Every point is scripts/global_shd_paired.py with
-    --override_n_int, 200 paired episodes, sampled action selection, three seeds. The
-    baselines re-run at every n_int because their beliefs read the same test statistics.
+    Left: disclose_regime=False, the U -- hidden partner interventions contaminate the
+    tests' control rows, and the contamination's detectability grows with n (the mechanism
+    is measured: answer_probe*, false detections 3.1% -> 17.3%, all spurious, eliminated by
+    the one-bit disclosure). Right: the same checkpoints and episodes with disclosure ON --
+    error is monotone in n for both arms, the learned arm crosses the myopic rule between
+    n=100 and 200, and both converge TOWARD their oracle-evaluation values (dotted
+    reference lines), which they do not attain at n=10,000.
     """
     grid = [10, 30, 100, 200, 1000, 3000, 10000]
-    files = {}
-    for n in grid:
-        got = sorted((ROOT / "results/nint_curve").glob(f"nint{n:05d}_s*.json"))
-        if got:
-            files[n] = got
-    if not files:
-        raise FileNotFoundError("no results/nint_curve measurements yet")
-    incomplete = {n: len(v) for n, v in files.items() if len(v) < 3}
-    if incomplete or len(files) < len(grid):
-        # Partial grids have said the opposite of complete ones four times this week; draw
-        # nothing rather than a curve that will be quoted.
-        raise RuntimeError(f"nint grid incomplete: {sorted(files)} of {grid}, "
-                           f"short cells {incomplete} -- not drawing a partial curve")
-    fig, ax = plt.subplots(figsize=(FULL, 3.2))
-    floor = 1e-5
-    for arm, colour, label in (("learned", LEARNED, "learned (oracle-trained, transferred)"),
-                               ("greedy", MYOPIC, "myopic"),
-                               ("random_vary", RANDOM, "random")):
-        means = []
+    panels = []
+    for d in ("results/nint_curve", "results/nint_disclose"):
+        files = {}
         for n in grid:
-            vals = [json.loads(f.read_text())[0]["means"][arm]["hard"] for f in files[n]]
-            ax.scatter([n] * len(vals), [max(v, floor) for v in vals],
-                       s=12, color=colour, alpha=0.4, zorder=3)
-            means.append(np.mean(vals))
-        ax.plot(grid, [max(m, floor) for m in means], "o-", color=colour, lw=1.6, ms=5,
-                label=label, zorder=4)
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xticks(grid)
-    ax.set_xticklabels([str(n) for n in grid], fontsize=7.5)
-    ax.set_xlabel(r"interventional samples per intervention $n_{\mathrm{int}}$")
-    ax.set_ylabel(r"SHD on committed marks ($\downarrow$)")
-    _title(ax, "Evidence quality is a sample-size dial at evaluation time")
-    ax.legend(frameon=False)
+            got = sorted((ROOT / d).glob(f"nint{n:05d}_s*.json"))
+            if len(got) == 3:
+                files[n] = got
+        panels.append(files)
+    if any(len(f) < len(grid) for f in panels):
+        raise RuntimeError("nint grids incomplete -- not drawing a partial curve")
+    oracle = json.loads((ROOT / "results/sweep12k/shd/k08s50n04b150.json").read_text())
+    o_l = np.mean([e["means"]["learned"]["hard"] for e in oracle])
+    o_g = np.mean([e["means"]["greedy"]["hard"] for e in oracle])
+
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.1), sharey=True)
+    for ax, files, title in zip(axes, panels,
+                                ("evidence undisclosed: the contamination U",
+                                 "one-bit disclosure: monotone, learned ahead")):
+        floor = 1e-4
+        for arm, colour, label in (("learned", LEARNED, "learned (transferred)"),
+                                   ("greedy", MYOPIC, "myopic"),
+                                   ("random_vary", RANDOM, "random")):
+            means = []
+            for n in grid:
+                vals = [json.loads(f.read_text())[0]["means"][arm]["hard"]
+                        for f in files[n]]
+                ax.scatter([n] * len(vals), [max(v, floor) for v in vals],
+                           s=11, color=colour, alpha=0.4, zorder=3)
+                means.append(np.mean(vals))
+            ax.plot(grid, [max(m, floor) for m in means], "o-", color=colour, lw=1.5,
+                    ms=4.5, label=label, zorder=4)
+        ax.axhline(o_l, color=LEARNED, lw=1.0, ls=":", zorder=1)
+        ax.axhline(max(o_g, floor), color=MYOPIC, lw=1.0, ls=":", zorder=1)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xticks(grid)
+        ax.set_xticklabels([str(n) for n in grid], fontsize=7)
+        ax.set_xlabel(r"samples per intervention $n_{\mathrm{int}}$")
+        _title(ax, title, fontsize=8.5)
+    axes[0].set_ylabel(r"SHD on committed marks ($\downarrow$)")
+    axes[1].annotate("dotted: oracle-evaluation\nreference per arm", xy=(0.97, 0.56),
+                     xycoords="axes fraction", ha="right", fontsize=7, color="#666666")
+    axes[0].legend(frameon=False, fontsize=7, loc="lower left")
     fig.tight_layout()
     fig.savefig(out / "nint.pdf", bbox_inches="tight")
     plt.close(fig)
-
 
 def fig_attribution_law(out: pathlib.Path):
     """Predicted against measured attribution. Source: scripts/attr_model.py, run live."""

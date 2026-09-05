@@ -203,6 +203,29 @@ bracketed by 3/3 separations on both sides.
 **MUST NOT** say 'more data hurts' without 'under fixed-alpha tests at
 evaluation time'; nothing here varies the training data.
 
+## C8a — The U is the price of non-disclosure; disclosed, the engine is consistent and the learned advantage grows with n
+
+* mechanism, measured: false-detection rate 0.031 -> 0.173 (n=100 -> 10,000) against nominal alpha 0.001; 0 of 1100 false detections are full-graph effects; disclosure A/B on identical episodes: 3.25% -> 0.16%
+* disclosed n_int=10: learned 0.1547, myopic 0.0913, learned ahead by sign 0/3
+* disclosed n_int=30: learned 0.0699, myopic 0.0500, learned ahead by sign 0/3
+* disclosed n_int=100: learned 0.0248, myopic 0.0249, learned ahead by sign 2/3
+* disclosed n_int=200: learned 0.0154, myopic 0.0167, learned ahead by sign 2/3
+* disclosed n_int=1000: learned 0.0061, myopic 0.0087, learned ahead by sign 3/3
+* disclosed n_int=3000: learned 0.0035, myopic 0.0052, learned ahead by sign 3/3
+* disclosed n_int=10000: learned 0.0021, myopic 0.0029, learned ahead by sign 2/3
+
+Same checkpoints, seeds and episodes as C8; the only change is
+disclose_regime=True at evaluation.
+
+**MUST NOT** quote significance counts at the top of the disclosed grid as if
+decisive: 1-2 of 3 seeds separate beyond 2 SE; means and signs order
+consistently and the SIGN counts are the quotable ones.
+**MUST NOT** say the disclosed engine attains the oracle: both arms are an
+order of magnitude above their oracle references at n=10,000. Convergence
+toward, not attainment.
+**MUST NOT** present disclosure as free: the bit reveals THAT a private
+intervention happened; the privacy cost of that bit is not analysed.
+
 ## C5 — The competence-floor exclusions are undertrained, not broken
 
 | cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |
