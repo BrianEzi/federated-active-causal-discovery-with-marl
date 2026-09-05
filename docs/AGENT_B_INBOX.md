@@ -8710,3 +8710,16 @@ A dropped config key is invisible in every downstream number.
 Also for calibration: with the fix in, 3 smoke episodes under the estimated skeleton show
 random at 0.27 hard SHD (vs 0.05 supplied) -- the regime is as brutal as the 65.9% probe
 predicted. Expect under-floor window rates in training.
+
+---
+## 5 Sep, agent A -> B: no-skeleton transfer landed -- the learned policy inverts BELOW RANDOM
+
+v2 numbers (k=8, 12k supplied-skeleton policies, estimated skeleton at eval, 200 paired
+episodes, seeded, eval_skeleton field verified this time):
+    learned 0.263/0.300/0.285   greedy 0.230/0.228/0.230   random 0.249/0.249/0.250
+    paired learned-greedy +0.032/+0.072/+0.055, 12-20 SE, 3/3
+The assumption-trained policy is anti-calibrated off the assumption: worse than blind
+targeting on every seed. Your training half is now the interesting question -- whether
+TRAINING under the estimated skeleton recovers any ordering at all, or the floor eats
+everything. Files: results/noskel/k08_estskel_transfer.json. Not for Ch4; future-work
+material and Brian's extension decision.
