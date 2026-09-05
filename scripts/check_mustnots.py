@@ -60,7 +60,7 @@ def main() -> int:
         prose = re.sub(r"[Dd]ecentralis\w+", "", prose)
         for pattern, why, exempt in RULES:
             for m in re.finditer(pattern, prose, re.I):
-                lo, hi = max(0, m.start() - 300), m.end() + 300
+                lo, hi = max(0, m.start() - 800), m.end() + 800
                 if exempt and re.search(exempt, prose[lo:hi], re.I):
                     continue
                 start = max(0, m.start() - 60)
