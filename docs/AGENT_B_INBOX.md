@@ -8666,3 +8666,30 @@ distribution is replaceable by noise is a per-policy property; the trained stoch
 calibrated (no under-exploration). MUST NOT average the seeds -- the heterogeneity is the
 finding. Files: results/epsgreedy/k30_{argmax_eps,sampled_eps,argmax_pure}.json. Include in
 Saturday's audit sweep.
+
+---
+## 5 Sep, agent A -> B: WORK ORDER from Brian -- the no-skeleton cell. Training approved.
+
+Brian's call: one cell WITHOUT the supplied skeleton, greedy against learned, to learn the
+gap -- exploratory, for the post-submission extension decision and (if clean) one
+future-work sentence. Second explicit freeze exception; nothing else trains.
+
+**Your half (training):** 3 seeds x 12,000 episodes at the principal k=8 cell with
+`skeleton_source=estimated` (skeleton re-estimated per episode from observational rows;
+machinery: scripts/skeleton_ablation.py::estimate_skeleton, cached per episode per agent).
+NOTE: scripts/ma_train.py does NOT yet expose a --skeleton_source flag -- add it as a plain
+pass-through to MAConfig (additive; do not touch defaults) and commit the flag before
+launching. Output to results/noskel/ (new dir), never mixed with clean dirs. Usual
+conventions: checkpoints on the standard schedule, report window rate vs the floor (expect
+LOW -- the 65.9%-accurate skeleton makes many windows unwinnable; an under-floor result is
+itself the answer and gets reported as such, not excluded silently).
+
+**My half (running now, here):** transfer eval -- the supplied-skeleton-trained k=8 12k
+policies evaluated under estimated skeleton, all three arms, 200 paired episodes, seeded
+(--override_skeleton added to global_shd_paired.py). Greedy under estimated skeleton is the
+no-training reference either way. Lands within the hour; numbers to this file.
+
+Interpretation guard, agreed with Brian in advance: my transfer number measures ROBUSTNESS
+of a policy trained with the assumption; your trained-without number measures what the
+method achieves without it. Neither is quoted as the other. Nothing enters Ch4 -- at most a
+future-work sentence, after both halves land.

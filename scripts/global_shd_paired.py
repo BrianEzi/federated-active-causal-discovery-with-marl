@@ -127,6 +127,12 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
+    ap.add_argument("--override_skeleton", default=None, choices=["true", "estimated"],
+                    help="evaluate with this skeleton_source instead of the trained one. "
+                         "'estimated' drops the supplied-adjacency assumption: the skeleton "
+                         "is re-estimated per episode from the observational rows "
+                         "(scripts/skeleton_ablation.py), measured at 65.9%% accuracy at "
+                         "n_obs=60. 5 Sep: the no-skeleton gap, greedy against learned.")
     ap.add_argument("--override_disclose", action="store_true",
                     help="evaluate with disclose_regime=True: the one-bit foreign-"
                          "intervention disclosure. Measured 4 Sep (answer_probe A/B): "
@@ -180,6 +186,8 @@ def main(argv=None) -> int:
             config = dict(config, n_int=args.override_n_int)
         if args.override_disclose:
             config = dict(config, disclose_regime=True)
+        if args.override_skeleton:
+            config = dict(config, skeleton_source=args.override_skeleton)
         env = env_from_config(config, seed=use_seed)
 
         if args.checkpoint == "best":
@@ -231,6 +239,7 @@ def main(argv=None) -> int:
                  "eval_evidence": args.override_evidence or config.get("vs_evidence"),
                  "eval_n_int": config.get("n_int"),
                  "eval_disclose": bool(config.get("disclose_regime", False)),
+                 "eval_skeleton": config.get("skeleton_source", "true"),
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},
