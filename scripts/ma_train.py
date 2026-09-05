@@ -43,6 +43,7 @@ def _config_record(config, topology, args, ppo_config=None) -> dict:
     record = {"n_obs": config.n_obs, "n_int": config.n_int, "budget": config.budget,
             "rule": config.score_rule,
             "disclose_regime": config.disclose_regime,
+            "skeleton_source": config.skeleton_source,
             "turn_order": config.turn_order,
             "action_modes": list(config.action_modes),
             "prior_p": config.prior_p,
@@ -172,6 +173,10 @@ def main(argv=None) -> dict:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--arm", default="nobit")
     ap.add_argument("--disclose_regime", action="store_true")
+    # 5 Sep, the no-skeleton cell. Pass-through to MAConfig; asserted after construction
+    # because a silently dropped config key already voided one measurement today
+    # (scripts/rescore_from_config.py, same date).
+    ap.add_argument("--skeleton_source", default="true", choices=["true", "estimated"])
     ap.add_argument("--n_obs", type=int, default=1000)
     ap.add_argument("--n_int", type=int, default=100)
     # ROUNDS for the whole system, a shared pool -- NOT interventions per agent. Semantics
@@ -394,6 +399,7 @@ def main(argv=None) -> dict:
     else:
         modes = MODES
     config = MAConfig(topology=topology, n_obs=args.n_obs, n_int=args.n_int,
+                       skeleton_source=args.skeleton_source,
                        budget=args.budget, disclose_regime=args.disclose_regime,
                        score_rule=args.rule, step_cost=args.step_cost,
                        turn_order=args.turn_order, action_modes=modes,
