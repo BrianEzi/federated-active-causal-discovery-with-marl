@@ -9185,3 +9185,57 @@ the local baseline, not the cluster one.
 long jobs to Myriad. The break-even is not per-core speed, which is roughly a wash; it is slot
 count. For the post-submission programme -- no-skeleton at 36k, k_v past 30, the joint version
 space -- that is decisive.
+
+---
+
+## 2026-09-06 19:0x -- Agent B: WORK ORDER (a) DELIVERED. Six new ladder seeds, scored both conventions -- and the two conventions disagree in SIGN.
+
+12 runs trained, 24 paired evaluations, 200 episodes each, seeded path.
+`results/central12k/scored/`. All 12 runs pass the competence floor (window rate 0.992-1.000
+over the last ten checkpoints); none excluded.
+
+### best checkpoint
+
+| seed | federated A | pooled E | A-E | myopic |
+|---|---|---|---|---|
+| 6 | 0.000000 | 0.000023 | -0.000023 | 0.000616 |
+| 7 | 0.000000 | 0.000068 | -0.000068 | 0.000594 |
+| 8 | 0.000000 | 0.000662 | -0.000662 | 0.000616 |
+| 9 | 0.000708 | 0.000000 | +0.000708 | 0.000388 |
+| 10 | 0.000046 | 0.001279 | -0.001233 | 0.000822 |
+| 11 | 0.000274 | 0.000000 | +0.000274 | 0.000502 |
+
+**mean A-E -0.000167 +/- 0.000281** (0.59 SE), median -0.000046
+
+### final checkpoint
+
+| seed | federated A | pooled E | A-E | myopic |
+|---|---|---|---|---|
+| 6 | 0.000000 | 0.000000 | +0.000000 | 0.000616 |
+| 7 | 0.000000 | 0.000068 | -0.000068 | 0.000594 |
+| 8 | 0.000662 | 0.000000 | +0.000662 | 0.000616 |
+| 9 | 0.000046 | 0.000000 | +0.000046 | 0.000388 |
+| 10 | 0.000068 | 0.000000 | +0.000068 | 0.000822 |
+| 11 | 0.000274 | 0.000000 | +0.000274 | 0.000502 |
+
+**mean A-E +0.000164 +/- 0.000110** (1.49 SE), median +0.000057
+
+### What this means for your TOST, and it is a real complication
+
+**The two checkpoint conventions point in OPPOSITE directions.** Selected checkpoint favours
+federated (-0.000167), final favours pooled (+0.000164), and neither clears 2 SE. So the
+equivalence bound you write will differ by convention, and quoting one without the other would
+be picking the direction. C4's existing MUST NOT -- "do not state a direction, mean and median
+disagree" -- now has a second, independent reason behind it. **Report both conventions or the
+claim is convention-selected.**
+
+**Everything here is at the floor and that is the honest headline.** Four of six federated cells
+at `best` are exactly 0.000000; four of six pooled cells at `final` are exactly 0.000000. The
+myopic arm sits at 0.000388-0.000822, so both learned arms beat it, but the two learned arms
+have nothing between them to measure. More seeds tighten the interval; they cannot separate arms
+that are both pinned at zero. This is Brian's saturation point, now with six seeds behind it
+rather than three.
+
+If you want the equivalence margin expressed against something interpretable, the myopic arm's
+0.0006 is the natural yardstick: A-E is a quarter of the gap to the myopic rule, in both
+directions, at six seeds.
