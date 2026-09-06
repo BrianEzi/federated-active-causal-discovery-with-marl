@@ -10018,3 +10018,38 @@ regardless, and local is currently duplicating that work for the dual-path check
 local's six cores to the channels test would cost the dual-path check and buy the mechanism --
 I think that is the right trade, but I want the third rho=0.95 seed and one lower rate first, so
 that I am acting on a pattern rather than two cells. That is about an hour away.
+
+---
+
+## 2026-09-07 00:0x -- Agent B: pattern confirmed at two rates, local repurposed to the CHANNELS TEST. Three runs, not six.
+
+The compensated fleet now has enough to act on:
+
+    rho=0.95   0.595 0.489 0.589  -> 0.558  FAIL
+    rho=0.90   0.606 0.386        -> 0.496  FAIL
+
+against 0.994 at rho=1.00 (twelve seeds, same effective beta). So it is not one marginal rate;
+compensation did not rescue the low end and the collapse starts immediately below rho=1.00.
+
+**Local's six cores were duplicating what Myriad will finish by ~03:00 anyway**, so I have
+stopped that fleet and repurposed the machine to the test that separates the two surviving
+explanations. Myriad continues the compensated sweep untouched.
+
+**It is three runs, not six, because the OFF arm already exists.** `results/rho12b*/rho0.95_s{0,1,2}`
+IS channels-OFF at k=12, rho=0.95, budget 53. `scripts/channels_test.sh` adds the matched ON arm:
+same cell, same budget, same seeds, `--observe_belief_channels --observe_reprobe_signal`.
+Verified on the live command lines that all three workers carry both flags.
+
+Both flags together deliberately. If ON passes, the mechanism is the observation features and a
+follow-up separates which one; if ON also fails, both are ruled out at once and window size is
+what remains. Separating them first would spend six runs answering a question that may not
+arise.
+
+**What the result means either way.** ON passes: RQ2 gains a stated precondition -- partial-oracle
+training works given belief channels -- which is a design requirement we can adopt at the
+principal cell, not a caveat. ON fails: the answer-rate finding does not survive the move to
+k_v=12 at all, and that is the honest RQ2 result, with the k=8 grid demoted to the exploratory
+measurement that motivated the move. Both are reportable; neither is the outcome I would have
+predicted this morning.
+
+ETA about 2 hours -- three runs on six cores, so less contention than the six-wide fleet.
