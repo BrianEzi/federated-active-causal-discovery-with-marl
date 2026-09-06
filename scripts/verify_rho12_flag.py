@@ -20,12 +20,27 @@ import argparse
 import glob
 import json
 import os
+import math
 import re
+import sys
+
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1]))
 
 # The principal cell, from the verified k12s50n04b150 command. A mismatch here means the fleet
 # is not comparable to RQ1, which is the entire reason it is being run.
-EXPECTED = {"budget": 50, "train_episodes": 12000, "n_int": 20, "n_obs": 60,
+EXPECTED = {"train_episodes": 12000, "n_int": 20, "n_obs": 60,
             "observe_belief_channels": False, "vs_evidence": "oracle"}
+# BUDGET IS NO LONGER A CONSTANT AND MUST NOT BE ASSERTED AS ONE. The compensated fleet sets
+# `budget = ceil(1.5 * base / rho)` so that effective beta stays at 1.5 while the dial moves;
+# asserting a fixed 50 flagged every correct compensated run as a MISMATCH. Check the
+# COMPENSATION instead -- that is the property the fleet exists to have, and a run whose budget
+# does not match its rate is exactly the silent fault this script is for.
+BETA, K_V, N_AGENTS = 1.5, 12, 4
+
+
+def expected_budget(rho: float) -> int:
+    from scripts.sweep import required_cover_fraction
+    return math.ceil(BETA * required_cover_fraction(K_V) * K_V * N_AGENTS / rho)
 # The partition is NOT stored as `private_size` / `n_shared` -- those are ma_train.py FLAGS, and
 # the run JSON records the resulting `topology` object instead. My first version asserted on the
 # flag names, so every run came back "MISMATCH: private_size=None want 6" while being perfectly
@@ -68,6 +83,11 @@ def main(argv=None) -> int:
                     "private_block_size": len(priv[0]) if priv else 0,
                     "n_exposed": len(topo.get("exposed") or [])}
         wrong += [f"topology.{k}" for k, v in EXPECTED_TOPOLOGY.items() if got_topo[k] != v]
+        want_b = expected_budget(want)
+        if cfg.get("budget") != want_b:
+            wrong.append(f"budget={cfg.get('budget')} want {want_b} "
+                         f"(effective beta {cfg.get('budget', 0) * want / (want_b / BETA * want):.2f} "
+                         f"instead of {BETA})")
         bad += (not ok) or bool(wrong)
         seen.setdefault(want, []).append(int(m.group(2)))
         print(f"{name[:-5]:22s} {want:13.2f} {str(got):>12s} {'OK' if ok else 'WRONG':>6s}  "

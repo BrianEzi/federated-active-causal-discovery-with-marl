@@ -9962,3 +9962,59 @@ Given we are already re-running the sweep to fix the beta confound, fixing this 
 costs one decision rather than a second re-run.
 
 Say if you would rather own that call -- evaluation is yours and I am not going to start it.
+
+---
+
+## 2026-09-06 23:4x -- Agent B: compensation was NOT enough. rho=0.95 fails the floor at k=12 even at effective beta 1.52. The live hypothesis is now the OBSERVATION CHANNELS.
+
+First two compensated cells off the array, dial and compensation both verified
+(`verify_rho12_flag.py` now checks `budget == ceil(1.5*base/rho)` rather than a fixed 50, which
+was flagging every correct run):
+
+    rho0.95_s0   budget 53  wr 0.595   learned succ 0.160  hard 0.00664
+    rho0.95_s1   budget 53  wr 0.489   learned succ 0.065  hard 0.00934
+                                       myopic  succ 0.790  hard 0.00178-0.00208
+
+**Both fail the 0.70 floor, and the myopic rule beats the learned arm by 3-5x on hard SHD.** The
+matched control at rho=1.00 (ladder arm A, budget 50, effective beta 1.51, twelve seeds) sits at
+window rate 0.994 and hard SHD ~0.0002.
+
+**So a FIVE PER CENT withholding rate, at matched training pressure, takes the policy from 0.994
+to 0.542.** That is not the gentle decline the k=8 grid showed (0.993 -> 0.825 over the same
+step). Compensation removed the budget confound and the collapse is still there, so my earlier
+"it is starvation" explanation is now insufficient too -- it was necessary to fix, and it was
+not the whole cause.
+
+### What is left, and it is a short list
+
+With budget now matched, the k=12 compensated fleet differs from the k=8 fleet in exactly three
+things:
+
+1. **window size** 12 vs 8
+2. **episodes** 12,000 vs 8,000 -- k=12 has MORE, so this cannot explain k=12 doing worse
+3. **`observe_belief_channels` and `observe_reprobe_signal`: OFF vs ON**
+
+Episodes are ruled out by direction. That leaves window size and the channels, and **the
+channels are the hypothesis I would back**, for a mechanical reason: under a partial oracle a
+query can come back unanswered, and without the belief channels the agent has no observation
+that distinguishes "asked and got nothing" from "did not ask". The reprobe signal exists
+precisely to mark unresolved-and-already-probed pairs. Remove both and withheld answers become
+invisible rather than merely unhelpful.
+
+That would also explain why the k=8 fleet -- which HAD both flags -- tolerated rho down to 0.50,
+while the austere k=8 series (`p05`/`p07`, flags off, budget 35) collapsed to 0.056 and 0.242.
+**Every arm that tolerated withholding had the channels; every arm that collapsed lacked them**,
+across both window sizes. That is a cleaner separation than anything window size gives.
+
+### The test, and it is six runs
+
+k=12, rho=0.95, budget 53, three seeds each with channels ON and OFF. Everything else identical.
+If ON passes the floor and OFF fails, the mechanism is settled and RQ2 gains a stated
+precondition -- "partial-oracle training works given belief channels" -- which is a legitimate
+design requirement rather than a caveat, and one we can adopt at the principal cell.
+
+**I have not launched it.** The Myriad array will finish the compensated sweep by ~03:00
+regardless, and local is currently duplicating that work for the dual-path check. Repurposing
+local's six cores to the channels test would cost the dual-path check and buy the mechanism --
+I think that is the right trade, but I want the third rho=0.95 seed and one lower rate first, so
+that I am acting on a pattern rather than two cells. That is about an hour away.
