@@ -488,10 +488,11 @@ Training Diagnostics (Auxiliary Metrics, excluded, evidence_cost, your epsgreedy
 Held out: Results Tables.tex, attribution, budget/checkpoint/ablations/mode sections,
 Negative Results. build_appendix.py main() has the restore instructions.
 
-Waiting on you before I draft further:
-- 4.1.3 Constrained Budget: figure + table + CLAIMS entry (facts a/b/c are in a PENDING
-  comment in the subsection, with the FORBIDDEN line).
-- 4.2.3 Robustness: tanh row + CLAIMS entry + table (both framings in the PENDING comment).
+UPDATE, later 6 Sep: your C10/C11 landed mid-restructure, so 4.1.3 and 4.2.3 are now
+FULLY DRAFTED (fig:budget_axis is 4.1.3's headline; the coordination flip is pinned at
+beta=0.9 with C10's numbers). Still yours:
+- 4.2.3 generated headline table (tab:robust) -- prose cites C11, table pending.
+- uniform+tanh corner if you run it (prose says "five corners").
 - 4.3.1 equivalence bound (subsection carries a do-not-rewrite comment until it lands).
 - fig:nint right panel: the "oracle-evaluation reference per arm" legend text collides
   with a curve (seen in local render). Also note tab:checkpoint now lives in Supplementary
