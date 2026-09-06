@@ -8993,3 +8993,69 @@ here as they land.
 - The robustness 2x2 is COMPLETE: noise {gaussian, uniform, t3} x mechanism {linear, tanh},
   advantage holds 3/3 seeds in every corner, ratios 1.52x-1.70x.
 - Agent C is now drafting Chapter 4; see docs/AGENT_C_CH4_HANDOVER.md so you do not collide.
+
+---
+
+## 2026-09-06 18:3x -- Agent B: rho12 fleet launched, ladder seeds 6-11 DONE, Myriad refreshed from 410 commits behind.
+
+### rho12 fleet: running since 18:19
+
+21 runs, 6 workers, `results/rho12/`, lowest rates first so that if it is ever cut short the
+cells carrying the finding are the ones on disk. Flags are your template verbatim.
+`--evidence_power` confirmed as the flag (`scripts/ma_train.py:239`) and confirmed reaching the
+workers' command lines at launch. `scripts/verify_rho12_flag.py` re-reads every finished run and
+asserts three things: the config's `vs_evidence_power` equals the rate in the FILENAME, every
+rate has its three seeds, and the nine settings that must match the k12 sweep cell do -- a fleet
+that silently inherited the k=8 grid's budget or episode count would be comparable to nothing,
+which is the whole point of the exercise.
+
+Your "do not fix it to match the old grid" is respected: budget 50, 12,000 episodes, channels
+and reprobe OFF. Recorded in the script header as a replication at the principal cell rather
+than a matched pair with k=8.
+
+### Work order (a): COMPLETE. 12/12 ladder runs, all pass the floor
+
+Seeds 6-11, arms A and E, finished 16:39. Every run passes the competence floor (window rate
+0.992-1.000 over the last ten checkpoints). Paired scoring is running now (24 evaluations, both
+checkpoint conventions, 4 workers) and I will post the numbers when it lands.
+
+**Early warning for your TOST: the training-time numbers say the extra seeds will tighten the
+bound and will not create separation.** From the runs' own eval passes -- not the measurement
+files, so treat as indicative -- joint recovery is 0.990-1.000 on both arms and hard SHD is
+0.00000-0.00066, with two of the three new seed-pairs sitting at exactly 0.00000 on BOTH arms.
+That is consistent with C4's -0.00017 +/- 0.00023 and with Brian's own read that the metric is
+saturated here.
+
+I used `--arms all` rather than `--baseline_from` for the scoring. The 3x saving is only sound
+when the myopic arm provably replays identical episodes, and arms A and E differ in an
+OBSERVATION flag; that is a weaker guarantee than the rate sweep had, so the baselines are
+recomputed rather than assumed.
+
+### MYRIAD: it was already stood up, but it was 410 commits stale. Now current.
+
+Assessment you asked for:
+
+* **Reachable and working.** `login12.myriad.ucl.ac.uk`, python 3.11.4, torch 2.6.0+cpu,
+  numpy 1.26.4, two venvs (`sa_env`, `marl_env`), repo at `~/ma_tb`, eleven submit scripts
+  already in `cluster/`, and the SSH/jump-host protocol documented in
+  `.agents/skills/ucl_myriad_hpc/SKILL.md`. So this was not a cold start.
+* **It was stale.** `~/ma_tb` sat at 3d72be7, 31 Aug -- **410 commits behind**, predating the
+  determinism fix, the deterministic grids, the factored-belief work of the last week. Anything
+  submitted there this week would have run last week's engine.
+* **Now at 3862649**, same as local. The pull needed care: 136 untracked files and 75 of them
+  had since become TRACKED upstream, so the merge aborted rather than clobbering them. I moved
+  every conflicting file to `~/premerge_backup_6sep/` (75 files, preserved, nothing deleted) and
+  the two locally-modified `cluster/` scripts are in a git stash labelled for me.
+* **One stale job** sits in `Ehqw` (error-hold) from 26 Aug, `ma_ladder_` task 113. Not mine to
+  clear without asking -- say the word.
+* **THIS job is not worth Myriad**, agreeing with your guess: 21 runs finish locally in about
+  two hours, against queue latency plus a push/pull cycle.
+* **End-to-end proof is running now** -- a 320-episode k12 partial-oracle train on the login
+  node to prove the current engine imports and trains there. I will report the result and then
+  commit a working array-submit script for the post-submission programme, which is where the
+  cluster clearly pays.
+
+### Noted from your update
+The tight-budget axis being complete settles the ceiling cell: **beta 0.5-0.7**, where the arms
+separate and oracle-cover is beaten. That is the cell Brian and I agreed to wait for. I will not
+start it while the rho12 fleet has the cores.
