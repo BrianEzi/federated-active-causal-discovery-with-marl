@@ -25,8 +25,15 @@ import re
 # The principal cell, from the verified k12s50n04b150 command. A mismatch here means the fleet
 # is not comparable to RQ1, which is the entire reason it is being run.
 EXPECTED = {"budget": 50, "train_episodes": 12000, "n_int": 20, "n_obs": 60,
-            "private_size": 6, "n_shared": 6, "n_agents": 4,
             "observe_belief_channels": False, "vs_evidence": "oracle"}
+# The partition is NOT stored as `private_size` / `n_shared` -- those are ma_train.py FLAGS, and
+# the run JSON records the resulting `topology` object instead. My first version asserted on the
+# flag names, so every run came back "MISMATCH: private_size=None want 6" while being perfectly
+# correct. That is the same shape as the reachability bug from 20 Aug: a check that can never
+# pass tells you nothing about the data, only about the check. Assert on what is actually
+# recorded.
+EXPECTED_TOPOLOGY = {"name": "T_4agent_6each_6shared", "n_private_blocks": 4,
+                     "private_block_size": 6, "n_exposed": 6}
 
 
 def main(argv=None) -> int:
@@ -55,12 +62,17 @@ def main(argv=None) -> int:
         got = cfg.get("vs_evidence_power")
         ok = got is not None and abs(got - want) < 1e-9
         wrong = [k for k, v in EXPECTED.items() if cfg.get(k) != v]
+        topo = cfg.get("topology") or {}
+        priv = topo.get("private") or []
+        got_topo = {"name": topo.get("name"), "n_private_blocks": len(priv),
+                    "private_block_size": len(priv[0]) if priv else 0,
+                    "n_exposed": len(topo.get("exposed") or [])}
+        wrong += [f"topology.{k}" for k, v in EXPECTED_TOPOLOGY.items() if got_topo[k] != v]
         bad += (not ok) or bool(wrong)
         seen.setdefault(want, []).append(int(m.group(2)))
         print(f"{name[:-5]:22s} {want:13.2f} {str(got):>12s} {'OK' if ok else 'WRONG':>6s}  "
               + ("all as specified" if not wrong
-                 else "MISMATCH: " + ", ".join(f"{k}={cfg.get(k)!r} want {EXPECTED[k]!r}"
-                                               for k in wrong)))
+                 else "MISMATCH: " + ", ".join(wrong)))
 
     print()
     for rate in sorted(seen, reverse=True):

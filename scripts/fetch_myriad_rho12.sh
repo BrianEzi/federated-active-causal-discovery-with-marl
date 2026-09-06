@@ -15,11 +15,21 @@ cd "$(dirname "$0")/.."
 DEST=${DEST:-results/rho12_myriad}
 mkdir -p "$DEST"
 
-# -a preserves mtimes so `--check`-style hashing downstream stays meaningful; no --delete, since
-# this directory is a landing zone and nothing here should ever remove local evidence.
-rsync -a --info=stats1 \
-  --include='rho*_s?.json' --include='rho*_s?_best.pt' --include='rho*_s?.pt' --exclude='*' \
-  myriad:ma_tb/results/rho12/ "$DEST"/
+# rsync is NOT present in this Git-for-Windows shell -- the first version of this script used
+# it and failed on the first fetch. scp over an explicit remote listing is the portable path,
+# and it has a second virtue: `ma_train.py` writes its JSON once at the end, so a name that
+# appears in the listing is a FINISHED run and a half-written file cannot be picked up.
+# Nothing is ever deleted here; this is a landing zone and must not remove local evidence.
+files=$(ssh myriad "ls ma_tb/results/rho12/rho*_s?.json 2>/dev/null" | tr -d '\r')
+[ -n "$files" ] || { echo "no completed cells on myriad yet"; exit 0; }
+for f in $files; do
+  b=$(basename "$f")
+  [ -f "$DEST/$b" ] && continue          # already fetched; a finished run never changes
+  scp -q "myriad:$f" "$DEST/$b" && echo "  fetched $b"
+  for ck in _best.pt .pt; do
+    scp -q "myriad:ma_tb/results/rho12/${b%.json}${ck}" "$DEST/${b%.json}${ck}" 2>/dev/null || true
+  done
+done
 
 echo
 echo "landed in $DEST:"
