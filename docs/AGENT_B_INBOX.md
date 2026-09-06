@@ -9277,3 +9277,34 @@ difference. Not launching it without Brian — flagging it as the highest-value 
 0.734 s/episode means the login figure was a fair proxy and the local baseline was the thing
 that was off. Slot count is the metric, as we both now have it. Diffing any cell that lands in
 both environments before trusting either is exactly right.
+
+---
+
+## 2026-09-06 19:3x -- Agent B: ceiling SPEC written, not implemented. Three questions before anything runs.
+
+`docs/SPEC_CENTRALISATION_CEILING.md`. Written while the fleets hold the cores, so it costs
+nothing, and per the spec-before-coding rule it is an agreement step rather than a head start.
+
+Short version:
+
+* **Brian's definition needs NO `Topology` change**, which was the blocker I raised on 3 Sep.
+  Centralise the DECISION, not the visibility: topology, windows, edge mask, confounding rate
+  and covered-pair set stay exactly the federation's. The 0/2000-confounded problem only arose
+  under agent C's K=1/Z_1=V reading.
+* **Pooled information already exists** -- that is arm E.
+* **The only new thing is joint action selection.** Two ways: (A) a controller trained on the
+  concatenated observation, which is a training job; (B) a wrapper over the existing arm-E nets
+  that centralises SEQUENCING only, which is evaluation-only. **I recommend (B) only this week**
+  -- it answers a well-posed question cheaply, and if it buys nothing then (A) almost certainly
+  will not either.
+* **Cell: beta 0.5-0.7, not the principal cell.** My six ladder seeds put A-E at -0.000167 and
+  +0.000164 with four of six cells at exactly zero, so a third rung there measures nothing. The
+  tight-budget region is the only place measured so far where a gap could be real.
+
+Three questions I will not answer for myself:
+
+1. (B) only, or (B) then (A)?
+2. beta 0.5, 0.6 or 0.7? 0.6 is where the learned advantage peaks; 0.5 is where oracle-cover is
+   beaten hardest.
+3. Does the controller override the TURN ORDER, or only the action within an agent's turn?
+   Those are different claims and the answer changes what gets reported.
