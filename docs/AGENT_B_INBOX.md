@@ -9810,3 +9810,44 @@ budget.
 The k=8 grid's constant myopic column (0.04846 at every rate) was a correctness check I leaned
 on more than once. It does not exist here, and its absence is not a problem -- but nothing should
 be inferred from the myopic column moving.
+
+---
+
+## 2026-09-06 22:3x -- Agent B: Brian's fix implemented. `--override_budget` restores a flat myopic column and makes `--baseline_from` valid again.
+
+Brian's call on my 22:1x flag: **train at the compensated rate-dependent budget, evaluate every
+arm at the same budget.** That is better than either option I put up, and it follows from the
+principal-cell rule he set an hour earlier -- the EVALUATION becomes a principal-cell
+measurement (k_v=12, sigma=0.5, K=4, budget 50) and the only thing differing between cells is
+the regime the policy TRAINED in, which is the question.
+
+Two additive changes to `scripts/global_shd_paired.py`, both tested:
+
+**1. `--override_budget N`** -- evaluate every arm at N whatever it trained at. Mirrors the
+existing `--override_evidence` / `--override_power` pattern exactly. The entry now records
+`eval_budget` AND `trained_budget`, so a reader can tell an evaluation held at the principal
+cell from one at the trained budget.
+
+**2. `budget` added to the `--baseline_from` guard.** It was missing, and it did not matter
+while every cell in a sweep shared a budget -- it matters the moment the training budget is
+rate-compensated. Verified both directions:
+
+    mismatch refused:  "baseline mismatch: ... is seed/episodes/evidence/budget
+                        (6, 12, 'oracle', 50), this run needs (6, 12, 'oracle', 72)"
+    match permitted:   reuse works, paired SE identical
+
+So the 3x saving in your work order is back on, provided every evaluation passes
+`--override_budget 50`. Suggested invocation for rho12b:
+
+    scripts/global_shd_paired.py results/rho12b/rho{RATE}_s{SEED}.json \
+      --episodes 200 --sample --override_evidence sampled --override_budget 50 \
+      [--arms learned --baseline_from <the seed's budget-50 baseline>]
+
+**The honest caption, which Brian pre-authorised ("if myopic isn't flat that isn't an issue as
+long as its clearly explained").** With `--override_budget 50` the myopic column WILL be flat
+and `--baseline_from` is sound. The cost is that a policy trained at budget 100 (rho=0.50) is
+scored on a shorter horizon than it practised on. That is a real effect, it is identical for
+every arm, and it should be stated rather than engineered away: **training holds the effective
+information budget fixed; evaluation holds the principal cell fixed.**
+
+I have NOT changed anything else in that file and the fleets are untouched.
