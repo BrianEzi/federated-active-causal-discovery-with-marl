@@ -248,6 +248,83 @@ def fig_window_budget(out: pathlib.Path):
     plt.close(fig)
 
 
+def _beta_axis(ax, axis):
+    """Log x-axis over the budget multipliers with the minor ticks silenced.
+
+    matplotlib draws its own decade minor labels on a log axis; left alone they collide
+    with the ten explicit beta positions and the axis becomes unreadable. Labels are
+    thinned to the ones a reader needs -- the ends and the crossings.
+    """
+    import matplotlib.ticker as mticker
+    shown = {0.5, 0.7, 1.0, 1.5, 2.0, 5.0}
+    ax.set_xscale("log")
+    ax.xaxis.set_minor_locator(mticker.NullLocator())
+    ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+    ax.set_xticks([b for b, _ in axis])
+    ax.set_xticklabels([f"{b:g}" if b in shown else "" for b, _ in axis], fontsize=7)
+
+
+def fig_budget(out: pathlib.Path):
+    """The constrained-budget axis (4.1.3): the learned advantage as experiments get scarce.
+
+    Ten budgets at the k=12 cell, 3 seeds each. Left: joint recovery for every arm. Right:
+    the learned-minus-myopic margin, which PEAKS at beta=0.6 and decays as rounds are added.
+
+    The oracle-cover arm is drawn because it stops being a ceiling below beta~0.8: it is
+    optimal WITHIN each window and uncoordinated ACROSS them by construction
+    (ma/baselines.py::OracleCoverAgent), so under scarcity its duplicated effort -- 0.325
+    avoidable at beta=0.5 against the learned arm's 0.017 -- costs it more than its per-window
+    optimality buys. It is NOT the achievable optimum at these budgets, and the figure must
+    never be captioned as though the learned arm beat one.
+    """
+    axis = [(0.5, "b050"), (0.6, "b060"), (0.7, "b070"), (0.8, "b080"), (0.9, "b090"),
+            (1.0, "b100"), (1.2, "b120"), (1.5, "b150"), (2.0, "b200"), (5.0, "b500")]
+    series = {k: [] for k in ("learned", "greedy_uncertainty", "greedy_partitioned",
+                              "oracle_cover", "random_vary")}
+    betas, margin = [], []
+    for beta, tag in axis:
+        fs = (sorted((ROOT / "results/budget_tight").glob(f"k12s50n04{tag}_s?.json"))
+              or sorted((ROOT / "results/sweep12k").glob(f"k12s50n04{tag}_s?.json")))
+        if not fs:
+            continue
+        runs = [json.loads(f.read_text()) for f in fs]
+        betas.append(beta)
+        for arm in series:
+            vals = [r["arms"][arm]["success"] for r in runs if arm in r["arms"]]
+            series[arm].append(np.mean(vals) if vals else np.nan)
+        margin.append(series["learned"][-1] - series["greedy_uncertainty"][-1])
+    if len(betas) < 5:
+        raise RuntimeError(f"budget axis incomplete: {len(betas)} points")
+
+    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 3.0))
+    for arm, colour, label, style in (
+            ("learned", LEARNED, "learned", "o-"),
+            ("oracle_cover", THIRD, "oracle cover (per-window\noptimal, uncoordinated)", "s--"),
+            ("greedy_partitioned", "#CC79A7", "myopic, fixed partition", "^-"),
+            ("greedy_uncertainty", MYOPIC, "myopic", "o-"),
+            ("random_vary", RANDOM, "random", "-")):
+        left.plot(betas, series[arm], style, color=colour, lw=1.5, ms=4, label=label,
+                  zorder=3 if arm == "learned" else 2)
+    _beta_axis(left, axis)
+    left.set_xlabel(r"budget multiplier $\beta$")
+    left.set_ylabel(r"joint recovery rate ($\uparrow$)")
+    left.set_ylim(-0.03, 1.05)
+    left.legend(frameon=False, fontsize=6.5, loc="lower right")
+
+    right.plot(betas, margin, "o-", color=LEARNED, lw=1.7, ms=4.5, zorder=3)
+    right.axhline(0, color="black", lw=0.8, zorder=1)
+    peak = int(np.argmax(margin))
+    right.annotate(f"peak $+{margin[peak]:.2f}$\nat $\\beta={betas[peak]:g}$",
+                   xy=(betas[peak], margin[peak]), xytext=(10, -6),
+                   textcoords="offset points", fontsize=7.5, color=LEARNED)
+    _beta_axis(right, axis)
+    right.set_xlabel(r"budget multiplier $\beta$")
+    right.set_ylabel("joint recovery margin ($\\uparrow$)\nlearned $-$ myopic", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out / "budget_axis.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def fig_nint(out: pathlib.Path):
     """The sample-size axis, twice: the undisclosed engine and the calibrated one.
 
@@ -922,7 +999,8 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     for name, fn in (("sweep_grid_[abcd]", fig_sweep_grid),
-                     ("window_budget", fig_window_budget), ("nint", fig_nint),
+                     ("window_budget", fig_window_budget), ("budget_axis", fig_budget),
+                     ("nint", fig_nint),
                      ("attribution_law", fig_attribution_law),
                      ("ladder+coordination", fig_federation),
                      ("answer_rate", fig_answer_rate),

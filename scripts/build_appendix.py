@@ -227,6 +227,60 @@ def appendix_ablations():
 
 
 
+def appendix_epsgreedy():
+    """The epsilon-greedy control across the whole sweep (Brian, 6 Sep).
+
+    The chapter carries two cells; a reviewer is entitled to ask whether those were the two
+    where it flattered us. This is all twenty, and it includes the four that do not.
+    """
+    import glob as _g
+    import numpy as np
+    eps = []
+    for f in sorted(_g.glob(str(ROOT / "results/epsgreedy/sweep/w*.json"))):
+        eps += jload(pathlib.Path(f))
+    if not eps:
+        return ""
+    best = {}
+    for e in eps:
+        cell = pathlib.Path(e["source"]).stem.rsplit("_s", 1)[0]
+        key = (cell, e["seed"])
+        best[key] = max(best.get(key, 0.0), float(np.mean(e["rows"]["success"])))
+    rows = []
+    for cell in sorted({c for c, _ in best}):
+        fs = (sorted(_g.glob(str(ROOT / f"results/sweep12k/{cell}_s?.json")))
+              or sorted(_g.glob(str(ROOT / f"results/sweep/oracle/{cell}_s?.json"))))
+        if not fs:
+            continue
+        L = np.mean([jload(pathlib.Path(f))["arms"]["learned"]["success"] for f in fs])
+        G = np.mean([jload(pathlib.Path(f))["arms"]["greedy_uncertainty"]["success"]
+                     for f in fs])
+        E = np.mean([best[(cell, sd)] for sd in (0, 1, 2) if (cell, sd) in best])
+        ahead = sum(1 for sd in (0, 1, 2)
+                    if (cell, sd) in best
+                    and jload(pathlib.Path(fs[sd]))["arms"]["learned"]["success"]
+                    > best[(cell, sd)])
+        rows.append((cell, G, E, L, ahead, L - E))
+    wins = sum(r[4] for r in rows)
+    body = [f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & {e:.3f} & "
+            f"\\textbf{{{l:.3f}}} & {a}/3 \\\\" if d > 0 else
+            f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & \\textbf{{{e:.3f}}} & "
+            f"{l:.3f} & {a}/3 \\\\"
+            for c, g, e, l, a, d in sorted(rows, key=lambda r: -r[5])]
+    return (
+        "\\section{The Epsilon-Greedy Control, Every Cell} \\label{app:epsgreedy}\n\n"
+        "The myopic rule taking a uniform randomised intervention with probability "
+        "$\\varepsilon$, over $\\varepsilon \\in \\{0.05, 0.1, 0.2, 0.3\\}$, on the same "
+        "$200$ paired episodes per seed as the arms it is compared with. The best "
+        "$\\varepsilon$ per seed is reported, a selection that favours the control. Bold "
+        "marks the better of the learned and $\\varepsilon$-greedy arms in each cell.\n\n"
+        + tbl("Joint recovery rate against the $\\varepsilon$-greedy control across all "
+              f"twenty sweep cells, three seeds each. The learned arm leads in {wins} of "
+              f"{3*len(rows)} individual seeds. The four cells where it does not are "
+              "discussed in \\S\\ref{sec:res_sweep}.",
+              "tab:epsgreedy_all", "lcccc",
+              r"Cell & Myopic & $\varepsilon$-greedy & Learned & Seeds ahead \\", body))
+
+
 def appendix_evidence_cost():
     """The price of realistic evidence, as a MATCHED two-arm comparison.
 
@@ -585,7 +639,7 @@ def main() -> int:
     parts.append((ROOT / "thesis/Auxiliary Metrics.tex").read_text())
     parts.append("")
     for fn in (appendix_excluded, appendix_budget, appendix_checkpoint,
-               appendix_ablations, appendix_mode, appendix_evidence_cost):
+               appendix_ablations, appendix_mode, appendix_evidence_cost, appendix_epsgreedy):
         parts.append(fn())
         parts.append("")
     parts.append((ROOT / "thesis/Negative Results.tex").read_text())

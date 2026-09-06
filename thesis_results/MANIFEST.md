@@ -281,6 +281,56 @@ Regenerate with: `scripts/global_shd_paired.py --episodes 200 --sample --checkpo
 
 14 files.
 
+## `budget_tight/` — RQ1, section sec:res_budget_axis, figure budget_axis, CLAIMS C10
+
+The constrained-budget axis: beta 0.5-0.9 at the k=12 cell, three seeds each, 12,000 episodes. With the sweep's b100..b500 cells this is a ten-point budget axis. The oracle_cover arm marks the feasibility floor at every point.
+
+Regenerate with: `scripts/ma_train.py --budget {17,20,24,27,31}; scripts/global_shd_paired.py for SHD`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `k12s50n04b050_s0.json` | `eaaa8ac8bf8eb513` | `results/budget_tight/k12s50n04b050_s0.json` |
+| `k12s50n04b050_s1.json` | `9e96da37a8567118` | `results/budget_tight/k12s50n04b050_s1.json` |
+| `k12s50n04b050_s2.json` | `269f18ca86d39a11` | `results/budget_tight/k12s50n04b050_s2.json` |
+| `k12s50n04b060_s0.json` | `df63a0cedb3293da` | `results/budget_tight/k12s50n04b060_s0.json` |
+| `k12s50n04b060_s1.json` | `2312d4682501c874` | `results/budget_tight/k12s50n04b060_s1.json` |
+| `k12s50n04b060_s2.json` | `a580ab35bb245db7` | `results/budget_tight/k12s50n04b060_s2.json` |
+| `k12s50n04b070_s0.json` | `da18202a0e479c16` | `results/budget_tight/k12s50n04b070_s0.json` |
+| `k12s50n04b070_s1.json` | `1e6c9225748537f9` | `results/budget_tight/k12s50n04b070_s1.json` |
+| `k12s50n04b070_s2.json` | `c21be5e3972cf98f` | `results/budget_tight/k12s50n04b070_s2.json` |
+| `k12s50n04b080_s0.json` | `5c9d978460d73f0c` | `results/budget_tight/k12s50n04b080_s0.json` |
+| `k12s50n04b080_s1.json` | `9f0719ebf73b35d0` | `results/budget_tight/k12s50n04b080_s1.json` |
+| `k12s50n04b080_s2.json` | `5ff8930489ad13f5` | `results/budget_tight/k12s50n04b080_s2.json` |
+| `k12s50n04b090_s0.json` | `d778f9a97688ab8e` | `results/budget_tight/k12s50n04b090_s0.json` |
+| `k12s50n04b090_s1.json` | `cb2ef9a5e8ceb73c` | `results/budget_tight/k12s50n04b090_s1.json` |
+| `k12s50n04b090_s2.json` | `770f41c7963786d9` | `results/budget_tight/k12s50n04b090_s2.json` |
+| `shd_b050.json` | `ed861646d7b6fa0b` | `results/budget_tight/shd_b050.json` |
+
+16 files.
+
+## `noisedist/` — RQ2, section sec:res_robustness, CLAIMS C11
+
+Distributional and mechanistic robustness: the rho=0.5 policies evaluated under sampled evidence across noise {gaussian,uniform,t3} x mechanism {linear,tanh}. Noise is standardised to unit variance so only the shape changes.
+
+Regenerate with: `scripts/global_shd_paired.py --override_noise --override_mechanism`
+
+| file | sha256 (16) | source |
+|---|---|---|
+| `rho050_gaussian_tanh_s0.json` | `ae2a9a835cf13a2c` | `results/noisedist/rho050_gaussian_tanh_s0.json` |
+| `rho050_gaussian_tanh_s1.json` | `6e2f930e12399a62` | `results/noisedist/rho050_gaussian_tanh_s1.json` |
+| `rho050_gaussian_tanh_s2.json` | `d5c0c9cb4b6cd058` | `results/noisedist/rho050_gaussian_tanh_s2.json` |
+| `rho050_t3_s0.json` | `75c95e67f9d83ac8` | `results/noisedist/rho050_t3_s0.json` |
+| `rho050_t3_s1.json` | `f647b37093fb6b8c` | `results/noisedist/rho050_t3_s1.json` |
+| `rho050_t3_s2.json` | `2c3d6b7682374868` | `results/noisedist/rho050_t3_s2.json` |
+| `rho050_t3_tanh_s0.json` | `9829274c80d4d81d` | `results/noisedist/rho050_t3_tanh_s0.json` |
+| `rho050_t3_tanh_s1.json` | `7863fc075fed3eee` | `results/noisedist/rho050_t3_tanh_s1.json` |
+| `rho050_t3_tanh_s2.json` | `3bc170caf5886d8d` | `results/noisedist/rho050_t3_tanh_s2.json` |
+| `rho050_uniform_s0.json` | `452cda6dea1da933` | `results/noisedist/rho050_uniform_s0.json` |
+| `rho050_uniform_s1.json` | `3a8501d908d892ca` | `results/noisedist/rho050_uniform_s1.json` |
+| `rho050_uniform_s2.json` | `e2b2b48dcd78770a` | `results/noisedist/rho050_uniform_s2.json` |
+
+12 files.
+
 ## `epsgreedy/` — RQ1, table tab:epsgreedy, CLAIMS C9
 
 The epsilon-greedy control: myopic with probability 1-eps, uniform vary otherwise, grid eps 0.05-0.3, same paired episodes as the stored learned/greedy rows.

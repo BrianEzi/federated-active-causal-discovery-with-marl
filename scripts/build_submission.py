@@ -86,6 +86,10 @@ GROUPS = [
                "probe that ruled out an unstable step size.",
      ["results/longcheck/*_long_s?.json", "results/longcheck/*_conv_s?.json",
       "results/longcheck/shd_*.json", "results/lrcheck/*.json"], True),
+    ("budget_tight", "The constrained-budget axis, beta 0.5-0.9 at k=12, three seeds each.",
+     ["results/budget_tight/*.json"], False),
+    ("noisedist", "Noise-shape and mechanism robustness of the rho=0.5 policies.",
+     ["results/noisedist/*.json"], False),
     ("epsgreedy", "The epsilon-greedy control at k=12 and k=30: is the learned policy "
                   "dithered greedy. Grid eps 0.05-0.3, 200 paired episodes per seed.",
      ["results/epsgreedy/*.json"], False),

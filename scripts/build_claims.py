@@ -297,6 +297,96 @@ else:
     out += ["## C4 — Federating information, reward and optimisation costs nothing measurable", "",
             f"**NOT YET AVAILABLE** -- {len(LAD)} of 4 ladder measurements at 12,000 episodes.", ""]
 
+# --- Distributional and mechanistic robustness ------------------------------------------------
+CORNERS = [("gaussian", "linear", "results/power/rho/deterministic/xfer_rho0.50_s?.json"),
+           ("uniform",  "linear", "results/noisedist/rho050_uniform_s?.json"),
+           ("t3",       "linear", "results/noisedist/rho050_t3_s?.json"),
+           ("gaussian", "tanh",   "results/noisedist/rho050_gaussian_tanh_s?.json"),
+           ("t3",       "tanh",   "results/noisedist/rho050_t3_tanh_s?.json")]
+ROB = []
+for noise, mech, pat in CORNERS:
+    fs = sorted(ROOT.glob(pat))
+    if len(fs) != 3:
+        continue
+    es = [json.loads(f.read_text())[0] for f in fs]
+    L = np.mean([e["means"]["learned"]["hard"] for e in es])
+    G = np.mean([e["means"]["greedy"]["hard"] for e in es])
+    R = np.mean([e["means"]["random_vary"]["hard"] for e in es])
+    sig = sum(1 for e in es if e["paired"]["learned-greedy"]["significant"]
+              and e["paired"]["learned-greedy"]["delta"] < 0)
+    ROB.append((noise, mech, L, G, R, sig, len(es)))
+if len(ROB) == 5:
+    out += ["## C11 — The advantage does not depend on linearity or Gaussianity", "",
+            "| noise | mechanism | learned | myopic | random | myopic/learned | ahead beyond 2 SE |",
+            "|---|---|---|---|---|---|---|"]
+    for noise, mech, L, G, R, sig, n in ROB:
+        out += [f"| {noise} | {mech} | {L:.5f} | {G:.5f} | {R:.5f} | {G/L:.2f}x | {sig}/{n} |"]
+    out += ["",
+            "rho=0.5 partial-oracle policies, selected checkpoint, sampled action selection,",
+            "evaluated under SAMPLED evidence, 200 paired episodes per seed, three seeds.",
+            "Noise shapes are standardised to unit variance before the per-node scale is",
+            "applied, so only the shape changes; the mechanism is 2*tanh(z/2), slope 1 at the",
+            "origin. The linear-Gaussian corner reproduces the stored baseline to every",
+            "recorded digit, which is what licenses reading the others as effects of the change.",
+            "",
+            "**MUST NOT** present this as the policy exploiting non-Gaussianity or",
+            "nonlinearity. In those families the structure is identifiable from observational",
+            "data alone (Shimizu et al. 2006; Hoyer et al. 2009) and this engine reads two",
+            "moments and a linear correlation, so it neither breaks nor benefits. Robust",
+            "because blind.",
+            "**MUST NOT** attribute these numbers to the sweep policies. They are the k=8",
+            "rho fleet: budget 70 not 50, 8,000 episodes not 12,000, belief channels and",
+            "reprobe signal ON. Different cell, different configuration.",
+            "**MUST NOT** read the absolute rise under tanh as the learned arm degrading:",
+            "every arm rises (random 0.054 -> 0.078 under gaussian+tanh); the task got harder",
+            "and the ratio held.", ""]
+
+# --- The constrained-budget axis, and the coordination it exposes ---------------------------
+AXIS = [(0.5,"b050"),(0.6,"b060"),(0.7,"b070"),(0.8,"b080"),(0.9,"b090"),
+        (1.0,"b100"),(1.2,"b120"),(1.5,"b150"),(2.0,"b200"),(5.0,"b500")]
+BUD = {}
+for beta, tag in AXIS:
+    fs = (sorted((ROOT/"results/budget_tight").glob(f"k12s50n04{tag}_s?.json"))
+          or sorted((ROOT/"results/sweep12k").glob(f"k12s50n04{tag}_s?.json")))
+    if len(fs) == 3:
+        BUD[beta] = [json.loads(f.read_text()) for f in fs]
+if len(BUD) >= 9:
+    def arm(runs, a, field="success"):
+        v = [r["arms"][a][field] for r in runs if a in r["arms"]]
+        return float(np.mean(v)) if v else float("nan")
+    out += ["## C10 — The learned advantage is a scarcity effect, and under scarcity it is "
+            "coordination", "",
+            "| beta | budget | learned | myopic | partition | oracle-cover | random | L-M |",
+            "|---|---|---|---|---|---|---|---|"]
+    for beta, runs in BUD.items():
+        out += [f"| {beta} | {runs[0]['config']['budget']} | {arm(runs,'learned'):.3f} | "
+                f"{arm(runs,'greedy_uncertainty'):.3f} | {arm(runs,'greedy_partitioned'):.3f} | "
+                f"{arm(runs,'oracle_cover'):.3f} | {arm(runs,'random_vary'):.3f} | "
+                f"{arm(runs,'learned')-arm(runs,'greedy_uncertainty'):+.3f} |"]
+    marg = {b: arm(r,'learned')-arm(r,'greedy_uncertainty') for b, r in BUD.items()}
+    peak = max(marg, key=marg.get)
+    lo = BUD[min(BUD)]
+    out += ["",
+            f"* margin PEAKS at beta={peak} (+{marg[peak]:.3f}) and decays to "
+            f"+{marg[max(BUD)]:.3f} at beta={max(BUD)}",
+            f"* at beta={min(BUD)} avoidable duplication is "
+            f"{arm(lo,'learned','duplicate_coverage_excess'):.3f} for the learned arm against "
+            f"{arm(lo,'oracle_cover','duplicate_coverage_excess'):.3f} for oracle-cover",
+            "* k12s50n04, 3 seeds per budget, 12,000 episodes, the run's own 200-episode "
+            "evaluation pass",
+            "",
+            "**MUST NOT** write that the learned policy beats the optimum. `oracle_cover` is "
+            "optimal WITHIN each window and uncoordinated ACROSS them by construction "
+            "(ma/baselines.py). A coordinated optimum does not exist in this codebase and the "
+            "achievable ceiling at tight budget is UNKNOWN.",
+            "**MUST NOT** carry 4.3.2's unconditional claim that coordinating without "
+            "communicating is worse than not coordinating. The sign FLIPS at beta=0.9: below "
+            "it the fixed partition beats uncoordinated myopic, above it the published "
+            "ordering holds.",
+            "**MUST NOT** quote the SHD version as though it matched the recovery version. "
+            "Measured at beta=0.5: learned 0.00554, myopic 0.00977 (1.76x, 2 of 3 seeds "
+            "separate) against 3.6x on joint recovery.", ""]
+
 # --- The epsilon-greedy control --------------------------------------------------------------
 EPS = {}
 for cell in ("k12", "k30"):

@@ -151,6 +151,58 @@ it measures 0.00000. It was an unconverged run, not a cost of pooling.
 **MUST NOT** read the final-update column as a federation effect: selection helps
 the federated arm and is inert for the pooled one, which is a checkpoint result.
 
+## C11 — The advantage does not depend on linearity or Gaussianity
+
+| noise | mechanism | learned | myopic | random | myopic/learned | ahead beyond 2 SE |
+|---|---|---|---|---|---|---|
+| gaussian | linear | 0.02989 | 0.04846 | 0.05434 | 1.62x | 3/3 |
+| uniform | linear | 0.02936 | 0.04821 | 0.05599 | 1.64x | 3/3 |
+| t3 | linear | 0.03168 | 0.04805 | 0.05654 | 1.52x | 3/3 |
+| gaussian | tanh | 0.03837 | 0.06282 | 0.07782 | 1.64x | 3/3 |
+| t3 | tanh | 0.03167 | 0.05369 | 0.06638 | 1.70x | 3/3 |
+
+rho=0.5 partial-oracle policies, selected checkpoint, sampled action selection,
+evaluated under SAMPLED evidence, 200 paired episodes per seed, three seeds.
+Noise shapes are standardised to unit variance before the per-node scale is
+applied, so only the shape changes; the mechanism is 2*tanh(z/2), slope 1 at the
+origin. The linear-Gaussian corner reproduces the stored baseline to every
+recorded digit, which is what licenses reading the others as effects of the change.
+
+**MUST NOT** present this as the policy exploiting non-Gaussianity or
+nonlinearity. In those families the structure is identifiable from observational
+data alone (Shimizu et al. 2006; Hoyer et al. 2009) and this engine reads two
+moments and a linear correlation, so it neither breaks nor benefits. Robust
+because blind.
+**MUST NOT** attribute these numbers to the sweep policies. They are the k=8
+rho fleet: budget 70 not 50, 8,000 episodes not 12,000, belief channels and
+reprobe signal ON. Different cell, different configuration.
+**MUST NOT** read the absolute rise under tanh as the learned arm degrading:
+every arm rises (random 0.054 -> 0.078 under gaussian+tanh); the task got harder
+and the ratio held.
+
+## C10 — The learned advantage is a scarcity effect, and under scarcity it is coordination
+
+| beta | budget | learned | myopic | partition | oracle-cover | random | L-M |
+|---|---|---|---|---|---|---|---|
+| 0.5 | 17 | 0.602 | 0.165 | 0.280 | 0.140 | 0.000 | +0.437 |
+| 0.6 | 20 | 0.760 | 0.288 | 0.495 | 0.260 | 0.000 | +0.472 |
+| 0.7 | 24 | 0.913 | 0.507 | 0.678 | 0.583 | 0.002 | +0.407 |
+| 0.8 | 27 | 0.932 | 0.587 | 0.732 | 0.855 | 0.002 | +0.345 |
+| 0.9 | 31 | 0.970 | 0.738 | 0.742 | 0.978 | 0.002 | +0.232 |
+| 1.0 | 34 | 0.973 | 0.815 | 0.742 | 0.997 | 0.005 | +0.158 |
+| 1.2 | 40 | 0.975 | 0.878 | 0.742 | 1.000 | 0.012 | +0.097 |
+| 1.5 | 50 | 0.985 | 0.918 | 0.740 | 1.000 | 0.017 | +0.067 |
+| 2.0 | 67 | 1.000 | 0.947 | 0.740 | 1.000 | 0.110 | +0.053 |
+| 5.0 | 166 | 0.980 | 0.947 | 0.740 | 1.000 | 0.795 | +0.033 |
+
+* margin PEAKS at beta=0.6 (+0.472) and decays to +0.033 at beta=5.0
+* at beta=0.5 avoidable duplication is 0.017 for the learned arm against 0.325 for oracle-cover
+* k12s50n04, 3 seeds per budget, 12,000 episodes, the run's own 200-episode evaluation pass
+
+**MUST NOT** write that the learned policy beats the optimum. `oracle_cover` is optimal WITHIN each window and uncoordinated ACROSS them by construction (ma/baselines.py). A coordinated optimum does not exist in this codebase and the achievable ceiling at tight budget is UNKNOWN.
+**MUST NOT** carry 4.3.2's unconditional claim that coordinating without communicating is worse than not coordinating. The sign FLIPS at beta=0.9: below it the fixed partition beats uncoordinated myopic, above it the published ordering holds.
+**MUST NOT** quote the SHD version as though it matched the recovery version. Measured at beta=0.5: learned 0.00554, myopic 0.00977 (1.76x, 2 of 3 seeds separate) against 3.6x on joint recovery.
+
 ## C9 — The learned policy is not a dithered myopic rule
 
 * k12: recovery myopic 0.918, eps-greedy best-eps 0.955, learned 0.985

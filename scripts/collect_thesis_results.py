@@ -93,6 +93,22 @@ REGISTRY = [
      "scripts/global_shd_paired.py --episodes 200 --sample --checkpoint {best,final}; "
      "scripts/recovery_paired.py --episodes 200 --checkpoint u0249"),
 
+    ("budget_tight",
+     "The constrained-budget axis: beta 0.5-0.9 at the k=12 cell, three seeds each, 12,000 "
+     "episodes. With the sweep's b100..b500 cells this is a ten-point budget axis. The "
+     "oracle_cover arm marks the feasibility floor at every point.",
+     "RQ1, section sec:res_budget_axis, figure budget_axis, CLAIMS C10",
+     ["results/budget_tight/k12s50n04b0??_s?.json", "results/budget_tight/shd_b050.json"],
+     "scripts/ma_train.py --budget {17,20,24,27,31}; scripts/global_shd_paired.py for SHD"),
+
+    ("noisedist",
+     "Distributional and mechanistic robustness: the rho=0.5 policies evaluated under "
+     "sampled evidence across noise {gaussian,uniform,t3} x mechanism {linear,tanh}. Noise "
+     "is standardised to unit variance so only the shape changes.",
+     "RQ2, section sec:res_robustness, CLAIMS C11",
+     ["results/noisedist/rho050_*.json"],
+     "scripts/global_shd_paired.py --override_noise --override_mechanism"),
+
     ("epsgreedy",
      "The epsilon-greedy control: myopic with probability 1-eps, uniform vary otherwise, "
      "grid eps 0.05-0.3, same paired episodes as the stored learned/greedy rows.",
