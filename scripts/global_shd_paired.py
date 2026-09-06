@@ -127,6 +127,21 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
+    # EVALUATE EVERY ARM AT ONE BUDGET, whatever it trained at. Needed once the training budget
+    # is RATE-COMPENSATED: the rho12b fleet trains at 53..100 so that effective beta stays at
+    # 1.5 while the answer rate moves, and without this flag each rate would also be EVALUATED
+    # at its own budget. Two consequences of that, both bad. The myopic and random arms would
+    # differ across rates, so `--baseline_from` -- which exists precisely because those arms are
+    # identical across a sweep -- would silently pair a learned arm against a baseline from a
+    # different problem. And the reported curve would vary two things at once.
+    #
+    # Fixing the evaluation budget puts every arm at the principal cell (k_v=12, sigma=0.5,
+    # K=4, beta=1.5, budget 50), so the only thing that differs between cells is the regime the
+    # policy TRAINED in, which is the question. It also means a policy trained at budget 100 is
+    # scored on a shorter horizon than it practised on; that is a real effect, it is identical
+    # for every arm, and it belongs in the caption rather than being engineered away.
+    ap.add_argument("--override_budget", type=int, default=None,
+                    help="evaluate every arm at this budget instead of the trained one")
     ap.add_argument("--override_mechanism", default=None,
                     choices=["linear", "tanh", "vshape"],
                     help="evaluate with this parent->child functional form instead of the "
@@ -194,6 +209,8 @@ def main(argv=None) -> int:
             config = dict(config, vs_evidence=args.override_evidence)
         if args.override_power is not None:
             config = dict(config, vs_evidence_power=args.override_power)
+        if args.override_budget is not None:
+            config = dict(config, budget=args.override_budget)
         if args.override_n_int is not None:
             config = dict(config, n_int=args.override_n_int)
         if args.override_disclose:
@@ -229,13 +246,23 @@ def main(argv=None) -> int:
         if args.arms == "learned":
             stored = json.loads(pathlib.Path(args.baseline_from).read_text())
             base = stored[0] if isinstance(stored, list) else stored
+            # BUDGET IS PART OF THE IDENTITY OF AN EPISODE, and was missing from this guard
+            # until 6 Sep. It did not matter while every cell in a sweep shared a budget; it
+            # matters the moment the training budget is rate-compensated, because then the
+            # myopic arm at budget 53 and the myopic arm at budget 100 are different arms on
+            # different problems and reusing one for the other is silent mispairing. Evaluating
+            # with `--override_budget` makes them the same again, and this check is what proves
+            # it rather than assuming it.
             want = (use_seed, args.episodes,
-                    args.override_evidence or config.get("vs_evidence"))
-            have = (base.get("seed"), base.get("episodes"), base.get("eval_evidence"))
+                    args.override_evidence or config.get("vs_evidence"),
+                    config.get("budget"))
+            have = (base.get("seed"), base.get("episodes"), base.get("eval_evidence"),
+                    base.get("eval_budget"))
             if want != have:
                 raise SystemExit(
-                    f"baseline mismatch: {args.baseline_from} is seed/episodes/evidence "
-                    f"{have}, this run needs {want}. Pairing requires the SAME episodes.")
+                    f"baseline mismatch: {args.baseline_from} is "
+                    f"seed/episodes/evidence/budget {have}, this run needs {want}. "
+                    f"Pairing requires the SAME episodes.")
             if "rows" not in base:
                 raise SystemExit(
                     f"{args.baseline_from} has no per-episode rows; regenerate it with "
@@ -253,6 +280,11 @@ def main(argv=None) -> int:
         entry = {"source": str(path), "seed": use_seed, "episodes": args.episodes,
                  "checkpoint": args.checkpoint, "sampled": bool(args.sample),
                  "eval_evidence": args.override_evidence or config.get("vs_evidence"),
+                 # Recorded so `--baseline_from` can prove the two runs shared a budget rather
+                 # than assume it, and so a reader can tell an evaluation at the trained budget
+                 # from one held at the principal cell's.
+                 "eval_budget": config.get("budget"),
+                 "trained_budget": report["config"].get("budget"),
                  "eval_n_int": config.get("n_int"),
                  "eval_disclose": bool(config.get("disclose_regime", False)),
                  "eval_skeleton": config.get("skeleton_source", "true"),

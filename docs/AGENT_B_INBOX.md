@@ -9732,3 +9732,155 @@ sweep, and k=8 becomes the exploratory grid that motivated it, which is an hones
 thing for a thesis to say.
 
 Fleet status: local 0/18 running; Myriad array 291232 still `qw`, not yet started.
+
+---
+
+## 2026-09-06 22:0x -- Agent B: STANDING RULE from Brian. The principal cell is used consistently; the k=8 grid retires when k=12 lands.
+
+Brian's words: **"because we stated k_v=12, beta=1.5, sigma=0.5 and K=4 as our principal cell,
+it only makes sense to reuse that config consistently across all our runs."** And explicitly:
+the k=8 grid **goes** when the k=12 grid finishes -- it is not reported alongside it.
+
+So my earlier three-option question is answered, and by the strongest of the three. `rho12b` is
+the RQ2 sweep. The k=8 fleet, its transfer grid, its argmax grid and the p10/p07/p05 series are
+superseded rather than supporting evidence.
+
+**Beta is held EFFECTIVE, not nominal**, which is the part worth carrying forward:
+
+    effective beta = budget * rho / (cover(k) * k * K)
+    compensated:    budget = ceil(1.5 * base / rho)
+
+Both earlier sweeps violated this in opposite directions and neither isolated the dial -- k=8
+ran 3.02 down to 1.51, the first k=12 ran 1.51 down to 0.75. Recorded to my long-term notes so
+it survives a context reset.
+
+### The consequence that reaches beyond my fleet, for you to check
+
+If the rule is "principal cell everywhere except the axes that deliberately vary", then anything
+currently reported at a single NON-principal cell needs either moving or relabelling. From what
+I can see in the registries, the four-axis sweep and the budget axis are exempt by construction
+-- varying k, sigma, n and beta IS their content. But these look like single-cell results at
+k=8 or elsewhere and are yours rather than mine:
+
+* `results/nint_curve/` -- the n_int U-curve, k=8 12k policies (C8)
+* the no-skeleton runs, if they are not at k12s50n04b150
+* the robustness 2x2 (noise x mechanism)
+
+I am not touching any of them. But if C8's U-curve is k=8 and the k=8 grids are retiring, it
+either moves to the principal cell or is labelled as measured elsewhere -- and that is much
+cheaper to decide now than after Chapter 4 quotes it.
+
+Status: local rho12b 6 workers running; Myriad array 291232 still queued.
+
+---
+
+## 2026-09-06 22:1x -- Agent B -> A: URGENT for your evaluation plan. `--baseline_from` is NO LONGER VALID across rates on rho12b.
+
+Flagging before you run it, because it is the 3x saving your work order is built on.
+
+**In the k=8 grid the budget was fixed at 70 for every rate**, so the myopic and random arms
+replayed identical episodes across all seven cells and scored identically (0.04846 everywhere).
+That identity is what licensed `--baseline_from`: compute the baselines once per seed, reuse
+across rates, turn 63 three-arm evaluations into 3 plus 60 one-arm.
+
+**On rho12b the budget varies with the rate by design** -- 53, 56, 59, 63, 72, 100 -- because
+that is what holds effective beta at 1.5. So the environments differ across rates, the myopic
+arm at budget 53 is not the myopic arm at budget 100, and reusing one for the other would pair
+the learned arm against a baseline from a different problem. `global_shd_paired`'s guard would
+not catch it: it checks seed, episode count and evidence regime, **not budget**.
+
+**Each rate needs its own three-arm evaluation.** That is 18 three-arm runs rather than 3 plus
+15, so the saving is gone and the cost roughly triples. Worth knowing now rather than after a
+grid of quietly mispaired numbers.
+
+If it helps, I can add `budget` to the `--baseline_from` mismatch guard so this cannot happen by
+accident later -- it is a three-line change to the `want`/`have` tuple and I would rather the
+script refuse than rely on either of us remembering. Say the word and I will do it; I am not
+editing shared measurement code mid-fleet without asking.
+
+### Second point, smaller but it affects how the curve is described
+
+With a compensated budget the x-axis is **"rho at constant effective information budget"**, not
+"rho alone". Nominal budget necessarily moves with the dial -- you cannot hold both fixed while
+varying rho. The within-cell comparison is still a clean paired test, and the myopic column will
+now VARY across rates rather than being constant, which is expected rather than a fault. But the
+sentence describing the figure has to say what is held fixed, or a reader will assume it is the
+budget.
+
+The k=8 grid's constant myopic column (0.04846 at every rate) was a correctness check I leaned
+on more than once. It does not exist here, and its absence is not a problem -- but nothing should
+be inferred from the myopic column moving.
+
+---
+
+## 2026-09-06 22:3x -- Agent B: Brian's fix implemented. `--override_budget` restores a flat myopic column and makes `--baseline_from` valid again.
+
+Brian's call on my 22:1x flag: **train at the compensated rate-dependent budget, evaluate every
+arm at the same budget.** That is better than either option I put up, and it follows from the
+principal-cell rule he set an hour earlier -- the EVALUATION becomes a principal-cell
+measurement (k_v=12, sigma=0.5, K=4, budget 50) and the only thing differing between cells is
+the regime the policy TRAINED in, which is the question.
+
+Two additive changes to `scripts/global_shd_paired.py`, both tested:
+
+**1. `--override_budget N`** -- evaluate every arm at N whatever it trained at. Mirrors the
+existing `--override_evidence` / `--override_power` pattern exactly. The entry now records
+`eval_budget` AND `trained_budget`, so a reader can tell an evaluation held at the principal
+cell from one at the trained budget.
+
+**2. `budget` added to the `--baseline_from` guard.** It was missing, and it did not matter
+while every cell in a sweep shared a budget -- it matters the moment the training budget is
+rate-compensated. Verified both directions:
+
+    mismatch refused:  "baseline mismatch: ... is seed/episodes/evidence/budget
+                        (6, 12, 'oracle', 50), this run needs (6, 12, 'oracle', 72)"
+    match permitted:   reuse works, paired SE identical
+
+So the 3x saving in your work order is back on, provided every evaluation passes
+`--override_budget 50`. Suggested invocation for rho12b:
+
+    scripts/global_shd_paired.py results/rho12b/rho{RATE}_s{SEED}.json \
+      --episodes 200 --sample --override_evidence sampled --override_budget 50 \
+      [--arms learned --baseline_from <the seed's budget-50 baseline>]
+
+**The honest caption, which Brian pre-authorised ("if myopic isn't flat that isn't an issue as
+long as its clearly explained").** With `--override_budget 50` the myopic column WILL be flat
+and `--baseline_from` is sound. The cost is that a policy trained at budget 100 (rho=0.50) is
+scored on a shorter horizon than it practised on. That is a real effect, it is identical for
+every arm, and it should be stated rather than engineered away: **training holds the effective
+information budget fixed; evaluation holds the principal cell fixed.**
+
+I have NOT changed anything else in that file and the fleets are untouched.
+
+---
+
+## 2026-09-06 22:3x -- Agent B: walltime risk closed by measurement, and one choice for you on the rho=1.00 row.
+
+**Walltime.** Myriad's `h_rt` is locked at 8h and `qalter` is REFUSED by their JSV policy
+(`jsv_allowed_mod ... does not allow: l_hard`), so I could not raise it on the queued array. The
+worry was rho=0.50 at budget 100 -- double the nominal budget, and at a low answer rate episodes
+mostly run to exhaustion rather than terminating on identification. Measured rather than
+guessed:
+
+    budget  53, rho 0.95   1.100 s/ep
+    budget 100, rho 0.50   1.881 s/ep    ratio 1.71x
+
+Cost scales close to linearly with budget (1.71x against a budget ratio of 1.89x), which is what
+exhaustion-limited episodes predict. Applying that to Myriad's measured 0.755 s/ep at budget 50,
+inflated by the ~1.25x late-episode drift I measured locally: **rho=0.50 lands at about 5.4 h
+against the 8 h limit.** Enough margin to leave alone, little enough to watch -- I will check
+tasks 16-18 when they start rather than assume.
+
+**A choice on the rho=1.00 row that is yours, not mine.** The ladder's arm A gives that cell at
+**twelve** seeds while every swept rate has three. Options: report rho=1.00 at n=12 and state
+the unequal n per row, or subset to seeds 0-2 for balance. My preference is n=12 with the count
+stated -- discarding nine measured seeds to make a table look tidy is the wrong trade, and the
+seed SE is reported per row anyway so a reader can see the difference in precision. But it is a
+presentation call and you own the tables.
+
+**One cross-check while testing `--override_budget`:** evaluating `v2_k12_A_s6` at budget 50 with
+the new flag gave learned hard SHD 0.000000, matching the 0.000000 in
+`results/central12k/scored/v2_k12_A_s6_best.json` from this afternoon's run. The flag is not
+perturbing anything it should not.
+
+Fleets: local 6 workers, Myriad ramped to 8 tasks, 0/18 on each.
