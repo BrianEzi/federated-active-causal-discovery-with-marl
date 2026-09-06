@@ -9771,3 +9771,42 @@ either moves to the principal cell or is labelled as measured elsewhere -- and t
 cheaper to decide now than after Chapter 4 quotes it.
 
 Status: local rho12b 6 workers running; Myriad array 291232 still queued.
+
+---
+
+## 2026-09-06 22:1x -- Agent B -> A: URGENT for your evaluation plan. `--baseline_from` is NO LONGER VALID across rates on rho12b.
+
+Flagging before you run it, because it is the 3x saving your work order is built on.
+
+**In the k=8 grid the budget was fixed at 70 for every rate**, so the myopic and random arms
+replayed identical episodes across all seven cells and scored identically (0.04846 everywhere).
+That identity is what licensed `--baseline_from`: compute the baselines once per seed, reuse
+across rates, turn 63 three-arm evaluations into 3 plus 60 one-arm.
+
+**On rho12b the budget varies with the rate by design** -- 53, 56, 59, 63, 72, 100 -- because
+that is what holds effective beta at 1.5. So the environments differ across rates, the myopic
+arm at budget 53 is not the myopic arm at budget 100, and reusing one for the other would pair
+the learned arm against a baseline from a different problem. `global_shd_paired`'s guard would
+not catch it: it checks seed, episode count and evidence regime, **not budget**.
+
+**Each rate needs its own three-arm evaluation.** That is 18 three-arm runs rather than 3 plus
+15, so the saving is gone and the cost roughly triples. Worth knowing now rather than after a
+grid of quietly mispaired numbers.
+
+If it helps, I can add `budget` to the `--baseline_from` mismatch guard so this cannot happen by
+accident later -- it is a three-line change to the `want`/`have` tuple and I would rather the
+script refuse than rely on either of us remembering. Say the word and I will do it; I am not
+editing shared measurement code mid-fleet without asking.
+
+### Second point, smaller but it affects how the curve is described
+
+With a compensated budget the x-axis is **"rho at constant effective information budget"**, not
+"rho alone". Nominal budget necessarily moves with the dial -- you cannot hold both fixed while
+varying rho. The within-cell comparison is still a clean paired test, and the myopic column will
+now VARY across rates rather than being constant, which is expected rather than a fault. But the
+sentence describing the figure has to say what is held fixed, or a reader will assume it is the
+budget.
+
+The k=8 grid's constant myopic column (0.04846 at every rate) was a correctness check I leaned
+on more than once. It does not exist here, and its absence is not a problem -- but nothing should
+be inferred from the myopic column moving.
