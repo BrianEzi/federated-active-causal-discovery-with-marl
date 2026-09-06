@@ -261,6 +261,10 @@ def appendix_epsgreedy():
                     > best[(cell, sd)])
         rows.append((cell, G, E, L, ahead, L - E))
     wins = sum(r[4] for r in rows)
+    # COUNTED, NOT ASSERTED. This was written as "four" and the recomputation says three;
+    # the count moves whenever a cell is re-measured, so it is derived here like every
+    # other number in this file.
+    behind = sum(1 for r in rows if r[5] <= 0)
     body = [f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & {e:.3f} & "
             f"\\textbf{{{l:.3f}}} & {a}/3 \\\\" if d > 0 else
             f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & \\textbf{{{e:.3f}}} & "
@@ -275,10 +279,69 @@ def appendix_epsgreedy():
         "marks the better of the learned and $\\varepsilon$-greedy arms in each cell.\n\n"
         + tbl("Joint recovery rate against the $\\varepsilon$-greedy control across all "
               f"twenty sweep cells, three seeds each. The learned arm leads in {wins} of "
-              f"{3*len(rows)} individual seeds. The four cells where it does not are "
-              "discussed in \\S\\ref{sec:res_sweep}.",
+              f"{3*len(rows)} individual seeds, and trails on the cell mean in "
+              f"{behind}.",
               "tab:epsgreedy_all", "lcccc",
-              r"Cell & Myopic & $\varepsilon$-greedy & Learned & Seeds ahead \\", body))
+              r"Cell & Myopic & $\varepsilon$-greedy & Learned & Seeds ahead \\", body)
+        # sec:res_epsgreedy carries the PRINCIPAL CELL (fig:epsgreedy). What belongs here
+        # is the sweep-wide version, drawn as fig:sweep_grid is drawn so the two can be read
+        # against each other, with the epsilon arms alone (Brian, 6 Sep).
+        + "\n\\paragraph{Across every swept axis.} The panels below repeat the axes of "
+          "Figure~\\ref{fig:sweep_grid} with the $\\varepsilon$-greedy arms alone, one line "
+          "per dither rate, so the two figures can be read against each other.\n\n"
+          "\\begin{figure}[htbp]\n\\centering\n"
+        + "".join(
+            "\\begin{subfigure}[t]{2.85in}\n  \\centering\n"
+            f"  \\includegraphics{{figures/epsgreedy_grid_{t}.pdf}}\n"
+            f"  \\caption{{{cap}}}\n\\end{{subfigure}}" + sep
+            for t, cap, sep in (("a", "window size", "\\hfill\n"),
+                                ("b", "federation size", "\\\\[4pt]\n"),
+                                ("c", "contended fraction", "\\hfill\n"),
+                                ("d", "budget multiplier", "\n")))
+        + "\\caption{The $\\varepsilon$-greedy control across every swept axis, one line per "
+          "dither rate, three seeds per cell: SHD on committed marks (upper panels) and joint "
+          "recovery rate (lower).}\n"
+          "\\label{fig:epsgreedy_grid}\n\\end{figure}\n\n"
+        + "\\paragraph{The same treatment on the learned policy.} If dithering a myopic rule "
+          "is a fair control, then dithering the learned rule asks the symmetric question: "
+          "whether its own action distribution does anything a coin could not. "
+          "Figure~\\ref{fig:epsgreedy_policy} applies the identical $\\varepsilon$ grid to "
+          "the learned policy at $k_v = 30$, from two bases -- the argmax policy, which "
+          "discards its trained stochasticity, and the sampled policy every other result in "
+          "this thesis uses.\n\n"
+          "\\begin{figure}[htbp]\n\\centering\n"
+          "\\includegraphics{figures/epsgreedy_policy.pdf}\n"
+          "\\caption{Pooled SHD against dither rate at $k_v = 30$, per seed, $200$ paired "
+          "episodes each. At $\\varepsilon = 0$ the left panel is the pure argmax policy and "
+          "the right panel is the sampled policy.}\n"
+          "\\label{fig:epsgreedy_policy}\n\\end{figure}\n\n")
+
+
+def appendix_robustness():
+    """Every seed of every robustness corner, with its paired difference.
+
+    The chapter's table carries corner means. Three seeds is few enough that a mean can be
+    carried by one run, so the seeds go here where a reader can see that they are not.
+    """
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from build_robustness import load, per_seed, CORNERS
+    rows = load()
+    if len(rows) != len(CORNERS):
+        return ("\\section{Robustness, Every Seed} \\label{app:robustness}\n\n"
+                f"PENDING: {len(rows)} of {len(CORNERS)} corners measured.\n\n")
+    return (
+        "\\section{Robustness, Every Seed} \\label{app:robustness}\n\n"
+        "The corners of Table~\\ref{tab:robust}, seed by seed. The policies are the "
+        "$\\rho = 0.5$ partial-oracle fleet and trained under a linear-Gaussian generator "
+        "in every row; only the evaluation generator changes. The final column is the "
+        "within-path paired difference between the learned and myopic arms on identical "
+        "episodes, so it is not the difference of the two preceding columns' spread.\n\n"
+        + tbl("Pooled SHD on committed marks per seed for each robustness corner, "
+              "$200$ paired episodes per seed. Negative differences favour the learned arm.",
+              "tab:robust_seeds", "llccccr",
+              r"Noise & Mechanism & Seed & Learned & Myopic & Random & "
+              r"Learned $-$ myopic \\", per_seed(rows)))
 
 
 def appendix_evidence_cost():
@@ -640,7 +703,8 @@ def main() -> int:
     parts.append("\\chapter{Training Diagnostics} \\label{app:diagnostics}\n")
     parts.append((ROOT / "thesis/Auxiliary Metrics.tex").read_text())
     parts.append("")
-    for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy):
+    for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy,
+               appendix_robustness):
         parts.append(fn())
         parts.append("")
     out.write_text("\n".join(parts))

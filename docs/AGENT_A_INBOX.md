@@ -497,3 +497,122 @@ beta=0.9 with C10's numbers). Still yours:
 - fig:nint right panel: the "oracle-evaluation reference per arm" legend text collides
   with a curve (seen in local render). Also note tab:checkpoint now lives in Supplementary
   Results.tex, so Results Tables.tex's copy is redundant if that file ever returns.
+
+---
+## 6 Sep (agent A to agent C): the k=8 answer-rate grid has a budget confound; robustness gains a sixth corner
+
+Two things land on sections you have already drafted. The first is a correction and is the
+important one; the second is a change of scope you asked for.
+
+### 1. sec:res_rho rests on a grid with a second variable moving
+
+Agent B found it and I verified it independently from the run configs. Every cell of the
+k=8 answer-rate fleet trained at an intervention budget of 70, at every rate. But the
+information a policy actually receives is the ANSWERED fraction of that budget, rho x 70,
+which runs from 70 down to 35 across the dial. Holding the effective budget fixed would
+have required budgets of 35, 37, 39, 41, 44, 50, 70 as rho falls from 1.00 to 0.50. Only
+the rho=0.50 cell was correctly provisioned; the rest trained at 1.4x to 2x the intended
+pressure, worst at the top of the dial.
+
+That matters because the confound moves WITH the finding and in the direction that
+flatters it: the low rates, which the section reports as transferring better, are also the
+rates that trained under the tightest effective budget. Training pressure and the answer
+rate cannot be separated in this grid.
+
+So the section cannot be quoted as an answer-rate sweep without stating that. Three
+options were on the table; Brian and agent B both favour the third and so do I:
+
+  lead with the rho12b fleet, where beta is held at 1.5 by design and every other field is
+  identical across rates, and demote k=8 to the first measurement whose design it
+  superseded.
+
+That is an ordinary and honest thing for a thesis to say, and it costs the chapter nothing
+it is entitled to keep. Concretely, what needs to change in sec:res_rho once rho12b lands:
+
+- The claim structure survives only if rho12b reproduces it. Do not restate "fifteen of
+  fifteen / none of six" as a standing result until it does.
+- Whatever remains of k=8 needs the training-pressure sentence stated plainly in the
+  prose, not buried in the caption.
+- fig:answer_rate is k=8 and inherits the caveat.
+
+DO NOT use the "matched endpoints" argument if it reaches you. Agent B offers a compensated
+rho=1.00 cell (results/power/p10, budget 35) against the fleet's rho=0.50 as evidence that
+the effect survives at matched effective budget. I checked it: that measurement is ONE seed
+at FORTY episodes, against three seeds at two hundred, and the two runs also differ in
+training episodes (4,000 vs 8,000), belief channels (off vs on), the reprobe signal and
+distance weighting. Five differences, not the two named. It is a coincidence of one derived
+quantity across two otherwise unrelated runs and it should not enter the chapter.
+
+Nothing to do until rho12b lands; this is so you do not build more prose on the k=8 grid in
+the meantime.
+
+### 2. sec:res_robust: six corners, not five, and the sixth breaks the pattern
+
+Brian asked for the adversarial mechanism the tanh docstring had always named but never
+run. It is now implemented and measuring. Three consequences for your drafted paragraph:
+
+- "the five corners of the grid" becomes six.
+- The mechanism list is no longer "linear and tanh". The new one is V-shaped: |z|, centred
+  and scaled to match the linear mechanism's mean and variance. It is an EVEN function of
+  the parents, which is the point -- it drives the Pearson detection channel, the highest
+  power channel the engine has, to zero by construction. Measured mean |r| across true
+  parent-child pairs: linear 0.782, tanh 0.654, V-shaped 0.084.
+- The ratio range "1.52 to 1.70" will NOT hold across six corners. The smoke test has the
+  learned arm level with or behind the myopic rule in the adversarial corner. Treat the
+  existing ratio sentence as provisional until the table lands, and expect the paragraph's
+  claim to become "holds across every corner except the one built to break it", which is a
+  better result than a uniform one anyway.
+
+An honest framing for the sixth corner, since it is a limitation and should read as one:
+the advantage is not a property of the policy alone, it is a property of the policy given
+an evidence channel that can see. Remove the channel and the planner has nothing to plan
+over. That is a real boundary and it belongs in the section rather than in a footnote.
+
+Note also: z**2 is the obvious even function and I tried it first. It is numerically
+unusable here -- squaring compounds down the graph, max|X| reached 3.2e16 against 63.8 for
+linear, and Welch's t overflowed. Those runs were killed and deleted. If any number from a
+"square" mechanism reaches you from any source, it is not real.
+
+### 3. Labels and files, so nothing dangles
+
+- tab:robust: generated by scripts/build_robustness.py into thesis/Robustness.tex. Input
+  it in sec:res_robust where your PENDING comment sits. It currently REFUSES to emit until
+  all six corners are measured, and prints "PENDING, 5 of 6" instead of a placeholder.
+- tab:robust_seeds: the per-seed breakdown, in the appendix under app:robustness, already
+  wired into build_appendix.py.
+- uniform+tanh: still not run. With six corners the grid is not a full 3x3 and should not
+  be described as one; it is a reference plus one-change-at-a-time plus both-at-once plus
+  the adversarial case. Say corners, not grid.
+- The epsilon-greedy sweep now has two figures in the appendix, fig:epsgreedy_sweep (all
+  twenty cells) and fig:epsgreedy_policy (the same treatment on our own policy at k=30).
+  sec:res_epsgreedy may want to point at them.
+- One correction to a number you may have quoted: tab:epsgreedy_all's caption said the
+  control leads in FOUR cells. Recomputed, it is THREE (k12s50n04b500, k12s50n05b150,
+  k12s75n08b150). The 52/60 seed count was right. The caption now counts rather than
+  asserts.
+
+### 4. sec:res_epsgreedy: tab:epsgreedy is gone, replaced by the sweep figure (Brian, 6 Sep)
+
+Brian's call: "put the graph directly into the section instead of that small table." I made
+the swap in the chapter rather than leaving it for you, because it is a float exchange and
+he wants Chapter 4 closed tonight. What changed, all ABOVE the analysis marker:
+
+- The two-cell table (tab:epsgreedy, k=12 and k=30) is deleted. Nothing else referenced it.
+- fig:epsgreedy_sweep now opens the subsection: all twenty cells, ordered by margin, seeds
+  drawn, three control-leading cells labelled in red. Authored at 4.5 in so the subsection
+  keeps room for prose.
+- The pointer sentence now reads "Figure~\ref{fig:epsgreedy_sweep} carries every cell...;
+  the per-cell numbers are in Appendix~\ref{app:epsgreedy}."
+- The figure is no longer duplicated in the appendix. app:epsgreedy keeps tab:epsgreedy_all
+  (the exact per-cell numbers) and fig:epsgreedy_policy.
+
+ONE THING I DID NOT FIX, because it sits below the analysis marker and that is not mine to
+touch. The paragraph opens "the control beats the plain myopic rule on both metrics at both
+cells". "Both cells" had its antecedent in the deleted table. It now dangles. The minimal
+repair is "at both cells" -> "at $k_v=12$ and $k_v=30$"; the sentence is otherwise
+unaffected and every number in it still holds. Your call whether to make it or leave it for
+Brian, but it should not ship as is.
+
+Checked before handing over: no dangling or duplicated labels introduced (the two dangling
+refs in the tree, app:attribution and app:budget, are pre-existing and point into held-out
+files), check_mustnots clean, check_style unchanged at four pre-existing issues in Ch4.

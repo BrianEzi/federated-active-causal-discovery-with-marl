@@ -302,7 +302,11 @@ CORNERS = [("gaussian", "linear", "results/power/rho/deterministic/xfer_rho0.50_
            ("uniform",  "linear", "results/noisedist/rho050_uniform_s?.json"),
            ("t3",       "linear", "results/noisedist/rho050_t3_s?.json"),
            ("gaussian", "tanh",   "results/noisedist/rho050_gaussian_tanh_s?.json"),
-           ("t3",       "tanh",   "results/noisedist/rho050_t3_tanh_s?.json")]
+           ("t3",       "tanh",   "results/noisedist/rho050_t3_tanh_s?.json"),
+           # The ADVERSARIAL corner (6 Sep): |z|, an even function of the parents, which
+           # drives the Pearson detection channel to zero by construction. Not a robustness
+           # corner -- it is the boundary, and it is expected to break the pattern.
+           ("gaussian", "vshape", "results/noisedist/rho050_gaussian_vshape_s?.json")]
 ROB = []
 for noise, mech, pat in CORNERS:
     fs = sorted(ROOT.glob(pat))
@@ -315,8 +319,9 @@ for noise, mech, pat in CORNERS:
     sig = sum(1 for e in es if e["paired"]["learned-greedy"]["significant"]
               and e["paired"]["learned-greedy"]["delta"] < 0)
     ROB.append((noise, mech, L, G, R, sig, len(es)))
-if len(ROB) == 5:
-    out += ["## C11 — The advantage does not depend on linearity or Gaussianity", "",
+if len(ROB) == len(CORNERS):
+    out += ["## C11 — The advantage survives every departure from linear-Gaussian except "
+            "the one that blinds the evidence channel", "",
             "| noise | mechanism | learned | myopic | random | myopic/learned | ahead beyond 2 SE |",
             "|---|---|---|---|---|---|---|"]
     for noise, mech, L, G, R, sig, n in ROB:
@@ -339,7 +344,40 @@ if len(ROB) == 5:
             "reprobe signal ON. Different cell, different configuration.",
             "**MUST NOT** read the absolute rise under tanh as the learned arm degrading:",
             "every arm rises (random 0.054 -> 0.078 under gaussian+tanh); the task got harder",
-            "and the ratio held.", ""]
+            "and the ratio held.",
+            "**MUST NOT** state that the advantage holds in every corner, or quote the",
+            "1.52-1.70 ratio range as covering the grid. Both were true of the FIVE-corner",
+            "version and are false now. The V-shaped corner is 0.98x with 0 of 3 seeds ahead:",
+            "learned and myopic are indistinguishable there (per-seed paired difference",
+            "+0.00569, -0.00138, +0.00766, and the one that clears two standard errors clears",
+            "it in the MYOPIC arm's favour).",
+            "**MUST NOT** describe the V-shaped mechanism as a robustness corner. It is",
+            "ADVERSARIAL BY CONSTRUCTION: an even function of the parents, so the Pearson",
+            "detection channel -- the highest-power channel the engine has -- reads zero.",
+            "Mean |r| over true parent-child pairs: linear 0.782, tanh 0.654, V-shaped 0.051.",
+            "**MUST NOT** read that corner as the learned policy failing. EVERY arm collapses",
+            "together: learned 0.030 -> 0.183, myopic 0.048 -> 0.179, random 0.054 -> 0.217.",
+            "Both trained arms still beat random; what disappears is the gap between them.",
+            "The reading is that the advantage is a property of the policy GIVEN an evidence",
+            "channel that can see, not of the policy alone.",
+            "**MUST NOT** quote any number from a `square` (z**2) mechanism. That was the",
+            "first implementation and it is numerically degenerate -- squaring compounds down",
+            "the graph, max|X| reached 3.2e16 against 63.8 under linear, and Welch's t",
+            "overflowed. Those runs were killed and deleted on 6 Sep.", ""]
+else:
+    # A SILENT DISAPPEARANCE IS WORSE THAN A GAP. Chapter 4 cites C11 by name; when the
+    # corner list grew from five to six this section vanished from CLAIMS.md with nothing
+    # said, which is exactly how a chapter comes to cite a claim the number source no
+    # longer makes.
+    have = ", ".join(f"{n}/{m}" for n, m, pat in CORNERS
+                     if len(sorted(ROOT.glob(pat))) == 3)
+    out += ["## C11 — The advantage survives every departure from linear-Gaussian except "
+            "the one that blinds the evidence channel", "",
+            f"**NOT YET AVAILABLE** -- {len(ROB)} of {len(CORNERS)} corners measured.",
+            f"Measured so far: {have}.",
+            "Do not quote a corner count, a ratio range, or a 'holds everywhere' claim from",
+            "the previous five-corner version of this section: the sixth corner is the",
+            "ADVERSARIAL one and is expected to break the pattern.", ""]
 
 # --- The constrained-budget axis, and the coordination it exposes ---------------------------
 AXIS = [(0.5,"b050"),(0.6,"b060"),(0.7,"b070"),(0.8,"b080"),(0.9,"b090"),

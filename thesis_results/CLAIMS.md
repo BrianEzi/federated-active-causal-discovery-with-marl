@@ -151,7 +151,7 @@ it measures 0.00000. It was an unconverged run, not a cost of pooling.
 **MUST NOT** read the final-update column as a federation effect: selection helps
 the federated arm and is inert for the pooled one, which is a checkpoint result.
 
-## C11 — The advantage does not depend on linearity or Gaussianity
+## C11 — The advantage survives every departure from linear-Gaussian except the one that blinds the evidence channel
 
 | noise | mechanism | learned | myopic | random | myopic/learned | ahead beyond 2 SE |
 |---|---|---|---|---|---|---|
@@ -160,6 +160,7 @@ the federated arm and is inert for the pooled one, which is a checkpoint result.
 | t3 | linear | 0.03168 | 0.04805 | 0.05654 | 1.52x | 3/3 |
 | gaussian | tanh | 0.03837 | 0.06282 | 0.07782 | 1.64x | 3/3 |
 | t3 | tanh | 0.03167 | 0.05369 | 0.06638 | 1.70x | 3/3 |
+| gaussian | vshape | 0.18339 | 0.17940 | 0.21688 | 0.98x | 0/3 |
 
 rho=0.5 partial-oracle policies, selected checkpoint, sampled action selection,
 evaluated under SAMPLED evidence, 200 paired episodes per seed, three seeds.
@@ -179,6 +180,25 @@ reprobe signal ON. Different cell, different configuration.
 **MUST NOT** read the absolute rise under tanh as the learned arm degrading:
 every arm rises (random 0.054 -> 0.078 under gaussian+tanh); the task got harder
 and the ratio held.
+**MUST NOT** state that the advantage holds in every corner, or quote the
+1.52-1.70 ratio range as covering the grid. Both were true of the FIVE-corner
+version and are false now. The V-shaped corner is 0.98x with 0 of 3 seeds ahead:
+learned and myopic are indistinguishable there (per-seed paired difference
++0.00569, -0.00138, +0.00766, and the one that clears two standard errors clears
+it in the MYOPIC arm's favour).
+**MUST NOT** describe the V-shaped mechanism as a robustness corner. It is
+ADVERSARIAL BY CONSTRUCTION: an even function of the parents, so the Pearson
+detection channel -- the highest-power channel the engine has -- reads zero.
+Mean |r| over true parent-child pairs: linear 0.782, tanh 0.654, V-shaped 0.051.
+**MUST NOT** read that corner as the learned policy failing. EVERY arm collapses
+together: learned 0.030 -> 0.183, myopic 0.048 -> 0.179, random 0.054 -> 0.217.
+Both trained arms still beat random; what disappears is the gap between them.
+The reading is that the advantage is a property of the policy GIVEN an evidence
+channel that can see, not of the policy alone.
+**MUST NOT** quote any number from a `square` (z**2) mechanism. That was the
+first implementation and it is numerically degenerate -- squaring compounds down
+the graph, max|X| reached 3.2e16 against 63.8 under linear, and Welch's t
+overflowed. Those runs were killed and deleted on 6 Sep.
 
 ## C10 — The learned advantage is a scarcity effect, and under scarcity it is coordination
 

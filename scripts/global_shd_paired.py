@@ -127,9 +127,12 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
-    ap.add_argument("--override_mechanism", default=None, choices=["linear", "tanh"],
+    ap.add_argument("--override_mechanism", default=None,
+                    choices=["linear", "tanh", "vshape"],
                     help="evaluate with this parent->child functional form instead of the "
-                         "trained one. 6 Sep: the nonlinear-mechanism robustness probe.")
+                         "trained one. 6 Sep: 'tanh' is the nonlinear-mechanism robustness "
+                         "probe; 'vshape' is the adversarial one that blinds the "
+                         "correlation detection channel (ma/scm.py).")
     ap.add_argument("--override_noise", default=None,
                     choices=["gaussian", "uniform", "t3"],
                     help="evaluate with this SCM noise SHAPE instead of the trained one "

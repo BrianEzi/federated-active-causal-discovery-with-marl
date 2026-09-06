@@ -990,6 +990,231 @@ def fig_training_signal(out: pathlib.Path):
     plt.close(fig)
 
 
+def _epsgreedy_best():
+    """Best-epsilon joint recovery per (cell, seed), from the twenty-cell sweep.
+
+    BEST EPSILON PER SEED, which is a selection that favours the CONTROL: it lets the
+    epsilon-greedy arm pick its dither rate with hindsight, per seed, while the learned arm
+    gets no such choice. Quoted that way wherever it appears, because the comparison is only
+    worth making if it is tilted against us.
+    """
+    best: dict = {}
+    for f in sorted(glob.glob(str(ROOT / "results/epsgreedy/sweep/w*.json"))):
+        for e in json.loads(pathlib.Path(f).read_text()):
+            cell = pathlib.Path(e["source"]).stem.rsplit("_s", 1)[0]
+            key = (cell, e["seed"])
+            best[key] = max(best.get(key, 0.0), float(np.mean(e["rows"]["success"])))
+    return best
+
+
+PRINCIPAL = "k12s50n04b150"
+EPS_LEVELS = (0.05, 0.1, 0.2, 0.3)
+
+
+def _eps_records():
+    """Every epsilon-greedy sweep record, keyed (cell, seed, eps)."""
+    rec = {}
+    for f in sorted(glob.glob(str(ROOT / "results/epsgreedy/sweep/w*.json"))):
+        for e in json.loads(pathlib.Path(f).read_text()):
+            cell = pathlib.Path(e["source"]).stem.rsplit("_s", 1)[0]
+            rec[(cell, e["seed"], e["eps"])] = e
+    return rec
+
+
+def fig_epsgreedy(out: pathlib.Path):
+    """The control at the principal cell, on both metrics, as one readable figure.
+
+    REPLACES the twenty-cell lollipop that used to open this subsection. That figure carried
+    every cell and was, in Brian's words, very difficult to decipher: twenty rows of three
+    overlapping markers answers a question nobody asked before the simple one is answered.
+    The simple one is what this figure answers -- at the cell the sweep is built around, what
+    does dithering the myopic rule buy, and does it reach the learned arm. The full sweep
+    moves to the appendix.
+
+    EPSILON ZERO IS THE MYOPIC RULE, so the axis starts there and the curve's left endpoint
+    is the undithered baseline rather than a separate series. That point comes from the cell's
+    own sweep and SHD files, not from the epsilon runs, which never ran an eps=0 arm.
+
+    BOTH METRICS, and they disagree in an informative way at this cell: recovery separates the
+    arms cleanly while SHD sits on the measurement floor for all of them. Showing only the
+    metric that separates would be choosing the flattering one.
+    """
+    rec = _eps_records()
+    have = [e for (c, _, _), e in rec.items() if c == PRINCIPAL]
+    if not have:
+        raise FileNotFoundError(f"no epsilon records for {PRINCIPAL}")
+    seeds = sorted({s for (c, s, _) in rec if c == PRINCIPAL})
+
+    # The eps=0 anchor and the learned reference, from the cell's own measurements.
+    sweep = {}
+    for f in sorted(glob.glob(str(ROOT / f"results/sweep12k/{PRINCIPAL}_s?.json"))):
+        d = json.loads(pathlib.Path(f).read_text())
+        sweep[d["seed"]] = d["arms"]
+    shd = {e["seed"]: e["means"]
+           for e in json.loads((ROOT / f"results/sweep12k/shd/{PRINCIPAL}.json").read_text())}
+
+    metrics = [("hard", "SHD on committed marks ($\\downarrow$)",
+                lambda sd: shd[sd]["greedy"]["hard"], lambda sd: shd[sd]["learned"]["hard"]),
+               ("success", "joint recovery rate ($\\uparrow$)",
+                lambda sd: sweep[sd]["greedy_uncertainty"]["success"],
+                lambda sd: sweep[sd]["learned"]["success"])]
+    xs = [0.0] + list(EPS_LEVELS)
+    pos = list(range(len(xs)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.6),
+                             gridspec_kw={"wspace": 0.28})
+    for ax, (key, ylabel, myopic_of, learned_of) in zip(axes, metrics):
+        # Learned: a horizontal band, because it does not vary with epsilon -- it is the
+        # thing the control is trying to reach.
+        lv = [learned_of(sd) for sd in seeds]
+        ax.axhline(float(np.mean(lv)), color=LEARNED, lw=1.6, zorder=4, label="learned")
+        ax.fill_between([-.4, len(xs) - .6], min(lv), max(lv), color=LEARNED, alpha=.11,
+                        lw=0, zorder=1,
+                        label="learned, seed range" if key == "success" else None)
+        means, spread = [], []
+        for x in xs:
+            vals = ([myopic_of(sd) for sd in seeds] if x == 0.0 else
+                    [rec[(PRINCIPAL, sd, x)]["means"][key] for sd in seeds])
+            means.append(float(np.mean(vals)))
+            spread.append(vals)
+        for p_, vals in zip(pos, spread):
+            ax.scatter([p_] * len(vals), vals, s=11, color=MYOPIC, alpha=.35, zorder=3)
+        ax.plot(pos, means, marker="s", ms=4, lw=1.6, color=MYOPIC, zorder=4,
+                label="myopic $+\\;\\varepsilon$ dither")
+        ax.set_xticks(pos)
+        ax.set_xticklabels(["0\n(myopic)"] + [f"{x:g}" for x in EPS_LEVELS])
+        ax.set_xlim(-.4, len(xs) - .6)
+        ax.set_xlabel("dither rate $\\varepsilon$")
+        ax.set_ylabel(ylabel, fontsize=8)
+    axes[0].set_ylim(bottom=0)
+    axes[1].set_ylim(.84, 1.005)
+    axes[1].legend(frameon=False, fontsize=8, loc="lower left", handlelength=1.5)
+    fig.savefig(out / "epsgreedy.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_epsgreedy_grid(out: pathlib.Path):
+    """The sweep grid of fig:sweep_grid, redrawn with the epsilon-greedy arms alone.
+
+    ONE LINE PER DITHER RATE, which is the point: the main grid answers "does the learned arm
+    beat the myopic one across the sweep", and this one answers "does any amount of dither
+    change the shape of that answer". Reading it against fig:sweep_grid is what makes it
+    informative, so it keeps that figure's panels, axes, ordering and log floor exactly, and
+    changes only which series are drawn.
+    """
+    rec = _eps_records()
+    if not rec:
+        raise FileNotFoundError("no results/epsgreedy/sweep/w*.json")
+    cells = {c for (c, _, _) in rec}
+    axes_spec = [
+        ("a", "window size $k_v$", lambda k, s, n, b: (s, n, b) == (50, 4, 150),
+         lambda k, s, n, b: k),
+        ("b", "agents $K$", lambda k, s, n, b: (k, s, b) == (12, 50, 150),
+         lambda k, s, n, b: n),
+        ("c", "contended fraction $\\sigma$", lambda k, s, n, b: (k, n, b) == (12, 4, 150),
+         lambda k, s, n, b: s / 100),
+        ("d", "budget multiplier $\\beta$", lambda k, s, n, b: (k, s, n) == (12, 50, 4),
+         lambda k, s, n, b: b / 100),
+    ]
+    parsed = {}
+    for c in cells:
+        m = re.match(r"k(\d+)s(\d+)n(\d+)b(\d+)$", c)
+        if m:
+            parsed[c] = tuple(int(g) for g in m.groups())
+    metrics = [("hard", "SHD on committed\nmarks ($\\downarrow$)", True),
+               ("success", "joint recovery\nrate ($\\uparrow$)", False)]
+    floor = 1e-5
+    shades = [.95, .72, .50, .30]
+
+    for tag, xlabel, keep, xof in axes_spec:
+        sel = [c for c, v in parsed.items() if keep(*v)]
+        if not sel:
+            continue
+        xvals = sorted({xof(*parsed[c]) for c in sel})
+        pos = list(range(len(xvals)))
+        fig, panel = plt.subplots(2, 1, figsize=(HALF, 3.45), sharex=True,
+                                  gridspec_kw={"hspace": 0.14})
+        for row, (key, ylabel, logy) in enumerate(metrics):
+            ax = panel[row]
+            for eps, shade in zip(EPS_LEVELS, shades):
+                means = []
+                for x in xvals:
+                    vals = [rec[(c, sd, eps)]["means"][key]
+                            for c in sel if xof(*parsed[c]) == x
+                            for sd in (0, 1, 2) if (c, sd, eps) in rec]
+                    means.append(float(np.mean(vals)) if vals else np.nan)
+                ax.plot(pos, [max(m, floor) if logy else m for m in means],
+                        marker="o", ms=3.2, lw=1.4, color=MYOPIC, alpha=shade,
+                        label=f"$\\varepsilon = {eps:g}$" if (row == 1 and tag == "a")
+                        else None, zorder=3)
+            if logy:
+                ax.set_yscale("log")
+                ax.set_ylim(floor * .7, 3e-1)
+                ax.axhspan(floor * .7, floor * 1.6, color="black", alpha=.05, zorder=0)
+            else:
+                ax.set_ylim(-.03, 1.05)
+            ax.set_xticks(pos)
+            ax.set_xticklabels([f"{x:g}" for x in xvals])
+            ax.set_xlim(-.4, len(xvals) - .6)
+            ax.set_ylabel(ylabel, fontsize=8)
+        panel[1].set_xlabel(xlabel)
+        if tag == "a":
+            panel[1].legend(frameon=False, fontsize=7.5, loc="lower right",
+                            handlelength=1.4, ncol=2, columnspacing=1.0)
+        fig.savefig(out / f"epsgreedy_grid_{tag}.pdf", bbox_inches="tight")
+        plt.close(fig)
+
+
+def fig_epsgreedy_policy(out: pathlib.Path):
+    """The same treatment turned on our own policy, at k=30.
+
+    THE SYMMETRIC QUESTION, and the reason it is not a footnote: if dithering a myopic rule
+    is a fair control for a learned one, then dithering the learned one asks whether its own
+    action distribution is doing anything a coin could not. Two bases: the ARGMAX policy,
+    which throws its trained stochasticity away, and the SAMPLED policy, which is the arm
+    every other result in the thesis uses.
+
+    PER SEED, NEVER AVERAGED. The three seeds disagree about whether dither recovers the
+    argmax deficit -- one is fully rescued, one is not -- and that heterogeneity is the
+    finding. A mean over three would report a middle that no seed occupies.
+    """
+    anchor = {e["seed"]: e["means"]["learned"]["hard"]
+              for e in json.loads((ROOT / "results/rerows/k30_best.json").read_text())}
+    pure = {e["seed"]: e["means"]["learned"]["hard"]
+            for e in json.loads((ROOT / "results/epsgreedy/k30_argmax_pure.json").read_text())}
+    panels = [("argmax base", "k30_argmax_eps", pure),
+              ("sampled base", "k30_sampled_eps", anchor)]
+    seeds = (0, 1, 2)
+    marks = ("o", "s", "^")
+
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.5), sharey=True,
+                             gridspec_kw={"wspace": 0.08})
+    for ax, (title, tag, zero) in zip(axes, panels):
+        d = json.loads((ROOT / f"results/epsgreedy/{tag}.json").read_text())
+        eps = sorted({e["eps"] for e in d})
+        xs = [0.0] + eps
+        posn = list(range(len(xs)))          # evenly spaced: 0.05 and 0.1 crush on a linear axis
+        for sd, mk in zip(seeds, marks):
+            ys = [zero[sd]] + [next(e["means"]["hard"] for e in d
+                                    if e["seed"] == sd and e["eps"] == x) for x in eps]
+            ax.plot(posn, ys, marker=mk, ms=3.6, lw=1.4, color=LEARNED,
+                    alpha=[.95, .62, .38][sd],
+                    label=f"seed {sd}" if title.startswith("argmax") else None)
+        ax.set_xticks(posn)
+        ax.set_xticklabels([f"{x:g}" for x in xs])
+        ax.set_xlim(-.3, len(xs) - .7)
+        ax.set_xlabel("dither rate $\\varepsilon$")
+        _title(ax, title)
+        # The base at eps=0 is the policy as it is normally run; everything to its right is
+        # the same policy with noise added.
+        ax.text(.03, .95, title, transform=ax.transAxes, ha="left", va="top", fontsize=8.5)
+    axes[0].set_ylabel("SHD on committed\nmarks ($\\downarrow$)", fontsize=8)
+    axes[0].set_ylim(-.0004, .0062)
+    axes[0].legend(frameon=False, fontsize=8, loc="upper right", handlelength=1.4)
+    fig.savefig(out / "epsgreedy_policy.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1008,7 +1233,10 @@ def main(argv=None) -> int:
                      ("fixedpolicy", fig_fixedpolicy),
                      ("inregime", fig_inregime),
                      ("generator", fig_generator),
-                     ("training_signal", fig_training_signal)):
+                     ("training_signal", fig_training_signal),
+                     ("epsgreedy", fig_epsgreedy),
+                     ("epsgreedy_grid_[abcd]", fig_epsgreedy_grid),
+                     ("epsgreedy_policy", fig_epsgreedy_policy)):
         try:
             fn(out)
             print(f"  wrote {name}.pdf")

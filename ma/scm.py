@@ -109,20 +109,54 @@ def topological_order(adjacency: np.ndarray) -> np.ndarray:
 
 
 
-MECHANISMS = ("linear", "tanh")
+MECHANISMS = ("linear", "tanh", "vshape")
+
+# |z| for a zero-mean Gaussian z of standard deviation s has mean s*sqrt(2/pi) and variance
+# s**2 * (1 - 2/pi). Centring and dividing by sqrt(1 - 2/pi) therefore returns mean 0 and
+# variance s**2 -- the same two moments the linear mechanism would have delivered.
+_ABS_MEAN = np.sqrt(2.0 / np.pi)          # 0.7979
+_ABS_SD = np.sqrt(1.0 - 2.0 / np.pi)      # 0.6028
 
 
-def _apply_mechanism(z, mechanism: str = "linear"):
-    """The parent contribution, optionally passed through a saturating nonlinearity.
+def _apply_mechanism(z, mechanism: str = "linear", scale=None):
+    """The parent contribution, optionally passed through a nonlinearity.
 
-    linear  z, unchanged: every result in the thesis.
+    linear  z, unchanged: every headline result in the thesis.
     tanh    2*tanh(z/2). An additive-noise model with a nonlinear function of the parents,
             the standard identifiable-ANM form (Hoyer et al. 2009). Chosen for two
             properties: its slope at the origin is exactly 1, so small signals behave as
             in the linear case and the comparison is not confounded by a change of gain;
             and it is MONOTONE, so it attenuates all three detection channels rather than
-            zeroing one. A symmetric nonlinearity (z**2) would send the correlation channel
-            to zero by construction and is the adversarial case, not the robustness case.
+            zeroing one. This is the ROBUSTNESS case.
+    vshape  (|z| - s*sqrt(2/pi)) / sqrt(1 - 2/pi), with s the SCM's own scale for this node.
+            The ADVERSARIAL case, added 6 Sep at Brian's request. An even function of the
+            parents, which defeats the third detection channel in `cb/citest.py`: the
+            Pearson correlation between a randomised intervention's assigned values and the
+            child, the highest-power channel this engine has. Those assigned values are
+            drawn Gaussian and independent of everything upstream, so for a direct child
+            E[x * f(z)] = 0 and the channel reads zero however many rows it is given. The
+            mean and variance channels still fire.
+
+            WHY |z| AND NOT z**2, which is the obvious even function and was tried first.
+            Squaring is not merely nonlinear, it is super-linear, so a tail value at one
+            node becomes a far larger tail value at the next and the graph compounds it.
+            Measured in this project's own generator: max|X| over 25 episodes ran to
+            3.2e16 against 63.8 under `linear`, and Welch's t overflowed on the resulting
+            variances. That corner would have measured floating-point degeneracy, not
+            robustness. |z| grows linearly, so the recursion is as stable as the linear
+            case while the evenness -- the property the whole corner rests on -- is
+            identical.
+
+            SCALED, NOT RAW, and s comes from the SCM rather than from the rows being drawn
+            (`_vshape_scales`). Both moments then match the linear mechanism: mean 0 and
+            variance s**2. Without that the gain would change alongside the correlation
+            channel and the two effects would be inseparable -- the second-variable-moved
+            error this project has caught four times. Estimating s per block instead would
+            attenuate the signal by ~11% at n_int=20 and ~3% at n_obs=60, a per-block
+            artefact that varies with block size.
+
+            Centring is exact only in expectation here, since s is the SCM's scale and not
+            the block's, which leaves the mean channel behaving as it does under `linear`.
 
     Roots are unaffected: with no parents z is 0 and every mechanism here fixes 0.
     """
@@ -130,7 +164,48 @@ def _apply_mechanism(z, mechanism: str = "linear"):
         return z
     if mechanism == "tanh":
         return 2.0 * np.tanh(z / 2.0)
+    if mechanism == "vshape":
+        if scale is None:                      # fallback only; callers pass the SCM scale
+            scale = float(np.sqrt(np.mean(z * z)))
+        if scale < 1e-12:                      # a root, or a node with no parent variance
+            return np.zeros_like(z)
+        return (np.abs(z) - scale * _ABS_MEAN) / _ABS_SD
     raise ValueError(f"unknown mechanism {mechanism!r}; expected one of {MECHANISMS}")
+
+
+def _vshape_scales(params: "SCMParams", targets: dict):
+    """Per-node standard deviation of the parent contribution under `vshape`.
+
+    Under `vshape` a child is uncorrelated with each of its parents whenever the parent is
+    symmetric, so the off-diagonal terms in `Var(X'w)` vanish and the variance recursion
+    collapses to a sum of squares that can be walked in topological order.
+
+    NOT EXACT EVERYWHERE, and the deviation is measured rather than assumed. Squaring makes
+    a node skewed, and `Var(f(z)) = Var(z)` relies on `E[z**4] = 3 Var(z)**2`, which is the
+    Gaussian value. Deep in a graph, where z is a sum of already-skewed terms, the fourth
+    moment runs high and the node's variance with it. Measured over three random 8-node
+    SCMs at 300,000 rows: most nodes sit within 0.2% of the linear generator's marginal
+    standard deviation, and a minority reach +38%. So this corner is deliberately
+    adversarial rather than a perfectly controlled single-variable change -- which does not
+    affect the comparison, since all three arms face the identical generator.
+
+    `targets` maps an intervened node to the standard deviation it is drawn at (0.0 for a
+    clamp). An intervened node contributes that variance instead of its structural one,
+    because its equation has been replaced -- so the scale a child's mechanism uses is
+    correct in the interventional block as well as the observational one, which is what
+    keeps the Brown-Forsythe channel reading a real variance contrast rather than a
+    normalisation artefact.
+    """
+    d = params.d
+    var_x = np.zeros(d)
+    scales = np.zeros(d)
+    for node in order_for(params.adjacency):
+        node = int(node)
+        w = params.weights[:, node]
+        scales[node] = np.sqrt(float(np.sum(w * w * var_x)))
+        var_x[node] = (float(targets[node]) ** 2 if node in targets
+                       else scales[node] ** 2 + float(params.noise_scales[node]) ** 2)
+    return scales
 
 
 NOISE_DISTS = ("gaussian", "uniform", "t3")
@@ -208,6 +283,9 @@ def sample(
     d = params.d
     samples = np.zeros((n, d))
     intervened = np.zeros((n, d))
+    scales = (_vshape_scales(params, {} if intervene_node is None
+                             else {int(intervene_node): float(intervene_scale)})
+              if mechanism == "vshape" else None)
 
     for node in order_for(params.adjacency):
         node = int(node)
@@ -217,7 +295,8 @@ def sample(
             intervened[:, node] = 1.0
         else:
             parent_contribution = _apply_mechanism(
-                samples @ params.weights[:, node], mechanism)
+                samples @ params.weights[:, node], mechanism,
+                None if scales is None else float(scales[node]))
             noise = _draw_noise(rng, params.noise_scales[node], n, noise_dist)
             samples[:, node] = parent_contribution + noise
 
@@ -264,6 +343,7 @@ def sample_multi(
         targets = {int(v): float(intervene_scale) for v in intervene_nodes}
     samples = np.zeros((n, d))
     intervened = np.zeros((n, d))
+    scales = _vshape_scales(params, targets) if mechanism == "vshape" else None
 
     for node in order_for(params.adjacency):
         node = int(node)
@@ -274,7 +354,8 @@ def sample_multi(
             intervened[:, node] = 1.0
         else:
             parent_contribution = _apply_mechanism(
-                samples @ params.weights[:, node], mechanism)
+                samples @ params.weights[:, node], mechanism,
+                None if scales is None else float(scales[node]))
             noise = _draw_noise(rng, params.noise_scales[node], n, noise_dist)
             samples[:, node] = parent_contribution + noise
 
