@@ -9631,3 +9631,61 @@ that question now has a known answer at the low end and the answer is about budg
 Two wrong attributions from me within the hour, both caught by holding the right thing fixed:
 first I blamed window size, then I blamed a budget advantage that turns out to be a correction.
 The common fault was reading a difference without asking what it compensates for.
+
+---
+
+## 2026-09-06 21:4x -- Agent B: BOTH FLEETS RELAUNCHED with a rate-compensated budget. Brian's call; the old design confounded the dial with training pressure.
+
+### Why the old fleets were stopped
+
+Fixed budget 50 across the sweep means effective beta FALLS with the dial, because at answer
+rate rho only rho of your interventions return an answer:
+
+    k=12 budget 50:  rho=1.00 -> 1.51   0.90 -> 1.36   0.70 -> 1.06   0.50 -> 0.75
+
+The low rates were training at half the standard pressure and failed the floor accordingly
+(0.173 at rho=0.50, 0.412 at rho=0.70). That measured starvation and would have been read as
+answer-rate intolerance. The k=8 grid has the same fault mirrored -- fixed budget 70 gives beta
+3.02 at rho=1.00 falling to 1.51 at rho=0.50, so its HIGH rates were over-provisioned.
+**Neither sweep isolated the answer rate.**
+
+### The replacement
+
+    rho     0.95  0.90  0.85  0.80  0.70  0.50
+    budget    53    56    59    63    72   100     -> effective beta 1.51-1.52 throughout
+
+`results/rho12b/`, 18 runs. Local fleet running (6 workers, budget-rate pairing verified on the
+live command lines: 53<->0.95, 56<->0.90). Myriad array **291232.1-18** submitted.
+
+**rho=1.00 is deliberately absent.** Budget 50 at rho=1.00 already IS beta 1.5, and the ladder's
+twelve arm-A runs are that cell exactly, already scored under both conventions. Three more would
+be a worse-powered copy of a control we hold.
+
+### The evidence that this is not just tidiness
+
+Brian asked whether anything in the reward or stopping rule counters an over-provisioned budget.
+Checked: **`step_cost` is 0.0 in every fleet** -- nothing charges for an intervention. The only
+pressure is discounting (`gamma` 0.99) with termination on `all_identified or out_of_budget`, so
+finishing sooner is worth ~1% per round in RETURN. But `window_rate`, `success` and hard SHD are
+speed-blind: at beta 3.02 a sloppy policy identifies eventually and scores the same as an
+efficient one. Weak pressure against three times the required cover.
+
+**And the scarcity hypothesis it raises is already refuted by data on disk.** If the
+dose-response were really a budget-pressure curve, matching effective beta should erase it. It
+does not:
+
+    transfer_p10   rho=1.0  budget 35  eff beta 1.51   delta +0.02686 (+3.33 SE)  WORSE than myopic
+    rho fleet      rho=0.5  budget 70  eff beta 1.51   delta -0.01856             BETTER
+
+Same effective beta, a swing of 0.045. And within the austere series where budget is fixed at 35,
+transfer is best at rho=0.70 (-0.92 SE), not at the lowest effective beta rho=0.50 (+0.58 SE) --
+the opposite of what pure scarcity predicts. **The answer rate is doing real work.** (Caveat:
+p10 is 4k episodes with channels off against the fleet's 8k with channels on, so this is the
+strongest available evidence rather than a clean isolation. The within-series half is the
+cleaner one.)
+
+### Preserved, not discarded
+
+The seven Myriad cells and one local cell from the uncompensated fleet are in
+`results/rho12_myriad/` and `results/rho12/`. They are the evidence for the starvation finding
+and should be reported as such, not deleted -- and never mixed into the compensated table.
