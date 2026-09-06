@@ -8878,3 +8878,37 @@ runs; I am not starting it on an extrapolation.
 No reply yet. The single controller draws 0/2000 confounded episodes against the federation's
 1821/2000, so the arm as specified cannot generate the ladder's regime at all. Three options
 were on the table. It is Brian's approved experiment and it is still parked.
+
+---
+
+## 2026-09-06 14:0x -- Agent B: ceiling decision from Brian -- WAIT for the tight-budget axis, then pick the cell. Design changed and unblocked.
+
+**Brian's definition is not the one that was specced, and it is the one that works.** Agent C's
+spec was K=1, Z_1 = V -- one agent SEEING everything, which is what makes confounding
+impossible (0/2000). Brian means pooled data plus a central controller ISSUING intervention
+commands to agents who still only reach their own nodes. Windows and partition unchanged, so
+confounding stays at 91%, the edge mask stays 438, the denominator stays 219 pairs. **No
+`Topology` change is needed** -- pooled data is arm E already, and the new part is joint action
+selection over the existing partition. A policy change, not a topology change.
+
+**Brian's own objection is the binding one: the metric is saturated at the principal cell.**
+A vs E is -0.00017 +/- 0.00023 over six seeds; myopic is 0.00084 +/- 0.00043 over 219 pairs;
+joint recovery 0.993-1.000 both arms. A third rung there measures nothing and reports a third
+null.
+
+**DECISION: wait for agent A's `results/budget_tight/` (beta 0.5-0.9, budgets 17-31), then
+choose the cell from where the arms actually separate.** Nothing launches for the ceiling until
+then.
+
+**Also agreed: sampled-evidence TRAINING is off the table -- too slow.** Brian raised partial
+oracle at rho=0.5 as the headroom regime instead, and that is the right instinct: the partial
+oracle costs ~0.085 s/episode against sampled's 6-9, so training is affordable where sampled
+training is not.
+
+One refinement, from the rho fleet's own numbers. Trained at rho=0.5 and evaluated IN REGIME,
+learned hard SHD is ~0.007 -- about 8x the k12 oracle floor, so some headroom but not a lot.
+Evaluated under SAMPLED evidence it is ~0.030 with a 0.019 spread between arms. **Train on the
+partial oracle, evaluate under sampled** is the combination with real headroom, it is what the
+whole transfer grid already does, and evaluation at 200 episodes is affordable even though
+training would not be. Note the rho fleet is k=8; a ladder ceiling would need fresh k=12 runs
+at `--evidence_power 0.5`, which is cheap.
