@@ -429,7 +429,7 @@ def fig_federation(out: pathlib.Path):
     """RQ3, one figure per subsection so each graph sits under the heading it answers.
 
     ladder.pdf       (4.3.1) federated against pooled only: joint recovery at both cells,
-                     and the six-seed paired panel on the primary metric.
+                     and the twelve-seed paired panel on the primary metric.
     coordination.pdf (4.3.2) the myopic coordination comparison: random, fixed partition,
                      uncoordinated. No learned arm -- that comparison is 4.3.1's.
     """
@@ -447,11 +447,21 @@ def fig_federation(out: pathlib.Path):
     cells = [("$k_v=12$", k12), ("$k_v=20$", "results/central/v2_k20_{a}_s*.json")]
 
     # ---- 4.3.1: the ladder ----
+    # TWELVE SEEDS, not six. Seeds 0-5 live in results/rerows/ and 6-11 in
+    # results/central12k/scored/; the panel read only the first source, so it showed half
+    # the evidence the equivalence bound of scripts/ladder_equivalence.py is computed from.
+    # A figure and a bound disagreeing about how much data exists is the kind of thing a
+    # viva finds.
     lad = {}
-    for k in ("A_best", "E_best"):
+    for k, armkey in (("A_best", "A"), ("E_best", "E")):
         q = ROOT / f"results/rerows/ladder12k_{k}.json"
         if q.exists():
             lad[k] = {r["seed"]: r for r in json.loads(q.read_text())}
+        for f in sorted(glob.glob(str(ROOT / f"results/central12k/scored/v2_k12_{armkey}_s*_best.json"))):
+            e = json.loads(pathlib.Path(f).read_text())
+            e = e[0] if isinstance(e, list) else e
+            sd = int(pathlib.Path(f).stem.split("_s")[1].split("_")[0])
+            lad.setdefault(k, {})[sd] = e
     fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9),
                                       gridspec_kw={"width_ratios": [1.0, 1.15]})
     for gi, (title, pattern) in enumerate(cells):
@@ -1124,7 +1134,15 @@ def fig_epsgreedy_grid(out: pathlib.Path):
     metrics = [("hard", "SHD on committed\nmarks ($\\downarrow$)", True),
                ("success", "joint recovery\nrate ($\\uparrow$)", False)]
     floor = 1e-5
-    shades = [.95, .72, .50, .30]
+    # HUE AND MARKER BOTH, not one hue at four opacities. Four shades of the same orange were
+    # not separable on the page (Brian, 6 Sep). These are Okabe-Ito, so they survive both
+    # greyscale and the common colour-vision deficiencies, and each rate also has its own
+    # marker so the series can be told apart without relying on colour at all.
+    series = [(0.0,  "#000000", "x", "$\\varepsilon = 0$ (myopic)"),
+              (0.05, "#D55E00", "o", "$\\varepsilon = 0.05$"),
+              (0.1,  "#E69F00", "s", "$\\varepsilon = 0.1$"),
+              (0.2,  "#009E73", "^", "$\\varepsilon = 0.2$"),
+              (0.3,  "#CC79A7", "D", "$\\varepsilon = 0.3$")]
 
     for tag, xlabel, keep, xof in axes_spec:
         sel = [c for c, v in parsed.items() if keep(*v)]
@@ -1136,81 +1154,119 @@ def fig_epsgreedy_grid(out: pathlib.Path):
                                   gridspec_kw={"hspace": 0.14})
         for row, (key, ylabel, logy) in enumerate(metrics):
             ax = panel[row]
-            for eps, shade in zip(EPS_LEVELS, shades):
+            for eps, colour, marker, lab in series:
                 means = []
                 for x in xvals:
-                    vals = [rec[(c, sd, eps)]["means"][key]
-                            for c in sel if xof(*parsed[c]) == x
-                            for sd in (0, 1, 2) if (c, sd, eps) in rec]
+                    cs = [c for c in sel if xof(*parsed[c]) == x]
+                    if eps == 0.0:
+                        # The UNDITHERED myopic rule, which is what eps=0 means. It is not in
+                        # the epsilon runs -- no eps=0 arm was ever executed -- so it comes
+                        # from the cell's own sweep and paired-SHD measurements, the same
+                        # source fig:sweep_grid draws its myopic arm from.
+                        vals = []
+                        for c in cs:
+                            fs = (sorted(glob.glob(str(ROOT / f"results/sweep12k/{c}_s?.json")))
+                                  or sorted(glob.glob(str(ROOT / f"results/sweep/oracle/{c}_s?.json"))))
+                            for f in fs:
+                                d = json.loads(pathlib.Path(f).read_text())
+                                if key == "success":
+                                    vals.append(d["arms"]["greedy_uncertainty"]["success"])
+                                else:
+                                    m = _measured_shd(c, d.get("seed"))
+                                    if "greedy_uncertainty" in m:
+                                        vals.append(m["greedy_uncertainty"])
+                    else:
+                        vals = [rec[(c, sd, eps)]["means"][key]
+                                for c in cs for sd in (0, 1, 2) if (c, sd, eps) in rec]
                     means.append(float(np.mean(vals)) if vals else np.nan)
                 ax.plot(pos, [max(m, floor) if logy else m for m in means],
-                        marker="o", ms=3.2, lw=1.4, color=MYOPIC, alpha=shade,
-                        label=f"$\\varepsilon = {eps:g}$" if (row == 1 and tag == "a")
-                        else None, zorder=3)
+                        marker=marker, ms=3.4, lw=1.4, color=colour,
+                        ls="--" if eps == 0.0 else "-",
+                        label=lab if (row == 1 and tag == "a") else None, zorder=3)
             if logy:
                 ax.set_yscale("log")
                 ax.set_ylim(floor * .7, 3e-1)
                 ax.axhspan(floor * .7, floor * 1.6, color="black", alpha=.05, zorder=0)
             else:
-                ax.set_ylim(-.03, 1.05)
+                # TRUNCATED AT 0.5, said in the caption. No arm drawn here falls below
+                # 0.602, and a 0-to-1 axis compressed every difference the panel exists
+                # to show. Checked against the data rather than assumed.
+                ax.set_ylim(.5, 1.02)
             ax.set_xticks(pos)
             ax.set_xticklabels([f"{x:g}" for x in xvals])
             ax.set_xlim(-.4, len(xvals) - .6)
             ax.set_ylabel(ylabel, fontsize=8)
         panel[1].set_xlabel(xlabel)
         if tag == "a":
-            panel[1].legend(frameon=False, fontsize=7.5, loc="lower right",
-                            handlelength=1.4, ncol=2, columnspacing=1.0)
+            panel[1].legend(frameon=False, fontsize=7, loc="lower left",
+                            handlelength=1.6, ncol=2, columnspacing=0.8)
         fig.savefig(out / f"epsgreedy_grid_{tag}.pdf", bbox_inches="tight")
         plt.close(fig)
 
 
 def fig_epsgreedy_policy(out: pathlib.Path):
-    """The same treatment turned on our own policy, at k=30.
+    """The same dither treatment turned on our own policy, at two cells.
 
-    THE SYMMETRIC QUESTION, and the reason it is not a footnote: if dithering a myopic rule
-    is a fair control for a learned one, then dithering the learned one asks whether its own
-    action distribution is doing anything a coin could not. Two bases: the ARGMAX policy,
-    which throws its trained stochasticity away, and the SAMPLED policy, which is the arm
-    every other result in the thesis uses.
+    THE SYMMETRIC QUESTION. If dithering a myopic rule is a fair control for a learned one,
+    then dithering the learned one asks whether its own action distribution does anything a
+    coin could not. Two bases: the ARGMAX policy, which throws its trained stochasticity
+    away, and the SAMPLED policy that every other result in this thesis uses.
 
-    PER SEED, NEVER AVERAGED. The three seeds disagree about whether dither recovers the
-    argmax deficit -- one is fully rescued, one is not -- and that heterogeneity is the
-    finding. A mean over three would report a middle that no seed occupies.
+    TWO CELLS, AND THE CONTRAST IS THE POINT (Brian, 6 Sep). At the principal cell the whole
+    comparison sits on the measurement floor -- sampled SHD is 0.00065 with one seed at
+    exactly zero, and not one paired comparison of the twenty clears two standard errors,
+    pooled or per seed. At k_v=30 the same experiment separates by a factor of ten on two of
+    three seeds. Reporting only the principal cell would say the question is unanswerable;
+    reporting only k_v=30 would hide that it is answerable at one scale and not the other.
+
+    PER SEED, NEVER AVERAGED INTO ONE CLAIM: the k_v=30 seeds disagree about how much dither
+    recovers, and that heterogeneity is itself the finding.
     """
-    anchor = {e["seed"]: e["means"]["learned"]["hard"]
-              for e in json.loads((ROOT / "results/rerows/k30_best.json").read_text())}
-    pure = {e["seed"]: e["means"]["learned"]["hard"]
-            for e in json.loads((ROOT / "results/epsgreedy/k30_argmax_pure.json").read_text())}
-    panels = [("argmax base", "k30_argmax_eps", pure),
-              ("sampled base", "k30_sampled_eps", anchor)]
-    seeds = (0, 1, 2)
-    marks = ("o", "s", "^")
+    cells = [("$k_v = 12$ (principal cell)", "results/epsgreedy/k12policy"),
+             ("$k_v = 30$", "results/epsgreedy/k30policy")]
+    eps = [0.0] + list(EPS_LEVELS)
+    bases = [("argmax", "#D55E00", "s"), ("sampled", LEARNED, "o")]
+    floor = 1e-5
 
-    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.5), sharey=True,
-                             gridspec_kw={"wspace": 0.08})
-    for ax, (title, tag, zero) in zip(axes, panels):
-        d = json.loads((ROOT / f"results/epsgreedy/{tag}.json").read_text())
-        eps = sorted({e["eps"] for e in d})
-        xs = [0.0] + eps
-        posn = list(range(len(xs)))          # evenly spaced: 0.05 and 0.1 crush on a linear axis
-        for sd, mk in zip(seeds, marks):
-            ys = [zero[sd]] + [next(e["means"]["hard"] for e in d
-                                    if e["seed"] == sd and e["eps"] == x) for x in eps]
-            ax.plot(posn, ys, marker=mk, ms=3.6, lw=1.4, color=LEARNED,
-                    alpha=[.95, .62, .38][sd],
-                    label=f"seed {sd}" if title.startswith("argmax") else None)
-        ax.set_xticks(posn)
-        ax.set_xticklabels([f"{x:g}" for x in xs])
-        ax.set_xlim(-.3, len(xs) - .7)
+    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.7), sharey=True,
+                             gridspec_kw={"wspace": 0.07})
+    for ax, (title, folder) in zip(axes, cells):
+        for base, colour, marker in bases:
+            means, spread = [], []
+            for e in eps:
+                # The runners named these files with the epsilon as written on the command
+                # line, so eps=0 is "_e0.0" and not "_e0"; try both spellings rather than
+                # relying on one format string matching what the shell produced.
+                cands = [ROOT / folder / f"{base}_e{n}.json" for n in (f"{e:g}", f"{e}")]
+                if e != 0.0:
+                    # k=30's eps>0 arms predate the per-cell folders and live flat.
+                    cands.append(ROOT / f"results/epsgreedy/k30_{base}_eps.json")
+                q = next((c for c in cands if c.exists()), cands[0])
+                if not q.exists():
+                    means.append(np.nan), spread.append([])
+                    continue
+                d = json.loads(q.read_text())
+                vals = [x["means"]["hard"] for x in d
+                        if e == 0.0 or abs(x.get("eps", -1) - e) < 1e-9]
+                means.append(float(np.mean(vals)) if vals else np.nan)
+                spread.append(vals)
+            pos = list(range(len(eps)))
+            for p_, vals in zip(pos, spread):
+                ax.scatter([p_] * len(vals), [max(v, floor) for v in vals],
+                           s=10, color=colour, alpha=.32, zorder=3)
+            ax.plot(pos, [max(m, floor) if m == m else np.nan for m in means],
+                    marker=marker, ms=4, lw=1.6, color=colour, zorder=4,
+                    label=f"{base} base" if title.startswith("$k_v = 12$") else None)
+        ax.set_yscale("log")
+        ax.set_ylim(floor * .7, 2e-2)
+        ax.axhspan(floor * .7, floor * 1.6, color="black", alpha=.05, zorder=0)
+        ax.set_xticks(list(range(len(eps))))
+        ax.set_xticklabels(["0"] + [f"{x:g}" for x in EPS_LEVELS])
+        ax.set_xlim(-.4, len(eps) - .6)
         ax.set_xlabel("dither rate $\\varepsilon$")
-        _title(ax, title)
-        # The base at eps=0 is the policy as it is normally run; everything to its right is
-        # the same policy with noise added.
-        ax.text(.03, .95, title, transform=ax.transAxes, ha="left", va="top", fontsize=8.5)
+        ax.text(.5, .95, title, transform=ax.transAxes, ha="center", va="top", fontsize=8.5)
     axes[0].set_ylabel("SHD on committed\nmarks ($\\downarrow$)", fontsize=8)
-    axes[0].set_ylim(-.0004, .0062)
-    axes[0].legend(frameon=False, fontsize=8, loc="upper right", handlelength=1.4)
+    axes[0].legend(frameon=False, fontsize=8, loc="lower left", handlelength=1.5)
     fig.savefig(out / "epsgreedy_policy.pdf", bbox_inches="tight")
     plt.close(fig)
 

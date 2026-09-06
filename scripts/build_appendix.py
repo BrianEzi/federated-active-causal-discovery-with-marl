@@ -300,21 +300,13 @@ def appendix_epsgreedy():
                                 ("d", "budget multiplier", "\n")))
         + "\\caption{The $\\varepsilon$-greedy control across every swept axis, one line per "
           "dither rate, three seeds per cell: SHD on committed marks (upper panels) and joint "
-          "recovery rate (lower).}\n"
+          "recovery rate (lower). $\\varepsilon = 0$ is the undithered myopic rule; the "
+          "recovery axis starts at $0.5$.}\n"
           "\\label{fig:epsgreedy_grid}\n\\end{figure}\n\n"
-        + "\\paragraph{The same treatment on the learned policy.} If dithering a myopic rule "
-          "is a fair control, then dithering the learned rule asks the symmetric question: "
-          "whether its own action distribution does anything a coin could not. "
-          "Figure~\\ref{fig:epsgreedy_policy} applies the identical $\\varepsilon$ grid to "
-          "the learned policy at $k_v = 30$, from two bases -- the argmax policy, which "
-          "discards its trained stochasticity, and the sampled policy every other result in "
-          "this thesis uses.\n\n"
-          "\\begin{figure}[htbp]\n\\centering\n"
-          "\\includegraphics{figures/epsgreedy_policy.pdf}\n"
-          "\\caption{Pooled SHD against dither rate at $k_v = 30$, per seed, $200$ paired "
-          "episodes each. At $\\varepsilon = 0$ the left panel is the pure argmax policy and "
-          "the right panel is the sampled policy.}\n"
-          "\\label{fig:epsgreedy_policy}\n\\end{figure}\n\n")
+        # The policy-dithering result was PROMOTED into sec:res_epsgreedy on 7 Sep
+        # (Brian: "its getting promoted out of appendix"), at two cells. It is not
+        # repeated here.
+        )
 
 
 def appendix_robustness():
