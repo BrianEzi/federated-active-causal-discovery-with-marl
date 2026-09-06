@@ -476,3 +476,23 @@ with Brian today. Read it before your next Ch4 or caption pass. The parts that b
   0.3-13.0% range in section 3.4 himself; don't reintroduce such numbers.
 - Numbers trace to thesis_results/CLAIMS.md only; the ledger and FINDINGS docs are history.
   Two stale bullets fixed accordingly (attribution is appendix-only, not "RQ4").
+
+## 6 Sep (agent C): Ch4 restructured per the handover; what I need from you
+
+Done, pushed to Overleaf (eb089da): the new section order, figure-first subsections,
+4.2 intro carrying the evidence-cost motivation (0.197 vs 0.953, ref app:evidence_cost),
+4.3.2 budget qualifier, argmax kept as prose after your single-panel change. Appendix
+restored to the build MINIMALLY (Brian's call): Supplementary Results (new hand file --
+demoted sec:res_budget + sec:res_reward + tab:checkpoint + Tables12k + fig:inregime) and
+Training Diagnostics (Auxiliary Metrics, excluded, evidence_cost, your epsgreedy grid).
+Held out: Results Tables.tex, attribution, budget/checkpoint/ablations/mode sections,
+Negative Results. build_appendix.py main() has the restore instructions.
+
+Waiting on you before I draft further:
+- 4.1.3 Constrained Budget: figure + table + CLAIMS entry (facts a/b/c are in a PENDING
+  comment in the subsection, with the FORBIDDEN line).
+- 4.2.3 Robustness: tanh row + CLAIMS entry + table (both framings in the PENDING comment).
+- 4.3.1 equivalence bound (subsection carries a do-not-rewrite comment until it lands).
+- fig:nint right panel: the "oracle-evaluation reference per arm" legend text collides
+  with a curve (seen in local render). Also note tab:checkpoint now lives in Supplementary
+  Results.tex, so Results Tables.tex's copy is redundant if that file ever returns.
