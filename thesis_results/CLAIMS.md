@@ -195,6 +195,27 @@ and the ratio held.
 | 2.0 | 67 | 1.000 | 0.947 | 0.740 | 1.000 | 0.110 | +0.053 |
 | 5.0 | 166 | 0.980 | 0.947 | 0.740 | 1.000 | 0.795 | +0.033 |
 
+**Measured SHD along the same axis — it does NOT reproduce the recovery shape:**
+
+| beta | learned | myopic | myopic/learned | seeds ahead |
+|---|---|---|---|---|
+| 0.5 | 0.00554 | 0.00977 | 1.76x | 2/3 |
+| 0.6 | 0.00414 | 0.00685 | 1.65x | 1/3 |
+| 0.7 | 0.00139 | 0.00403 | 2.91x | 3/3 |
+| 0.8 | 0.00246 | 0.00307 | 1.25x | 0/3 |
+| 0.9 | 0.00195 | 0.00197 | 1.01x | 0/3 |
+| 1.0 | 0.00148 | 0.00139 | 0.94x | 1/3 |
+| 1.2 | 0.00056 | 0.00098 | 1.74x | 2/3 |
+| 1.5 | 0.00065 | 0.00077 | 1.17x | 1/3 |
+| 2.0 | 0.00000 | 0.00056 | n/a (learned exactly 0) | 3/3 |
+| 5.0 | 0.00008 | 0.00059 | 7.00x | 2/3 |
+
+**MUST report both metrics or neither.** Joint recovery gives a monotone curve peaking at beta=0.6; SHD gives a ragged one that puts the myopic arm AHEAD at beta=1.0 and swings from 1.01x to 7x with significance counts between 0/3 and 3/3. Quoting the recovery shape alone as 'the advantage grows as budget tightens' is not supported by the structural metric.
+**The divergence is explicable and should be argued, not hidden.** Joint recovery is conjunctive over agents; SHD averages over 219 covered pairs. An agent that exhausts its budget because a partner duplicated its work destroys the episode's recovery and barely moves its SHD. Coordination failures punish a conjunction and are diluted by an average.
+**MUST NOT** quote the beta=2.0 ratio: the learned arm is exactly 0.00000 on all three seeds there.
+**Guard:** resolved fractions are 0.962-0.972 for every arm at every budget, so no arm reaches a lower error by committing to fewer marks.
+
+
 * margin PEAKS at beta=0.6 (+0.472) and decays to +0.033 at beta=5.0
 * at beta=0.5 avoidable duplication is 0.017 for the learned arm against 0.325 for oracle-cover
 * k12s50n04, 3 seeds per budget, 12,000 episodes, the run's own 200-episode evaluation pass

@@ -366,6 +366,44 @@ if len(BUD) >= 9:
     marg = {b: arm(r,'learned')-arm(r,'greedy_uncertainty') for b, r in BUD.items()}
     peak = max(marg, key=marg.get)
     lo = BUD[min(BUD)]
+    # SHD along the same axis, MEASURED (results/budget_tight/shd_*.json and the sweep's
+    # own shd/ files) -- never the runs' recorded global_hard_shd field.
+    shd_rows = []
+    for beta, tag in AXIS:
+        q = ROOT / f"results/budget_tight/shd_{tag}.json"
+        if not q.exists():
+            q = ROOT / f"results/sweep12k/shd/k12s50n04{tag}.json"
+        if not q.exists():
+            continue
+        d = json.loads(q.read_text())
+        L = np.mean([e["means"]["learned"]["hard"] for e in d])
+        G = np.mean([e["means"]["greedy"]["hard"] for e in d])
+        sig = sum(1 for e in d if e["paired"]["learned-greedy"]["significant"]
+                  and e["paired"]["learned-greedy"]["delta"] < 0)
+        shd_rows.append((beta, L, G, sig, len(d)))
+    if shd_rows:
+        out += ["", "**Measured SHD along the same axis — it does NOT reproduce the recovery "
+                "shape:**", "",
+                "| beta | learned | myopic | myopic/learned | seeds ahead |", "|---|---|---|---|---|"]
+        for beta, L, G, sig, n in shd_rows:
+            r = f"{G/L:.2f}x" if L > 0 else "n/a (learned exactly 0)"
+            out += [f"| {beta} | {L:.5f} | {G:.5f} | {r} | {sig}/{n} |"]
+        out += ["",
+                "**MUST report both metrics or neither.** Joint recovery gives a monotone "
+                "curve peaking at beta=0.6; SHD gives a ragged one that puts the myopic arm "
+                "AHEAD at beta=1.0 and swings from 1.01x to 7x with significance counts "
+                "between 0/3 and 3/3. Quoting the recovery shape alone as 'the advantage "
+                "grows as budget tightens' is not supported by the structural metric.",
+                "**The divergence is explicable and should be argued, not hidden.** Joint "
+                "recovery is conjunctive over agents; SHD averages over 219 covered pairs. An "
+                "agent that exhausts its budget because a partner duplicated its work destroys "
+                "the episode's recovery and barely moves its SHD. Coordination failures punish "
+                "a conjunction and are diluted by an average.",
+                "**MUST NOT** quote the beta=2.0 ratio: the learned arm is exactly 0.00000 on "
+                "all three seeds there.",
+                "**Guard:** resolved fractions are 0.962-0.972 for every arm at every budget, "
+                "so no arm reaches a lower error by committing to fewer marks.", ""]
+
     out += ["",
             f"* margin PEAKS at beta={peak} (+{marg[peak]:.3f}) and decays to "
             f"+{marg[max(BUD)]:.3f} at beta={max(BUD)}",
