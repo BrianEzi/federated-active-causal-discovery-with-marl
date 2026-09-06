@@ -81,6 +81,13 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--k8_dir", default="results/power/rho")
+    # TWO SEPARATE k=12 FLEETS, AND THEY MUST NOT BE POOLED. `rho12b` is the rate-compensated
+    # sweep (budget 53..100, effective beta 1.5 throughout); `rho12` is the superseded fixed-
+    # budget-50 fleet whose low rates were starved to beta 0.75. Averaging a starved cell with a
+    # compensated one at the same rho would produce a number describing neither. An earlier edit
+    # of this file put all four directories in one list and did exactly that.
+    ap.add_argument("--k12b_dirs", nargs="*",
+                    default=["results/rho12b", "results/rho12b_myriad"])
     ap.add_argument("--k12_dirs", nargs="*",
                     default=["results/rho12", "results/rho12_myriad"])
     args = ap.parse_args(argv)
@@ -92,7 +99,12 @@ def main(argv=None) -> int:
     # Both k=12 paths pooled by rate: a cell is a cell whichever machine produced it, and
     # `scripts/diff_dual_path.py` is what checks they agree before either is trusted. Duplicates
     # across paths show up as a larger n, which is visible rather than hidden.
-    report("k_v = 12  (budget 50, 12k episodes, channels OFF -- the principal cell)",
+    report("k_v = 12  RATE-COMPENSATED, budget 53-100, effective beta 1.5 throughout  [CURRENT]",
+           collect([(os.path.join(d, "rho[01].[0-9][0-9]_s?.json"),
+                     r"rho([0-9.]+)_s\d\.json$") for d in args.k12b_dirs]))
+
+    report("k_v = 12  fixed budget 50, effective beta 1.51 -> 0.75  [SUPERSEDED: the low rates "
+           "are STARVED, not intolerant]",
            collect([(os.path.join(d, "rho[01].[0-9][0-9]_s?.json"),
                      r"rho([0-9.]+)_s\d\.json$") for d in args.k12_dirs]))
 

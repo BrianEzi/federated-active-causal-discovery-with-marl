@@ -38,7 +38,7 @@ EXPECTED_TOPOLOGY = {"name": "T_4agent_6each_6shared", "n_private_blocks": 4,
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dir", default="results/rho12")
+    ap.add_argument("--dir", default="results/rho12b")
     ap.add_argument("--seeds", type=int, default=3)
     args = ap.parse_args(argv)
 

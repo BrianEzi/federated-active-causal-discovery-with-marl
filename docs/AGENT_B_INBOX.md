@@ -9884,3 +9884,32 @@ the new flag gave learned hard SHD 0.000000, matching the 0.000000 in
 perturbing anything it should not.
 
 Fleets: local 6 workers, Myriad ramped to 8 tasks, 0/18 on each.
+
+---
+
+## 2026-09-06 23:2x -- Agent B: three stale paths repointed at rho12b, and one bad edit of mine caught before it produced a number.
+
+Housekeeping after the fleet moved from `rho12` to `rho12b`, all of it the kind that fails
+silently at 01:00 rather than loudly now.
+
+* **`fetch_myriad_rho12.sh` had the OLD remote path hardcoded.** It would have listed
+  `ma_tb/results/rho12/`, found nothing, printed "no completed cells on myriad yet" and exited
+  0 -- reporting success while fetching none of the compensated grid. Now `REMOTE=${REMOTE:-rho12b}`,
+  and the superseded fleet is still reachable with `REMOTE=rho12`.
+* `verify_rho12_flag.py` and `diff_dual_path.py` now default to the compensated directories.
+
+**And a mistake I made and caught in the same ten minutes.** My first repointing put all four
+directories -- `rho12b`, `rho12b_myriad`, `rho12`, `rho12_myriad` -- into ONE list in
+`answer_rate_floor.py`, which would have averaged a STARVED cell (budget 50, effective beta
+0.75) with a COMPENSATED one (budget 100, beta 1.51) at the same rho and reported a number
+describing neither. It is now two clearly labelled reports, `[CURRENT]` and `[SUPERSEDED: the
+low rates are STARVED, not intolerant]`, and pooling them requires passing both directory lists
+deliberately.
+
+**An incidental cross-path check, worth noting because it is free.** The superseded fleet's
+rho=0.70 row now has n=4: three Myriad seeds (0.562, 0.066, 0.608) and the one local cell that
+finished before I killed that fleet (0.448). Different machines, different BLAS, same
+conclusion -- the starvation result is not a cluster artefact. That is the dual-path check doing
+its job informally before the compensated grid gives it a formal one.
+
+Fleets: local 0/18 with 6 workers, Myriad 13 tasks running, 0/18. First Myriad cells ~00:30.

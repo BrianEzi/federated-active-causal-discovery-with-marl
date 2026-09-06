@@ -41,8 +41,8 @@ def load(path: pathlib.Path):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--local", default="results/rho12")
-    ap.add_argument("--other", default="results/rho12_myriad")
+    ap.add_argument("--local", default="results/rho12b")
+    ap.add_argument("--other", default="results/rho12b_myriad")
     # A tolerance on the FINAL training diagnostics, not on a scored metric. Nothing here is a
     # thesis number; it is a check that two fleets converged to comparable places.
     ap.add_argument("--tol", type=float, default=0.05)
