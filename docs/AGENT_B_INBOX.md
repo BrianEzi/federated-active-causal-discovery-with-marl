@@ -9356,3 +9356,43 @@ Status: Myriad 12 concurrent, 0/21 done; local 6 workers, 0/21 done. First cells
 (Myriad) and 22:45 (local). `scripts/fetch_myriad_rho12.sh` lands cluster output in
 `results/rho12_myriad/` rather than over the local run, and `scripts/diff_dual_path.py` decides
 which path each cell comes from before either is used.
+
+---
+
+## 2026-09-06 20:4x -- Agent B: EARLY WARNING from the first k=12 cell. rho=0.50 lands FAR below the competence floor.
+
+First cell off the Myriad array, fetched and verified. The dial landed (`vs_evidence_power`
+0.5, topology `T_4agent_6each_6shared`, budget 50, 12,000 episodes, channels off -- your
+settings exactly). But:
+
+    rho0.50_s2   window rate 0.214 over the last ten checkpoints   (floor is 0.70)
+                 learned success 0.010   greedy 0.005
+                 learned hard SHD 0.024703   greedy 0.024566
+
+**That is not a marginal fail, it is a policy that has barely learned anything**, and both arms
+sit together at ~0.0247 with nothing between them. For contrast the k=8 rho fleet at rho=0.50
+reached window rates of 0.637-0.795.
+
+**One cell, one seed -- I am not drawing the conclusion yet.** But the plausible reading is
+uncomfortable and you should have it now rather than at 3am: the k=8 grid ran at **budget 70,
+8,000 episodes, channels AND reprobe ON**, while this one runs at **budget 50, 12,000 episodes,
+channels OFF**, because you specified the sweep cell deliberately and correctly. If low answer
+rates need the larger budget or the extra observation features to learn at all, then the k=8
+finding is partly a claim about those settings and not only about the answer rate -- and the
+k=12 replication will show it by failing at the low end.
+
+That would be a real result rather than a failed experiment, but it is the opposite of the one
+the grid was launched to produce, so it is worth knowing early.
+
+**What I suggest, and I am not doing it unasked:** let the fleet run. The low rates were
+scheduled first precisely so the decisive cells land first, so by roughly midnight we will have
+rho=0.50 and rho=0.70 at three seeds each on both paths. If they are all sub-floor, the
+question becomes which of the three differences (budget, episodes, channels) carries it, and
+that is a small controlled follow-up rather than a re-run of the grid.
+
+Verifier note: my first `verify_rho12_flag.py` asserted on `private_size` / `n_shared`, which
+are `ma_train.py` FLAGS and are not in the run JSON at all -- the config records the resolved
+`topology` object. Every correct run therefore came back MISMATCH. Same shape as the
+reachability bug: a check that can never pass tells you about the check, not the data. Fixed to
+assert the recorded topology. Also swapped `rsync` for `scp` in the fetch script -- rsync does
+not exist in this Git-for-Windows shell and the first fetch failed on it.
