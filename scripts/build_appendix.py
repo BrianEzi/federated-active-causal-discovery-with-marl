@@ -227,6 +227,59 @@ def appendix_ablations():
 
 
 
+def appendix_evidence_cost():
+    """The price of realistic evidence, as a MATCHED two-arm comparison.
+
+    Replaces fig:training_signal (cut from Chapter 4 on 6 Sep, Brian's call). That figure
+    put three evidence regimes on one axis at three different TRAINING budgets; fixing the
+    episode budget alone would have left the intervention budget, n_int and two observation
+    features varying between arms -- agent B's catch, and a fair one. These two arms are
+    matched on every field except the evidence regime and n_int, and the n_int difference
+    favours the SAMPLED arm, which makes the comparison conservative.
+    """
+    import numpy as np
+    rows, meta = [], {}
+    for label, pat in (("Oracle", "results/sweep/oracle/k08s50n04b150_s?.json"),
+                       ("Sampled", "results/sampled_ref/k08s50n04b150i0200_s?.json")):
+        fs = sorted((ROOT).glob(pat))
+        if not fs:
+            return ""
+        vals = []
+        for f in fs:
+            d = jload(f)
+            tail = [x["window_rate"] for x in (d.get("history") or [])[-10:]
+                    if isinstance(x, dict)]
+            if tail:
+                vals.append(float(np.mean(tail)))
+        c = jload(fs[0])["config"]
+        meta[label] = c
+        rows.append(f"{label} & {c.get('n_int')} & {len(vals)} & "
+                    + " & ".join(f"{v:.3f}" for v in vals)
+                    + f" & {np.mean(vals):.3f} \\\\")
+    return (
+        "\\section{The Cost of Realistic Evidence} \\label{app:evidence_cost}\n\n"
+        "Training under evidence estimated from finite samples, against training on exactly "
+        "answered queries, with every other field of the configuration held fixed: the same "
+        "$k_v=8$ cell, the same intervention budget of "
+        f"{meta['Oracle'].get('budget')}, the same {meta['Oracle'].get('train_episodes'):,} "
+        "training episodes, the same observation features, three seeds each. The reported "
+        "quantity is the per-window solve rate averaged over each run's last ten "
+        "checkpoints, which is the competence measure of \\S\\ref{sec:meth_gate}.\n\n"
+        + tbl("Per-window solve rate by evidence regime, matched configurations. The "
+              "sampled arm draws ten times as many rows per intervention, a difference "
+              "that favours it: at $n_{\\text{int}}=20$ the sampled regime yields no "
+              "usable signal at all, while $n_{\\text{int}}$ is inert under oracle "
+              "evidence and so cannot be matched downward.",
+              "tab:evidence_cost", "lcccccc",
+              r"Regime & $n_{\text{int}}$ & Seeds & \multicolumn{3}{c}{Per seed} & Mean \\",
+              rows)
+        + "\nThe sampled arm does not approach the competence floor of $0.70$ on any seed, "
+          "while the oracle arm clears it on all three. No policy-against-baseline "
+          "comparison is drawn from the sampled runs, and none is needed for the point: at "
+          "this budget the realistic regime is not a harder examination that the policy "
+          "sits and fails, it is a training signal too weak to learn from.\n")
+
+
 def appendix_mode():
     """The intervention-mode ablation, consolidated. Qualitative on the sampled-evidence gap
     BY DESIGN: the 30 Aug probe that measured the vary/clamp table (soft-SHD ratios 3.3-5.5x,
@@ -532,7 +585,7 @@ def main() -> int:
     parts.append((ROOT / "thesis/Auxiliary Metrics.tex").read_text())
     parts.append("")
     for fn in (appendix_excluded, appendix_budget, appendix_checkpoint,
-               appendix_ablations, appendix_mode):
+               appendix_ablations, appendix_mode, appendix_evidence_cost):
         parts.append(fn())
         parts.append("")
     parts.append((ROOT / "thesis/Negative Results.tex").read_text())

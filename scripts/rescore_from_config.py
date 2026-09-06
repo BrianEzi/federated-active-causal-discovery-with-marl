@@ -65,11 +65,12 @@ def env_from_config(config: dict, seed: int = 0) -> TwoAgentEnv:
     # the supplied skeleton while stamping eval_skeleton="estimated" in its own metadata.
     # A dropped config key must never be silent again, hence the assert below.
     for key in ("vs_evidence", "vs_evidence_alpha", "vs_evidence_power",
-                "skeleton_source", "skeleton_alpha", "skeleton_max_cond"):
+                "skeleton_source", "skeleton_alpha", "skeleton_max_cond",
+                "noise_dist", "mechanism"):
         if key in config:
             kwargs[key] = config[key]
     env = TwoAgentEnv(MAConfig(**kwargs), seed=seed)
-    for key in ("skeleton_source",):
+    for key in ("skeleton_source", "noise_dist", "mechanism"):
         if key in config:
             assert getattr(env.config, key) == config[key], key
     return env

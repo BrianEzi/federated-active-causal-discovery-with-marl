@@ -634,7 +634,7 @@ def fig_answer_rate(out: pathlib.Path):
     rhos = sorted(per)
     pos = rhos
     at = {r: r for r in rhos}
-    fig, (top, bottom) = plt.subplots(1, 2, figsize=(FULL, 2.9))
+    fig, top = plt.subplots(figsize=(TWOTHIRD, 3.0))
     myopic = np.mean([v[1] for r in rhos for v in per[r]])
     top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
                 label=f"myopic ({myopic:.4f}, all rates)")
@@ -651,33 +651,8 @@ def fig_answer_rate(out: pathlib.Path):
     top.legend(loc="upper right", frameon=False, fontsize=7)
     _title(top, "Degrading the training evidence improves transfer")
 
-    bottom.axhline(0, color="black", lw=0.8, zorder=2)
-    for r in rhos:
-        for _l, _g, d, sig in per[r]:
-            bottom.scatter([at[r]], [d], s=22, zorder=3,
-                           color=LEARNED if sig else "none",
-                           edgecolors=LEARNED, linewidths=0.9)
-    bottom.plot(pos, [np.mean([v[2] for v in per[r]]) for r in rhos], "-",
-                color=LEARNED, lw=1.5, zorder=4, label="sampled (trained policy)")
-    # The argmax derivative of the same policies, drawn because the convention is part of the
-    # claim: the ordering of rates survives it, the threshold does not, and 87% of the shift
-    # is pairs left undetermined once the policy cannot sample its way out of a state.
-    am = {}
-    for f in sorted(glob.glob(str(ROOT / "results/power/rho/argmax_det/argmax_rho*_s?.json"))):
-        rho = float(re.search(r"rho([\d.]+)_", pathlib.Path(f).stem).group(1))
-        for e in json.loads(pathlib.Path(f).read_text()):
-            am.setdefault(rho, []).append(e["paired"]["learned-greedy"]["delta"])
-    if am:
-        bottom.plot([at[r] for r in rhos if r in am],
-                    [np.mean(am[r]) for r in rhos if r in am], "^--",
-                    color=MYOPIC, lw=1.2, ms=4.5, zorder=3, label="argmax derivative")
-        bottom.legend(loc="upper right", frameon=False, fontsize=7)
-    top.set_xlabel(r"answer rate $\rho$ trained under")
-    bottom.set_xlabel(r"answer rate $\rho$ trained under")
-    bottom.set_ylabel("paired difference in SHD ($\\downarrow$)\nlearned $-$ myopic")
-    bottom.annotate("filled: ahead beyond 2 SE", xy=(0.04, 0.05),
-                    xycoords="axes fraction", fontsize=7, color="#555555")
-    for ax in (top, bottom):
+    top.set_xlabel(r"answer rate $\rho$ the policy trained under")
+    for ax in (top,):
         ax.set_xticks(rhos)
         # labels on alternate ticks: linear in rho without 0.80-1.00 overprinting at half width
         ax.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else ""

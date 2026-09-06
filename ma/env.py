@@ -233,6 +233,13 @@ class MAConfig:
     # That is what makes "is the policy robust to a wrong skeleton?" a question that can be
     # asked of a trained policy rather than only of full coverage. See
     # docs/FINDINGS_SKELETON_2026_08_31.md.
+    # Shape of the SCM noise. "gaussian" is every result in the thesis; "uniform" and
+    # "t3" are the 6 Sep transfer probes out of the linear-Gaussian family. Standardised
+    # to unit variance in ma/scm.py, so this changes shape only, never magnitude.
+    noise_dist: str = "gaussian"
+    # Functional form of each node's dependence on its parents. "linear" is every result
+    # in the thesis; "tanh" is the 6 Sep nonlinear-mechanism robustness probe.
+    mechanism: str = "linear"
     skeleton_source: str = "true"
     skeleton_alpha: float = 0.05
     skeleton_max_cond: int = 2
@@ -700,7 +707,9 @@ class TwoAgentEnv:
         else:
             self.true_adjacency, self.mix_draws = self._sample_mixed_dag(cfg)
         self.params = sample_scm_params(self.true_adjacency, self._rng)
-        self.samples, _ = sample_multi(self.params, cfg.n_obs, self._rng)
+        self.samples, _ = sample_multi(self.params, cfg.n_obs, self._rng,
+                                       noise_dist=cfg.noise_dist,
+                                       mechanism=cfg.mechanism)
 
         self.known: Dict[int, np.ndarray] = {}
         self.clean: Dict[int, np.ndarray] = {}
@@ -932,7 +941,9 @@ class TwoAgentEnv:
             targets[node] = min(scale, targets.get(node, np.inf))
 
         new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng,
-                                      intervene_nodes=targets)
+                                      intervene_nodes=targets,
+                                      noise_dist=cfg.noise_dist,
+                                      mechanism=cfg.mechanism)
         self.samples = np.vstack([self.samples, new_samples])
         self.blocks = np.concatenate(
             [self.blocks, np.full(cfg.n_int, self.blocks[-1] + 1, dtype=int)])
@@ -1057,7 +1068,9 @@ class TwoAgentEnv:
     def _append_observational_batch(self) -> None:
         """One batch with nothing intervened on -- what a forfeited round produces."""
         cfg = self.config
-        new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng)
+        new_samples, _ = sample_multi(self.params, cfg.n_int, self._rng,
+                                      noise_dist=cfg.noise_dist,
+                                      mechanism=cfg.mechanism)
         self.samples = np.vstack([self.samples, new_samples])
         self.blocks = np.concatenate(
             [self.blocks, np.full(cfg.n_int, self.blocks[-1] + 1, dtype=int)])

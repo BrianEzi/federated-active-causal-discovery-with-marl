@@ -107,12 +107,70 @@ def topological_order(adjacency: np.ndarray) -> np.ndarray:
     return np.array(order, dtype=int)
 
 
+
+
+MECHANISMS = ("linear", "tanh")
+
+
+def _apply_mechanism(z, mechanism: str = "linear"):
+    """The parent contribution, optionally passed through a saturating nonlinearity.
+
+    linear  z, unchanged: every result in the thesis.
+    tanh    2*tanh(z/2). An additive-noise model with a nonlinear function of the parents,
+            the standard identifiable-ANM form (Hoyer et al. 2009). Chosen for two
+            properties: its slope at the origin is exactly 1, so small signals behave as
+            in the linear case and the comparison is not confounded by a change of gain;
+            and it is MONOTONE, so it attenuates all three detection channels rather than
+            zeroing one. A symmetric nonlinearity (z**2) would send the correlation channel
+            to zero by construction and is the adversarial case, not the robustness case.
+
+    Roots are unaffected: with no parents z is 0 and every mechanism here fixes 0.
+    """
+    if mechanism == "linear":
+        return z
+    if mechanism == "tanh":
+        return 2.0 * np.tanh(z / 2.0)
+    raise ValueError(f"unknown mechanism {mechanism!r}; expected one of {MECHANISMS}")
+
+
+NOISE_DISTS = ("gaussian", "uniform", "t3")
+
+
+def _draw_noise(rng, scale: float, n: int, dist: str = "gaussian"):
+    """Noise of the requested SHAPE at the requested standard deviation.
+
+    STANDARDISED ON PURPOSE. Every distribution here is scaled to unit variance before
+    `scale` is applied, so switching `dist` changes the shape of the noise and nothing else.
+    Drawing Student-t(3) at `scale` directly would also multiply the noise MAGNITUDE by
+    sqrt(3), and the comparison would confound tail weight with signal-to-noise -- the
+    second-variable-moved error this project has caught four times.
+
+    gaussian  N(0, 1) * scale.
+    uniform   U(-sqrt(3), sqrt(3)) * scale. Bounded, light-tailed; the classic
+              linear-non-Gaussian case, under which the DAG is identifiable from
+              observational data alone (Shimizu et al. 2006) -- which this engine cannot
+              exploit, since it reads only the first two moments and a linear correlation.
+    t3        Student-t with 3 degrees of freedom, divided by sqrt(3) (its own standard
+              deviation), times scale. Heavy-tailed: finite variance, infinite kurtosis.
+              The adversarial case for the correlation channel's p-values.
+    """
+    if dist == "gaussian":
+        return rng.normal(0.0, scale, n)
+    if dist == "uniform":
+        return rng.uniform(-np.sqrt(3.0), np.sqrt(3.0), n) * scale
+    if dist == "t3":
+        return rng.standard_t(3, n) / np.sqrt(3.0) * scale
+    raise ValueError(f"unknown noise_dist {dist!r}; expected one of {NOISE_DISTS}")
+
+
 def sample(
     params: SCMParams,
     n: int,
     rng: np.random.Generator,
     intervene_node: Optional[int] = None,
     intervene_scale: float = 2.0,
+    noise_dist: str = "gaussian",
+    mechanism: str = "linear",
 ) -> tuple:
     """Draw `n` samples, optionally under a hard intervention on `intervene_node`.
 
@@ -158,8 +216,9 @@ def sample(
             samples[:, node] = rng.normal(0.0, intervene_scale, n)
             intervened[:, node] = 1.0
         else:
-            parent_contribution = samples @ params.weights[:, node]
-            noise = rng.normal(0.0, params.noise_scales[node], n)
+            parent_contribution = _apply_mechanism(
+                samples @ params.weights[:, node], mechanism)
+            noise = _draw_noise(rng, params.noise_scales[node], n, noise_dist)
             samples[:, node] = parent_contribution + noise
 
     return samples, intervened
@@ -171,6 +230,8 @@ def sample_multi(
     rng: np.random.Generator,
     intervene_nodes=(),
     intervene_scale: float = 2.0,
+    noise_dist: str = "gaussian",
+    mechanism: str = "linear",
 ) -> tuple:
     """As `sample`, but with SEVERAL nodes intervened on at once.
 
@@ -212,8 +273,9 @@ def sample_multi(
                                 else np.zeros(n))
             intervened[:, node] = 1.0
         else:
-            parent_contribution = samples @ params.weights[:, node]
-            noise = rng.normal(0.0, params.noise_scales[node], n)
+            parent_contribution = _apply_mechanism(
+                samples @ params.weights[:, node], mechanism)
+            noise = _draw_noise(rng, params.noise_scales[node], n, noise_dist)
             samples[:, node] = parent_contribution + noise
 
     return samples, intervened

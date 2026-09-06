@@ -127,6 +127,15 @@ def main(argv=None) -> int:
                     help="evaluate in this evidence regime instead of the trained one")
     ap.add_argument("--override_power", type=float, default=None,
                     help="evaluate at this vs_evidence_power instead of the trained one")
+    ap.add_argument("--override_mechanism", default=None, choices=["linear", "tanh"],
+                    help="evaluate with this parent->child functional form instead of the "
+                         "trained one. 6 Sep: the nonlinear-mechanism robustness probe.")
+    ap.add_argument("--override_noise", default=None,
+                    choices=["gaussian", "uniform", "t3"],
+                    help="evaluate with this SCM noise SHAPE instead of the trained one "
+                         "(standardised to equal variance, so only the shape changes). "
+                         "6 Sep: transfer out of the linear-Gaussian family. Inert under "
+                         "oracle evidence, where the belief never reads the data matrix.")
     ap.add_argument("--override_skeleton", default=None, choices=["true", "estimated"],
                     help="evaluate with this skeleton_source instead of the trained one. "
                          "'estimated' drops the supplied-adjacency assumption: the skeleton "
@@ -188,6 +197,10 @@ def main(argv=None) -> int:
             config = dict(config, disclose_regime=True)
         if args.override_skeleton:
             config = dict(config, skeleton_source=args.override_skeleton)
+        if args.override_noise:
+            config = dict(config, noise_dist=args.override_noise)
+        if args.override_mechanism:
+            config = dict(config, mechanism=args.override_mechanism)
         env = env_from_config(config, seed=use_seed)
 
         if args.checkpoint == "best":
@@ -240,6 +253,8 @@ def main(argv=None) -> int:
                  "eval_n_int": config.get("n_int"),
                  "eval_disclose": bool(config.get("disclose_regime", False)),
                  "eval_skeleton": config.get("skeleton_source", "true"),
+                 "eval_noise_dist": config.get("noise_dist", "gaussian"),
+                 "eval_mechanism": config.get("mechanism", "linear"),
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
                  "means": {k: {m: float(np.mean(v[m])) for m in ("hard", "soft", "resolved")}
                            for k, v in rows.items()},
