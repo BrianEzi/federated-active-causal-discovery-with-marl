@@ -761,7 +761,7 @@ def fig_credit(out: pathlib.Path):
     4,000 episodes; per-seed dots are the caveat drawn.
     """
     panels = [("$k_v=8$", "k08s50n04b150"), ("$k_v=12$", "k12s50n04b150")]
-    data = {}
+    data, support = {}, {}
     for _, cell in panels:
         for arm in ("pooled", "E4"):
             for state in ("credit", "nocredit"):
@@ -769,8 +769,15 @@ def fig_credit(out: pathlib.Path):
                 if not q.exists():
                     print("!! credit measurement incomplete; skipping figure")
                     return
-                data[(cell, arm, state)] = [e["means"]["learned"]["hard"]
-                                            for e in json.loads(q.read_text())]
+                es = json.loads(q.read_text())
+                data[(cell, arm, state)] = [e["means"]["learned"]["hard"] for e in es]
+                # HOW MANY EPISODES CARRY THIS POINT. A mean over 600 episodes of which one
+                # is non-zero is not a measurement of the arm, it is a measurement of that
+                # episode -- and drawn as a line segment it invites a reader to explain a
+                # direction that a single episode decides. Counted so the figure can say so.
+                rows = [np.asarray(e["rows"]["learned"]["hard"]) for e in es]
+                support[(cell, arm, state)] = (int(sum((r > 0).sum() for r in rows)),
+                                               int(sum(r.size for r in rows)))
 
     fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.0), sharey=True)
     floor = 3e-5
@@ -778,8 +785,24 @@ def fig_credit(out: pathlib.Path):
         for arm, label, colour, dx in (("pooled", "pooled", THIRD, -0.045),
                                        ("E4", "federated", LEARNED, 0.045)):
             means = [np.mean(data[(cell, arm, st)]) for st in ("credit", "nocredit")]
-            ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means], "o-", color=colour,
-                    lw=1.7, ms=5.5, label=label if cell.startswith("k08") else None, zorder=4)
+            # THIN SUPPORT IS DRAWN AS THIN. Where either end of a segment rests on a
+            # handful of episodes, the connector is dotted and the counts are printed, so
+            # the slope cannot be read as an effect. At k=12 the pooled pair is exactly
+            # this: one non-zero episode of 600 against four, and it slopes the "wrong"
+            # way for that reason alone.
+            nz = [support[(cell, arm, st)] for st in ("credit", "nocredit")]
+            thin = any(n <= 5 for n, _ in nz)
+            ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means], "o-" if not thin else "o:",
+                    color=colour, lw=1.7 if not thin else 1.2, ms=5.5,
+                    alpha=1.0 if not thin else .75,
+                    label=label if cell.startswith("k08") else None, zorder=4)
+            if thin:
+                for k_, (n, tot) in enumerate(nz):
+                    # Above the marker: below it the label collides with the tick labels
+                    # on the floor-hugging points, which are exactly the ones being labelled.
+                    ax.annotate(f"{n}/{tot}", xy=(k_ + dx, max(means[k_], floor)),
+                                xytext=(0, 8), textcoords="offset points", fontsize=7,
+                                ha="center", color=colour)
             for k_, st in enumerate(("credit", "nocredit")):
                 vals = data[(cell, arm, st)]
                 ax.scatter([k_ + dx] * len(vals), [max(v, floor) for v in vals],

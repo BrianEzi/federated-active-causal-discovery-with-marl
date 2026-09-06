@@ -616,3 +616,44 @@ Brian, but it should not ship as is.
 Checked before handing over: no dangling or duplicated labels introduced (the two dangling
 refs in the tree, app:attribution and app:budget, are pre-existing and point into held-out
 files), check_mustnots clean, check_style unchanged at four pre-existing issues in Ch4.
+
+### 5. Reporting-standard audit, 7 Sep (agent A). New gate: scripts/check_reporting.py
+
+Brian found fig:credit drawing a confident line segment between two points, one of which was
+a mean over 600 episodes of which exactly ONE was non-zero. The slope was decided by that
+single episode and pointed the "wrong" way. Nothing was false; the number was reported at a
+precision its support could not carry. That is mechanical, so it is now checked mechanically.
+
+`scripts/check_reporting.py` counts, for every arm of every reported cell, how many episodes
+actually contribute a non-zero error, and flags any mean resting on five or fewer. It also
+audits Chapter 4 captions for the conditions a reader needs (seeds, episodes, declared axis
+truncation). Run it with the other three gates.
+
+FIXED in this pass:
+- fig:credit: segments whose endpoints rest on five or fewer non-zero episodes are drawn
+  DOTTED with the counts printed ("1/600", "4/600"). The k=12 pooled pair is exactly this.
+- Four captions were missing their episode count and one its seed count: fig:budget_axis,
+  fig:fixedpolicy, fig:coordination, fig:credit. All four now state both.
+- 4.3.1 now quantifies the saturation instead of gesturing at it: over twelve seeds and
+  1,200 episodes per arm, the federated arm errs in 8 episodes and the pooled arm in 4.
+  Twelve episodes of 2,400 carry the entire equivalence bound, which is a far more honest
+  statement of why the bound is loose than "joint recovery lies between 0.993 and 1.000".
+
+STILL OPEN, and they are yours or Brian's because they sit in analysis prose:
+
+1. sec:res_sweep, the contention paragraph: "on structural distance the two are level at the
+   top of the axis, $0.00043$ against $0.00038$, with no seed separating". Those rest on 7
+   and 17 non-zero episodes of 600. "Level" is defensible; the two five-decimal figures
+   imply a resolution the support does not have. Consider "both at the measurement floor,
+   fewer than twenty episodes of 600 contributing to either".
+2. sec:res_sweep, the K axis: "both sit near the floor at $0.00010$ against $0.00013$" --
+   25 and 19 episodes of 600. Better supported than (1) but the same phrasing issue.
+3. sec:res_credit: the figure shows pooled below federated in every cell and both credit
+   states, and at k=8 credit-off that clears two standard errors on 3 of 3 seeds. Read
+   against 4.3.1's equivalence bound a reader has a fair question. The reconciliation is
+   the training budget -- these runs are 4,000 episodes, the ladder is 12,000, and C7 is
+   exactly the claim that budget decides who wins -- but the chapter never says it. One
+   sentence, below the analysis marker, so not mine.
+
+NOT a defect, recorded so nobody "fixes" it: "committing no error in $600$ episodes at
+$\beta=2$" is 0/600 and is correctly stated as a count rather than as a rate.
