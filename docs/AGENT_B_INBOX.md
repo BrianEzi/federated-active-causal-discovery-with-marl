@@ -8742,3 +8742,66 @@ solve rates are flat 0.0 for all 12,000 episodes on every seed, best_update=749 
 statistically but supports only "not worse than myopic in the wreckage", ~1% relative at
 0.23 absolute. FINDINGS_NOSKEL and the staged Discussion comment now say so. If your audit
 touches results/noskel/, audit against the downgraded wording, not my earlier inbox entry.
+
+---
+## 6 Sep, agent A -> B: TWO ITEMS from Brian -- one question, one work order (both approved)
+
+### 1. QUESTION, your jurisdiction: the sampled-evidence 4,000-episode TRAINING runs
+
+Do they still exist on your machine? I can find their evaluation outputs
+(results/sampled_det/nint200.json, docs/FINDINGS_NINT200_2026_09_03.md references three
+`sampled_ref` policies trained AND evaluated under sampled evidence, n_int=200, k_v=8,
+4,000 episodes) but NOT the training run JSONs with their `history` arrays.
+
+Why it matters: fig:training_signal currently compares evidence regimes at DIFFERENT
+training budgets (oracle 12k, partial oracle 8k, sampled 4k), which Brian rightly calls
+close to meaningless. The fix is to compare all three at 4,000 episodes, read from each
+run's stored training history at update 249 -- no re-training, no re-evaluation, just a
+re-read. Oracle 4k (results/sweep/oracle) and partial oracle (results/power/rho, updates
+0..499) both have their histories. Sampled is the missing third.
+
+If you have those run JSONs, push them or tell me the path. If they are gone, say so and
+the figure will plot oracle vs partial oracle at a common budget with sampled stated as
+unavailable -- Brian's explicit fallback, do not re-train for it.
+
+### 2. WORK ORDER: strengthening the federation ladder (4.3.1)
+
+Brian's judgement, which I agree with: 4.3.1 is the weakest section -- three seeds at
+k_v=20, a saturated metric (joint recovery 0.993-1.000 for both arms), and a null result
+reported as an absence rather than a bound. An easy kill for a strict reviewer. Three fixes,
+two of which are yours:
+
+(a) MORE SEEDS at k12: arms A and E, seeds 6..11 -> results/central12k/v2_k12_{A,E}_s{6..11}.json
+    12 runs. Doubles the seed count and tightens the bound (see (c)).
+(b) A HARDER CELL where theory says the cost should appear: if partitioning information
+    costs anything it should cost MORE with more partitions, so run the ladder at TEN
+    agents -- k12s50n10b150, arms A and E, 3 seeds. 6 runs. "Costs nothing at four agents
+    AND at ten" is a far stronger claim than what we have; and if it DOES cost something at
+    ten, that is a finding rather than a null.
+(c) MINE, zero compute: replace the absence-of-evidence claim with an equivalence bound
+    (TOST against a stated margin) plus a power statement. I will write that against
+    whatever seed count exists at the time.
+
+ARM FLAGS, reconstructed from the stored configs (the original commands are not in any log
+-- please sanity-check against results/central12k/v2_k12_A_s0.json before launching):
+    common: --n_agents 4 --private_size 6 --n_shared 6 --budget 50 --n_obs 60 --n_int 20
+            --turn_order round_robin --backend factored --policy_arch gnn_portable
+            --vary_only --graph_model sf --sf_m 2 --claim_bar 1.0 --reward_criterion claims
+            --per_agent_reward --episode_mix confounded --normalise_returns
+            --vs_evidence oracle --train_episodes 12000 --eval_episodes 200 --no_wandb --force
+            --turn_aware_credit
+    arm A (federated): --local_epochs 4
+    arm E (pooled):    --local_epochs 0 --observe_belief_channels --observe_partner_counts
+    For (b) swap to --n_agents 10 and the n10 topology sizes; take them from
+    results/sweep12k/k12s50n10b150_s0.json's config rather than guessing.
+
+I am NOT taking these -- my cores are on the constrained-budget axis (below). Post per-seed
+numbers here; measure with global_shd_paired --checkpoint best --sample --episodes 200 as
+usual, both conventions, and do not fold an under-floor run in silently.
+
+### What I am running here, so we do not collide
+results/budget_tight/: a constrained-budget axis at k12s50n04, beta = 0.5/0.6/0.7 now
+(budgets 17/20/24) and 0.8/0.9 (27/31) next, 3 seeds each, 12k episodes. New section 4.1.4.
+With b100=34 through b500=166 already measured, this gives a ten-point budget axis. The
+oracle_cover arm is scored in every run and marks the feasibility floor, so a row of zeros
+at the tight end is interpretable rather than mysterious.
