@@ -9521,3 +9521,60 @@ replication is supposed to do.
 
 The tool refuses to interpolate a crossing unless a passing rate and a failing rate bracket it,
 so the k=8 column says "below 0.50, unmeasured" rather than inventing a number.
+
+---
+
+## 2026-09-06 21:2x -- Agent B: RETRACTION, twenty minutes old. The floor does NOT move with window size. It moves with BUDGET and CHANNELS.
+
+I posted "the answer-rate floor moves with window size" at 21:0x. That attribution is wrong and
+I am withdrawing it. The two grids differ in FIVE fields, not one, and I named the one that
+suited the story. This is precisely the confound I have spent two days catching in other
+people's tables.
+
+**The controlled comparison was already on disk.** `results/power/p05/p07/p10` are k=8 at the
+SWEEP cell -- budget 35, 4,000 episodes, channels OFF -- the same austere settings as the k=12
+fleet:
+
+    k_v=8, budget 35, 4k eps, channels OFF     k_v=12, budget 50, 12k eps, channels OFF
+      rho=1.00   0.983  PASS                     rho=1.00   0.994  PASS (12 seeds)
+      rho=0.70   0.242  FAIL                     rho=0.70   0.562  FAIL
+      rho=0.50   0.056  FAIL                     rho=0.50   0.173  FAIL
+
+    k_v=8, budget 70, 8k eps, channels+reprobe ON
+      rho=0.70   0.915  PASS
+      rho=0.50   0.733  PASS
+
+**At k=8 with the austere settings the floor is between 0.70 and 1.00 -- the same collapse I
+attributed to the larger window.** If anything the k=12 runs do BETTER at low rates than the
+austere k=8 runs (0.562 vs 0.242 at rho=0.70; 0.173 vs 0.056 at rho=0.50), despite the larger
+window, because they have more budget and three times the episodes.
+
+**So window size is not implicated at all on this evidence. The competence of a partial-oracle
+policy at low answer rates depends on the training budget and the observation channels.**
+
+### The part that matters for the thesis
+
+**The k=8 transfer grid was run at DOUBLE its own cell's budget.** The k=8 sweep cell
+`k08s50n04b150` derives budget 35; the rho fleet used 70. It also carried
+`observe_belief_channels` and `observe_reprobe_signal`, which the sweep cell does not, and 8,000
+episodes against the sweep's 4,000. At the cell's own settings the same dial produces window
+rates of 0.056 and 0.242 -- no policy at all.
+
+That is a real and material caveat on RQ2 which I do not think is written down anywhere: **the
+answer-rate result requires a budget and an observation set that the rest of the thesis's
+principal cells do not have.** It does not make the k=8 numbers wrong -- those policies passed
+the floor and their transfer deltas stand -- but "training under a partial oracle transfers"
+carries an unstated precondition.
+
+### What follows
+
+1. The k=12 fleet at sweep-cell settings will very likely fail below rho~0.80, and that is now
+   an expected result rather than a surprise.
+2. The interesting experiment is no longer window size. It is whether the k=12 grid becomes
+   competent at low rates when given the k=8 fleet's budget and channels. That is a controlled
+   two-arm question, not a seven-rate sweep.
+3. I am not launching anything. Both fleets keep running to completion; the current grid still
+   answers "does the finding survive at the principal cell's own settings", which is a fair
+   question with an increasingly clear answer.
+
+Retraction stands on its own: my 21:0x message should not be quoted.
