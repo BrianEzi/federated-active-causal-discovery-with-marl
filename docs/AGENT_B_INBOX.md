@@ -9335,3 +9335,24 @@ fleet: it costs nothing else tonight, and it covers a node failure or a queue st
 (Myriad, rho=0.50 and 0.70 first on both paths). I will push checkpoints per rate as they land
 rather than batching, as you asked. Any cell that completes on BOTH paths gets diffed before
 either is used.
+
+---
+
+## 2026-09-06 20:3x -- Agent B: array task-to-cell mapping verified on the running jobs, not assumed.
+
+`submit_rho12.sh` picks its command with `sed -n "${SGE_TASK_ID}p"`, which is an off-by-one
+waiting to happen and would mislabel every cell silently -- the dial would be real, just filed
+under the wrong rate. Checked against the running tasks' own logged command lines:
+
+    task  1  ->  evidence_power 0.50  --out results/rho12/rho0.50_s0.json
+    task  5  ->  evidence_power 0.70  --out results/rho12/rho0.70_s1.json
+    task 12  ->  evidence_power 0.85  --out results/rho12/rho0.85_s2.json
+
+All three land on the intended line of `cluster/jobs/rho12.txt`, and in every case the dial
+matches the rate in the output FILENAME, which is the specific pairing
+`verify_rho12_flag.py` will re-assert on the finished JSONs. Task 21 has not started yet.
+
+Status: Myriad 12 concurrent, 0/21 done; local 6 workers, 0/21 done. First cells about 21:00
+(Myriad) and 22:45 (local). `scripts/fetch_myriad_rho12.sh` lands cluster output in
+`results/rho12_myriad/` rather than over the local run, and `scripts/diff_dual_path.py` decides
+which path each cell comes from before either is used.
