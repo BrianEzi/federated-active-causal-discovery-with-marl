@@ -15,6 +15,13 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+# Notebooks are scanned too: submission/README.md points a reader at
+# notebooks/thesis_figures.ipynb as where every figure is drawn from raw files, so its
+# markdown ships and must obey the same MUST NOT lines as the chapters. Six cells asserting
+# retracted claims ("the crossover", a stale 2.3x/16x checkpoint factor, the unconditional
+# convention claim) were found there on 6 Sep by a scan the checker did not then perform.
+NOTEBOOKS = ["notebooks/results.ipynb", "notebooks/thesis_figures.ipynb"]
+
 FILES = ["thesis/0 Abstract.tex", "thesis/1 Introduction.tex",
          "thesis/2 Background and Related Work.tex", "thesis/3 Methodology.tex",
          "thesis/4 Results and Analysis.tex", "thesis/5 Discussion.tex",
@@ -52,6 +59,24 @@ def strip_comments(text: str) -> str:
 
 def main() -> int:
     bad = 0
+    for rel in NOTEBOOKS:
+        path = ROOT / rel
+        if not path.exists():
+            continue
+        import json as _json
+        cells = _json.loads(path.read_text()).get("cells", [])
+        prose = "\n".join("".join(c["source"]) for c in cells
+                           if c.get("cell_type") == "markdown")
+        prose = re.sub(r"[Dd]ecentralis\w+", "", prose)
+        for pattern, why, exempt in RULES:
+            for m in re.finditer(pattern, prose, re.I):
+                lo, hi = max(0, m.start() - 800), m.end() + 800
+                if exempt and re.search(exempt, prose[lo:hi], re.I):
+                    continue
+                start = max(0, m.start() - 60)
+                print(f"!! {rel}: /{pattern}/ -- {why}\n     ...{prose[start:m.end()+60]}...")
+                bad += 1
+
     for rel in FILES:
         path = ROOT / rel
         if not path.exists():

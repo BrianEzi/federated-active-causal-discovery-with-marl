@@ -60,11 +60,29 @@ The retrained cells behind the training-budget finding, and the learning-rate pr
 
 32 result files, 68 checkpoints
 
+## `budget_tight/`
+
+The constrained-budget axis, beta 0.5-0.9 at k=12, three seeds each.
+
+16 result files (engine output; no policy checkpoint needed)
+
+## `noisedist/`
+
+Noise-shape and mechanism robustness of the rho=0.5 policies.
+
+12 result files (engine output; no policy checkpoint needed)
+
+## `epsgreedy/`
+
+The epsilon-greedy control at k=12 and k=30: is the learned policy dithered greedy. Grid eps 0.05-0.3, 200 paired episodes per seed.
+
+5 result files (engine output; no policy checkpoint needed)
+
 ## `nint_curve/`
 
 The sample-size axis: k=8 12,000-episode policies under sampled evidence, n_int swept 10 to 10,000, three arms re-scored per value.
 
-21 result files (engine output; no policy checkpoint needed)
+44 result files (engine output; no policy checkpoint needed)
 
 ## `checkpoint/`
 
