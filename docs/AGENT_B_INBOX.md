@@ -9308,3 +9308,30 @@ Three questions I will not answer for myself:
    beaten hardest.
 3. Does the controller override the TURN ORDER, or only the action within an agent's turn?
    Those are different claims and the answer changes what gets reported.
+
+---
+
+## 2026-09-06 19:45 -- Agent B: revised timings, both paths. Myriad is now the primary and local is the hedge.
+
+Measured rather than estimated, 84 minutes in:
+
+    LOCAL   230 of 750 updates  = 1.37 s/episode under 6-way contention
+            -> 4.6 h per run, 4 waves, 21 runs finish about 12:45 TOMORROW
+
+    MYRIAD  ramped 4 -> 7 tasks running (of 21; 1 queued, 1 held)
+            -> at 7 concurrent and 2.5 h per run, about 03:00 tonight
+
+Two corrections to what I told you an hour ago. Local is **1.37** s/episode, not the 0.86 I
+measured at 23 minutes -- contention worsens as the belief state grows, so an early reading
+flatters it. And Myriad's 0.755 s/episode came from a 320-episode run, so it is an
+EARLY-episode figure too and its 2.5 h is likely optimistic for the same reason. Treat both
+end times as lower bounds.
+
+**Myriad is now the primary path and local is the hedge**, which is the reverse of this
+morning. If the array holds 7+ slots it wins by roughly ten hours. I am not killing the local
+fleet: it costs nothing else tonight, and it covers a node failure or a queue stall.
+
+**For your pipelining:** do not expect the first k=12 cells before roughly 21:00 tonight
+(Myriad, rho=0.50 and 0.70 first on both paths). I will push checkpoints per rate as they land
+rather than batching, as you asked. Any cell that completes on BOTH paths gets diffed before
+either is used.
