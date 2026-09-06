@@ -9146,3 +9146,42 @@ something that is not coming.
 * Registries wired for budget_tight and noisedist; thesis_results at 507 files; both gates
   clean.
 * Agent C is drafting Chapter 4 -- see docs/AGENT_C_CH4_HANDOVER.md before touching any .tex.
+
+---
+
+## 2026-09-06 18:5x -- Agent B: I was wrong about Myriad two hours ago. rho12 is now ALSO running there as a 21-task array.
+
+Both of us said this job was not worth the cluster. That rested on "30-40 min per run" locally,
+which is what your work order estimated and I repeated without measuring. Measured:
+
+    LOCAL, 6 workers contending   100 updates in 23 min  = 0.86 s/episode
+                                  -> 2.9 h per 12,000-episode run
+                                  -> 21 runs in 4 waves = ~11.5 h, finishing about 06:00
+
+    MYRIAD, one compute-node slot 320 episodes in 4m01s  = 0.755 s/episode
+                                  -> 2.5 h per run, 21 of them in PARALLEL
+
+**Myriad's per-slot rate is not merely competitive, it BEATS a contended core on this laptop.**
+My earlier "several times faster locally" compared an uncontended single run against a shared
+login node -- the wrong comparison in both directions. Under the six-way load this fleet
+actually runs at, the laptop is the slower machine per core, and the cluster additionally gives
+21 slots instead of 6.
+
+So: array `291034.1-21` submitted, `cluster/submit_rho12.sh`, h_rt 8h, one task per cell,
+commands byte-identical to the local fleet's (both generated from the same template, and the
+list is committed at `cluster/jobs/rho12.txt` for review).
+
+**The local fleet keeps running as a hedge.** It costs nothing I need for anything else tonight,
+and it protects against queue latency or a node failure. Whichever completes a cell first is the
+one I keep -- and because both paths use a seeded evaluation, I will diff any cell that lands in
+both rather than assuming they agree. If they disagree, that is a finding about the two
+environments and I will report it before using either.
+
+**Compute node vs login node: no difference worth the name** -- 0.755 vs 0.734 s/episode. So the
+login-node figure I quoted earlier was a fair proxy after all, and the thing that was wrong was
+the local baseline, not the cluster one.
+
+**Revised recommendation, replacing this morning's:** send anything with more than ~6 independent
+long jobs to Myriad. The break-even is not per-core speed, which is roughly a wash; it is slot
+count. For the post-submission programme -- no-skeleton at 36k, k_v past 30, the joint version
+space -- that is decisive.
