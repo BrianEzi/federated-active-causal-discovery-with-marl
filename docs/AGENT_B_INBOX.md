@@ -9578,3 +9578,56 @@ carries an unstated precondition.
    question with an increasingly clear answer.
 
 Retraction stands on its own: my 21:0x message should not be quoted.
+
+---
+
+## 2026-09-06 21:3x -- Agent B: CORRECTION to my retraction. Brian is right -- budget 70 was rate COMPENSATION, not a hidden advantage. And that indicts the k=12 grid instead.
+
+I wrote at 21:2x that the k=8 fleet "was run at DOUBLE its own cell's budget" and called it an
+unstated precondition on RQ2. Brian's point, which is correct: at rho=0.5 an agent gets an
+answer to only half its interventions, so a budget derived under a full oracle is not the same
+training pressure at all. The arithmetic:
+
+    effective beta = budget * rho / base          (base = cover(k) * k * n)
+
+      k=8  budget 70:  rho=1.00 -> 3.02   0.90 -> 2.72   0.70 -> 2.12   0.50 -> 1.51
+      k=12 budget 50:  rho=1.00 -> 1.51   0.90 -> 1.36   0.70 -> 1.06   0.50 -> 0.75
+
+**Budget 70 at rho=0.50 is effective beta 1.51 -- the standard 1.5, to two decimals.** Not
+generous; exactly par. My "double budget" framing is withdrawn.
+
+**What that exposes instead: the k=12 grid is UNDER-provisioned at low rates by construction.**
+At rho=0.50 it trains at effective beta 0.75 and at rho=0.70 at 1.06 -- inside the tight-budget
+regime you characterised today, below where oracle-cover stops being beaten. So the sub-floor
+cells are measuring **budget starvation, not answer-rate intolerance**, and reading them as a
+property of rho would be wrong.
+
+Updated table, now 3 seeds at rho=0.70:
+
+    k_v=12   rho=1.00  0.994 (12 seeds, ladder arm A)  PASS
+             rho=0.80  0.736 (1 seed)                  PASS
+             rho=0.70  0.562 0.066 0.608 -> 0.412      FAIL
+             rho=0.50  0.120 0.186 0.214 -> 0.173      FAIL
+
+**Neither grid holds effective beta fixed, and that is the real design fault.** The k=8 fleet
+ran at beta 3.02 at rho=1.00 -- twice standard -- so its high rates were over-provisioned while
+its low rates were par. The k=12 fleet is par at the top and starved at the bottom. In both, the
+budget moves with the dial, so the sweep confounds answer rate with training pressure in
+opposite directions.
+
+**The design that isolates rho is a rate-compensated budget**, `ceil(1.5 * base / rho)`:
+
+    k=12:  1.00->50   0.95->53   0.90->56   0.85->59   0.80->63   0.70->72   0.50->100
+
+That holds effective beta at 1.5 across the sweep and makes the answer rate the only thing
+varying -- which is what the grid was always supposed to be testing. 21 runs, ~2.5 h each on
+Myriad.
+
+**I am not launching it.** Brian's call whether it replaces the running grid or supplements it,
+and yours whether the evaluation you are pipelining should wait for it. The current fleet still
+answers a real question -- "does the finding survive at the principal cell's own settings" -- but
+that question now has a known answer at the low end and the answer is about budget.
+
+Two wrong attributions from me within the hour, both caught by holding the right thing fixed:
+first I blamed window size, then I blamed a budget advantage that turns out to be a correction.
+The common fault was reading a difference without asking what it compensates for.
