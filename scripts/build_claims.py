@@ -514,6 +514,34 @@ if len(DISC) == 7 and PROBE.exists():
             "intervention happened; the privacy cost of that bit is not analysed.", ""]
 
 
+# --- C4a: the ladder as an equivalence bound (6 Sep) ------------------------------------------
+EQ = ROOT / "results/ladder_equivalence.json"
+if EQ.exists():
+    eq = json.loads(EQ.read_text())
+    out += ["### C4a — the bound, replacing the absence of evidence (6 Sep)", ""]
+    for conv in ("best", "final"):
+        if conv not in eq:
+            continue
+        r = eq[conv]
+        worst = max(abs(r["ci_lo"]), abs(r["ci_hi"]))
+        out += [f"* {conv} checkpoint, {r['n']} seeds: paired federated - pooled "
+                f"{r['mean']:+.6f} +/- {r['se']:.6f}, 90% CI "
+                f"[{r['ci_lo']:+.6f}, {r['ci_hi']:+.6f}], TOST p = {r['p']:.2e} against a "
+                f"margin of {r['margin']:.6f} (the myopic arm on the same episodes) — "
+                f"EQUIVALENT; any cost is at most {worst/r['margin']:.0%} of the gap to the "
+                f"myopic rule"]
+    out += ["",
+            "**The conventions disagree in SIGN** — selected favours federated, final favours",
+            "pooled, neither clearing 2 SE. Report BOTH or the claim is convention-selected.",
+            "**The bound is loose and must be described as such.** It excludes a cost larger",
+            "than roughly three-quarters of the learned-to-myopic gap, and no tighter. That is",
+            "a real statement where 'no seed separates' was not, but it is not a tight one.",
+            "**MUST NOT** propose more seeds as the fix. The standard error scales as",
+            "1/sqrt(n): halving this bound needs about 48 seeds, quartering it about 192. The",
+            "cell is saturated — four of six federated cells at the selected checkpoint are",
+            "exactly zero — and seeds cannot separate arms both pinned there. The fix is a",
+            "HARDER CELL, and the budget axis (C10) says where: beta 0.5-0.7.", ""]
+
 # --- Undertraining ---------------------------------------------------------------------------
 out += ["## C5 — The competence-floor exclusions are undertrained, not broken", "",
         "| cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |",

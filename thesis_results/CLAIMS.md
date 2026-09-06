@@ -278,6 +278,22 @@ toward, not attainment.
 **MUST NOT** present disclosure as free: the bit reveals THAT a private
 intervention happened; the privacy cost of that bit is not analysed.
 
+### C4a — the bound, replacing the absence of evidence (6 Sep)
+
+* best checkpoint, 12 seeds: paired federated - pooled -0.000084 +/- 0.000224, 90% CI [-0.000486, +0.000318], TOST p = 1.57e-02 against a margin of 0.000635 (the myopic arm on the same episodes) — EQUIVALENT; any cost is at most 76% of the gap to the myopic rule
+* final checkpoint, 12 seeds: paired federated - pooled +0.000272 +/- 0.000162, 90% CI [-0.000019, +0.000563], TOST p = 2.32e-02 against a margin of 0.000635 (the myopic arm on the same episodes) — EQUIVALENT; any cost is at most 89% of the gap to the myopic rule
+
+**The conventions disagree in SIGN** — selected favours federated, final favours
+pooled, neither clearing 2 SE. Report BOTH or the claim is convention-selected.
+**The bound is loose and must be described as such.** It excludes a cost larger
+than roughly three-quarters of the learned-to-myopic gap, and no tighter. That is
+a real statement where 'no seed separates' was not, but it is not a tight one.
+**MUST NOT** propose more seeds as the fix. The standard error scales as
+1/sqrt(n): halving this bound needs about 48 seeds, quartering it about 192. The
+cell is saturated — four of six federated cells at the selected checkpoint are
+exactly zero — and seeds cannot separate arms both pinned there. The fix is a
+HARDER CELL, and the budget axis (C10) says where: beta 0.5-0.7.
+
 ## C5 — The competence-floor exclusions are undertrained, not broken
 
 | cell (seed 2) | 4,000 ep wr / learned | 12,000 ep wr / learned | myopic |
