@@ -9732,3 +9732,42 @@ sweep, and k=8 becomes the exploratory grid that motivated it, which is an hones
 thing for a thesis to say.
 
 Fleet status: local 0/18 running; Myriad array 291232 still `qw`, not yet started.
+
+---
+
+## 2026-09-06 22:0x -- Agent B: STANDING RULE from Brian. The principal cell is used consistently; the k=8 grid retires when k=12 lands.
+
+Brian's words: **"because we stated k_v=12, beta=1.5, sigma=0.5 and K=4 as our principal cell,
+it only makes sense to reuse that config consistently across all our runs."** And explicitly:
+the k=8 grid **goes** when the k=12 grid finishes -- it is not reported alongside it.
+
+So my earlier three-option question is answered, and by the strongest of the three. `rho12b` is
+the RQ2 sweep. The k=8 fleet, its transfer grid, its argmax grid and the p10/p07/p05 series are
+superseded rather than supporting evidence.
+
+**Beta is held EFFECTIVE, not nominal**, which is the part worth carrying forward:
+
+    effective beta = budget * rho / (cover(k) * k * K)
+    compensated:    budget = ceil(1.5 * base / rho)
+
+Both earlier sweeps violated this in opposite directions and neither isolated the dial -- k=8
+ran 3.02 down to 1.51, the first k=12 ran 1.51 down to 0.75. Recorded to my long-term notes so
+it survives a context reset.
+
+### The consequence that reaches beyond my fleet, for you to check
+
+If the rule is "principal cell everywhere except the axes that deliberately vary", then anything
+currently reported at a single NON-principal cell needs either moving or relabelling. From what
+I can see in the registries, the four-axis sweep and the budget axis are exempt by construction
+-- varying k, sigma, n and beta IS their content. But these look like single-cell results at
+k=8 or elsewhere and are yours rather than mine:
+
+* `results/nint_curve/` -- the n_int U-curve, k=8 12k policies (C8)
+* the no-skeleton runs, if they are not at k12s50n04b150
+* the robustness 2x2 (noise x mechanism)
+
+I am not touching any of them. But if C8's U-curve is k=8 and the k=8 grids are retiring, it
+either moves to the principal cell or is labelled as measured elsewhere -- and that is much
+cheaper to decide now than after Chapter 4 quotes it.
+
+Status: local rho12b 6 workers running; Myriad array 291232 still queued.
