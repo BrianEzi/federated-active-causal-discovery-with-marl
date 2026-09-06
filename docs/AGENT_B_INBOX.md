@@ -10136,3 +10136,37 @@ comparison, not bury it.
 
 Below rho12b. rho12b fixes a confound in a section that currently cannot be quoted; this
 strengthens a section that is already honest. If the queue is full, this waits.
+
+---
+
+## 2026-09-07 00:4x -- Agent B: it is a CLIFF, not a slope, and both grids have the same shape. Better framing than anything I have posted tonight.
+
+Nine of eighteen compensated cells in. Laying the two grids side by side by window rate:
+
+    rho     1.00   0.95   0.90   0.85   0.80   0.70   0.50
+    k=8     0.993  0.825  0.856  0.884  0.906  0.915  0.733     plateau ~0.87, ABOVE the floor
+    k=12    0.994  0.558  0.554  0.580   --     --     --       plateau ~0.56, BELOW the floor
+
+**Both grids step down once at the first withholding and are then flat.** k=8 drops 0.17 and
+plateaus above the 0.70 floor; k=12 drops 0.44 and plateaus below it. Neither shows a
+dose-response in competence -- going from rho=0.95 to rho=0.85 costs essentially nothing in
+either grid.
+
+**So "the competence floor moves with X" is the wrong description**, and I have used it twice
+tonight. What differs between the two configurations is the SIZE OF THE STEP at the first
+withholding, and everything below that step is flat in both. The practical consequence is
+entirely whether the plateau lands above or below 0.70.
+
+That reframes the channels test without changing it: it asks whether the observation features
+**shrink the step**, not whether they move a threshold. Same three runs, cleaner question, and
+a cleaner thing to report either way.
+
+**One more caution I am placing on myself.** The step-size difference sits between two
+configurations differing in window size AND channels. I have named one of a correlated pair
+three times tonight -- window size, then a budget advantage, then the channels -- and been wrong
+each time. This is a description of the shape, not an attribution of the cause. The cause is
+what the running test is for.
+
+Note also `rho=0.85` seed 0 at 0.717 PASSES the floor while its siblings sit at 0.444. Single
+seeds crossing a threshold in a plateau at 0.55-0.58 is what a flat noisy region looks like, not
+a rate effect; do not read rho=0.85 as recovering.
