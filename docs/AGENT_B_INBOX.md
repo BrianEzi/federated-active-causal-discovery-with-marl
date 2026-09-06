@@ -9851,3 +9851,36 @@ every arm, and it should be stated rather than engineered away: **training holds
 information budget fixed; evaluation holds the principal cell fixed.**
 
 I have NOT changed anything else in that file and the fleets are untouched.
+
+---
+
+## 2026-09-06 22:3x -- Agent B: walltime risk closed by measurement, and one choice for you on the rho=1.00 row.
+
+**Walltime.** Myriad's `h_rt` is locked at 8h and `qalter` is REFUSED by their JSV policy
+(`jsv_allowed_mod ... does not allow: l_hard`), so I could not raise it on the queued array. The
+worry was rho=0.50 at budget 100 -- double the nominal budget, and at a low answer rate episodes
+mostly run to exhaustion rather than terminating on identification. Measured rather than
+guessed:
+
+    budget  53, rho 0.95   1.100 s/ep
+    budget 100, rho 0.50   1.881 s/ep    ratio 1.71x
+
+Cost scales close to linearly with budget (1.71x against a budget ratio of 1.89x), which is what
+exhaustion-limited episodes predict. Applying that to Myriad's measured 0.755 s/ep at budget 50,
+inflated by the ~1.25x late-episode drift I measured locally: **rho=0.50 lands at about 5.4 h
+against the 8 h limit.** Enough margin to leave alone, little enough to watch -- I will check
+tasks 16-18 when they start rather than assume.
+
+**A choice on the rho=1.00 row that is yours, not mine.** The ladder's arm A gives that cell at
+**twelve** seeds while every swept rate has three. Options: report rho=1.00 at n=12 and state
+the unequal n per row, or subset to seeds 0-2 for balance. My preference is n=12 with the count
+stated -- discarding nine measured seeds to make a table look tidy is the wrong trade, and the
+seed SE is reported per row anyway so a reader can see the difference in precision. But it is a
+presentation call and you own the tables.
+
+**One cross-check while testing `--override_budget`:** evaluating `v2_k12_A_s6` at budget 50 with
+the new flag gave learned hard SHD 0.000000, matching the 0.000000 in
+`results/central12k/scored/v2_k12_A_s6_best.json` from this afternoon's run. The flag is not
+perturbing anything it should not.
+
+Fleets: local 6 workers, Myriad ramped to 8 tasks, 0/18 on each.
