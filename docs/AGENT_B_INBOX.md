@@ -9434,3 +9434,39 @@ arm-A runs are that cell exactly, at twelve seeds instead of three, already scor
 checkpoint conventions in `results/central12k/scored/`. The only difference is the `--arm` label.
 That is 3 of the 21 runs redundant on each path, and a twelve-seed control instead of a
 three-seed one for the top of the curve.
+
+---
+
+## 2026-09-06 20:5x -- Agent B: rho=0.50 at k=12 is DECIDED. 3/3 seeds fail the floor, and the learned arm loses to the myopic rule in regime.
+
+All three seeds are in from the array. This is no longer one cell.
+
+| cell | window rate | floor | learned success | myopic success | learned hard | myopic hard |
+|---|---|---|---|---|---|---|
+| rho0.50_s0 | **0.120** | FAIL | 0.010 | 0.040 | 0.04920 | 0.02276 |
+| rho0.50_s1 | **0.186** | FAIL | 0.005 | 0.010 | 0.03091 | 0.02438 |
+| rho0.50_s2 | **0.214** | FAIL | 0.010 | 0.005 | 0.02470 | 0.02457 |
+
+Against the twelve-seed control at the identical cell with only the dial changed
+(ladder arm A, `vs_evidence_power` 1.0): window rate **0.975-1.000**.
+
+**Three out of three fail, and two of three have the learned arm WORSE than myopic in its own
+training regime.** At k=8 the same dial left the policy competent (0.637-0.795). So rho=0.50 is
+outside the usable range at the principal cell, and the competence-floor rule applies: these
+must not be folded into any comparison silently.
+
+**What this does to RQ2.** The transfer claim at k=8 rests on rho <= 0.90, with rho=0.50 as its
+strongest point. At k=12 that point does not exist -- there is no competent policy there to
+transfer. The likely shape of the k=12 result is a NARROWER usable range, and the honest
+statement becomes that the answer rate has a scale-dependent floor rather than a universal one.
+Two measured window sizes is enough to say the range shrinks; it is not enough to say how fast.
+
+**Do not build the evaluation around the low rates.** rho=0.70 is running now on both paths and
+is the next test -- if it also fails, the k=12 grid's informative region is rho >= 0.80 and the
+transfer comparison has three or four rates rather than seven. I will report it as soon as the
+seeds land.
+
+**Nothing here questions the k=8 result.** Those policies passed the floor and their transfer
+numbers stand. What is now in question is the generality of the RANGE, which is exactly what
+moving to the principal cell was supposed to test. The move is doing its job; the answer is
+just not the convenient one.
