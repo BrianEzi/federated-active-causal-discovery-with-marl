@@ -9470,3 +9470,54 @@ seeds land.
 numbers stand. What is now in question is the generality of the RANGE, which is exactly what
 moving to the principal cell was supposed to test. The move is doing its job; the answer is
 just not the convenient one.
+
+---
+
+## 2026-09-06 21:0x -- Agent B: the answer-rate floor MOVES WITH WINDOW SIZE. Measured, both cells, one table.
+
+`scripts/answer_rate_floor.py`. Training-side only -- it reads `window_rate` from each run's own
+history, which decides which cells are ELIGIBLE to be transfer results. Nothing here is a
+transfer number.
+
+    k_v = 8   (budget 70, 8k episodes, channels+reprobe ON)
+      rho   n   window rate per seed          mean   verdict
+     1.00   3   0.992 0.997 0.991            0.993   PASS
+     0.95   3   0.778 0.831 0.866            0.825   PASS
+     0.90   3   0.866 0.867 0.836            0.856   PASS
+     0.85   3   0.836 0.944 0.873            0.884   PASS
+     0.80   3   0.914 0.925 0.880            0.906   PASS
+     0.70   3   0.909 0.923 0.911            0.915   PASS
+     0.50   3   0.795 0.766 0.637            0.733   2/3
+     -> every measured rate competent; the floor is BELOW 0.50 and unmeasured
+
+    k_v = 12  (budget 50, 12k episodes, channels OFF -- the principal cell)
+      rho   n   window rate per seed          mean   verdict
+     1.00  12   0.975 - 1.000                0.994   PASS   (ladder arm A control)
+     0.80   1   0.736                        0.736   PASS
+     0.70   1   0.562                        0.562   FAIL
+     0.50   3   0.120 0.186 0.214            0.173   FAIL
+     -> competence lost between rho=0.70 and rho=0.80
+
+**At k=8 the floor is below 0.50 and unmeasured. At k=12 it sits between 0.70 and 0.80.** And
+rho=0.80 clears it by 0.036, so it is marginal rather than comfortable.
+
+**The consequence for RQ2 is sharp: the k=8 finding's strongest region is entirely outside the
+k=12 competent range.** The k=8 transfer result wins at rho <= 0.90 and is strongest at 0.50 and
+0.70. At k=12 there is no competent policy at either of those rates. The replication cannot
+reproduce the k=8 headline because the regime it was measured in does not exist at the principal
+cell.
+
+**Provisional -- rho=0.70 and 0.80 are one seed each so far.** Two more of each are running on
+both paths and will settle it within a few hours. I am flagging it now because it changes what
+the grid is FOR: not "does the k=8 result replicate" but "how far does the usable range of rho
+extend, and how does it shrink with the window". Two window sizes give the direction, not the
+rate of shrinkage.
+
+**What I think this is worth, and it is not a consolation prize.** A result that holds only in a
+regime whose existence depends on window size is a weaker claim than we had, but a
+scale-dependent competence floor is a real and reportable property of the method -- and it was
+invisible at a single window size. This is the move to the principal cell doing exactly what a
+replication is supposed to do.
+
+The tool refuses to interpolate a crossing unless a passing rate and a failing rate bracket it,
+so the k=8 column says "below 0.50, unmeasured" rather than inventing a number.
