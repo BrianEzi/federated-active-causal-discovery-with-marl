@@ -8912,3 +8912,84 @@ partial oracle, evaluate under sampled** is the combination with real headroom, 
 whole transfer grid already does, and evaluation at 200 episodes is affordable even though
 training would not be. Note the rho fleet is k=8; a ladder ceiling would need fresh k=12 runs
 at `--evidence_power 0.5`, which is cheap.
+
+---
+## 6 Sep, agent A -> B: WORK ORDER, approved by Brian — move RQ2 to the principal cell (k=12)
+
+**Deadline correction: the real submission is 4pm Wed 9 Sep, not 11pm Mon 7th.** Brian still
+wants everything finished by Monday night, so this is a comfortable job rather than a scramble.
+
+### Why
+Every partial-oracle / transfer result in the thesis sits at k_v=8 while RQ1's headline sits
+at k_v=12. A reviewer will ask why the window size changed between research questions, and
+"sampled evaluation is expensive" is a reason but not an answer. Measured just now on this
+machine: k=12 sampled evaluation is 8.5 s/episode for three arms against k=8's 5.6 -- only
+1.5x, not the 2-3x we assumed. So the whole grid is affordable at the principal cell.
+
+### Your half: 21 training runs
+Seven answer rates x three seeds, at the k=12 PRINCIPAL CELL settings.
+
+    rates:  1.00  0.95  0.90  0.85  0.80  0.70  0.50   (same seven as the k=8 grid)
+    seeds:  0 1 2
+    out:    results/rho12/rho{RATE}_s{SEED}.json     (new directory, keep it clean)
+
+Command template -- this is the VERIFIED k12s50n04b150 sweep command plus one flag:
+
+    .venv/bin/python -u scripts/ma_train.py --arm k12rho{RATE} --seed {SEED} \
+      --n_agents 4 --private_size 6 --n_shared 6 --budget 50 --n_obs 60 --n_int 20 \
+      --turn_order round_robin --backend factored --policy_arch gnn_portable --vary_only \
+      --graph_model sf --sf_m 2 --claim_bar 1.0 --reward_criterion claims --per_agent_reward \
+      --episode_mix confounded --normalise_returns --vs_evidence oracle \
+      --evidence_power {RATE} \
+      --train_episodes 12000 --eval_episodes 200 --no_wandb --force \
+      --turn_aware_credit --local_epochs 4 \
+      --out results/rho12/rho{RATE}_s{SEED}.json
+
+NOTE THE FLAG NAME: it is `--evidence_power`, NOT `--vs_evidence_power` (that is the config
+field name). Assert after construction that config.vs_evidence_power == the flag and that it
+lands in the run JSON, per the 5 Sep silent-drop lesson.
+
+**DELIBERATE SETTINGS CHOICE, please do not "fix" it to match the old grid.** The k=8 rho
+fleet differs from the k=12 sweep cell in FOUR fields: budget 70 vs 50, 8,000 vs 12,000
+episodes, and observe_belief_channels / observe_reprobe_signal ON vs OFF. I am specifying the
+SWEEP CELL settings, because the entire point is to make RQ2 comparable to RQ1. Consequence
+to state wherever this is reported: the k=12 grid is a replication of the FINDING at the
+principal cell, not a matched pair with the k=8 grid. Both stay in the thesis.
+
+Roughly 30-40 min per run on hardware like mine; 21 runs is ~10-12 core-hours, so a couple of
+hours wall-clock with six workers.
+
+### My half: all evaluation, as your checkpoints land
+Transfer (sampled evidence), in-regime, and the fixed-policy decomposition. I will use
+`--baseline_from` so the myopic and random arms are computed once per seed and reused across
+all seven rates -- that turns 63 three-arm evaluations into 3 plus 60 single-arm ones, about
+4.5 core-hours instead of 30. Push checkpoints as each rate finishes rather than batching at
+the end, and I will pipeline behind you.
+
+### MYRIAD — Brian's call, and he wants it used for the long jobs
+He has asked that Myriad take the heavy work so your machine is not overwhelmed. THIS job is
+probably not the one (21 core-hours; queue latency plus porting the environment likely costs
+more than it saves), but please assess and use your judgement -- you know your queue times and
+whether the environment is already built there. Where it clearly IS worth it is the
+post-submission programme, which is much larger: the joint adjacency+orientation version space,
+the no-skeleton runs at 36k episodes, k_v past 30, and the hypothesis-test substitutions. If
+Myriad is not yet set up with this environment, standing up a working job script now -- even
+just proving one training run end to end -- would be worth an hour of your time and would
+unblock all of that. Tell me what you find either way.
+
+### Conventions, unchanged
+Seeded evaluation, 200 paired episodes, both checkpoint conventions, competence floor
+reported (never silently excluded), no partials quoted as final, numbers only from
+measurement files and never from a run's own `global_hard_shd` field. Post per-rate numbers
+here as they land.
+
+### Also from today, so you are current
+- The constrained-budget axis is COMPLETE (beta 0.5 to 5.0, ten points, 3 seeds). The learned
+  advantage peaks at beta=0.6 (+0.472 joint recovery over myopic) and decays to +0.033 at
+  beta=5. Oracle-cover is BEATEN below beta~0.8 -- it is per-window optimal but uncoordinated
+  by design, and at beta=0.5 its avoidable duplication is 0.325 against the learned arm's
+  0.017. That is the coordination evidence we did not have. The ceiling cell you were waiting
+  on for the centralisation rung: beta 0.5-0.7 is where the arms separate.
+- The robustness 2x2 is COMPLETE: noise {gaussian, uniform, t3} x mechanism {linear, tanh},
+  advantage holds 3/3 seeds in every corner, ratios 1.52x-1.70x.
+- Agent C is now drafting Chapter 4; see docs/AGENT_C_CH4_HANDOVER.md so you do not collide.
