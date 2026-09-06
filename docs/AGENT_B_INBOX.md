@@ -9689,3 +9689,46 @@ cleaner one.)
 The seven Myriad cells and one local cell from the uncompensated fleet are in
 `results/rho12_myriad/` and `results/rho12/`. They are the evidence for the starvation finding
 and should be reported as such, not deleted -- and never mixed into the compensated table.
+
+---
+
+## 2026-09-06 21:5x -- Agent B: the k=8 grid's two ENDPOINTS are already correctly provisioned, and they carry the effect. Partial rescue, with the confounds named.
+
+Working out what a compensated k=8 sweep would have used, to see how much of the published grid
+is salvageable:
+
+    rho     1.00  0.95  0.90  0.85  0.80  0.70  0.50
+    should    35    37    39    41    44    50    70
+    used      70    70    70    70    70    70    70
+    eff beta 3.02  2.87  2.72  2.57  2.42  2.12  1.51
+
+**Exactly one cell of the seven was correctly provisioned: rho=0.50, where 70 IS the compensated
+budget.** Every other rate trained at 1.4x to 2x the intended pressure, worst at the top.
+
+**But the compensated rho=1.00 cell also exists** -- `results/power/p10`, budget 35, which is
+precisely the compensated value for rho=1.00. So the two ENDPOINTS of a properly compensated k=8
+sweep are already measured, and their transfer numbers are:
+
+    rho=1.00  budget 35  eff beta 1.51   delta +0.02686 +/- 0.00806  (+3.33 SE, WORSE than myopic)
+    rho=0.50  budget 70  eff beta 1.51   delta -0.01856             (BETTER than myopic)
+
+**At matched training pressure the endpoints still separate by 0.045.** That is the strongest
+single piece of evidence that the answer rate does real work independent of budget, and it comes
+from data already on disk rather than from anything I have run tonight.
+
+**The confounds I am not hiding.** The two endpoint runs differ in more than the dial: p10 is
+4,000 episodes with channels and reprobe OFF; the fleet's rho=0.50 is 8,000 episodes with both
+ON. So this is two cells that happen to share an effective beta, not a controlled pair. It is
+suggestive, not decisive -- and the decisive version is the rho12b fleet now running, where beta
+is held at 1.5 by design and every other field is identical across rates.
+
+**What I would do with the k=8 grid, for you and Brian to decide.** It cannot be quoted as an
+answer-rate sweep without stating that training pressure fell from beta 3.02 to 1.51 across it,
+because that is a second variable moving with the dial and it moves in the direction that
+flatters the low rates. Three options: report it with that caveat stated plainly; recompensate
+and re-run it (21 runs, and k=8 is cheap); or lead with rho12b and demote k=8 to a first
+measurement whose design was superseded. My preference is the third -- rho12b will be the clean
+sweep, and k=8 becomes the exploratory grid that motivated it, which is an honest and ordinary
+thing for a thesis to say.
+
+Fleet status: local 0/18 running; Myriad array 291232 still `qw`, not yet started.
