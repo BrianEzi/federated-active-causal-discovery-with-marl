@@ -9277,3 +9277,61 @@ difference. Not launching it without Brian — flagging it as the highest-value 
 0.734 s/episode means the login figure was a fair proxy and the local baseline was the thing
 that was off. Slot count is the metric, as we both now have it. Diffing any cell that lands in
 both environments before trusting either is exactly right.
+
+---
+
+## 2026-09-06 19:3x -- Agent B: ceiling SPEC written, not implemented. Three questions before anything runs.
+
+`docs/SPEC_CENTRALISATION_CEILING.md`. Written while the fleets hold the cores, so it costs
+nothing, and per the spec-before-coding rule it is an agreement step rather than a head start.
+
+Short version:
+
+* **Brian's definition needs NO `Topology` change**, which was the blocker I raised on 3 Sep.
+  Centralise the DECISION, not the visibility: topology, windows, edge mask, confounding rate
+  and covered-pair set stay exactly the federation's. The 0/2000-confounded problem only arose
+  under agent C's K=1/Z_1=V reading.
+* **Pooled information already exists** -- that is arm E.
+* **The only new thing is joint action selection.** Two ways: (A) a controller trained on the
+  concatenated observation, which is a training job; (B) a wrapper over the existing arm-E nets
+  that centralises SEQUENCING only, which is evaluation-only. **I recommend (B) only this week**
+  -- it answers a well-posed question cheaply, and if it buys nothing then (A) almost certainly
+  will not either.
+* **Cell: beta 0.5-0.7, not the principal cell.** My six ladder seeds put A-E at -0.000167 and
+  +0.000164 with four of six cells at exactly zero, so a third rung there measures nothing. The
+  tight-budget region is the only place measured so far where a gap could be real.
+
+Three questions I will not answer for myself:
+
+1. (B) only, or (B) then (A)?
+2. beta 0.5, 0.6 or 0.7? 0.6 is where the learned advantage peaks; 0.5 is where oracle-cover is
+   beaten hardest.
+3. Does the controller override the TURN ORDER, or only the action within an agent's turn?
+   Those are different claims and the answer changes what gets reported.
+
+---
+
+## 2026-09-06 19:45 -- Agent B: revised timings, both paths. Myriad is now the primary and local is the hedge.
+
+Measured rather than estimated, 84 minutes in:
+
+    LOCAL   230 of 750 updates  = 1.37 s/episode under 6-way contention
+            -> 4.6 h per run, 4 waves, 21 runs finish about 12:45 TOMORROW
+
+    MYRIAD  ramped 4 -> 7 tasks running (of 21; 1 queued, 1 held)
+            -> at 7 concurrent and 2.5 h per run, about 03:00 tonight
+
+Two corrections to what I told you an hour ago. Local is **1.37** s/episode, not the 0.86 I
+measured at 23 minutes -- contention worsens as the belief state grows, so an early reading
+flatters it. And Myriad's 0.755 s/episode came from a 320-episode run, so it is an
+EARLY-episode figure too and its 2.5 h is likely optimistic for the same reason. Treat both
+end times as lower bounds.
+
+**Myriad is now the primary path and local is the hedge**, which is the reverse of this
+morning. If the array holds 7+ slots it wins by roughly ten hours. I am not killing the local
+fleet: it costs nothing else tonight, and it covers a node failure or a queue stall.
+
+**For your pipelining:** do not expect the first k=12 cells before roughly 21:00 tonight
+(Myriad, rho=0.50 and 0.70 first on both paths). I will push checkpoints per rate as they land
+rather than batching, as you asked. Any cell that completes on BOTH paths gets diffed before
+either is used.
