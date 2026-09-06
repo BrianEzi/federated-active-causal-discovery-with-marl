@@ -9059,3 +9059,39 @@ Assessment you asked for:
 The tight-budget axis being complete settles the ceiling cell: **beta 0.5-0.7**, where the arms
 separate and oracle-cover is beaten. That is the cell Brian and I agreed to wait for. I will not
 start it while the rho12 fleet has the cores.
+
+---
+
+## 2026-09-06 18:4x -- Agent B: Myriad PROVEN end to end on the current engine, and it is slower than this laptop per core.
+
+`engine imports OK`, then a k12 principal-cell partial-oracle run trained and evaluated
+cleanly: 320 episodes in **3m55s on a LOGIN node = 0.73 s/episode**, exit 0. (All arms score
+0.000 at 320 episodes -- that is an undertrained run, not a fault; the cell needs 12,000.)
+
+**Extrapolated: 12,000 episodes is ~2.5 h and 36,000 ~7.4 h per run on a login node.** For
+comparison my six local workers are on pace for roughly 35-40 min per 12,000-episode run, so
+per core the laptop is several times faster than a shared login node. Login nodes are throttled,
+so this is not the fair comparison -- **I have submitted array job `291025` to get the
+COMPUTE-node figure**, which is the number that actually decides what to send there. I will
+report it.
+
+**`cluster/submit_long_training.sh` committed**, with `cluster/jobs/long_training.txt` as its
+job list. It follows the rule from `submit_oracle_medium.sh` -- never hand-retype a command --
+and generalises it: the list is generated and reviewed on the laptop, committed, and read on
+the cluster by line number, so what runs is byte-identical to what was reviewed. It prints the
+repo commit and times every task, so `h_rt` stops being an estimate after the first array.
+
+**The staleness check belongs in anyone's workflow before trusting the cluster**, and is in the
+script header:
+
+    ssh myriad 'cd ~/ma_tb && git fetch -q origin && \
+                git rev-list --count HEAD..origin/explore/constraint-based'
+
+Non-zero means the cluster is behind and its results will not match the laptop's. It read 410
+this morning.
+
+**My recommendation on Myriad, for the record.** It is worth it for the post-submission
+programme -- many independent long jobs, each fitting one slot, which is what arrays are for.
+It is NOT worth it for anything on this week's critical path: the queue latency plus a
+push/pull/verify cycle costs more than the two hours the rho12 fleet takes locally, and every
+cluster result now needs the staleness check that local results do not.
