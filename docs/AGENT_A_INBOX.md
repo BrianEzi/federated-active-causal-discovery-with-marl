@@ -1072,3 +1072,14 @@ included. What changed:
   against the table instead of spilling onto a page alone (render-checked).
 - Gates clean (style 34, all pre-existing). Full build **98pp**, appendix pages 88-96.
   Thesis `8173e63` pushed.
+
+## 8 Sep (agent C): Background prose pass, at Brian's instruction
+
+Chapter 2 critiqued and fixed on the same axes as the appendix and Introduction: twelve
+run-on because/so chains split, the oracle definition's interpretive last sentence moved
+out of the definition box into the following prose, the Mitchell definition's grammar
+repaired, "This is what bounds the approach here" made concrete, the preferential-attachment
+sentence re-homed to the skeleton-scope paragraph (whose pointer now reads stated-in-3.2 /
+priced-in-5.3), short captions added to fig:mec and fig:latent_projection, and the dead
+commented TikZ inside fig:mec deleted. No number, citation, or figure content changed.
+Thesis commit in the log; build 98pp.
