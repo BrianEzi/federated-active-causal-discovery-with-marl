@@ -34,7 +34,7 @@ def jload(p):
 
 
 def tbl(caption, label, spec, header, body, note=""):
-    out = [r"\begin{table}[htbp]", r"\centering", f"\\caption{{{caption}}}",
+    out = [r"\begin{table}[!htbp]", r"\centering", f"\\caption{{{caption}}}",
            f"\\label{{{label}}}", f"\\begin{{tabular}}{{{spec}}}", r"\toprule",
            header, r"\midrule", *body, r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     if note:
@@ -62,7 +62,7 @@ def appendix_excluded():
     return ("\\section{Excluded Runs} \\label{app:excluded}\n\n"
             "Every run falling below the competence floor of \\S\\ref{sec:meth_gate}, with what\n"
             "the same configuration reaches at $12{,}000$ episodes. The retrained runs appear in\n"
-            "no sweep table; they are reported here and in Appendix~\\ref{app:budget}.\n\n"
+            "no sweep table; they are reported here and in \\S\\ref{sec:res_budget}.\n\n"
             + tbl("The excluded runs, at the sweep's budget and at three times it.",
                   "tab:excluded", "llcccccc",
                   r"Cell & Seed & \multicolumn{2}{c}{4{,}000 episodes} & "
@@ -283,26 +283,9 @@ def appendix_epsgreedy():
               f"{behind}.",
               "tab:epsgreedy_all", "lcccc",
               r"Cell & Myopic & $\varepsilon$-greedy & Learned & Seeds ahead \\", body)
-        # sec:res_epsgreedy carries the PRINCIPAL CELL (fig:epsgreedy). What belongs here
-        # is the sweep-wide version, drawn as fig:sweep_grid is drawn so the two can be read
-        # against each other, with the epsilon arms alone (Brian, 6 Sep).
-        + "\n\\paragraph{Across every swept axis.} The panels below repeat the axes of "
-          "Figure~\\ref{fig:sweep_grid} with the $\\varepsilon$-greedy arms alone, one line "
-          "per dither rate, so the two figures can be read against each other.\n\n"
-          "\\begin{figure}[htbp]\n\\centering\n"
-        + "".join(
-            "\\begin{subfigure}[t]{2.85in}\n  \\centering\n"
-            f"  \\includegraphics{{figures/epsgreedy_grid_{t}.pdf}}\n"
-            f"  \\caption{{{cap}}}\n\\end{{subfigure}}" + sep
-            for t, cap, sep in (("a", "window size", "\\hfill\n"),
-                                ("b", "federation size", "\\\\[4pt]\n"),
-                                ("c", "contended fraction", "\\hfill\n"),
-                                ("d", "budget multiplier", "\n")))
-        + "\\caption{The $\\varepsilon$-greedy control across every swept axis, one line per "
-          "dither rate, three seeds per cell: SHD on committed marks (upper panels) and joint "
-          "recovery rate (lower). $\\varepsilon = 0$ is the undithered myopic rule; the "
-          "recovery axis starts at $0.5$.}\n"
-          "\\label{fig:epsgreedy_grid}\n\\end{figure}\n\n"
+        # The sweep-wide 4-panel figure was CUT on 7 Sep (Brian: lean the appendix to
+        # ~7 pages; the repo carries figures/epsgreedy_grid_*.pdf and git history has
+        # the block that drew it here).
         # The policy-dithering result was PROMOTED into sec:res_epsgreedy on 7 Sep
         # (Brian: "its getting promoted out of appendix"), at two cells. It is not
         # repeated here.
@@ -491,7 +474,7 @@ this work and later withdrawn; the record of every withdrawal is
 Appendix~\ref{app:negative}, and the five that concern this appendix are kept beside the
 results they qualify.
 
-\begin{table}[htbp]
+\begin{table}[!htbp]
 \centering
 \caption{Attribution claims withdrawn, with the measurement that refuted each.}
 \label{tab:app_attr_withdrawn}
@@ -699,6 +682,17 @@ def main() -> int:
                appendix_robustness):
         parts.append(fn())
         parts.append("")
+    # Source-code appendix (required; Brian, 7 Sep). PLACEHOLDER link until submission.
+    parts.append(
+        "\\chapter{Source Code} \\label{app:source}\n\n"
+        "The complete implementation, the environment, belief engine, policies, baselines, "
+        "training and every measurement script behind the numbers in this dissertation, "
+        "is available at:\n\n"
+        "\\begin{center}\\url{https://github.com/PLACEHOLDER/PLACEHOLDER}\\end{center}\n\n"
+        "The repository also carries the full per-run result files, the generated tables "
+        "this document inlines, and the scripts that rebuild every figure, table and "
+        "appendix from those files.\n")
+    parts.append("")
     out.write_text("\n".join(parts))
     print(f"wrote {out.relative_to(ROOT)}: {len(out.read_text().splitlines())} lines, "
           f"{out.read_text().count(chr(92) + chr(99) + chr(104) + chr(97) + chr(112) + chr(116) + chr(101) + chr(114) + chr(123))} appendices")

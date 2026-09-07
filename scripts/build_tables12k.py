@@ -107,7 +107,7 @@ def main() -> int:
             fv = f"{fav[0]}/{fav[2]} & {fav[1]}/{fav[2]}" if fav else "--- & ---"
             rows.append(f"{x:g} & {b[0]:.5f} & {f[0]:.5f} & {g[0]:.5f} & {rec} & {fv} \\\\")
         parts.append("\n".join([
-            r"\begin{table}[htbp]", r"\centering",
+            r"\begin{table}[!htbp]", r"\centering",
             f"\\caption{{{title} axis at $12{{,}}000$ episodes: SHD on committed marks and "
             r"joint recovery, 200 paired episodes per seed, both checkpoint conventions.}",
             f"\\label{{tab:12k_{key}}}", r"\begin{tabular}{rcccccrr}", r"\toprule",
@@ -135,7 +135,7 @@ def main() -> int:
         hrows.append(f"\\texttt{{\\scriptsize {cell.replace('_', chr(92)+'_')}}} & {r4[0]:.3f} & "
                      f"{r12[0]:.3f} & {M:.3f} & {mark} \\\\")
     parts.append("\n".join([
-        r"\begin{table}[htbp]", r"\centering",
+        r"\begin{table}[!htbp]", r"\centering",
         r"\caption{Joint recovery per cell at both training budgets. The myopic arm does "
         r"not train, so one number per cell; an arrow marks a change of winner.}",
         r"\label{tab:12k_headline}", r"\begin{tabular}{lcccc}", r"\toprule",
@@ -146,7 +146,11 @@ def main() -> int:
 
     out = ROOT / "thesis/Tables12k.tex"
     out.write_text("\n".join(parts))
-    print(f"wrote {out.relative_to(ROOT)}: 4 axis tables")
+    # Headline table alone, for the leaned appendix (Brian, 7 Sep: the four per-axis tables
+    # duplicate fig:sweep_grid and live in the repo; the per-cell winners table is the one
+    # the demoted budget section rests on).
+    (ROOT / "thesis/Tables12k_headline.tex").write_text("\n".join(parts[:3]) + "\n" + parts[-1])
+    print(f"wrote {out.relative_to(ROOT)}: 4 axis tables (+ Tables12k_headline.tex)")
     if pending:
         print(f"PENDING measurement, {len(set(pending))} cells: {sorted(set(pending))}")
     return 0
