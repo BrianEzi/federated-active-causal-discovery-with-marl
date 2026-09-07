@@ -656,6 +656,42 @@ def appendix_attribution():
         + "\n" + WITHDRAWN)
 
 
+
+def appendix_attribution_summary():
+    """One-page distillation (Brian, 7 Sep: option 3 -- attribution distilled, negative
+    results repo-only). The full chapter remains in appendix_attribution(), unwired."""
+    return (
+        "\\chapter{Latent-Owner Attribution} \\label{app:attribution}\n\n"
+        "A pair left bidirected is confounded by some peer's latent variable, and attribution "
+        "asks which peer owns it. The thesis's research questions do not depend on the answer, "
+        "so the machinery and its results are summarised here; the full material, including "
+        "its five withdrawn claims, is in the repository (Appendix~\\ref{app:source}). "
+        "Attribution rests on one sound pruning rule, atomicity, and one named modelling "
+        "assumption, local disturbance, which is unsound and declared as such.\n\n"
+        "The measured ceiling is structural rather than motivational. A self-interested "
+        "policy, scored only on its own recovery, spends $7.6\\%$ of its budget on private "
+        "variables against $38$--$61\\%$ for every other policy, and still attributes worse "
+        "than a rule not scored on attribution at all, $0.245$ against $0.327$ over three "
+        "seeds of $100$ episodes. Wanting attribution more does not buy it.\n\n"
+        "What does limit it is ownership ambiguity. A two-factor decomposition, the measured "
+        "rate at which one-pair latent groups resolve times the share of one-pair groups in "
+        "the graph distribution, predicts the measured attribution share within $0.041$ at "
+        "every configuration with two or more peers (Figure~\\ref{fig:attribution_law}); "
+        "the single-peer configuration is under-predicted by $0.263$, because larger groups "
+        "also resolve there.\n\n"
+        "\\begin{figure}[!htbp]\n\\centering\n"
+        "\\includegraphics[width=0.667\\textwidth]{figures/attribution_law.pdf}\n"
+        "\\caption{Measured attribution against the two-factor decomposition, with the "
+        "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
+        "\\label{fig:attribution_law}\n\\end{figure}\n\n"
+        "The engine itself scales and stays sound: $21$, $33$ and $27$ correct attributions "
+        "at $k_v = 30$, $40$ and $50$ over $30$ episodes each, with no incorrect attribution "
+        "and no contradiction raised at any size. Detection under the randomised mode is "
+        "V-shaped in the interventional scale, $63\\%$, $22\\%$ and $92.5\\%$ at "
+        "$\\sigma_{\\text{int}} = 0.5$, $1.0$ and $2.0$, while the atomic mode detects "
+        "$90.5\\%$ at any scale, the association itself vanishing under a constant clamp.\n")
+
+
 def main() -> int:
     out = ROOT / "thesis/Appendix.tex"
     # ONE FILE, input after the references inside Report.tex's \begin{appendices} block
@@ -675,11 +711,12 @@ def main() -> int:
              ""]
     parts.append((ROOT / "thesis/Supplementary Results.tex").read_text())
     parts.append("")
+    # LEANED 7 Sep (Brian): Auxiliary Metrics and the per-seed robustness table cut
+    # (unreferenced / repo-only); attribution restored as a one-page distillation;
+    # Negative Results stays repo-only.
     parts.append("\\chapter{Training Diagnostics} \\label{app:diagnostics}\n")
-    parts.append((ROOT / "thesis/Auxiliary Metrics.tex").read_text())
-    parts.append("")
     for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy,
-               appendix_robustness):
+               appendix_attribution_summary):
         parts.append(fn())
         parts.append("")
     # Source-code appendix (required; Brian, 7 Sep). PLACEHOLDER link until submission.
