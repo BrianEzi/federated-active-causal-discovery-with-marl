@@ -557,7 +557,8 @@ def fig_federation(out: pathlib.Path):
     ax.set_xlabel(r"budget multiplier $\beta$")
     ax.set_ylim(-.03, 1.05)
     ax.set_ylabel(r"joint recovery rate ($\uparrow$)")
-    ax.legend(frameon=False, fontsize=7.5, loc="upper left", handlelength=1.4)
+    # Legend lives in the RIGHT panel at its right side (Brian, 7 Sep): in the left panel
+    # every corner is crossed by a curve.
 
     # The second cell, at its own budget: one column per arm, same colours.
     for index, (label, key, colour, _m) in enumerate(series):
@@ -572,6 +573,13 @@ def fig_federation(out: pathlib.Path):
     # set_title, not annotate: the bars reach 1.0 under sharey, so anything placed
     # inside the axes collides with the learned column.
     axk.set_title(r"$k_v=20$, $\beta=1.5$", fontsize=8.5, pad=4)
+    # Legend at the very right of this panel (Brian, 7 Sep), in the empty region right of
+    # the bars; labels shortened so the box stays off the bars.
+    axk.set_xlim(-0.55, 5.6)
+    h, _l = ax.get_legend_handles_labels()
+    axk.legend(h, ["learned", "fixed partition", "uncoordinated", "random"],
+               frameon=False, fontsize=7, loc="center right", handlelength=1.2,
+               borderaxespad=0.2)
     fig.savefig(out / "coordination.pdf", bbox_inches="tight")
     plt.close(fig)
     print("  wrote coordination.pdf")
