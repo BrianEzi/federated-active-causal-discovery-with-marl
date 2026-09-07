@@ -542,23 +542,14 @@ def fig_federation(out: pathlib.Path):
             ax.scatter([p_] * len(vals), vals, s=10, color=colour, alpha=.30, zorder=3)
         ax.plot(pos, curves[key], marker=marker, ms=4, lw=1.6, color=colour, zorder=4,
                 label=label)
-    # The crossover: where the partition stops paying. Drawn from the data, not placed.
-    d = np.array(curves["greedy_partitioned"]) - np.array(curves["greedy_uncertainty"])
-    flip = next((k for k in range(1, len(d)) if d[k - 1] > 0 >= d[k]), None)
-    if flip is not None:
-        x = flip - 1 + d[flip - 1] / (d[flip - 1] - d[flip])
-        ax.axvline(x, color="#B00020", lw=1.0, ls="--", zorder=2)
-        ax.annotate("partition stops paying", xy=(x, 0.06), xytext=(-5, 0),
-                    textcoords="offset points", fontsize=7.5, color="#B00020",
-                    ha="right")
+    # Crossover line and note removed (Brian, 7 Sep); the prose carries the flip.
     ax.set_xticks(pos)
     ax.set_xticklabels([f"{b:g}" for b in betas])
     ax.set_xlim(-.35, len(betas) - .65)
     ax.set_xlabel(r"budget multiplier $\beta$")
     ax.set_ylim(-.03, 1.05)
     ax.set_ylabel(r"joint recovery rate ($\uparrow$)")
-    # Legend lives in the RIGHT panel at its right side (Brian, 7 Sep): in the left panel
-    # every corner is crossed by a curve.
+    ax.legend(frameon=False, fontsize=7.5, loc="lower right", handlelength=1.4)
 
     # The second cell, at its own budget: one column per arm, same colours.
     for index, (label, key, colour, _m) in enumerate(series):
@@ -573,13 +564,6 @@ def fig_federation(out: pathlib.Path):
     # set_title, not annotate: the bars reach 1.0 under sharey, so anything placed
     # inside the axes collides with the learned column.
     axk.set_title(r"$k_v=20$, $\beta=1.5$", fontsize=8.5, pad=4)
-    # Legend at the very right of this panel (Brian, 7 Sep), in the empty region right of
-    # the bars; labels shortened so the box stays off the bars.
-    axk.set_xlim(-0.55, 5.6)
-    h, _l = ax.get_legend_handles_labels()
-    axk.legend(h, ["learned", "fixed partition", "uncoordinated", "random"],
-               frameon=False, fontsize=7, loc="center right", handlelength=1.2,
-               borderaxespad=0.2)
     fig.savefig(out / "coordination.pdf", bbox_inches="tight")
     plt.close(fig)
     print("  wrote coordination.pdf")
