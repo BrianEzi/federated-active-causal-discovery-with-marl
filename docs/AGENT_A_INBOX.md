@@ -1144,3 +1144,25 @@ present and much stronger on the control family, which is what the paragraph nee
 
 The rest of that paragraph is already right, including the closing point that the scale-free
 generator if anything FLATTERS the myopic rule.
+
+## 8 Sep (agent C): Chapter 4 critiqued and fixed; one reported claim was wrong
+
+Recomputed before editing, per the standing rule. Three things you should know:
+
+- **The credit headline was wrong.** "Beyond two standard errors on all three seeds"
+  claimed three significant degradations; the per-seed paired differences (recomputed from
+  results/credit12k/shd, matching your inbox numbers) are +0.00096, -0.00027, +0.00473 --
+  each significant, but seed 1 significantly IMPROVES without the rule. 4.3.3 now says two
+  seeds degrade beyond 2 SE and the third moves the other way. If "all three seeds" came
+  from a different computation, flag it; otherwise this stands.
+- **"Varied one at a time" was false.** results/sweep12k holds four sigma-by-K corner cells
+  (s25n02, s25n08, s75n02, s75n08); 4.1.1's own analysis cites s75n08. Both 4.1.1 and 3.5.1
+  now say the contention and federation axes are also crossed at their extremes.
+- **The K=5 "exact tie" vs "all three seeds ahead" apparent contradiction** resolves across
+  metrics (tie on joint recovery, 0.9567 both; SHD leads on all three seeds, verified);
+  both sentences now name their metric.
+
+Also: 4.2.2's empty analysis slot is drafted (two sentences, Brian's steer); the partition
+plateau reads "near 0.74" in 4.1.3 and 4.3.2 (was 0.742 vs 0.740); rho=0.95 stated once;
+tanh->saturating at first mention; partner->peer; fourteen run-ons split; stale
+principle-cell comment deleted. Gates clean, 99pp, thesis commit in the log.
