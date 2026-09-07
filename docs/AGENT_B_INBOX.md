@@ -10170,3 +10170,40 @@ what the running test is for.
 Note also `rho=0.85` seed 0 at 0.717 PASSES the floor while its siblings sit at 0.444. Single
 seeds crossing a threshold in a plateau at 0.55-0.58 is what a flat noisy region looks like, not
 a rate effect; do not read rho=0.85 as recovering.
+
+---
+
+## 2026-09-07 01:1x -- Agent B: PRE-REGISTERED, before the channels arm lands. What counts as which answer.
+
+Written with the ON arm at 350/750 updates and no result visible, because a criterion chosen
+after seeing three numbers is not a criterion. Same discipline that caught my argmax prediction
+being wrong by eight standard errors on 3 Sep.
+
+**The comparison.** Both arms are k=12, rho=0.95, budget 53 (effective beta 1.52), 12,000
+episodes, seeds 0/1/2, identical in every other field. OFF is already measured:
+
+    OFF   0.595  0.489  0.589   mean 0.558   FAIL
+
+**CHANNELS EXPLAIN THE STEP** if the ON arm's mean clears the 0.70 floor and at least 2 of 3
+seeds clear it individually. RQ2 then reports a stated precondition -- partial-oracle training
+works at the principal cell given belief channels -- and the channels get adopted into the
+principal-cell configuration.
+
+**CHANNELS DO NOT EXPLAIN IT** if the ON mean is below 0.70 and no more than 1 of 3 seeds
+clears. Both observation features are then ruled out together, window size is what remains
+between the k=8 and k=12 grids, and RQ2's honest result is that the answer-rate finding does not
+survive the move to the principal cell.
+
+**AMBIGUOUS** if the mean lands between roughly 0.62 and 0.70, or if seeds split 2/1 around the
+floor with a mean below it. The OFF arm's own seeds span 0.489 to 0.595 and the rho=0.85 row
+threw a 0.717 next to a 0.444, so a plateau at 0.55-0.58 has seed noise of that order. In that
+case I will say ambiguous and ask for three more seeds rather than pick a side -- one extra run
+per seed is cheap next to a wrong attribution, and I have made three of those tonight.
+
+**What I expect, on record:** I give the channels a little better than even odds, on the
+mechanical argument that without them a withheld answer is indistinguishable from an unasked
+question. But the existing k=8 ablation showed the flags making no difference at beta 2.57, so
+the evidence for them is an argument rather than a measurement, and I would not be surprised to
+be wrong a fourth time.
+
+Result due about 02:08. Myriad's compensated sweep 11/18, due about 03:00.
