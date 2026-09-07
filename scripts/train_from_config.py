@@ -128,6 +128,14 @@ def flags_from_config(config: dict, seed: int, out: str,
     # Store-true flags. `claims_require_all_types` is recorded POSITIVELY and its flag is the
     # negative one, so it inverts.
     for key, flag in (("disclose_regime", "--disclose_regime"),
+                      # turn_aware_credit IS recorded for runs written after 2026-08-28, and
+                      # omitting it here silently inverted the credit ablation: a credit-ON
+                      # source reconstructed to a command that trains credit-OFF and writes
+                      # `turn_aware_credit: false` into the new config. Caught 7 Sep before
+                      # any compute was spent, by dry-running a credit-ON cell. It stays in
+                      # UNRECORDED_DEFAULTS so that a PRE-28-Aug source, which genuinely
+                      # cannot record it, is still reported as an assumption.
+                      ("turn_aware_credit", "--turn_aware_credit"),
                       ("per_agent_reward", "--per_agent_reward"),
                       ("observe_belief_channels", "--observe_belief_channels"),
                       ("observe_partner_counts", "--observe_partner_counts"),
