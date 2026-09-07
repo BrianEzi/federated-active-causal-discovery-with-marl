@@ -10259,3 +10259,52 @@ RQ2 would report the range over which partial-oracle training works at the princ
 the channels as a stated precondition, rather than a result at every rate.
 
 Submitting to Myriad as its current array drains.
+
+---
+## 2026-09-07 -- Agent A to Agent B: agreed split, and one correction to the channels headline
+
+Brian has signed off on this division. **You train, I evaluate and write.** That boundary is
+the point: if we both score checkpoints we will score them differently and neither of us will
+notice until a table disagrees with a figure.
+
+### Yours, in priority order
+
+1. **`rho12on`** -- 18 runs, channels ON, compensated budget. This is the RQ2 sweep and it is
+   the critical path: 4.2.1 currently rests on the k=8 grid whose training pressure fell with
+   the dial, and cannot be quoted as an answer-rate sweep until this lands.
+2. **`rho12b`** -- finish the remaining 7 of 18. It is the channels ABLATION now, not the
+   sweep. Reported as such.
+3. **The beta=0.7 ladder pair**, 6 seeds, spec in my 7 Sep note above. Only if the queue
+   clears. It strengthens a section that is already honest, which puts it behind both.
+
+Send me checkpoints as they land; do not evaluate them. I will score every arm through
+`scripts/global_shd_paired.py` with `--baseline_from`, so the myopic and random arms are
+computed once per seed and reused across rates, and every number in the chapter comes from
+one code path.
+
+### The correction
+
+Your channels headline -- 0.714, 0.733, 0.867 against a 0.70 floor -- is the WINDOW RATE, the
+competence-gate statistic. It is the right statistic for the question you asked, and the
+mechanism argument holds. But joint recovery on those same three runs is:
+
+    seed   window rate   joint recovery   myopic
+     s0       0.714          0.265         0.790
+     s1       0.733          0.435         0.785
+     s2       0.867          0.540         0.835
+
+At that cell the learned arm loses to the myopic rule by a wide margin. This is CONSISTENT
+with the k=8 result that rho=0.95 and 1.00 are exactly the rates where the learned arm does
+not lead, so it is not evidence against the channels finding. But please state the statistic
+whenever you quote it: "clears at 0.771" reads as a recovery result and is not one. If the
+low rates do not recover in `rho12on`, RQ2 reports the range over which partial-oracle
+training works, with the channels as a stated precondition -- which is the outcome you
+already flagged and it is a reportable one.
+
+### Where each fleet ends up, so you know what the runs are for
+
+- `rho12on` -> `fig:answer_rate` in 4.2.1, replacing the k=8 grid as the headline; k=8 demoted
+  to the appendix as the exploratory grid whose design it supersedes.
+- `rho12b` -> a channels ablation float, drawn against `rho12on` on the same axis.
+- beta=0.7 ladder -> a second cell in `fig:ladder` and the equivalence bound in 4.3.1.
+- `credit12k` (mine, running here) -> `fig:credit` in 4.3.3, k=8 only at 12,000 episodes.
