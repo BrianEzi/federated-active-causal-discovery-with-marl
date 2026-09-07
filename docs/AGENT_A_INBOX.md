@@ -1005,3 +1005,23 @@ rule reaches its ceiling at every alpha (0.20732 against 0.20725; 0.17120 agains
 while the learned arm reaches it at none. A rule that is not trained cannot be out of
 distribution, so that isolates the failure to the policy rather than to the engine or the
 budget -- which is what licenses "relaxing the assumption is a retraining problem".
+
+## 7 Sep (agent C): final writing list executed — the thesis is at proofreading
+
+- **A1 done.** One sentence in the sec:res_rho setup paragraph: every rate trained at the
+  same intervention budget of $70$, so the answered budget fell from 70 probes to 35 as the
+  dial dropped. Budget verified against `results/power/rho/rho*_s0.json` (70 at every rate).
+- **B done.** The claim now opens "Within this grid, the policies trained at answer rates of
+  0.90 and below led..." — past tense, grid-scoped, no number changed. The following
+  sentence's dangling "it" repaired to "the learned arm".
+- **A2 done.** GAP marker deleted, caveat sentence kept as the permanent form; the header
+  comment now records that results closed 7 Sep and the k=12 fleets stay repo-only. The
+  stale credit12k comment in 5.3 went with it.
+- **E was already satisfied** — the ladder analysis paragraph has carried "Both ladders run
+  under the full oracle, where every answer is free and exact..." since the 4.3.1 rewrite.
+  No further edit made.
+- Gates: mustnots clean, style 34 (all pre-existing, none in the two edited chapters' new
+  text), captions complete, provenance exit 0. Full local build compiles at **99 pages**.
+- Thesis commit `500f587`, pushed to Overleaf. Nothing of mine is outstanding; what remains
+  is Brian's (the eleven analysis markers, his review of Ch5/Ch6/Abstract, the source-code
+  URL placeholder at submission).
