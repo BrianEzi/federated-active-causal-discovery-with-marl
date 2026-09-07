@@ -36,11 +36,35 @@ The generator control: the advantage is not a scale-free artefact. Three ER seed
 
 5 result files, 9 checkpoints
 
+## `skeleton/`
+
+What the supplied skeleton assumption is worth, measured at the principal cell (Appendix, app:skeleton). Three sweeps: the achievable ceiling against sample size and CI level; the achieved-against-ceiling saturation test at three sample sizes and two budgets; and the budget-limited alpha test. The older `results/skeleton_ablation.json` is the 3-agent window-6 probe it supersedes and is shipped beside it for provenance, NOT as the reported measurement.
+
+19 result files (engine output; no policy checkpoint needed)
+
+## `generator_probe/`
+
+Why the myopic rule collapses on Erdos-Renyi: its own decision statistic, the undetermined marks touched, at each agent's first decision on both families under identical episode seeds.
+
+1 result files (engine output; no policy checkpoint needed)
+
+## `ladder_b070/`
+
+The federation ladder at beta=0.7, the constrained cell where both arms are competent and the equivalence bound tightens to 44% and 23% of its margin against 76% and 89% at beta=1.5. Six seeds per arm.
+
+16 result files, 36 checkpoints
+
 ## `credit/`
 
-Turn-aware credit under pooled and federated optimisation, measured. The recorded-field interaction (18x, federation-only) does not exist: 15.1x pooled against 13.2x federated.
+Turn-aware credit under pooled and federated optimisation at k=8, RETRAINED to 12,000 episodes. At the converged budget the pooled arm is flat (1.1x) and the federated arm degrades 6.1x, so an interaction does exist; the 4,000-episode runs, which showed 15.1x and 13.2x and supported no ordering, ship beside them because the difference between the two budgets IS the finding. k=12 was not extended: ~70 hours against 3.3 for k=8, and its pooled cells sat on the measurement floor in both credit states.
 
-32 result files, 48 checkpoints
+16 result files, 36 checkpoints
+
+## `credit4k/`
+
+The SUPERSEDED 4,000-episode credit ablation, shipped because the difference between the two budgets is itself the finding: at 4,000 both optimisers degraded about equally (15.1x pooled, 13.2x federated) and no interaction was supported. It is NOT the reported measurement. Kept in its own group because its filenames are identical to the 12,000-episode runs and flattening both into one folder silently overwrote them.
+
+32 result files (engine output; no policy checkpoint needed)
 
 ## `inregime/`
 
@@ -64,19 +88,19 @@ The retrained cells behind the training-budget finding, and the learning-rate pr
 
 The constrained-budget axis, beta 0.5-0.9 at k=12, three seeds each.
 
-16 result files (engine output; no policy checkpoint needed)
+20 result files (engine output; no policy checkpoint needed)
 
 ## `noisedist/`
 
 Noise-shape and mechanism robustness of the rho=0.5 policies.
 
-12 result files (engine output; no policy checkpoint needed)
+15 result files (engine output; no policy checkpoint needed)
 
 ## `epsgreedy/`
 
 The epsilon-greedy control at k=12 and k=30: is the learned policy dithered greedy. Grid eps 0.05-0.3, 200 paired episodes per seed.
 
-5 result files (engine output; no policy checkpoint needed)
+24 result files (engine output; no policy checkpoint needed)
 
 ## `nint_curve/`
 

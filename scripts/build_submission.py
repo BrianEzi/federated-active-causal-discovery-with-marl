@@ -67,10 +67,39 @@ GROUPS = [
                   "ER seeds at the principal cell, both conventions identical; the myopic rule "
                   "is the arm the family change breaks.",
      ["results/generator12k/er_s?.json", "results/generator12k/shd_er_*.json"], True),
-    ("credit", "Turn-aware credit under pooled and federated optimisation, measured. The "
-               "recorded-field interaction (18x, federation-only) does not exist: 15.1x pooled "
-               "against 13.2x federated.",
-     ["results/credit/k*_s?.json", "results/credit/shd/*.json"], True),
+    ("skeleton", "What the supplied skeleton assumption is worth, measured at the principal "
+                 "cell (Appendix, app:skeleton). Three sweeps: the achievable ceiling against "
+                 "sample size and CI level; the achieved-against-ceiling saturation test at "
+                 "three sample sizes and two budgets; and the budget-limited alpha test. The "
+                 "older `results/skeleton_ablation.json` is the 3-agent window-6 probe it "
+                 "supersedes and is shipped beside it for provenance, NOT as the reported "
+                 "measurement.",
+     ["results/skeleton_sweep_principal.json", "results/skeleton_alpha_n60.json",
+      "results/skeleton_ablation.json", "results/skel_alpha/a*_b*.json",
+      "results/skel_saturate/n*_b*.json"], False),
+    ("generator_probe", "Why the myopic rule collapses on Erdos-Renyi: its own decision "
+                        "statistic, the undetermined marks touched, at each agent's first "
+                        "decision on both families under identical episode seeds.",
+     ["results/generator_decision_probe.json"], False),
+    ("ladder_b070", "The federation ladder at beta=0.7, the constrained cell where both arms "
+                    "are competent and the equivalence bound tightens to 44% and 23% of its "
+                    "margin against 76% and 89% at beta=1.5. Six seeds per arm.",
+     ["results/ladder_b070/b070_?_s?.json", "results/ladder_b070/scored/*.json"], True),
+    ("credit", "Turn-aware credit under pooled and federated optimisation at k=8, RETRAINED "
+               "to 12,000 episodes. At the converged budget the pooled arm is flat (1.1x) and "
+               "the federated arm degrades 6.1x, so an interaction does exist; the 4,000-"
+               "episode runs, which showed 15.1x and 13.2x and supported no ordering, ship "
+               "beside them because the difference between the two budgets IS the finding. "
+               "k=12 was not extended: ~70 hours against 3.3 for k=8, and its pooled cells sat "
+               "on the measurement floor in both credit states.",
+     ["results/credit12k/k*_s?.json", "results/credit12k/shd/*.json"], True),
+    ("credit4k", "The SUPERSEDED 4,000-episode credit ablation, shipped because the "
+                 "difference between the two budgets is itself the finding: at 4,000 both "
+                 "optimisers degraded about equally (15.1x pooled, 13.2x federated) and no "
+                 "interaction was supported. It is NOT the reported measurement. Kept in its "
+                 "own group because its filenames are identical to the 12,000-episode runs "
+                 "and flattening both into one folder silently overwrote them.",
+     ["results/credit/k*_s?.json", "results/credit/shd/*.json"], False),
     ("inregime", "The answer-rate grid's second reading: each policy measured in its own "
                  "regime (21/21), plus the rebuilt fixed-policy sweep and the finite-sample "
                  "cell. All seeded-path measurements.",
@@ -92,7 +121,8 @@ GROUPS = [
      ["results/noisedist/*.json"], False),
     ("epsgreedy", "The epsilon-greedy control at k=12 and k=30: is the learned policy "
                   "dithered greedy. Grid eps 0.05-0.3, 200 paired episodes per seed.",
-     ["results/epsgreedy/*.json"], False),
+     ["results/epsgreedy/*.json", "results/epsgreedy/sweep/w*.json",
+      "results/epsgreedy/k12policy/*.json", "results/epsgreedy/k30policy/*.json"], False),
     ("nint_curve", "The sample-size axis: k=8 12,000-episode policies under sampled "
                    "evidence, n_int swept 10 to 10,000, three arms re-scored per value.",
      ["results/nint_curve/*.json", "results/nint_disclose/*.json"], False),
@@ -150,14 +180,30 @@ def main(argv=None) -> int:
             if want_ckpt:
                 ck_dir.mkdir(parents=True, exist_ok=True)
 
+        # NAME COLLISIONS ACROSS SOURCE DIRECTORIES. A group whose patterns span several
+        # directories can match the same basename twice -- `shd/`, `shd_final/` and
+        # `shd_argmax/` all hold `k12s50n04b150.json` -- and a flat copy silently lands one
+        # on top of the other. The checkpoint group, whose whole purpose is to compare those
+        # three conventions, was shipping one file where it claimed three. Where a basename
+        # is not unique within a group, the source directory is prefixed so every file
+        # survives and its provenance is legible from its name.
+        seen = {}
+        for src in files:
+            seen[src.name] = seen.get(src.name, 0) + 1
+        collide = {n for n, c in seen.items() if c > 1}
+        if collide and not args.check:
+            print(f"     ({len(collide)} basename(s) appear in more than one source "
+                  f"directory; prefixing those with their directory)")
+
         n_ck = 0
         for src in files:
-            dst = data_dir / src.name
+            dst = data_dir / (f"{src.parent.name}__{src.name}" if src.name in collide
+                              else src.name)
             if args.check:
                 if not dst.exists():
                     missing += 1
                 elif sha(dst) != sha(src):
-                    print(f"  DRIFTED {name}/{src.name}"); drift += 1
+                    print(f"  DRIFTED {name}/{dst.name}"); drift += 1
             else:
                 shutil.copy2(src, dst)
             total_bytes += src.stat().st_size
