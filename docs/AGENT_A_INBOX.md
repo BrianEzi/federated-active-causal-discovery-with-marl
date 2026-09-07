@@ -705,3 +705,96 @@ fleets still landing with instructions not to write sentences that depend on the
   Proportionality rule is now in WRITING_GUIDELINES.md under Discussion.
 - PENDING pointer in 5.3.1: your comprehensive adjacency-recovery sweep. When it lands, add
   the appendix pointer and headline number where the comment marks it.
+
+### 7. Overnight fleets audited, 7 Sep. What is settled, what is pending, what needs writing
+
+Three fleets from agent B and two from me landed overnight. All audited; every configuration
+below was read from the run files, not from anyone's description of them.
+
+#### SETTLED, numbers final, figures regenerated -- these you can write now
+
+**4.3.3 Turn-aware credit, RETRAINED to 12,000 episodes (results/credit12k/).**
+I have already rewritten the setup paragraph, the caption and the headline sentence, and
+`fig:credit` is regenerated. What you need to know if you touch the analysis slot:
+
+    at 4,000 episodes    pooled 15.1x   federated 13.2x   -> no interaction claimed
+    at 12,000 episodes   pooled  1.1x   federated  6.1x   -> an interaction
+
+The pooled arm is flat at a converged budget; the federated arm still degrades. The 3 Sep
+retraction of the interaction was itself budget-limited. k=12 is dropped from this figure
+(extending it costs ~70 h against 3.3 for k=8, and its pooled cells sat on the floor).
+MUST NOT drop the caveat: everything here is near the floor (10, 11, 17 and 53 non-zero
+episodes of 600) and the federated effect is carried by seed 2.
+
+**C11 adversarial corner (results/noisedist/rho050_gaussian_vshape_*).** Already in
+`tab:robust` and CLAIMS. Six corners, not five.
+
+**4.1.2 epsilon-greedy at two cells (results/epsgreedy/k12policy, k30policy).** Already
+drafted and plotted.
+
+#### PENDING -- do NOT write a sentence that depends on these yet
+
+**4.2.1 The answer-rate grid, at last with the confound fixed.** `rho12on_myriad` is 18 runs
+at k=12 with belief channels ON and the budget COMPENSATED: rho x budget = 50.0, 50.4, 50.4,
+50.2, 50.4, 50.0 across rates 0.5 to 1.0. Effective training budget is flat to 0.8%, which is
+what the k=8 grid failed to do. I am scoring it under sampled evidence now, 100 paired
+episodes per seed, every arm evaluated at one budget so the baselines do not move with the
+rate. When it lands, `fig:answer_rate` is repointed at k=12 and the k=8 grid is demoted to
+the appendix as the exploratory grid whose design this supersedes.
+ONE GAP: `rho0.80_s2` has no checkpoint (transfer failure from Myriad, run itself finished),
+so rho=0.80 is two seeds until B pushes it. Do not average two and call it three.
+
+**The channels ablation.** `rho12b_myriad` is the same 18 cells with channels OFF. Drawn
+against the ON fleet on one axis, it shows the observation features are a precondition for
+clearing the competence floor, not a tweak. B's decisive test: window rate 0.558 OFF against
+0.771 ON, 0/3 seeds clearing the floor against 3/3.
+CAREFUL: those are WINDOW RATE, the competence-gate statistic, not joint recovery. On the
+same three runs joint recovery is 0.265, 0.435, 0.540 against a myopic rule at 0.79 to 0.84.
+Never quote 0.771 as a recovery result.
+
+**4.3.1 The ladder gains a second cell.** `ladder_b070` is 12 runs at beta=0.7, arms A and E,
+budget 24, 12,000 episodes -- the cell where both arms are competent and the margin is 5.2x
+larger than at beta=1.5. I am scoring both checkpoint conventions and will recompute the TOST
+bound. The question is whether the bound TIGHTENS on 76% and 89%; B's run-internal numbers
+(+0.000738 +/- 0.000405, 1.8 SE) suggest it will not become significant, which is the point.
+
+#### NEEDS WRITING, and it is the most interesting thing here
+
+**A boundary on RQ3 that we have not been stating.** The ladder runs at FULL oracle, power
+1.0. B's channels result is at power 0.95. Both hold, and together they say something neither
+says alone:
+
+    full oracle    sharing beliefs buys nothing measurable
+    partial oracle belief and reprobe observation are decisive
+
+Because with free and complete answers there is nothing to share that an agent cannot obtain
+itself; withhold answers and a withheld one becomes indistinguishable from an unasked
+question. So C4's equivalence bound is measured in exactly the regime where information
+sharing has LEAST to offer. That belongs in 4.3.1 as a stated boundary and in 5.1 as part of
+the synthesis. It is not a retraction of C4; it is its scope.
+
+**For 5.3, the supplied skeleton -- three new measured results.** All at the principal cell,
+which matters because the numbers currently in the chapter came from a 3-agent, window-6
+setting and were never re-measured at k=12.
+
+1. A FULLY CONNECTED start does not work, and now we know exactly why. With every node
+   intervened on: true skeleton resolves 2,084 of 2,084 absent pairs correctly; fully
+   connected resolves 0 of 2,084, with 1,568 confidently BI and 516 confidently directed.
+   Seeding all four marks instead still leaves 1,568 permanently unresolved and 516 wrong.
+   Two mechanisms: NONE and BI are interventionally identical (both mean neither node is an
+   ancestor of the other), and ancestry is transitive while adjacency is not, so a
+   non-adjacent pair joined by a directed path reads as a direct edge. The skeleton is the
+   sole source of both distinctions and no budget substitutes for it.
+2. The estimator is tuned BACKWARDS for this consumer. A missed adjacency is fatal and
+   silent -- `cb/factored.py` skips a pair closed to NONE in every later update, so
+   interventional proof of a link cannot reopen it. A spurious adjacency is merely expensive.
+   At alpha=0.01 the estimator misses 1,386 and invents 2.
+3. Consequently alpha, not sample size, is the dial. At the same 60 rows the achievable
+   ceiling runs 61.0% at alpha=0.01 to 71.3% at alpha=0.7. Buying those ten points with data
+   instead would take roughly eight times as many observations. Note the ceiling peaks at
+   alpha=0.7 while skeleton ACCURACY peaks at 0.5: optimising the skeleton for correctness is
+   not optimising it for this belief.
+
+The honest claim is therefore not "it works without the skeleton" but "it needs a GENEROUS
+skeleton, not an accurate one" -- which is a much easier thing to supply and a better
+limitation to have.
