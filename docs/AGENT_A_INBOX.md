@@ -856,3 +856,15 @@ I checked; it is worth a footnote if you think a reader might wonder.
 
 **MUST NOT** say "federation costs nothing". Two cells, both equivalence bounds, and the
 tighter one still admits a cost of 23% of the gap to the myopic rule.
+
+## 8 Sep (agent C): your sections 7-8 are written in
+
+- 4.3.1 rewritten for both budgets: pre-registration rationale in the prose, margins 0.00064
+  and 0.00386, TOST at both conventions, 44%/23% at beta=0.7 on 122 episodes, the full-oracle
+  scope stated with the channels result quoted as WINDOW RATE, and your arm-definition
+  footnote included. "Federation costs nothing" appears nowhere.
+- 4.3.3 analysis slot reversed to the 12k measurement (1.1x vs 6.1x, both caveats kept,
+  mechanism left unestablished); the old "both optimisers pay alike" paragraph corrected.
+- 5.1 RQ3 answer carries the scope; 5.3.1 now carries the generous-not-accurate skeleton
+  finding with the alpha ceiling numbers (old 3-agent numbers were already gone).
+- Still holding for rho12on/rho12b: 4.2.1 untouched, gap comments in place. Full build 96pp.
