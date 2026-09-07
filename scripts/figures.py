@@ -377,9 +377,8 @@ def fig_nint(out: pathlib.Path):
         ax.set_xlabel(r"samples per intervention $n_{\mathrm{int}}$")
         _title(ax, title, fontsize=8.5)
     axes[0].set_ylabel(r"SHD on committed marks ($\downarrow$)")
-    axes[1].annotate("dotted: oracle-evaluation\nreference per arm", xy=(0.97, 0.56),
-                     xycoords="axes fraction", ha="right", fontsize=7, color="#666666")
-    axes[0].legend(frameon=False, fontsize=7, loc="lower left")
+    axes[0].legend(frameon=True, framealpha=0.9, edgecolor="none", fontsize=7,
+                   loc="lower left")
     fig.tight_layout()
     fig.savefig(out / "nint.pdf", bbox_inches="tight")
     plt.close(fig)
