@@ -29,10 +29,14 @@ files=$(ssh myriad "ls ma_tb/results/$REMOTE/rho*_s?.json 2>/dev/null" | tr -d '
 [ -n "$files" ] || { echo "no completed cells on myriad yet"; exit 0; }
 for f in $files; do
   b=$(basename "$f")
-  [ -f "$DEST/$b" ] && continue          # already fetched; a finished run never changes
-  scp -q "myriad:$f" "$DEST/$b" && echo "  fetched $b"
+  # The JSON guard must NOT gate the checkpoints. It used to: an early fetch that caught the
+  # JSON before its `_best.pt` was written would skip the whole cell forever afterwards, and
+  # `rho12on/rho0.80_s2` reached agent A as a result with no checkpoint to score. Each artefact
+  # is now checked for its own existence.
+  [ -f "$DEST/$b" ] || { scp -q "myriad:$f" "$DEST/$b" && echo "  fetched $b"; }
   for ck in _best.pt .pt; do
-    scp -q "myriad:ma_tb/results/$REMOTE/${b%.json}${ck}" "$DEST/${b%.json}${ck}" 2>/dev/null || true
+    [ -f "$DEST/${b%.json}${ck}" ] && continue
+    scp -q "myriad:ma_tb/results/$REMOTE/${b%.json}${ck}" "$DEST/${b%.json}${ck}" 2>/dev/null       && echo "  fetched ${b%.json}${ck}"
   done
 done
 
