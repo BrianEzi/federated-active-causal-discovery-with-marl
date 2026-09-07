@@ -325,6 +325,99 @@ def appendix_robustness():
               r"Learned $-$ myopic \\", per_seed(rows)))
 
 
+def appendix_skeleton():
+    """What the supplied skeleton is worth, measured at the principal cell.
+
+    The numbers in sec:disc_validity came from a 3-agent, window-6 setting and were never
+    re-measured at the cell the rest of the thesis reports. These are k=12, four agents, six
+    shared -- and they say something the earlier probe could not: the constraint is neither
+    the budget nor the sample size but the direction the estimator is tuned in.
+    """
+    import numpy as np
+    alpha_rows, ceil_rows = [], []
+    for a in ("0.01", "0.1", "0.3", "0.5", "0.7"):
+        cell = {}
+        for b in ("50", "400"):
+            q = ROOT / f"results/skel_alpha/a{a}_b{b}.json"
+            if not q.exists():
+                return ""
+            es = jload(q)
+            cell[b] = {k: float(np.mean([e["means"][k]["hard"] for e in es]))
+                       for k in ("learned", "greedy")}
+        alpha_rows.append(f"${a}$ & {cell['50']['greedy']:.5f} & {cell['400']['greedy']:.5f} & "
+                          f"{cell['50']['learned']:.5f} & {cell['400']['learned']:.5f} \\\\")
+    q = ROOT / "results/skeleton_sweep_principal.json"
+    if not q.exists():
+        return ""
+    for r in jload(q)["rows"]:
+        if r["alpha"] == 0.01 and r["n_obs"] in (30, 60, 250, 1000, 8000, 64000):
+            n = "$" + f"{r['n_obs']:,}".replace(",", "{,}") + "$"
+            ceil_rows.append(
+                f"{n} & {r['accuracy']:.1%} & {r['missed']} & {r['spurious']} & "
+                f"{r['claims_estimated']:.1%} \\\\".replace("%", "\\%"))
+    return (
+        "\\section{The Supplied Skeleton, Measured at the Principal Cell} "
+        "\\label{app:skeleton}\n\n"
+        "\\S\\ref{sec:disc_validity} states what the skeleton assumption requires and where "
+        "it binds; this section carries the measurements behind that account, at $k_v=12$ "
+        "with four agents and six shared variables.\n\n"
+        "\\paragraph{The two errors are not symmetric.} An estimated skeleton makes two "
+        "kinds of mistake. A MISSED adjacency closes the pair to the no-edge mark, and "
+        "\\texttt{cb/factored.py} skips a closed pair in every subsequent update, so no "
+        "intervention "
+        "can reopen it however plainly it demonstrates a dependence: the loss is permanent "
+        "and silent. A SPURIOUS adjacency merely leaves a pair that nothing can settle, "
+        "costing budget and resolution but never recording a false mark. The estimator at "
+        "the conventional operating point makes the fatal error almost exclusively: at "
+        "$n_{\\text{obs}}=60$ and $\\alpha=0.01$ it misses $2{,}104$ true adjacencies of "
+        "$7{,}920$ pairs and invents $2$.\n\n"
+        + tbl("Skeleton quality and the achievable ceiling against sample size at the "
+              "principal cell, $\\alpha = 0.01$, thirty episodes. The ceiling is claim "
+              "accuracy with every node intervened on.",
+              "tab:skeleton_nobs", "rrrrr",
+              r"$n_{\text{obs}}$ & Accuracy & Missed & Spurious & Ceiling \\", ceil_rows)
+        + "\nEven at $64{,}000$ observational rows, a thousand times what the agents hold, "
+          "the ceiling reaches only $90.2\\%$. Sample size is an expensive dial.\n\n"
+        "\\paragraph{The cheap dial is the test's operating point.} Because missed edges are "
+        "the fatal error, the test should be tuned for recall and not for accuracy. "
+        "Table~\\ref{tab:skeleton_alpha} sweeps $\\alpha$ at the operating sample size of "
+        "sixty rows, at the trained budget and at a budget generous enough that coverage is "
+        "no longer the constraint.\n\n"
+        + tbl("Pooled SHD under an estimated skeleton at $n_{\\text{obs}}=60$, principal "
+              "cell, three seeds, $100$ paired episodes per seed. Budget $50$ is the trained "
+              "horizon; budget $400$ is the ceiling in the same units.",
+              "tab:skeleton_alpha", "rrrrr",
+              r"$\alpha$ & Myopic, $b{=}50$ & Myopic, $b{=}400$ & Learned, $b{=}50$ & "
+              r"Learned, $b{=}400$ \\", alpha_rows)
+        + "\nThree readings follow. The myopic rule reaches its ceiling at every "
+          "$\\alpha$ -- $0.20732$ against $0.20725$, $0.17120$ against $0.17087$ -- so the "
+          "intervention budget is never the binding constraint. Retuning the test from "
+          "$\\alpha=0.01$ to $\\alpha=0.3$ lowers pooled distance from $0.20732$ to "
+          "$0.17120$ on the same sixty rows, and the gain survives the trained budget rather "
+          "than living only at the ceiling. And the learned arm reaches its ceiling at no "
+          "$\\alpha$ and trails the myopic rule throughout, which isolates the failure: a "
+          "rule that is not trained cannot be out of distribution, so the engine and the "
+          "budget are sound and it is the policy, trained against a true skeleton and handed "
+          "an estimated one, that does not transfer.\n\n"
+        "\\paragraph{A fully connected start is not the alternative.} Opening every pair "
+        "removes missed adjacencies by construction, and fails for two reasons that no "
+        "budget addresses. With every node intervened on, the true skeleton resolves "
+        "$2{,}084$ of $2{,}084$ absent pairs correctly and a fully connected start resolves "
+        "none of them, committing $1{,}568$ to a bidirected mark and $516$ to a direction. "
+        "Seeding all four marks, so that the no-edge mark is never excluded, still leaves "
+        "$1{,}568$ pairs permanently unresolved and $516$ wrong. The no-edge and bidirected "
+        "marks are interventionally identical, both meaning that neither node is an ancestor "
+        "of the other, and ancestry is transitive where adjacency is not, so a non-adjacent "
+        "pair joined by a directed path reads as a direct edge. The skeleton is the only "
+        "source of both distinctions.\n\n"
+        "\\paragraph{What this changes.} The assumption is not that the agents are handed "
+        "an accurate skeleton but that they are handed a GENEROUS one, and generosity is "
+        "cheaper than accuracy: it is a change to a test threshold rather than a demand for "
+        "more data. Relaxing the assumption is therefore a retraining problem under a "
+        "deliberately over-inclusive skeleton, which is the experiment "
+        "\\S\\ref{sec:disc_future} names and this work does not run.\n\n")
+
+
 def appendix_evidence_cost():
     """The price of realistic evidence, as a MATCHED two-arm comparison.
 
@@ -722,16 +815,17 @@ def main() -> int:
     # Negative Results stays repo-only.
     parts.append("\\chapter{Training Diagnostics} \\label{app:diagnostics}\n")
     for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy,
+               appendix_skeleton, appendix_robustness,
                appendix_attribution_summary):
         parts.append(fn())
         parts.append("")
-    # Source-code appendix (required; Brian, 7 Sep). PLACEHOLDER link until submission.
+    # Source-code appendix (required; Brian, 7 Sep). URL filled by Brian on Overleaf, 7 Sep.
     parts.append(
         "\\chapter{Source Code} \\label{app:source}\n\n"
         "The complete implementation, the environment, belief engine, policies, baselines, "
         "training and every measurement script behind the numbers in this dissertation, "
         "is available at:\n\n"
-        "\\begin{center}\\url{https://github.com/PLACEHOLDER/PLACEHOLDER}\\end{center}\n\n"
+        "\\begin{center}\\url{https://github.com/BrianEzi/federated-active-causal-discovery-with-marl}\\end{center}\n\n"
         "The repository also carries the full per-run result files, the generated tables "
         "this document inlines, and the scripts that rebuild every figure, table and "
         "appendix from those files.\n")

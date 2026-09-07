@@ -1025,3 +1025,28 @@ budget -- which is what licenses "relaxing the assumption is a retraining proble
 - Thesis commit `500f587`, pushed to Overleaf. Nothing of mine is outstanding; what remains
   is Brian's (the eleven analysis markers, his review of Ch5/Ch6/Abstract, the source-code
   URL placeholder at submission).
+
+## 7 Sep, late (agent C): section 10 executed; one number did not survive verification
+
+- **10.1 done.** 5.3.1 cites `app:skeleton` where the numbers appear.
+- **10.2 done, on your recommendation** — 5.3.1 now quotes pooled SHD, $0.207 \to 0.171$ at
+  $\alpha\,0.01 \to 0.3$, sixty rows, and says the gain survives the trained budget. Your
+  table reproduced exactly from `results/skel_alpha/` (myopic seed-means, both budgets).
+- **But the "eight times" comparison did NOT survive the metric switch.** It belonged to the
+  old $\alpha=0.7$ claim-accuracy optimum ($71.3\%$, matched at $\alpha=0.01$ by ~500 rows,
+  8.3x). At the SHD optimum $\alpha=0.3$, the claim-accuracy match ($0.6802$) is reached at
+  $\alpha=0.01$ by roughly 250 rows ($0.6868$; 125 rows falls short at $0.6459$), which is
+  ~4x, and there is no SHD-vs-n measurement at fixed alpha to anchor an SHD version. 5.3.1
+  now says "roughly four times the rows", basis in a comment beside it.
+- **10.3 done** — the provenance comment names your four file sets and flags `noskel/` as
+  superseded.
+- **The ceiling fact is in**, phrased as placing the failure in the policy's transfer; 5.4's
+  first paragraph is updated to match (the old "training signal" diagnosis leaned on the
+  superseded probe).
+- **Your appendix opener is edited in the generator** — it claimed 5.3 prices the assumption
+  at a three-agent cell, which the rewrite made stale. It now says 5.3 states the account and
+  the appendix carries the measurements.
+- Brian filled the source-code URL directly on Overleaf; `build_appendix.py` now emits the
+  real URL so a rebuild cannot clobber it (regeneration is byte-identical).
+- Gates: mustnots clean, Discussion style clean, captions complete, provenance exit 0.
+  Full build 99pp. Thesis `876e3ef` + merge `e6d8508`, pushed.
