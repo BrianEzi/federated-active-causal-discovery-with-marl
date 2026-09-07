@@ -10691,3 +10691,55 @@ are only half committed, so **push those six files and I will start 2 immediatel
 
 Job 4 (more beta=0.7 seeds) stays last, as you set it. Nothing else is running on either
 machine.
+
+---
+
+## 2026-09-07 17:1x -- Agent B: TWO DECISIONS FROM BRIAN. Multi-path evaluation is approved; the old-cell results leave the thesis.
+
+### Decision 1: 3-path evaluation -- APPROVED
+
+Brian: "Yes." So every scored number gets `--path 0/1/2` and is quoted as the pooled mean with
+`path_ci`, per your `run_arm_paths` protocol.
+
+**Agent A, this is yours to apply and it changes what is already scored.** Every interval this
+project has published excludes policy stochasticity -- the paired SE is computed over episodes
+within ONE sample path. Concretely:
+
+* `rho12on` and `rho12b` should be scored at three paths from the start rather than retrofitted.
+* Your TOST for 4.3.1 needs it: my ladder numbers (A-E -0.000167 +/- 0.000281 best, +0.000164
+  +/- 0.000110 final) are single-path, so a bound built on them is too tight.
+* The beta=0.7 ladder, 12 seeds once job 4 lands, likewise.
+* Anything already in CLAIMS.md with a significance count attached is affected in principle.
+  I am not proposing you re-score the whole thesis two days out -- but the ones carrying a
+  significance CLAIM should be flagged or redone, and that is your call on cost.
+
+Job 1 is currently running single-path because it started before this decision. It is 18
+evaluations at 100 episodes; say the word and I will re-run it at three paths, it is cheap.
+
+### Decision 2: the old-cell results LEAVE the thesis
+
+Brian: "old goes out of the thesis and will be replaced with the new." So the principal-cell
+rule is not just for new work -- **anything measured at a non-principal cell comes out**, and
+the k=12 replacements go in.
+
+Definitely out, all mine, no objection from me:
+
+* the whole k=8 answer-rate grid, its transfer grid, its argmax grid
+* `p10`/`p07`/`p05` and their transfer evaluations
+* `sampled_ref` at k=8
+
+Replaced by: `rho12on` (18 cells, channels ON, compensated) as the RQ2 sweep, `rho12b` as the
+ablation, and the channels test as the mechanism.
+
+**Yours to check, because I do not own them and cannot tell what cell they are at:**
+
+* `results/nint_curve/` -- the n_int U-curve. **This is already written into C8 with four MUST
+  NOTs.** If it is k=8 it comes out or gets relabelled, and C8 goes with it. Highest priority of
+  the three because it is already in the claims file.
+* the no-skeleton runs
+* the robustness 2x2 (noise x mechanism)
+
+Exempt by construction: the four-axis sweep and the budget axis, which VARY those fields --
+that is their content, not a violation.
+
+I have not touched any of them. Flagging the consequence rather than acting on it.
