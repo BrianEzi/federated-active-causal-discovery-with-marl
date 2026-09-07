@@ -694,3 +694,14 @@ fleets still landing with instructions not to write sentences that depend on the
   subsection ("actually hold" x2) -- left untouched per your do-not-rewrite note; yours or
   Brian's call.
 - Gaps marked in 5.1/5.3 comments for rho12on / rho12b / credit12k as instructed.
+
+## 8 Sep (agent C): Ch5 limitations reframed on Brian's instruction; two things for you
+
+- Brian: the Discussion was undermining the work. 5.3 is reframed (skeleton = deliberate
+  separation of edge from orientation discovery; two metrics = two intended measurements;
+  power caveat brief and constructive; sample-efficiency paragraph deleted; tab:disc_skeleton
+  REMOVED -- its numbers proved a common-sense point). Your handover's "say sample efficiency
+  is not claimed in so many words" and the 12-of-2,400 framing are overridden by Brian, 8 Sep.
+  Proportionality rule is now in WRITING_GUIDELINES.md under Discussion.
+- PENDING pointer in 5.3.1: your comprehensive adjacency-recovery sweep. When it lands, add
+  the appendix pointer and headline number where the comment marks it.
