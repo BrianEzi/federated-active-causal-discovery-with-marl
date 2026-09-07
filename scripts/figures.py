@@ -814,83 +814,75 @@ def fig_answer_rate(out: pathlib.Path):
 
 
 def fig_credit(out: pathlib.Path):
-    """Turn-aware credit, measured, at both window sizes.
+    """Turn-aware credit at a CONVERGED budget, k=8 only.
 
-    k=8: both optimisers degrade about an order of magnitude without the fix -- the
-    recorded-field version's federation-specific interaction does not exist. k=12: the pooled
-    cell sits at the floor in both states and is uninformative; the federated arm degrades,
-    one seed carrying it, as one seed carries every credit-off degradation measured. All runs
-    4,000 episodes; per-seed dots are the caveat drawn.
+    RETRAINED 7 Sep. The ablation was measured at 4,000 episodes, which is the budget this
+    thesis's own C7 calls undertrained, so the honest options were to report a known-
+    undertrained result or to finish the training. All twelve k=8 cells were resumed from
+    their update-200 checkpoints to 12,000 episodes. k=12 is dropped: extending it costs
+    ~70 hours against 3.3 for k=8, and its pooled cells sat on the measurement floor in both
+    credit states, contributing nothing but a slope a reader would try to explain.
+
+    WHAT CHANGED, AND IT IS NOT COSMETIC. At 4,000 episodes both optimisers degraded about
+    equally without the rule (15.1x pooled, 13.2x federated) and no interaction was claimed.
+    At 12,000 the pooled arm barely moves, 1.1x on 10 against 11 non-zero episodes of 600,
+    while the federated arm still degrades 6.1x, beyond two standard errors on all three
+    seeds. The interaction retracted on 3 Sep as an artefact of the recorded field returns
+    once both arms are trained to convergence -- so that retraction was itself budget-
+    limited, and this figure is the corrected measurement.
+
+    THIN SUPPORT IS STILL DRAWN AS THIN: everything here is near the floor, and a segment
+    resting on five or fewer non-zero episodes is dotted with its counts printed.
     """
-    panels = [("$k_v=8$", "k08s50n04b150"), ("$k_v=12$", "k12s50n04b150")]
+    cell = "k08s50n04b150"
     data, support = {}, {}
-    for _, cell in panels:
-        for arm in ("pooled", "E4"):
-            for state in ("credit", "nocredit"):
-                q = ROOT / f"results/credit/shd/{cell}_{arm}_{state}.json"
-                if not q.exists():
-                    print("!! credit measurement incomplete; skipping figure")
-                    return
-                es = json.loads(q.read_text())
-                data[(cell, arm, state)] = [e["means"]["learned"]["hard"] for e in es]
-                # HOW MANY EPISODES CARRY THIS POINT. A mean over 600 episodes of which one
-                # is non-zero is not a measurement of the arm, it is a measurement of that
-                # episode -- and drawn as a line segment it invites a reader to explain a
-                # direction that a single episode decides. Counted so the figure can say so.
-                rows = [np.asarray(e["rows"]["learned"]["hard"]) for e in es]
-                support[(cell, arm, state)] = (int(sum((r > 0).sum() for r in rows)),
-                                               int(sum(r.size for r in rows)))
+    for arm in ("pooled", "E4"):
+        for state in ("credit", "nocredit"):
+            q = ROOT / f"results/credit12k/shd/{cell}_{arm}_{state}.json"
+            if not q.exists():
+                print("!! credit12k measurement incomplete; skipping figure")
+                return
+            es = json.loads(q.read_text())
+            data[(arm, state)] = [e["means"]["learned"]["hard"] for e in es]
+            rows = [np.asarray(e["rows"]["learned"]["hard"]) for e in es]
+            support[(arm, state)] = (int(sum((r > 0).sum() for r in rows)),
+                                     int(sum(r.size for r in rows)))
 
-    fig, axes = plt.subplots(1, 2, figsize=(FULL, 3.0), sharey=True)
+    fig, ax = plt.subplots(figsize=(TWOTHIRD, 3.0))
     floor = 3e-5
-    for ax, (title, cell) in zip(axes, panels):
-        for arm, label, colour, dx in (("pooled", "pooled", THIRD, -0.045),
-                                       ("E4", "federated", LEARNED, 0.045)):
-            means = [np.mean(data[(cell, arm, st)]) for st in ("credit", "nocredit")]
-            # THIN SUPPORT IS DRAWN AS THIN. Where either end of a segment rests on a
-            # handful of episodes, the connector is dotted and the counts are printed, so
-            # the slope cannot be read as an effect. At k=12 the pooled pair is exactly
-            # this: one non-zero episode of 600 against four, and it slopes the "wrong"
-            # way for that reason alone.
-            nz = [support[(cell, arm, st)] for st in ("credit", "nocredit")]
-            thin = any(n <= 5 for n, _ in nz)
-            ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means], "o-" if not thin else "o:",
-                    color=colour, lw=1.7 if not thin else 1.2, ms=5.5,
-                    alpha=1.0 if not thin else .75,
-                    label=label if cell.startswith("k08") else None, zorder=4)
-            if thin:
-                for k_, (n, tot) in enumerate(nz):
-                    # Above the marker: below it the label collides with the tick labels
-                    # on the floor-hugging points, which are exactly the ones being labelled.
-                    ax.annotate(f"{n}/{tot}", xy=(k_ + dx, max(means[k_], floor)),
-                                xytext=(0, 8), textcoords="offset points", fontsize=7,
-                                ha="center", color=colour)
-            for k_, st in enumerate(("credit", "nocredit")):
-                vals = data[(cell, arm, st)]
-                ax.scatter([k_ + dx] * len(vals), [max(v, floor) for v in vals],
-                           s=14, color=colour, alpha=0.4, zorder=3)
-            # Annotate the ratio only where BOTH states are off the floor: a saturated cell
-            # has no headroom, and a ratio of two floor values reads as a finding it is not.
-            if min(means) > 10 * floor:
-                ax.annotate(f"{means[1]/means[0]:.0f}$\\times$", xy=(1 + dx, means[1]),
-                            xytext=(7, -2), textcoords="offset points", fontsize=8,
-                            color=colour)
-        # The random anchor: identical in both credit states (it reads no reward), so a
-        # single line per cell. From the same measurement files.
-        rnd = np.mean([np.mean([e["means"]["random_vary"]["hard"] for e in
-                       json.loads((ROOT / f"results/credit/shd/{cell}_{arm_}_{st}.json")
-                                  .read_text())])
-                       for arm_ in ("pooled", "E4") for st in ("credit", "nocredit")])
-        ax.axhline(rnd, color=RANDOM, lw=1.2, ls=":", zorder=1,
-                   label="random" if cell.startswith("k08") else None)
-        ax.set_yscale("log")
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels(["credit on", "credit off"])
-        ax.set_xlim(-0.35, 1.45)
-        ax.annotate(title, xy=(0.05, 0.92), xycoords="axes fraction", fontsize=9)
-    axes[0].set_ylabel(r"SHD on committed marks ($\downarrow$)")
-    axes[0].legend(loc="lower right", frameon=False)
-    fig.tight_layout()
+    for arm, label, colour, dx in (("pooled", "pooled", THIRD, -0.04),
+                                   ("E4", "federated", LEARNED, 0.04)):
+        means = [float(np.mean(data[(arm, st)])) for st in ("credit", "nocredit")]
+        nz = [support[(arm, st)] for st in ("credit", "nocredit")]
+        thin = any(n <= 5 for n, _ in nz)
+        ax.plot([0 + dx, 1 + dx], [max(m, floor) for m in means],
+                "o-" if not thin else "o:", color=colour, lw=1.7 if not thin else 1.2,
+                ms=5.5, label=label, zorder=4)
+        for k_, st in enumerate(("credit", "nocredit")):
+            vals = data[(arm, st)]
+            ax.scatter([k_ + dx] * len(vals), [max(v, floor) for v in vals],
+                       s=14, color=colour, alpha=0.4, zorder=3)
+            n, tot = support[(arm, st)]
+            # Staggered by arm: the two arms nearly touch at "credit on", so one label
+            # goes above its marker and the other below.
+            ax.annotate(f"{n}/{tot}", xy=(k_ + dx, max(means[k_], floor)),
+                        xytext=(0, 9 if arm == "E4" else -14), textcoords="offset points",
+                        fontsize=6.5, ha="center", color=colour)
+        # The ratio, only where both ends are off the floor.
+        if min(means) > 10 * floor:
+            ax.annotate(f"{means[1] / means[0]:.1f}$\\times$", xy=(1 + dx, means[1]),
+                        xytext=(8, -3), textcoords="offset points", fontsize=8,
+                        color=colour)
+    rnd = float(np.mean([e["means"]["random_vary"]["hard"]
+                         for arm in ("pooled", "E4") for st in ("credit", "nocredit")
+                         for e in json.loads((ROOT / f"results/credit12k/shd/{cell}_{arm}_{st}.json").read_text())]))
+    ax.axhline(rnd, color=RANDOM, lw=1.2, ls=":", zorder=1, label="random")
+    ax.set_yscale("log")
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["credit on", "credit off"])
+    ax.set_xlim(-0.32, 1.42)
+    ax.set_ylabel(r"SHD on committed marks ($\downarrow$)", fontsize=8)
+    ax.legend(loc="upper left", frameon=False, fontsize=8)
     fig.savefig(out / "credit.pdf", bbox_inches="tight")
     plt.close(fig)
 
