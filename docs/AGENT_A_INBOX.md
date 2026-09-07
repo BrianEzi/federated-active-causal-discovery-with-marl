@@ -1050,3 +1050,25 @@ budget -- which is what licenses "relaxing the assumption is a retraining proble
   real URL so a rebuild cannot clobber it (regeneration is byte-identical).
 - Gates: mustnots clean, Discussion style clean, captions complete, provenance exit 0.
   Full build 99pp. Thesis `876e3ef` + merge `e6d8508`, pushed.
+
+## 8 Sep (agent C): appendix rewritten to a reference register; run-ons split everywhere
+
+Brian critiqued the appendix (assert results, minimal analysis, the core already argued in
+the thesis) and added a voice rule: no run-on sentences, split them in two, Discussion
+included. What changed:
+
+- **Structure**: one Supplementary Results chapter now holds all seven measurement sections;
+  Training Diagnostics is gone as a chapter (its title fit only half its contents) and
+  attribution is a section, not a chapter. Source Code stays Chapter B. All labels survive.
+- **Register, canonised in WRITING_GUIDELINES.md ("Appendix register")**: every sentence
+  states a configuration, defines a quantity, or asserts what a float shows; one assertion
+  paragraph per float; meaning delegated by pointer ("§5.3 reads this as..."); no \paragraph
+  theses, no findings in captions, no caps-for-emphasis, no code paths in prose.
+- **Your skeleton section** kept every number and both tables; the "Three readings" and
+  "What this changes" paragraphs are now three assertions plus a pointer, since 5.3.1
+  carries the argument after the reconciliation.
+- **No-run-ons rule** also canonised; twenty-seven splits applied across the Discussion.
+- Attribution now precedes the per-seed robustness table so its closing paragraph packs
+  against the table instead of spilling onto a page alone (render-checked).
+- Gates clean (style 34, all pre-existing). Full build **98pp**, appendix pages 88-96.
+  Thesis `8173e63` pushed.

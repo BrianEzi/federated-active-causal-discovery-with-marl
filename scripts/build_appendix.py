@@ -60,9 +60,10 @@ def appendix_excluded():
             f"{f'{w12:.3f} & {l12:.3f}' if w12 is not None else '--- & ---'} & {g:.3f} \\\\"
             for c, s, w4, l4, w12, l12, g in rows]
     return ("\\section{Excluded Runs} \\label{app:excluded}\n\n"
-            "Every run falling below the competence floor of \\S\\ref{sec:meth_gate}, with what\n"
-            "the same configuration reaches at $12{,}000$ episodes. The retrained runs appear in\n"
-            "no sweep table; they are reported here and in \\S\\ref{sec:res_budget}.\n\n"
+            "The table reports every run that fell below the competence floor of\n"
+            "\\S\\ref{sec:meth_gate}, and what the same configuration reaches at $12{,}000$\n"
+            "episodes. The retrained runs appear in no sweep table; they are reported here\n"
+            "and in \\S\\ref{sec:res_budget}.\n\n"
             + tbl("The excluded runs, at the sweep's budget and at three times it.",
                   "tab:excluded", "llcccccc",
                   r"Cell & Seed & \multicolumn{2}{c}{4{,}000 episodes} & "
@@ -272,7 +273,7 @@ def appendix_epsgreedy():
             for c, g, e, l, a, d in sorted(rows, key=lambda r: -r[5])]
     return (
         "\\section{The Epsilon-Greedy Control, Every Cell} \\label{app:epsgreedy}\n\n"
-        "The myopic rule taking a uniform randomised intervention with probability "
+        "The myopic rule takes a uniform randomised intervention with probability "
         "$\\varepsilon$, over $\\varepsilon \\in \\{0.05, 0.1, 0.2, 0.3\\}$, on the same "
         "$200$ paired episodes per seed as the arms it is compared with. The best "
         "$\\varepsilon$ per seed is reported, a selection that favours the control. Bold "
@@ -280,15 +281,16 @@ def appendix_epsgreedy():
         + (lambda half=(len(body)+1)//2, head=r"Cell & Myopic & $\varepsilon$-g. & Learned & Ahead \\":
            "\n".join([
             r"\begin{table}[H]", r"\centering", r"\scriptsize", r"\setlength{\tabcolsep}{3pt}",
-            "\\caption{Joint recovery rate against the $\\varepsilon$-greedy control across "
-            f"all twenty sweep cells, three seeds each. The learned arm leads in {wins} of "
-            f"{3*len(rows)} individual seeds, and trails on the cell mean in {behind}.}}",
+            "\\caption{Joint recovery rate against the $\\varepsilon$-greedy control "
+            "across all twenty sweep cells, three seeds each.}",
             r"\label{tab:epsgreedy_all}",
             r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
             *body[:half], r"\bottomrule", r"\end{tabular}", r"\hspace{2mm}",
             r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
             *(body[half:] + [r" & & & & \\"] * (half - len(body[half:]))),
             r"\bottomrule", r"\end{tabular}", r"\end{table}"]))()
+        + f"\nThe learned arm leads in {wins} of {3*len(rows)} individual seeds and trails "
+          f"on the cell mean in {behind} of {len(rows)} cells.\n"
         # The sweep-wide 4-panel figure was CUT on 7 Sep (Brian: lean the appendix to
         # ~7 pages; the repo carries figures/epsgreedy_grid_*.pdf and git history has
         # the block that drew it here).
@@ -313,11 +315,12 @@ def appendix_robustness():
                 f"PENDING: {len(rows)} of {len(CORNERS)} corners measured.\n\n")
     return (
         "\\section{Robustness, Every Seed} \\label{app:robustness}\n\n"
-        "The corners of Table~\\ref{tab:robust}, seed by seed. The policies are the "
-        "$\\rho = 0.5$ partial-oracle fleet and trained under a linear-Gaussian generator "
-        "in every row; only the evaluation generator changes. The final column is the "
-        "within-path paired difference between the learned and myopic arms on identical "
-        "episodes, so it is not the difference of the two preceding columns' spread.\n\n"
+        "The table repeats the corners of Table~\\ref{tab:robust} seed by seed. The "
+        "policies are the $\\rho = 0.5$ partial-oracle fleet, trained under a "
+        "linear-Gaussian generator in every row; only the evaluation generator changes. "
+        "The final column is the within-path paired difference between the learned and "
+        "myopic arms on identical episodes, not the difference of the two preceding "
+        "columns.\n\n"
         + tbl("Pooled SHD on committed marks per seed for each robustness corner, "
               "$200$ paired episodes per seed. Negative differences favour the learned arm.",
               "tab:robust_seeds", "llccccr",
@@ -361,61 +364,44 @@ def appendix_skeleton():
         "\\S\\ref{sec:disc_validity} states what the skeleton assumption requires and where "
         "it binds; this section carries the measurements behind that account, at $k_v=12$ "
         "with four agents and six shared variables.\n\n"
-        "\\paragraph{The two errors are not symmetric.} An estimated skeleton makes two "
-        "kinds of mistake. A MISSED adjacency closes the pair to the no-edge mark, and "
-        "\\texttt{cb/factored.py} skips a closed pair in every subsequent update, so no "
-        "intervention "
-        "can reopen it however plainly it demonstrates a dependence: the loss is permanent "
-        "and silent. A SPURIOUS adjacency merely leaves a pair that nothing can settle, "
-        "costing budget and resolution but never recording a false mark. The estimator at "
-        "the conventional operating point makes the fatal error almost exclusively: at "
-        "$n_{\\text{obs}}=60$ and $\\alpha=0.01$ it misses $2{,}104$ true adjacencies of "
-        "$7{,}920$ pairs and invents $2$.\n\n"
+        "An estimated skeleton makes two kinds of mistake, and they are not symmetric. A "
+        "missed adjacency closes the pair to the no-edge mark, and the belief engine never "
+        "revisits a closed pair, so the loss is permanent and silent. A spurious adjacency "
+        "merely leaves a pair that nothing can settle, costing budget and resolution but "
+        "never recording a false mark. At $n_{\\text{obs}}=60$ and $\\alpha=0.01$ the "
+        "estimator misses $2{,}104$ true adjacencies of $7{,}920$ pairs and invents $2$. "
+        "Table~\\ref{tab:skeleton_nobs} sweeps the sample size at that threshold.\n\n"
         + tbl("Skeleton quality and the achievable ceiling against sample size at the "
               "principal cell, $\\alpha = 0.01$, thirty episodes. The ceiling is claim "
               "accuracy with every node intervened on.",
               "tab:skeleton_nobs", "rrrrr",
               r"$n_{\text{obs}}$ & Accuracy & Missed & Spurious & Ceiling \\", ceil_rows)
         + "\nEven at $64{,}000$ observational rows, a thousand times what the agents hold, "
-          "the ceiling reaches only $90.2\\%$. Sample size is an expensive dial.\n\n"
-        "\\paragraph{The cheap dial is the test's operating point.} Because missed edges are "
-        "the fatal error, the test should be tuned for recall and not for accuracy. "
-        "Table~\\ref{tab:skeleton_alpha} sweeps $\\alpha$ at the operating sample size of "
-        "sixty rows, at the trained budget and at a budget generous enough that coverage is "
-        "no longer the constraint.\n\n"
+          "the ceiling reaches only $90.2\\%$. Table~\\ref{tab:skeleton_alpha} sweeps the "
+          "test's threshold instead, at the operating sample size of sixty rows, at the "
+          "trained budget and at a budget generous enough that coverage is no longer the "
+          "constraint.\n\n"
         + tbl("Pooled SHD under an estimated skeleton at $n_{\\text{obs}}=60$, principal "
               "cell, three seeds, $100$ paired episodes per seed. Budget $50$ is the trained "
               "horizon; budget $400$ is the ceiling in the same units.",
               "tab:skeleton_alpha", "rrrrr",
               r"$\alpha$ & Myopic, $b{=}50$ & Myopic, $b{=}400$ & Learned, $b{=}50$ & "
               r"Learned, $b{=}400$ \\", alpha_rows)
-        + "\nThree readings follow. The myopic rule reaches its ceiling at every "
-          "$\\alpha$ -- $0.20732$ against $0.20725$, $0.17120$ against $0.17087$ -- so the "
-          "intervention budget is never the binding constraint. Retuning the test from "
-          "$\\alpha=0.01$ to $\\alpha=0.3$ lowers pooled distance from $0.20732$ to "
-          "$0.17120$ on the same sixty rows, and the gain survives the trained budget rather "
-          "than living only at the ceiling. And the learned arm reaches its ceiling at no "
-          "$\\alpha$ and trails the myopic rule throughout, which isolates the failure: a "
-          "rule that is not trained cannot be out of distribution, so the engine and the "
-          "budget are sound and it is the policy, trained against a true skeleton and handed "
-          "an estimated one, that does not transfer.\n\n"
-        "\\paragraph{A fully connected start is not the alternative.} Opening every pair "
-        "removes missed adjacencies by construction, and fails for two reasons that no "
-        "budget addresses. With every node intervened on, the true skeleton resolves "
-        "$2{,}084$ of $2{,}084$ absent pairs correctly and a fully connected start resolves "
-        "none of them, committing $1{,}568$ to a bidirected mark and $516$ to a direction. "
-        "Seeding all four marks, so that the no-edge mark is never excluded, still leaves "
-        "$1{,}568$ pairs permanently unresolved and $516$ wrong. The no-edge and bidirected "
-        "marks are interventionally identical, both meaning that neither node is an ancestor "
-        "of the other, and ancestry is transitive where adjacency is not, so a non-adjacent "
-        "pair joined by a directed path reads as a direct edge. The skeleton is the only "
-        "source of both distinctions.\n\n"
-        "\\paragraph{What this changes.} The assumption is not that the agents are handed "
-        "an accurate skeleton but that they are handed a GENEROUS one, and generosity is "
-        "cheaper than accuracy: it is a change to a test threshold rather than a demand for "
-        "more data. Relaxing the assumption is therefore a retraining problem under a "
-        "deliberately over-inclusive skeleton, which is the experiment "
-        "\\S\\ref{sec:disc_future} names and this work does not run.\n\n")
+        + "\nThe myopic rule reaches its ceiling at every threshold, $0.20732$ against "
+          "$0.20725$ at the strictest, so the intervention budget never binds. Retuning "
+          "the test from $\\alpha=0.01$ to $\\alpha=0.3$ lowers pooled distance from "
+          "$0.20732$ to $0.17120$ on the same sixty rows, at both budgets. The learned arm "
+          "reaches its ceiling at no threshold and trails the myopic rule throughout; "
+          "\\S\\ref{sec:disc_validity} reads this as a failure of the policy's "
+          "transfer.\n\n"
+        "A fully connected start removes missed adjacencies by construction and still "
+        "fails. With every node intervened on, the true skeleton resolves $2{,}084$ of "
+        "$2{,}084$ absent pairs correctly; a fully connected start resolves none of them, "
+        "committing $1{,}568$ to a bidirected mark and $516$ to a direction. Seeding all "
+        "four marks, so that the no-edge mark is never excluded, leaves the same $1{,}568$ "
+        "pairs permanently unresolved and the same $516$ wrong. The no-edge and bidirected "
+        "marks are interventionally identical, and ancestry is transitive where adjacency "
+        "is not, so the skeleton is the only source of both distinctions.\n\n")
 
 
 def appendix_evidence_cost():
@@ -449,26 +435,26 @@ def appendix_evidence_cost():
                     + f" & {np.mean(vals):.3f} \\\\")
     return (
         "\\section{The Cost of Realistic Evidence} \\label{app:evidence_cost}\n\n"
-        "Training under evidence estimated from finite samples, against training on exactly "
-        "answered queries, with every other field of the configuration held fixed: the same "
-        "$k_v=8$ cell, the same intervention budget of "
+        "Two fleets are identical except for their evidence. One trained on exactly "
+        "answered queries and the other on tests estimated from finite samples, at the "
+        "same $k_v=8$ cell, the same intervention budget of "
         f"{meta['Oracle'].get('budget')}, the same {meta['Oracle'].get('train_episodes'):,} "
-        "training episodes, the same observation features, three seeds each. The reported "
-        "quantity is the per-window solve rate averaged over each run's last ten "
-        "checkpoints, which is the competence measure of \\S\\ref{sec:meth_gate}.\n\n"
-        + tbl("Per-window solve rate by evidence regime, matched configurations. The "
-              "sampled arm draws ten times as many rows per intervention, a difference "
-              "that favours it: at $n_{\\text{int}}=20$ the sampled regime yields no "
-              "usable signal at all, while $n_{\\text{int}}$ is inert under oracle "
-              "evidence and so cannot be matched downward.",
+        "training episodes and the same observation features, three seeds each. The "
+        "reported quantity is the per-window solve rate of \\S\\ref{sec:meth_gate}, "
+        "averaged over each run's last ten checkpoints. The sampled arm draws ten times "
+        "as many rows per intervention, a mismatch that favours it; at "
+        "$n_{\\text{int}}=20$ the sampled regime yields no usable signal at all, while "
+        "$n_{\\text{int}}$ is inert under oracle evidence and cannot be matched "
+        "downward.\n\n"
+        + tbl("Per-window solve rate by evidence regime, matched configurations, three "
+              "seeds each.",
               "tab:evidence_cost", "lcccccc",
               r"Regime & $n_{\text{int}}$ & Seeds & \multicolumn{3}{c}{Per seed} & Mean \\",
               rows)
         + "\nThe sampled arm does not approach the competence floor of $0.70$ on any seed, "
           "while the oracle arm clears it on all three. No policy-against-baseline "
-          "comparison is drawn from the sampled runs, and none is needed for the point: at "
-          "this budget the realistic regime is not a harder examination that the policy "
-          "sits and fails, it is a training signal too weak to learn from.\n")
+          "comparison is drawn from the sampled runs; \\S\\ref{sec:res_transfer} carries "
+          "what the realistic regime costs a trained policy.\n")
 
 
 def appendix_mode():
@@ -760,35 +746,36 @@ def appendix_attribution_summary():
     """One-page distillation (Brian, 7 Sep: option 3 -- attribution distilled, negative
     results repo-only). The full chapter remains in appendix_attribution(), unwired."""
     return (
-        "\\chapter{Latent-Owner Attribution} \\label{app:attribution}\n\n"
+        "\\section{Latent-Owner Attribution} \\label{app:attribution}\n\n"
         "A pair left bidirected is confounded by some peer's latent variable, and attribution "
         "asks which peer owns it. The thesis's research questions do not depend on the answer, "
         "so the machinery and its results are summarised here; the full material, including "
         "its five withdrawn claims, is in the repository (Appendix~\\ref{app:source}). "
         "Attribution rests on one sound pruning rule, atomicity, and one named modelling "
         "assumption, local disturbance, which is unsound and declared as such.\n\n"
-        "The measured ceiling is structural rather than motivational. A self-interested "
-        "policy, scored only on its own recovery, spends $7.6\\%$ of its budget on private "
-        "variables against $38$--$61\\%$ for every other policy, and still attributes worse "
-        "than a rule not scored on attribution at all, $0.245$ against $0.327$ over three "
-        "seeds of $100$ episodes. Wanting attribution more does not buy it.\n\n"
-        "What does limit it is ownership ambiguity. A two-factor decomposition, the measured "
-        "rate at which one-pair latent groups resolve times the share of one-pair groups in "
-        "the graph distribution, predicts the measured attribution share within $0.041$ at "
-        "every configuration with two or more peers (Figure~\\ref{fig:attribution_law}); "
-        "the single-peer configuration is under-predicted by $0.263$, because larger groups "
-        "also resolve there.\n\n"
+        "The measured ceiling is structural. A self-interested policy, scored only on its "
+        "own recovery, spends $7.6\\%$ of its budget on private variables against "
+        "$38$--$61\\%$ for every other policy. It still attributes worse than a rule not "
+        "scored on attribution at all, an attribution rate of $0.245$ against $0.327$ over "
+        "three seeds of $100$ episodes.\n\n"
+        "What limits attribution is ownership ambiguity. A two-factor decomposition, the "
+        "measured rate at which one-pair latent groups resolve times the share of one-pair "
+        "groups in the graph distribution, predicts the measured attribution share within "
+        "$0.041$ at every configuration with two or more peers "
+        "(Figure~\\ref{fig:attribution_law}). The single-peer configuration is "
+        "under-predicted by $0.263$, because larger groups also resolve there.\n\n"
         "\\begin{figure}[H]\n\\centering\n"
         "\\includegraphics[width=0.55\\textwidth]{figures/attribution_law.pdf}\n"
         "\\caption[The attribution decomposition]{Measured attribution against the two-factor decomposition, with the "
         "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
         "\\label{fig:attribution_law}\n\\end{figure}\n\n"
-        "The engine itself scales and stays sound: $21$, $33$ and $27$ correct attributions "
-        "at $k_v = 30$, $40$ and $50$ over $30$ episodes each, with no incorrect attribution "
-        "and no contradiction raised at any size. Detection under the randomised mode is "
-        "V-shaped in the interventional scale, $63\\%$, $22\\%$ and $92.5\\%$ at "
-        "$\\sigma_{\\text{int}} = 0.5$, $1.0$ and $2.0$, while the atomic mode detects "
-        "$90.5\\%$ at any scale, the association itself vanishing under a constant clamp.\n")
+        "The engine itself scales and stays sound, with $21$, $33$ and $27$ correct "
+        "attributions at $k_v = 30$, $40$ and $50$ over $30$ episodes each, no incorrect "
+        "attribution and no contradiction raised at any size. Detection under the "
+        "randomised intervention mode varies non-monotonically with the interventional "
+        "scale, $63\\%$, $22\\%$ and $92.5\\%$ at $\\sigma_{\\text{int}} = 0.5$, $1.0$ "
+        "and $2.0$. The atomic mode, which clamps the target to a constant, detects "
+        "$90.5\\%$ at any scale, the association itself vanishing under the clamp.\n")
 
 
 def main() -> int:
@@ -810,13 +797,17 @@ def main() -> int:
              ""]
     parts.append((ROOT / "thesis/Supplementary Results.tex").read_text())
     parts.append("")
-    # LEANED 7 Sep (Brian): Auxiliary Metrics and the per-seed robustness table cut
-    # (unreferenced / repo-only); attribution restored as a one-page distillation;
-    # Negative Results stays repo-only.
-    parts.append("\\chapter{Training Diagnostics} \\label{app:diagnostics}\n")
+    # RESTRUCTURED 8 Sep (Brian): ONE Supplementary Results chapter holding every
+    # measurement section -- the Training Diagnostics chapter title fit only half its
+    # contents, and a chapter wrapping one section wasted a page. The sections below are
+    # emitted straight into the chapter the hand file opens. Register: appendix sections
+    # assert what a float shows and point at the chapter that argues it
+    # (WRITING_GUIDELINES.md "Appendix register").
+    # Attribution precedes the per-seed robustness table so its closing paragraph packs
+    # against the table instead of spilling onto a page of its own (render-checked 8 Sep).
     for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy,
-               appendix_skeleton, appendix_robustness,
-               appendix_attribution_summary):
+               appendix_skeleton, appendix_attribution_summary,
+               appendix_robustness):
         parts.append(fn())
         parts.append("")
     # Source-code appendix (required; Brian, 7 Sep). URL filled by Brian on Overleaf, 7 Sep.
