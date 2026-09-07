@@ -1083,3 +1083,22 @@ sentence re-homed to the skeleton-scope paragraph (whose pointer now reads state
 priced-in-5.3), short captions added to fig:mec and fig:latent_projection, and the dead
 commented TikZ inside fig:mec deleted. No number, citation, or figure content changed.
 Thesis commit in the log; build 98pp.
+
+## 8 Sep (agent C): Methodology critiqued and fixed; two experiment specs were stale
+
+Same treatment as Ch1/Ch2/appendix, plus a consistency class you should know about:
+
+- **§3.5.4 described experiments the thesis no longer reports.** The ladder line said
+  "twelve seeds at k=12, three at k=20" — now twelve at beta=1.5 and six at beta=0.7, k=12,
+  tight budget flagged as chosen in advance; the k=20 fragment belonged to the coordination
+  ablation, which now names the budget axis at k=12 plus the k=20 cell. The credit line said
+  "k=8 and k=12, eight cells" — now k=8, four cells, matching 4.3.3's retrained ablation.
+- **Charter fixes**: the order-of-magnitude checkpoint claim -> Table tab:checkpoint; the
+  V-shaped detection claim -> app:attribution; the mode-gap n=20->1000 measurement CUT
+  (its report is repo-only since the appendix lean; the zero-variance structural argument
+  carries the choice alone); the two-implementations sign-flip story restated as a property.
+- Prose: ~15 run-ons split, 3.2.8's 340-word paragraph now three, its moment-test
+  restatement of 2.5.4 reduced to a pointer, three-conventions block one paragraph per
+  convention, one em dash removed, fig:metric's dead foreach deleted.
+- Verified before editing: the constrained-budget "ten budgets 166->17" matches 4.1.3
+  exactly, so it stayed. Gates clean, 98pp, thesis commit in the log.
