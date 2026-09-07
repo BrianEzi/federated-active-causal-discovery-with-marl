@@ -107,7 +107,7 @@ def main() -> int:
             fv = f"{fav[0]}/{fav[2]} & {fav[1]}/{fav[2]}" if fav else "--- & ---"
             rows.append(f"{x:g} & {b[0]:.5f} & {f[0]:.5f} & {g[0]:.5f} & {rec} & {fv} \\\\")
         parts.append("\n".join([
-            r"\begin{table}[!htbp]", r"\centering",
+            r"\begin{table}[H]", r"\centering", r"\small",
             f"\\caption{{{title} axis at $12{{,}}000$ episodes: SHD on committed marks and "
             r"joint recovery, 200 paired episodes per seed, both checkpoint conventions.}",
             f"\\label{{tab:12k_{key}}}", r"\begin{tabular}{rcccccrr}", r"\toprule",
@@ -134,13 +134,20 @@ def main() -> int:
         mark = r"$\rightarrow$" if (r4[0] > M) != (r12[0] > M) else ""
         hrows.append(f"\\texttt{{\\scriptsize {cell.replace('_', chr(92)+'_')}}} & {r4[0]:.3f} & "
                      f"{r12[0]:.3f} & {M:.3f} & {mark} \\\\")
+    # Two side-by-side halves (8 Sep, appendix air): one 18-row column wasted half a page.
+    half = (len(hrows) + 1) // 2
+    head = r"Cell & $4$k & $12$k & Myopic & \\"
+    left_rows, right_rows = hrows[:half], hrows[half:]
+    right_rows += [r" & & & & \\"] * (half - len(right_rows))
     parts.append("\n".join([
-        r"\begin{table}[!htbp]", r"\centering",
-        r"\caption{Joint recovery per cell at both training budgets. The myopic arm does "
-        r"not train, so one number per cell; an arrow marks a change of winner.}",
-        r"\label{tab:12k_headline}", r"\begin{tabular}{lcccc}", r"\toprule",
-        r"Cell & Learned, $4{,}000$ & Learned, $12{,}000$ & Myopic & \\",
-        r"\midrule", *hrows, r"\bottomrule", r"\end{tabular}", r"\end{table}", ""]))
+        r"\begin{table}[H]", r"\centering", r"\footnotesize",
+        r"\caption{Joint recovery (learned) per cell at both training budgets, with the "
+        r"myopic arm's single number; an arrow marks a change of winner.}",
+        r"\label{tab:12k_headline}",
+        r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule", *left_rows,
+        r"\bottomrule", r"\end{tabular}", r"\hspace{6mm}",
+        r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule", *right_rows,
+        r"\bottomrule", r"\end{tabular}", r"\end{table}", ""]))
     print(f"headline: learned ahead in {w4}/{len(hrows)} cells at 4,000 and "
           f"{w12}/{len(hrows)} at 12,000; {flips} cells change winner")
 

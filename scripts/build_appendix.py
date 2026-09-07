@@ -34,7 +34,7 @@ def jload(p):
 
 
 def tbl(caption, label, spec, header, body, note=""):
-    out = [r"\begin{table}[!htbp]", r"\centering", f"\\caption{{{caption}}}",
+    out = [r"\begin{table}[H]", r"\centering", r"\small", f"\\caption{{{caption}}}",
            f"\\label{{{label}}}", f"\\begin{{tabular}}{{{spec}}}", r"\toprule",
            header, r"\midrule", *body, r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     if note:
@@ -277,12 +277,18 @@ def appendix_epsgreedy():
         "$200$ paired episodes per seed as the arms it is compared with. The best "
         "$\\varepsilon$ per seed is reported, a selection that favours the control. Bold "
         "marks the better of the learned and $\\varepsilon$-greedy arms in each cell.\n\n"
-        + tbl("Joint recovery rate against the $\\varepsilon$-greedy control across all "
-              f"twenty sweep cells, three seeds each. The learned arm leads in {wins} of "
-              f"{3*len(rows)} individual seeds, and trails on the cell mean in "
-              f"{behind}.",
-              "tab:epsgreedy_all", "lcccc",
-              r"Cell & Myopic & $\varepsilon$-greedy & Learned & Seeds ahead \\", body)
+        + (lambda half=(len(body)+1)//2, head=r"Cell & Myopic & $\varepsilon$-g. & Learned & Ahead \\":
+           "\n".join([
+            r"\begin{table}[H]", r"\centering", r"\scriptsize", r"\setlength{\tabcolsep}{3pt}",
+            "\\caption{Joint recovery rate against the $\\varepsilon$-greedy control across "
+            f"all twenty sweep cells, three seeds each. The learned arm leads in {wins} of "
+            f"{3*len(rows)} individual seeds, and trails on the cell mean in {behind}.}}",
+            r"\label{tab:epsgreedy_all}",
+            r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
+            *body[:half], r"\bottomrule", r"\end{tabular}", r"\hspace{2mm}",
+            r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
+            *(body[half:] + [r" & & & & \\"] * (half - len(body[half:]))),
+            r"\bottomrule", r"\end{tabular}", r"\end{table}"]))()
         # The sweep-wide 4-panel figure was CUT on 7 Sep (Brian: lean the appendix to
         # ~7 pages; the repo carries figures/epsgreedy_grid_*.pdf and git history has
         # the block that drew it here).
@@ -474,7 +480,7 @@ this work and later withdrawn; the record of every withdrawal is
 Appendix~\ref{app:negative}, and the five that concern this appendix are kept beside the
 results they qualify.
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{Attribution claims withdrawn, with the measurement that refuted each.}
 \label{tab:app_attr_withdrawn}
@@ -613,9 +619,9 @@ def appendix_attribution():
           "is under-predicted by $0.263$, because groups explaining more than one pair also\n"
           "resolve there. Figure~\\ref{fig:attribution_law} plots the prediction against\n"
           "the measurement.\n\n"
-          "\\begin{figure}[htbp]\n"
+          "\\begin{figure}[H]\n"
           "\\centering\n"
-          "\\includegraphics[width=0.667\\textwidth]{figures/attribution_law.pdf}\n"
+          "\\includegraphics[width=0.55\\textwidth]{figures/attribution_law.pdf}\n"
           "\\caption[The attribution decomposition]{Measured attribution against the two-factor decomposition, with the "
           "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
           "\\label{fig:attribution_law}\n"
@@ -679,8 +685,8 @@ def appendix_attribution_summary():
         "every configuration with two or more peers (Figure~\\ref{fig:attribution_law}); "
         "the single-peer configuration is under-predicted by $0.263$, because larger groups "
         "also resolve there.\n\n"
-        "\\begin{figure}[!htbp]\n\\centering\n"
-        "\\includegraphics[width=0.667\\textwidth]{figures/attribution_law.pdf}\n"
+        "\\begin{figure}[H]\n\\centering\n"
+        "\\includegraphics[width=0.55\\textwidth]{figures/attribution_law.pdf}\n"
         "\\caption[The attribution decomposition]{Measured attribution against the two-factor decomposition, with the "
         "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
         "\\label{fig:attribution_law}\n\\end{figure}\n\n"

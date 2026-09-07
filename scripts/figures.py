@@ -173,7 +173,7 @@ def fig_window_budget(out: pathlib.Path):
     convention), final update at 4,000 (the policy after exactly 4,000 episodes). The
     myopic rule does not train, so it is one line per panel, not one per budget.
     """
-    fig, (top, bot) = plt.subplots(1, 2, figsize=(FULL, 3.0))
+    fig, (top, bot) = plt.subplots(1, 2, figsize=(FULL, 2.35))  # tightened 8 Sep: appendix air
     L4 = RANDOM   # grey: the undertrained policy, matching the retired budget figure
 
     # (a) joint recovery rate
@@ -971,7 +971,7 @@ def fig_inregime(out: pathlib.Path):
     rhos = sorted({k[0] for k in inreg})
 
     # Right-hand scatter moved onto fig_answer_rate (Brian, 7 Sep); one panel remains.
-    fig, left = plt.subplots(figsize=(TWOTHIRD, 2.9))
+    fig, left = plt.subplots(figsize=(TWOTHIRD, 2.3))  # tightened 8 Sep: appendix air
     left.axhline(0, color="black", lw=0.8, zorder=1)
     means = [np.mean([inreg[(r, s_)] for s_ in (0, 1, 2)]) for r in rhos]
     for r in rhos:
