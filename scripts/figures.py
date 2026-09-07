@@ -718,10 +718,23 @@ def fig_answer_rate(out: pathlib.Path):
     # makes a curve whose gradient per unit rho is NOT smooth look like smooth saturation.
     # Agent B found the same distortion in the numeric version of this claim on 3 Sep.
     # Legibility is not worth a false shape on a dose-response figure.
+    # In-regime deltas for the right-hand scatter (Brian, 7 Sep: the in-regime-against-
+    # transfer panel moves here from fig_inregime -- it further supports the trend).
+    inreg, xfer = {}, {}
+    for f in sorted(glob.glob(str(ROOT / "results/power/rho/inregime_det/rho*_s?.json"))):
+        m = re.search(r"rho([\d.]+)_s(\d)", pathlib.Path(f).stem)
+        e = json.loads(pathlib.Path(f).read_text())[0]
+        inreg[(float(m.group(1)), int(m.group(2)))] = e["paired"]["learned-greedy"]["delta"]
+    for f in src:
+        m = re.search(r"rho([\d.]+)_s(\d)", pathlib.Path(f).stem)
+        e = json.loads(pathlib.Path(f).read_text())[0]
+        xfer[(float(m.group(1)), int(m.group(2)))] = e["paired"]["learned-greedy"]["delta"]
+
     rhos = sorted(per)
     pos = rhos
     at = {r: r for r in rhos}
-    fig, top = plt.subplots(figsize=(TWOTHIRD, 3.0))
+    fig, (top, right) = plt.subplots(1, 2, figsize=(FULL, 3.0),
+                                     gridspec_kw={"width_ratios": [1.25, 1]})
     myopic = np.mean([v[1] for r in rhos for v in per[r]])
     top.axhline(myopic, color=MYOPIC, lw=1.3, ls="--", zorder=2,
                 label=f"myopic ({myopic:.4f}, all rates)")
@@ -745,6 +758,17 @@ def fig_answer_rate(out: pathlib.Path):
         ax.set_xticklabels([f"{r:g}" if r in (0.5, 0.7, 0.8, 0.9, 1.0) else ""
                             for r in rhos], fontsize=7.5)
         ax.set_xlim(1.04, 0.46)   # oracle on the left, noise increasing rightward
+
+    right.axhline(0, color="black", lw=0.7, zorder=1)
+    right.axvline(0, color="black", lw=0.7, zorder=1)
+    for (r, s_), v in inreg.items():
+        if (r, s_) in xfer:
+            right.scatter(v, xfer[(r, s_)], s=16, color=LEARNED, alpha=0.55, zorder=3)
+    right.set_xlabel(r"paired difference in SHD, in-regime ($\downarrow$)", fontsize=8)
+    right.set_ylabel(r"paired difference in SHD, transfer ($\downarrow$)", fontsize=8)
+    right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.95),
+                   xycoords="axes fraction", va="top", fontsize=8, color="#666666",
+                   bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
     fig.tight_layout()
     fig.savefig(out / "answer_rate.pdf", bbox_inches="tight")
     plt.close(fig)
@@ -905,8 +929,8 @@ def fig_inregime(out: pathlib.Path):
         return
     rhos = sorted({k[0] for k in inreg})
 
-    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9),
-                                      gridspec_kw={"width_ratios": [1.15, 1]})
+    # Right-hand scatter moved onto fig_answer_rate (Brian, 7 Sep); one panel remains.
+    fig, left = plt.subplots(figsize=(TWOTHIRD, 2.9))
     left.axhline(0, color="black", lw=0.8, zorder=1)
     means = [np.mean([inreg[(r, s_)] for s_ in (0, 1, 2)]) for r in rhos]
     for r in rhos:
@@ -924,17 +948,6 @@ def fig_inregime(out: pathlib.Path):
                   xy=(0.95, 0.0041), xytext=(0.66, 0.0038), fontsize=8, color="#666666",
                   ha="center", arrowprops=dict(arrowstyle="->", color="#666666", lw=0.7))
 
-    right.axhline(0, color="black", lw=0.7, zorder=1)
-    right.axvline(0, color="black", lw=0.7, zorder=1)
-    for r in rhos:
-        for s_ in (0, 1, 2):
-            if (r, s_) in xfer:
-                right.scatter(inreg[(r, s_)], xfer[(r, s_)], s=16, color=LEARNED,
-                              alpha=0.55, zorder=3)
-    right.set_xlabel(r"paired difference in SHD, in-regime ($\downarrow$)", fontsize=8)
-    right.set_ylabel(r"paired difference in SHD, transfer ($\downarrow$)", fontsize=8)
-    right.annotate("Spearman $+0.795$\n(21 cells)", xy=(0.05, 0.95),
-                   xycoords="axes fraction", va="top", fontsize=8, color="#666666")
     fig.tight_layout()
     fig.savefig(out / "inregime.pdf", bbox_inches="tight")
     plt.close(fig)
