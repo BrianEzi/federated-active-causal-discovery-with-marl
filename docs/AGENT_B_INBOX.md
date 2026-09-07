@@ -10207,3 +10207,55 @@ the evidence for them is an argument rather than a measurement, and I would not 
 be wrong a fourth time.
 
 Result due about 02:08. Myriad's compensated sweep 11/18, due about 03:00.
+
+---
+
+## 2026-09-07 02:2x -- Agent B: THE CHANNELS TEST IS DECISIVE. They explain the step, 3/3 seeds, beating the criterion I registered beforehand.
+
+    seed   channels OFF   channels ON    delta
+     s0       0.595          0.714      +0.119
+     s1       0.489          0.733      +0.244
+     s2       0.589          0.867      +0.278
+
+    OFF mean 0.558   0/3 seeds clear the 0.70 floor
+    ON  mean 0.771   3/3 seeds clear
+
+k_v=12, rho=0.95, budget 53 (effective beta 1.52), 12,000 episodes, same seeds, identical in
+every other field. The criterion registered at 01:1x required mean >= 0.70 and at least 2 of 3
+seeds; this gives 3 of 3 and every seed improves. `scripts/channels_verdict.py` applies the
+criterion in code, including the 0.62-0.70 ambiguous band, and was tested against synthetic
+pass/fail/ambiguous arms before the data landed.
+
+**Mechanism, as argued in advance rather than after.** Under a partial oracle a query can come
+back unanswered, and without the belief channels the agent has no observation distinguishing
+"asked and got nothing" from "did not ask". `observe_reprobe_signal` marks
+unresolved-but-already-probed pairs. Remove both and a withheld answer is invisible rather than
+merely unhelpful.
+
+This is the first attribution I have made tonight that survives a matched test. The three before
+it -- window size, a budget advantage, and an earlier looser version of this same claim -- all
+failed, each because I named one of a correlated pair without holding the other fixed.
+
+### Consequences
+
+**1. `rho12b` is not wasted, it is the ABLATION.** Those 18 channels-OFF cells now demonstrate
+across every rate what the three-run test showed at one: the features are necessary. Report it
+as the ablation, not as the RQ2 sweep.
+
+**2. The RQ2 sweep must be channels-ON with the compensated budget** -- the first configuration
+in this project that fixes both faults at once. `cluster/jobs/rho12on.txt`, 18 runs into
+`results/rho12on/`, `cluster/submit_rho12on.sh`.
+
+**3. A control mismatch I caught while generating it.** I have been using the ladder's arm A as
+the rho=1.00 control all night. That is correct for the OFF fleet -- same cell, same budget,
+channels OFF, twelve seeds -- and WRONG for an ON fleet, because arm A has the flags off. Using
+it would have compared an ON sweep against an OFF control and reintroduced the exact confound
+this fleet exists to remove. rho=1.00 is therefore trained fresh here, three seeds. rho=0.95 is
+NOT retrained: `results/channels12/on_rho0.95_s?.json` already is that cell.
+
+**4. Watch the low rates.** rho=0.95 with channels clears at 0.771, which is not a comfortable
+margin. The lower rates may still fall below the floor. If they do, that is the measurement --
+RQ2 would report the range over which partial-oracle training works at the principal cell, with
+the channels as a stated precondition, rather than a result at every rate.
+
+Submitting to Myriad as its current array drains.
