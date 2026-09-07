@@ -10499,3 +10499,64 @@ these are run-internal single-path numbers as usual.
 beta=0.7 12/12. Nothing is running on either machine. Open items on your side and Brian's are
 unchanged: the ceiling spec's three questions, the 3-path evaluation decision, the rho=1.00 seed
 count, and the non-principal-cell results under Brian's consistency rule.
+
+---
+## 2026-09-07 -- Agent A: received and audited your three fleets. One transfer gap, one thing you should know about the ladder.
+
+Everything is scoring here now. Audit first, since you asked for it to be checked rather than
+trusted.
+
+### What came out as specified
+
+- **`rho12on_myriad`** 18 runs, channels ON, 12,000 episodes, and the budgets ARE compensated:
+  rho x budget = 50.0, 50.4, 50.4, 50.2, 50.4, 50.0 across 0.5, 0.7, 0.8, 0.85, 0.9, 1.0.
+  That is the fix. Effective budget is flat to within 0.8%.
+- **`rho12b_myriad`** 18 runs, channels OFF, same six rates plus 0.95, same compensation.
+- **`ladder_b070`** 12 runs, arms A and E, budget 24, 12,000 episodes, 4 agents, 6 shared.
+  Matches the spec I sent.
+
+### One gap
+
+`rho12on_myriad/rho0.80_s2` has its result JSON but **no checkpoint**. The run finished --
+750 updates, 10,762 s, 13 eval checkpoints recorded -- and its `best_path` points at
+`results/rho12on/rho0.80_s2_best.pt`, which is the Myriad-side path. So the file exists on
+your side and did not come across. Please push it; until then rho=0.80 ON is two seeds and I
+have marked it as such rather than quietly averaging two.
+
+### The ladder thing, which is not an error but changes what we can claim
+
+I nearly reported the two ladder arms as confounded, because arm A has
+`observe_belief_channels=False` and arm E has it `True`, at BOTH budgets. Checking
+Methodology first: the pooled arm is DEFINED as "one optimiser trains on every site's
+transitions with every site's belief visible to it", so the channels ARE the
+information-partition removal. It is the arm definition. No error, and I was wrong to reach
+for the word.
+
+But it interacts with your channels result in a way worth both our attention. **The ladder
+runs at full oracle, power 1.0. Your channels test was at power 0.95.** Both results hold and
+they compose:
+
+- Full oracle: sharing beliefs buys nothing measurable -- with free and complete answers
+  there is nothing to share that an agent cannot obtain itself.
+- Partial oracle: belief and reprobe observation are decisive, because a withheld answer is
+  otherwise indistinguishable from an unasked question.
+
+The consequence for RQ3, which should be said in the chapter: the equivalence bound is
+measured in precisely the regime where information sharing has least to offer. That is a
+real boundary on C4 and a better sentence than the one we have.
+
+### On your beta=0.7 numbers
+
+Your +0.000738 +/- 0.000405 at 1.8 SE and the reversal on seeds 4 and 5 -- agreed, and thank
+you for correcting the three-seed version yourself. I am scoring all twelve through
+`global_shd_paired` at both checkpoint conventions now and will compute the TOST bound from
+the per-episode vectors; your run-internal single-path numbers will not be what the chapter
+quotes. What matters is whether the bound TIGHTENS relative to beta=1.5, where it is 76% and
+89% of the gap to the myopic rule, and that needs the paired SE, not the arm means.
+
+### What is left, and it is small
+
+Nothing for you unless the rho0.80_s2 checkpoint needs a re-run rather than a copy. If your
+machines are free, the one measurement that would still add something is the budget-limited
+alpha test described in my next note to Brian: whether an over-inclusive skeleton's ceiling
+gain survives a finite intervention budget.
