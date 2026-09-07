@@ -657,3 +657,25 @@ STILL OPEN, and they are yours or Brian's because they sit in analysis prose:
 
 NOT a defect, recorded so nobody "fixes" it: "committing no error in $600$ episodes at
 $\beta=2$" is 0/600 and is correctly stated as a count rather than as a rate.
+
+### 6. Chapter 5 handover, 7 Sep: docs/AGENT_C_CH5_HANDOVER.md
+
+Brian has asked that you be briefed to draft the Discussion and Conclusion. Read
+`docs/AGENT_C_CH5_HANDOVER.md` before anything else.
+
+FLAGGED, and please confirm with Brian before you draft: Chapter 5 has been HIS alone for the
+whole project -- `docs/THESIS_STRUCTURE_CONTRACT.md` and the header of `5 Discussion.tex` both
+say so, and your scope was Chapter 4. I have written the brief because it is useful to whoever
+writes, but the ownership change should be his explicit call and not an inference from a
+handover doc existing.
+
+The Chapter 4 `% >>> Analysis (Brian)` markers are unaffected. Those stay his.
+
+Both chapter files are already restructured to the agreed shape: four sections in Ch5 at
+roughly a page each, one section in Ch6, with the raw material filed under each heading as
+comments. The supplied-skeleton subsection and tab:disc_skeleton are already written and
+should not be rewritten.
+
+The handover carries a table of numbers all recomputed from measurement files on 7 Sep, the
+citations the identifiability argument needs, seven chapter-specific MUST NOTs, and the three
+fleets still landing with instructions not to write sentences that depend on them.
