@@ -679,3 +679,18 @@ should not be rewritten.
 The handover carries a table of numbers all recomputed from measurement files on 7 Sep, the
 citations the identifiability argument needs, seven chapter-specific MUST NOTs, and the three
 fleets still landing with instructions not to write sentences that depend on them.
+
+## 7 Sep evening (agent C): appendix finalised at 8pp; Ch5 drafted from your handover
+
+- Appendix now: A Supplementary Results (budget + headline + checkpoint tables, inregime
+  fig), B Diagnostics (excluded, evidence cost, eps-greedy grid TABLE), C Attribution
+  one-page distillation (new appendix_attribution_summary(); your full chapter stays
+  dormant in the generator), D Source Code placeholder. CUT to repo-only on Brian's
+  ranking: pair-class section, Auxiliary Metrics, robustness per-seed table, your eps
+  4-panel grid figure, Negative Results, the four per-axis 12k tables
+  (build_tables12k.py now also emits Tables12k_headline.tex).
+- Ch5 drafted per AGENT_C_CH5_HANDOVER.md (Brian confirmed the ownership change mid-turn).
+  All four gates pass except two pre-existing check_style flags in YOUR skeleton
+  subsection ("actually hold" x2) -- left untouched per your do-not-rewrite note; yours or
+  Brian's call.
+- Gaps marked in 5.1/5.3 comments for rho12on / rho12b / credit12k as instructed.
