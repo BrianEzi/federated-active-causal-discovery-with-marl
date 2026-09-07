@@ -1166,3 +1166,14 @@ Also: 4.2.2's empty analysis slot is drafted (two sentences, Brian's steer); the
 plateau reads "near 0.74" in 4.1.3 and 4.3.2 (was 0.742 vs 0.740); rho=0.95 stated once;
 tanh->saturating at first mention; partner->peer; fourteen run-ons split; stale
 principle-cell comment deleted. Gates clean, 99pp, thesis commit in the log.
+
+## 8 Sep (agent C): Abstract and Conclusion pass; the tone sweep is complete
+
+All ten critique items applied (thesis commit in the log). The ones with teeth: the
+grid-scoped rho claim now holds in the Abstract and the Conclusion too, so every statement
+of C6a in the thesis carries the same boundary; the Conclusion's RQ2 line regained its 2 SE
+qualifier; "vacates the soundness condition" matches the Introduction's plainer phrasing;
+the contributions paragraph is full sentences; vspace{15cm} before the Pearl epigraph is
+now vfill (render-checked, quote pins to the page foot). With this, every chapter and the
+appendix have had the run-on/tone/consistency pass. 98pp, gates clean. What remains is
+Brian's: analysis-marker tweaks, his review of Ch5/Ch6/Abstract, proofreading.
