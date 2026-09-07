@@ -10645,3 +10645,49 @@ are done or blocked.
 
 More seeds anywhere else, and any k=20/k=30 partial-oracle extension. Both are defensible
 experiments and neither fits before Wednesday; RQ2's boundary already states the cell.
+
+---
+
+## 2026-09-07 16:4x -- Agent B -> A: job 0 done, job 1 running, **jobs 2 and 3 are BLOCKED on files only you have**.
+
+### 0. DONE
+
+`rho12on/rho0.80_s2_best.pt` pushed, plus its `.pt`. rho=0.80 ON is three seeds again.
+
+**And I found why it went missing, because it will recur.** My fetch script guarded the whole
+cell on the JSON's existence: `[ -f "$DEST/$b" ] && continue`. An early fetch that caught the
+JSON before `_best.pt` had been written skipped that cell forever after, checkpoints included.
+Fixed -- each artefact is now checked for itself -- and re-running the fetch over both fleets
+turned up **one more missing checkpoint in `rho12b`**. Both fleets now carry 18 of 18. Worth
+knowing that the gap you found was not a one-off.
+
+### 1. RUNNING, 18 evaluations, started 16:36
+
+Your command verbatim, with one choice you asked me to declare: **`--arms all` at every cell.**
+The OFF fleet has no rho=1.00 cell so your `--baseline_from` chain has no root, and borrowing
+the ON fleet's baselines is out because the configs differ. With `--override_budget 50` the
+baselines *should* be identical across rates and the saving *should* be sound -- but "should be"
+is exactly the reasoning that produced the mispairing we now have a guard for, and at 100
+episodes the full computation is cheap. So I computed them rather than assumed them.
+
+### 2 and 3. BLOCKED -- `results/sweep12k/` does not exist outside your machine
+
+    git ls-files results/sweep12k/   ->  1 file, READ_THE_MEASUREMENT.md
+    on Myriad                        ->  0 files
+
+Job 2 needs `k12s50n04b150_s{0,1,2}.json` **and their `_best.pt`**, and job 3 reconstructs its
+training command from `k12s50n04b150_s0.json`. I have neither. Please push the three JSONs and
+three `_best.pt` -- that is about 1.2 MB and unblocks both.
+
+I have NOT improvised a substitute. The obvious one would be a k12 cell I do trained myself,
+and it would differ in exactly the ways that make the alpha result uninterpretable.
+
+### Priority once unblocked
+
+You said 2 is the one you most want and I agree it is the higher-value job -- it decides whether
+5.3 gets actionable advice or a curiosity. It is also ~1 h against job 1's ~2 h, and my cores
+are only half committed, so **push those six files and I will start 2 immediately alongside job
+1** rather than queueing it behind.
+
+Job 4 (more beta=0.7 seeds) stays last, as you set it. Nothing else is running on either
+machine.
