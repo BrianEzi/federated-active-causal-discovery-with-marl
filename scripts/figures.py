@@ -509,23 +509,70 @@ def fig_federation(out: pathlib.Path):
     print("  wrote ladder.pdf")
 
     # ---- 4.3.2: coordination without communication ----
-    series = [("random", "random_vary", RANDOM),
-              ("myopic,\nfixed partition", "greedy_partitioned", THIRD),
-              ("myopic,\nuncoordinated", "greedy_uncertainty", MYOPIC)]
-    fig, axes = plt.subplots(1, 2, figsize=(FULL, 2.8), sharey=True)
-    for ax, (title, pattern) in zip(axes, cells):
-        for index, (label, key, colour) in enumerate(series):
-            vals = arm(pattern.format(a="A"), key)
-            if not vals:
-                continue
-            ax.bar(index, np.mean(vals), 0.6, color=colour, alpha=0.85, zorder=2)
-            ax.scatter([index] * len(vals), vals, s=13, color="black", alpha=0.55, zorder=4)
-        ax.set_xticks(range(len(series)))
-        ax.set_xticklabels([s_[0] for s_ in series], fontsize=8, rotation=15, ha="center")
-        ax.annotate(title, xy=(0.05, 0.92), xycoords="axes fraction", fontsize=9)
-        ax.set_ylim(0, 1.05)
-    axes[0].set_ylabel(r"joint recovery rate ($\uparrow$)")
-    fig.tight_layout()
+    # ACROSS THE BUDGET AXIS, not at one budget (Brian, 7 Sep). The old version drew bars at
+    # beta=1.5 only -- the surplus end, where the fixed partition LOSES to uncoordinated
+    # myopic. Section 4.1.3 argues coordination is what the advantage buys under scarcity, so
+    # the chapter argued scarcity and measured surplus. The arms already exist at every
+    # budget, so this costs no compute and shows the sign flip instead of asserting it.
+    # Trade: six seeds at one budget becomes three seeds at seven.
+    AX = [(0.5, "b050"), (0.6, "b060"), (0.7, "b070"), (0.8, "b080"), (0.9, "b090"),
+          (1.0, "b100"), (1.5, "b150")]
+    series = [("learned", "learned", LEARNED, "o"),
+              ("myopic, fixed partition", "greedy_partitioned", THIRD, "D"),
+              ("myopic, uncoordinated", "greedy_uncertainty", MYOPIC, "s"),
+              ("random", "random_vary", RANDOM, "^")]
+    betas, curves = [], {k: [] for _l, k, _c, _m in series}
+    spread = {k: [] for _l, k, _c, _m in series}
+    for beta, tag in AX:
+        fs = (sorted(glob.glob(str(ROOT / f"results/budget_tight/k12s50n04{tag}_s?.json")))
+              or sorted(glob.glob(str(ROOT / f"results/sweep12k/k12s50n04{tag}_s?.json"))))
+        if len(fs) != 3:
+            continue
+        runs = [json.loads(pathlib.Path(f).read_text()) for f in fs]
+        betas.append(beta)
+        for _l, key, _c, _m in series:
+            vals = [r["arms"][key]["success"] for r in runs if key in r["arms"]]
+            curves[key].append(float(np.mean(vals)) if vals else np.nan)
+            spread[key].append(vals)
+
+    fig, (ax, axk) = plt.subplots(1, 2, figsize=(FULL, 2.8), sharey=True,
+                                  gridspec_kw={"width_ratios": [1.6, 1.0], "wspace": 0.08})
+    pos = list(range(len(betas)))
+    for label, key, colour, marker in series:
+        for p_, vals in zip(pos, spread[key]):
+            ax.scatter([p_] * len(vals), vals, s=10, color=colour, alpha=.30, zorder=3)
+        ax.plot(pos, curves[key], marker=marker, ms=4, lw=1.6, color=colour, zorder=4,
+                label=label)
+    # The crossover: where the partition stops paying. Drawn from the data, not placed.
+    d = np.array(curves["greedy_partitioned"]) - np.array(curves["greedy_uncertainty"])
+    flip = next((k for k in range(1, len(d)) if d[k - 1] > 0 >= d[k]), None)
+    if flip is not None:
+        x = flip - 1 + d[flip - 1] / (d[flip - 1] - d[flip])
+        ax.axvline(x, color="#B00020", lw=1.0, ls="--", zorder=2)
+        ax.annotate("partition stops paying", xy=(x, 0.06), xytext=(-5, 0),
+                    textcoords="offset points", fontsize=7.5, color="#B00020",
+                    ha="right")
+    ax.set_xticks(pos)
+    ax.set_xticklabels([f"{b:g}" for b in betas])
+    ax.set_xlim(-.35, len(betas) - .65)
+    ax.set_xlabel(r"budget multiplier $\beta$")
+    ax.set_ylim(-.03, 1.05)
+    ax.set_ylabel(r"joint recovery rate ($\uparrow$)")
+    ax.legend(frameon=False, fontsize=7.5, loc="upper left", handlelength=1.4)
+
+    # The second cell, at its own budget: one column per arm, same colours.
+    for index, (label, key, colour, _m) in enumerate(series):
+        vals = arm("results/central/v2_k20_{a}_s*.json".format(a="A"), key)
+        if not vals:
+            continue
+        axk.bar(index, np.mean(vals), 0.6, color=colour, alpha=0.85, zorder=2)
+        axk.scatter([index] * len(vals), vals, s=13, color="black", alpha=0.55, zorder=4)
+    axk.set_xticks(range(len(series)))
+    axk.set_xticklabels(["learned", "partition", "uncoord.", "random"], fontsize=7.5,
+                        rotation=20, ha="right")
+    # set_title, not annotate: the bars reach 1.0 under sharey, so anything placed
+    # inside the axes collides with the learned column.
+    axk.set_title(r"$k_v=20$, $\beta=1.5$", fontsize=8.5, pad=4)
     fig.savefig(out / "coordination.pdf", bbox_inches="tight")
     plt.close(fig)
     print("  wrote coordination.pdf")
