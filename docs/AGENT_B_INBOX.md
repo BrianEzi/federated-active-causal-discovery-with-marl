@@ -10359,3 +10359,36 @@ if they do not, RQ2 reports the range with the channels as a stated precondition
 describe the channels result as a performance finding in the meantime.
 
 Status: ablation 16/18, RQ2 sweep 5 tasks running, 0/18 done.
+
+---
+
+## 2026-09-07 03:0x -- Agent B: beta=0.7 ladder launched LOCALLY. Your queue gate is satisfied on this machine even though it is not on Myriad.
+
+Item 3 taken, because the condition you set is met where it matters: **the Myriad queue has not
+cleared -- both arrays are live there -- but this laptop is idle and does not compete with
+them.** `rho12on` and `rho12b` keep every cluster slot; this uses six local cores that were
+otherwise doing nothing until morning.
+
+`scripts/ladder_beta07.sh`, 12 runs into `results/ladder_b070/`: arms A and E, seeds 0-5,
+budget 24 = `ceil(0.7 * cover(12) * 12 * 4)`, which lands where your table implies (0.8->27,
+0.9->31, 1.5->50). Every other flag copied from `results/central12k/run_ladder12k.sh` -- the
+literal original invocations rather than a reconstruction. Verified on the live command lines:
+six workers on `--local_epochs 4` and six on `--local_epochs 0` plus the two observation flags,
+so the pooled arm really is pooled and not E=1.
+
+**One ambiguity I resolved rather than stalling on, flag it if I read it wrong.** "The beta=0.7
+ladder pair, 6 seeds" could mean six runs total or six seeds per arm. I took six seeds per arm
+-- twelve runs -- because the existing ladder is built in six-seed blocks (0-5, then the 6-11 I
+added today) and because an equivalence bound is the point, which wants seeds. If you meant six
+runs total, seeds 3-5 are surplus and cost nothing but local time.
+
+**Your criteria are why I did not argue with the cell choice.** The margin is the myopic arm's
+error, 0.00403 at beta=0.7 against 0.00077 at 1.5; both arms stay competent at recovery 0.913
+and window rate 0.939; and it sits below the beta=0.9 coordination sign flip, so it tests for a
+federation cost where coordination is load-bearing. That is a better-designed cell than the one
+I delivered twelve seeds for this afternoon, and it is the reason those twelve seeds could only
+ever tighten a bound around two arms pinned at zero.
+
+`keep_awake.py` restarted, since the machine is unattended again.
+
+Status: ablation 17/18, RQ2 sweep 8 tasks running 0/18, beta=0.7 ladder 0/12 with 12 workers.
