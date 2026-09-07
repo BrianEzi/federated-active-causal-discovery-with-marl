@@ -1102,3 +1102,45 @@ Same treatment as Ch1/Ch2/appendix, plus a consistency class you should know abo
   convention, one em dash removed, fig:metric's dead foreach deleted.
 - Verified before editing: the constrained-budget "ten budgets 166->17" matches 4.1.3
   exactly, so it stayed. Gates clean, 98pp, thesis commit in the log.
+
+### 11. sec:res_generator -- the myopic collapse on Erdos-Renyi is now MEASURED, not conjectured
+
+Brian: "we cannot just say we don't know why myopic greedy falters on erdos renyi, we need to
+justify this." The paragraph currently reads "no per-decision measurement has tested this, so
+it stands as the design-level reading". That sentence can go. Replace it with the measurement.
+
+`scripts/generator_decision_probe.py`, output `results/generator_decision_probe.json`.
+It records the statistic `UncertaintyGreedyAgent` actually ranks on -- undetermined marks
+touched, over the authority nodes -- at each agent's first decision, 60 episodes, both
+families, SAME episode seeds, principal cell, nothing differing but the generator.
+
+                                  scale-free   Erdos-Renyi
+    decisions sampled                    240           240
+    share with a unique best           86.7%         67.5%
+    share where the top is TIED         13.3%         32.5%
+    mean margin, best - runner-up   2.475 marks   1.000 marks
+    mean top score                     9.033         7.179
+    degree heterogeneity (CV)          1.017         0.665
+
+Two facts to write, both measured:
+
+1. On Erdos-Renyi the rule faces a TIE on roughly one decision in three, against one in
+   eight on scale-free. A tie is not a near-miss: `ma/baselines.py` breaks it with
+   `self.rng.choice(candidates)`, a uniform random draw. So a third of its decisions on the
+   control family are taken at random.
+2. Where it does have a unique best, the margin is 2.5x weaker -- 1.000 undetermined marks
+   against 2.475. The ranking is not merely tied more often, it is shallower throughout.
+
+The underlying generator quantity is there too: degree heterogeneity 1.017 on scale-free
+against 0.665 on Erdos-Renyi. Hubs are what make "the node touching the most undetermined
+marks" a decisive question, and the control family has none.
+
+**SCOPE, and it must survive the rewrite.** This samples the FIRST decision of each episode,
+with the belief freshly seeded. The rule makes about fifty decisions per episode, so the
+claim that this compounds across a budget is inference, not measurement. Write the tie rate
+and the margin as measured; write the compounding as the reading they support. Do not claim
+the probe explains the full 51x, because it does not -- it establishes the mechanism is
+present and much stronger on the control family, which is what the paragraph needs.
+
+The rest of that paragraph is already right, including the closing point that the scale-free
+generator if anything FLATTERS the myopic rule.
