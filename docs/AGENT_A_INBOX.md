@@ -798,3 +798,61 @@ setting and were never re-measured at k=12.
 The honest claim is therefore not "it works without the skeleton" but "it needs a GENEROUS
 skeleton, not an accurate one" -- which is a much easier thing to supply and a better
 limitation to have.
+
+### 8. 4.3.1 is ready to write NOW. Everything you need, 7 Sep.
+
+The beta=0.7 ladder landed and is scored. This section can be written before the answer-rate
+fleet finishes; it does not depend on it.
+
+**THE RESULT: the bound tightened, and on ten times the support.**
+
+    convention   beta=1.5              beta=0.7
+    selected     76% of the margin     44%
+    final        89%                   23%
+    support      12 of 2,400 episodes  122 of 2,400
+
+Recomputed from the per-episode vectors 7 Sep (`results/ladder_b070/scored/`):
+
+    beta=0.7 selected   federated - pooled  +0.00041 +/- 0.00078   90% CI [-0.00087, +0.00169]
+    beta=0.7 final      federated - pooled  +0.00035 +/- 0.00033   90% CI [-0.00020, +0.00090]
+    margin (myopic on the same episodes)    0.00386   -- against 0.00064 at beta=1.5
+    six seeds, 200 paired episodes each, both conventions equivalent within the margin
+
+Non-zero episodes: federated 79 of 1,200 and pooled 43 of 1,200 at the selected checkpoint,
+against 8 and 4 at beta=1.5. The comparison is no longer resting on a dozen episodes.
+
+**WHY THIS CELL.** beta=0.7 was chosen before the data, on three criteria, and the reasoning
+should appear in the prose because it is what makes the choice not post-hoc: the margin is
+5.2x larger than at beta=1.5; the learned arm still recovers 0.913 of graphs with a window
+rate of 0.939, so both arms are competent rather than both struggling; and it sits below the
+beta=0.9 coordination flip, inside the scarcity regime where a cost of partitioning is most
+likely to appear if one exists. beta=0.8 was rejected: smaller margin, and an unexplained
+inversion in its learned SHD.
+
+**FIGURE.** `fig:ladder` is regenerated and now has TWO panels, the per-seed paired difference
+at each budget with the equivalence margin drawn as a shaded band. I removed the
+joint-recovery panel: it drew four bars spanning 0.9925 to 1.000, which is the saturated
+measurement Brian ruled has nothing in it. The per-arm recovery numbers still belong in the
+prose; they no longer need a float. The caption is updated and all four gates pass.
+
+**THE BOUNDARY THAT MUST BE STATED, and it is the most interesting thing in 4.3.**
+Both ladders run at FULL oracle, power 1.0. Agent B's channels test, at power 0.95, shows
+belief and reprobe observation are decisive there -- window rate 0.558 without them against
+0.771 with, 0/3 seeds clearing the competence floor against 3/3. The two results compose:
+
+    full oracle     sharing beliefs buys nothing measurable
+    partial oracle  belief observation is decisive
+
+because with free and complete answers there is nothing to share that an agent cannot obtain
+itself, while a withheld answer is otherwise indistinguishable from an unasked question. So
+C4's equivalence bound is measured in exactly the regime where information sharing has LEAST
+to offer. Say it. It is not a retraction of C4, it is C4's scope, and a reader who notices it
+unaided will trust the rest less.
+
+Note also that the pooled arm's belief channels ARE the information-partition removal
+(sec:meth_ladder: "one optimiser trains on every site's transitions with every site's belief
+visible to it"), so the arms differing on that flag is the arm definition and not a confound.
+I checked; it is worth a footnote if you think a reader might wonder.
+
+**MUST NOT** say "federation costs nothing". Two cells, both equivalence bounds, and the
+tighter one still admits a cost of 23% of the gap to the myopic rule.

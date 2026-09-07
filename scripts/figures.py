@@ -461,47 +461,58 @@ def fig_federation(out: pathlib.Path):
             e = e[0] if isinstance(e, list) else e
             sd = int(pathlib.Path(f).stem.split("_s")[1].split("_")[0])
             lad.setdefault(k, {})[sd] = e
-    fig, (left, right) = plt.subplots(1, 2, figsize=(FULL, 2.9),
-                                      gridspec_kw={"width_ratios": [1.0, 1.15]})
-    for gi, (title, pattern) in enumerate(cells):
-        fed, pool = arm(pattern.format(a="A"), "learned"), arm(pattern.format(a="E"), "learned")
-        for off, vals, hatch, alpha in ((0.0, fed, None, 0.85), (0.4, pool, "//", 0.4)):
-            if not vals:
-                continue
-            left.bar(gi + off, np.mean(vals), 0.36, color=LEARNED, alpha=alpha,
-                     hatch=hatch, edgecolor=LEARNED, zorder=2)
-            left.scatter([gi + off] * len(vals), vals, s=13, color="black", alpha=0.55,
-                         zorder=4)
-    left.set_xticks([0, 0.4, 1, 1.4])
-    left.set_xticklabels(["federated", "pooled", "federated", "pooled"],
-                         rotation=28, ha="right", fontsize=8)
-    for gi, (title, _p) in enumerate(cells):
-        left.annotate(title, xy=(gi + 0.2, 0.9725), ha="center", fontsize=9)
-    # Axis starts at 0.97 (Brian, 3 Sep): every arm sits in [0.975, 1.0] and wider scales
-    # hid the comparison. The truncation is stated on the axis, not hidden.
-    left.set_ylim(0.97, 1.003)
-    left.set_ylabel(r"joint recovery rate ($\uparrow$)")
+    # THREE PANELS from 7 Sep: the paired difference is now shown at BOTH budgets, each
+    # against its OWN margin, because the margins differ by a factor of six (0.00064 at
+    # beta=1.5, 0.00386 at beta=0.7) and a shared axis would flatten the tighter cell to a
+    # line. The margin is what the bound is a fraction of, so drawing it is what makes the
+    # bound legible instead of a number in the prose.
+    # THE JOINT-RECOVERY PANEL IS GONE (7 Sep). It drew four bars spanning 0.9925 to 1.000 --
+    # a saturated cell where both arms solve almost every episode, which is precisely the
+    # measurement Brian ruled has nothing in it. What replaces it is the same comparison at a
+    # budget where both arms have room to be wrong. The per-arm recovery numbers survive in
+    # the prose; they do not need a float.
+    fig, (right, right7) = plt.subplots(
+        1, 2, figsize=(FULL, 2.7), gridspec_kw={"width_ratios": [1.0, 1.0], "wspace": 0.28})
+    def _paired_panel(ax, A, E, title, first):
+        """Per-seed paired difference, with the equivalence margin drawn behind it."""
+        seeds = sorted(set(A) & set(E))
+        ds, ses, myo = [], [], []
+        for sd in seeds:
+            x = np.asarray(A[sd]["rows"]["learned"]["hard"])
+            y = np.asarray(E[sd]["rows"]["learned"]["hard"])
+            d = x - y
+            ds.append(float(d.mean()))
+            ses.append(float(d.std(ddof=1) / np.sqrt(len(d))))
+            myo.append(float(np.mean(A[sd]["rows"]["greedy"]["hard"])))
+        margin = float(np.mean(myo))
+        ax.axhspan(-margin, margin, color=THIRD, alpha=.12, zorder=0)
+        ax.axhline(0, color="black", lw=0.8, zorder=1)
+        ax.errorbar(range(len(seeds)), ds, yerr=[2 * e for e in ses], fmt="o",
+                    color=LEARNED, ms=4.0, lw=1.1, capsize=2.5, zorder=3)
+        lim = max(margin, max(abs(d) + 2 * e for d, e in zip(ds, ses))) * 1.25
+        ax.set_ylim(-lim, lim)
+        ax.set_xticks(range(len(seeds)))
+        step = 2 if len(seeds) > 8 else 1        # twelve ticks collide at this width
+        ax.set_xticklabels([str(sd) if i % step == 0 else "" for i, sd in enumerate(seeds)],
+                           fontsize=7)
+        ax.set_xlabel("seed")
+        ax.text(.5, .96, title, transform=ax.transAxes, ha="center", va="top", fontsize=8.5)
+        if first:
+            ax.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ pooled",
+                          fontsize=8)
+
 
     if len(lad) == 2:
-        seeds = sorted(lad["A_best"])
-        ds, ses = [], []
-        for sd in seeds:
-            x = np.array(lad["A_best"][sd]["rows"]["learned"]["hard"])
-            y = np.array(lad["E_best"][sd]["rows"]["learned"]["hard"])
-            d = x - y
-            ds.append(d.mean())
-            ses.append(d.std(ddof=1) / np.sqrt(len(d)))
-        right.axhline(0, color="black", lw=0.8, zorder=1)
-        right.errorbar(seeds, ds, yerr=[2 * e for e in ses], fmt="o", color=LEARNED,
-                       ms=4.5, lw=1.1, capsize=2.5, zorder=3)
-        lim = max(abs(d) + 2 * e for d, e in zip(ds, ses)) * 1.3
-        right.set_ylim(-lim, lim)
-        right.set_xticks(seeds)
-        right.set_xlabel("seed")
-        right.set_ylabel("paired difference in SHD ($\\downarrow$)\nfederated $-$ pooled",
-                         fontsize=8)
-        right.annotate("above 0: pooling wins", xy=(0.04, 0.92), xycoords="axes fraction",
-                       fontsize=8, color="#666666")
+        _paired_panel(right, lad["A_best"], lad["E_best"], r"$\beta=1.5$", True)
+    b7 = {}
+    for ladder_arm in ("A", "E"):        # not `arm`: that name is the helper defined above
+        q = ROOT / f"results/ladder_b070/scored/b070_{ladder_arm}_best.json"
+        if q.exists():
+            b7[ladder_arm] = {e["seed"]: e for e in json.loads(q.read_text())}
+    if len(b7) == 2:
+        _paired_panel(right7, b7["A"], b7["E"], r"$\beta=0.7$", False)
+    else:
+        right7.set_axis_off()
     fig.tight_layout()
     fig.savefig(out / "ladder.pdf", bbox_inches="tight")
     plt.close(fig)

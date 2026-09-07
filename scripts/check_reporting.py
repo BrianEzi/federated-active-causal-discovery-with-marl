@@ -119,7 +119,9 @@ def caption_audit():
 
 # Figures whose axes do not start at the natural origin. Declared here so the caption check
 # can insist the caption says so; add to this list when a figure is truncated.
-TRUNCATED = {"fig:ladder", "fig:epsgreedy_grid"}
+# fig:ladder left the truncated-axis list on 7 Sep: its joint-recovery panel, the one
+# that started at 0.97, was removed. Both remaining panels are centred on zero.
+TRUNCATED = {"fig:epsgreedy_grid"}
 
 
 def main(argv=None) -> int:
