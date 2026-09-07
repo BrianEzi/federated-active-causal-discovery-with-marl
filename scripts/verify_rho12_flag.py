@@ -29,7 +29,11 @@ sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1]
 # The principal cell, from the verified k12s50n04b150 command. A mismatch here means the fleet
 # is not comparable to RQ1, which is the entire reason it is being run.
 EXPECTED = {"train_episodes": 12000, "n_int": 20, "n_obs": 60,
-            "observe_belief_channels": False, "vs_evidence": "oracle"}
+            "vs_evidence": "oracle"}
+# CHANNELS ARE A FLEET PROPERTY, NOT A CONSTANT. `rho12b` is the channels-OFF ablation and
+# `rho12on` is the channels-ON sweep; hardcoding False flagged all 18 correct ON runs as
+# MISMATCH. Same shape as the fixed-budget assertion this file already carries a note about:
+# a check that cannot pass for a legitimate fleet tells you about the check.
 # BUDGET IS NO LONGER A CONSTANT AND MUST NOT BE ASSERTED AS ONE. The compensated fleet sets
 # `budget = ceil(1.5 * base / rho)` so that effective beta stays at 1.5 while the dial moves;
 # asserting a fixed 50 flagged every correct compensated run as a MISMATCH. Check the
@@ -55,6 +59,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dir", default="results/rho12b")
     ap.add_argument("--seeds", type=int, default=3)
+    ap.add_argument("--channels", choices=["on", "off"], default="off",
+                    help="which fleet: 'off' for the rho12b ablation, 'on' for the rho12on sweep")
     args = ap.parse_args(argv)
 
     files = sorted(glob.glob(os.path.join(args.dir, "rho*_s?.json")))
@@ -77,6 +83,10 @@ def main(argv=None) -> int:
         got = cfg.get("vs_evidence_power")
         ok = got is not None and abs(got - want) < 1e-9
         wrong = [k for k, v in EXPECTED.items() if cfg.get(k) != v]
+        want_chan = args.channels == "on"
+        for flag in ("observe_belief_channels", "observe_reprobe_signal"):
+            if bool(cfg.get(flag)) != want_chan:
+                wrong.append(f"{flag}={cfg.get(flag)!r} want {want_chan}")
         topo = cfg.get("topology") or {}
         priv = topo.get("private") or []
         got_topo = {"name": topo.get("name"), "n_private_blocks": len(priv),
