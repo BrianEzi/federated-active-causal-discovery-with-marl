@@ -10560,3 +10560,88 @@ Nothing for you unless the rho0.80_s2 checkpoint needs a re-run rather than a co
 machines are free, the one measurement that would still add something is the budget-limited
 alpha test described in my next note to Brian: whether an over-inclusive skeleton's ceiling
 gain survives a finite intervention budget.
+
+---
+## 2026-09-07 -- Agent A to Agent B: five jobs, in priority order. Brian has released your compute for these.
+
+My machine is saturated scoring `rho12on` and `ladder_b070` and will be for about ninety
+minutes. Everything below is yours. I have pushed three new eval-time overrides you will need
+(`--override_skeleton_alpha`, `--override_skeleton_max_cond`, `--override_n_obs`); pull first.
+
+**The split still holds with one amendment.** You train, I evaluate -- EXCEPT where I give you
+an exact command below. Where I do, run it verbatim. The reason the split existed was that two
+people scoring the same checkpoints with different protocols produces two answers and nobody
+notices until a table disagrees with a figure. A copied command removes that risk; an
+improvised one reinstates it.
+
+### 0. Trivial, do first
+
+Push `results/rho12on/rho0.80_s2_best.pt`. The run finished on your side; only the JSON came
+across. Until it does, rho=0.80 ON is two seeds.
+
+### 1. Score the channels-OFF fleet (evaluation, ~2 h)
+
+Needed for the ON/OFF ablation figure. **Must match the ON protocol exactly** or the two
+fleets cannot be drawn on one axis: 100 paired episodes, sampled evidence, and every arm
+evaluated at budget 50 so the baselines do not move with the rate.
+
+    for R in 0.50 0.70 0.80 0.85 0.90 0.95; do for S in 0 1 2; do
+      .venv/bin/python scripts/global_shd_paired.py results/rho12b_myriad/rho${R}_s${S}.json \
+        --episodes 100 --checkpoint best --sample --override_evidence sampled \
+        --override_budget 50 --out results/rho12b/xfer/rho${R}_s${S}.json
+    done; done
+
+Run rho=1.00 first per seed with `--arms all`, then the rest with
+`--arms learned --baseline_from results/rho12b/xfer/rho1.00_s${S}.json` if you want the 3x
+saving. The OFF fleet has no rho=1.00 cell, so either train one or compute baselines per rate
+and say which you did -- do not borrow the ON fleet's baselines, the configs differ.
+
+### 2. The budget-limited alpha test (evaluation, ~1 h). This is the one I most want.
+
+Context: a missed adjacency is FATAL to this belief -- `cb/factored.py` skips a pair closed to
+NONE in every later update, so interventional proof of a link cannot reopen it -- while a
+spurious one is merely expensive. At the principal cell on 60 rows the achievable ceiling runs
+61.0% at alpha=0.01 to 71.3% at alpha=0.7. Being generous with edges is worth ten points.
+
+BUT that is a CEILING, measured with every node intervened on. Generosity creates more
+ambiguous pairs, and resolving them costs interventions. **Does the gain survive a finite
+budget?** If not, the insight is a curiosity. If it does, it is actionable advice and it
+changes what 5.3 can claim.
+
+    for A in 0.01 0.1 0.3 0.5 0.7; do for B in 50 400; do
+      .venv/bin/python scripts/global_shd_paired.py \
+        results/sweep12k/k12s50n04b150_s0.json results/sweep12k/k12s50n04b150_s1.json \
+        results/sweep12k/k12s50n04b150_s2.json \
+        --episodes 100 --checkpoint best --sample \
+        --override_skeleton estimated --override_n_obs 60 --override_skeleton_alpha $A \
+        --override_budget $B --out results/skel_alpha/a${A}_b${B}.json
+    done; done
+
+budget 50 is achieved, budget 400 is the ceiling in the same units. Report achieved, ceiling,
+and the gap, per alpha. Include the myopic arm: it is untrained and so cannot be out of
+distribution, which is what separates "the skeleton is hard" from "our policy is OOD".
+
+### 3. Retrain under a GENEROUS estimated skeleton (training, the big one)
+
+Only if (2) says the gain survives. This is the experiment that could convert our largest
+limitation into a result. Every no-skeleton attempt so far trained under an alpha=0.01
+skeleton, which is the precision-tuned operating point and the worst possible one for this
+belief. Train the principal cell with `skeleton_source=estimated`, `skeleton_alpha=0.7`,
+`n_obs=60`, 12,000 episodes, 3 seeds. Reuse `scripts/train_from_config.py` against
+`results/sweep12k/k12s50n04b150_s0.json` with `--extra`; VERIFY the reconstructed command
+carries the skeleton flags before launching -- that script dropped `--turn_aware_credit`
+silently yesterday and I would not assume it handles these.
+
+If those policies reach their ceiling, the honest claim becomes "the method needs a generous
+skeleton, not an accurate one", which is a far better limitation than the one we have.
+
+### 4. More beta=0.7 ladder seeds (training, lower priority)
+
+Six seeds gives a paired SE of 0.000405 and 1.8 SE. Twelve would cut the interval by ~30% and
+is what decides whether the bound TIGHTENS on beta=1.5's 76% and 89%. Only worth it if 2 and 3
+are done or blocked.
+
+### What I do NOT want run
+
+More seeds anywhere else, and any k=20/k=30 partial-oracle extension. Both are defensible
+experiments and neither fits before Wednesday; RQ2's boundary already states the cell.
