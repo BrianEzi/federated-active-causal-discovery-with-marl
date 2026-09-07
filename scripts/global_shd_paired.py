@@ -166,6 +166,26 @@ def main(argv=None) -> int:
                          "without it, hidden partner interventions contaminate the test's "
                          "control rows and the false-detection rate GROWS with n_int; with "
                          "it the rate returns to the calibrated regime.")
+    # THE SKELETON DIAL. The estimated skeleton is built from the episode's observational
+    # rows (ma/env.py::_estimated_skeleton), so n_obs is what sets its accuracy. Varying it
+    # is how "how good must the skeleton be" becomes a measured curve instead of one point.
+    ap.add_argument("--override_n_obs", type=int, default=None,
+                    help="evaluate with this many observational rows instead of the trained "
+                         "n_obs. Only meaningful with --override_skeleton estimated, where "
+                         "it sets the accuracy of the skeleton the agents are handed.")
+    # THE RECALL DIALS. Missed adjacencies are fatal to this belief and spurious ones are
+    # merely expensive (cb/factored.py skips a pair closed to NONE in every later update),
+    # so the CI test's operating point matters more than its sample size. Measured at the
+    # principal cell on 60 rows: the achievable ceiling runs 61.0% at alpha=0.01 to 71.3% at
+    # alpha=0.7, while skeleton ACCURACY peaks at 0.5 -- tuning for correctness is not tuning
+    # for this consumer. A lower max_cond finds fewer separations and so keeps more edges.
+    ap.add_argument("--override_skeleton_alpha", type=float, default=None,
+                    help="CI-test level for the estimated skeleton. Only meaningful with "
+                         "--override_skeleton estimated. Higher keeps more edges.")
+    ap.add_argument("--override_skeleton_max_cond", type=int, default=None,
+                    help="largest conditioning set the skeleton search considers. Only "
+                         "meaningful with --override_skeleton estimated. Lower keeps more "
+                         "edges.")
     ap.add_argument("--override_n_int", type=int, default=None,
                     help="evaluate with this many interventional rows per intervention "
                          "instead of the trained n_int. Only meaningful under sampled "
@@ -213,6 +233,12 @@ def main(argv=None) -> int:
             config = dict(config, budget=args.override_budget)
         if args.override_n_int is not None:
             config = dict(config, n_int=args.override_n_int)
+        if args.override_n_obs is not None:
+            config = dict(config, n_obs=args.override_n_obs)
+        if args.override_skeleton_alpha is not None:
+            config = dict(config, skeleton_alpha=args.override_skeleton_alpha)
+        if args.override_skeleton_max_cond is not None:
+            config = dict(config, skeleton_max_cond=args.override_skeleton_max_cond)
         if args.override_disclose:
             config = dict(config, disclose_regime=True)
         if args.override_skeleton:
@@ -286,8 +312,11 @@ def main(argv=None) -> int:
                  "eval_budget": config.get("budget"),
                  "trained_budget": report["config"].get("budget"),
                  "eval_n_int": config.get("n_int"),
+                 "eval_n_obs": config.get("n_obs"),
                  "eval_disclose": bool(config.get("disclose_regime", False)),
                  "eval_skeleton": config.get("skeleton_source", "true"),
+                 "eval_skeleton_alpha": config.get("skeleton_alpha"),
+                 "eval_skeleton_max_cond": config.get("skeleton_max_cond"),
                  "eval_noise_dist": config.get("noise_dist", "gaussian"),
                  "eval_mechanism": config.get("mechanism", "linear"),
                  "trained_power": report["config"].get("vs_evidence_power", 1.0),
