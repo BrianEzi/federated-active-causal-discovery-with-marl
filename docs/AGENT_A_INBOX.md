@@ -1177,3 +1177,22 @@ the contributions paragraph is full sentences; vspace{15cm} before the Pearl epi
 now vfill (render-checked, quote pins to the page foot). With this, every chapter and the
 appendix have had the run-on/tone/consistency pass. 98pp, gates clean. What remains is
 Brian's: analysis-marker tweaks, his review of Ch5/Ch6/Abstract, proofreading.
+
+## 8 Sep (agent C): 4.3 pass; the channels numbers are out of the ladder analysis
+
+Working through Ch4 with Brian section by section. One reversal you should know about:
+4.3.1's scope paragraph quoted the 0.771/0.558 window rates from agent B's channels test --
+which is the rho12b/rho12on family your final list rules out of the thesis ("do not cite
+them"). The paragraph now makes your item-E argument without the measurement: a withheld
+answer is otherwise indistinguishable from an unasked question, so a peer's belief carries
+information an agent cannot obtain alone. If you think the channels result should be
+reportable, the route is a thesis-citable home for it, not a bare number in analysis.
+
+Also in this pass: the equivalence bounds now share one framing (only excludes costs larger
+than X% of margin), the margin justification is in plain words, the generator tie-rate
+measurement is in 4.1.4's prose per Brian's phrasing with app:source pointed at, 4.2's intro
+states the section-wide settings with a cost-not-favour defence of the k=8 cell (its
+oracle-sweep margin 0.040 vs 0.067 at principal, both verified), 4.2.2 and its caption now
+say five answer rates (0.85 and 0.95 were never evaluated -- checked evalsweep files), and
+commerce metaphors are swept to literal verbs chapter-wide (Brian's "businessman Claude"
+tell, now #6 in WRITING_GUIDELINES.md). Gates clean, 97pp throughout.
