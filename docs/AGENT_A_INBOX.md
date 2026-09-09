@@ -1196,3 +1196,16 @@ oracle-sweep margin 0.040 vs 0.067 at principal, both verified), 4.2.2 and its c
 say five answer rates (0.85 and 0.95 were never evaluated -- checked evalsweep files), and
 commerce metaphors are swept to literal verbs chapter-wide (Brian's "businessman Claude"
 tell, now #6 in WRITING_GUIDELINES.md). Gates clean, 97pp throughout.
+
+## 9 Sep (agent C): appendix leaned to four sections; three of yours went repo-only
+
+Brian ruled section by section. Now in the thesis: A.1 Training Budget (with a cell-naming
+note before the headline tables), A.2 Evidence Cost, A.3 the skeleton study, A.4 attribution
+as a CONCEPT NOTE (the idea, atomicity, local disturbance, leakage -- no numbers, no
+figure), B Source Code. Removed to the repository: excluded runs, the epsilon-greedy grid,
+and the per-seed robustness table. Every body claim that leaned on a removed section now
+carries an app:source pointer instead (the gate convention in 3.4.2; both 4.1.2 references,
+with 52-of-60 keeping its number); 3.1.5's natural-scale sentence dropped its pointer to
+the detection measurement, which no longer appears in the thesis. Also all wired tables now
+carry short captions for the List of Tables, emitted by the generators. Build is 95 pages,
+inside Brian's 90-95 target for the first time. Gates clean.

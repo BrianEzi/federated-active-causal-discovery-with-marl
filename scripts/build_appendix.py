@@ -455,7 +455,7 @@ def appendix_evidence_cost():
         + "\nThe sampled arm does not approach the competence floor of $0.70$ on any seed, "
           "while the oracle arm clears it on all three. No policy-against-baseline "
           "comparison is drawn from the sampled runs; \\S\\ref{sec:res_transfer} carries "
-          "what the realistic regime costs a trained policy.\n")
+          "what the realistic regime does to a trained policy.\n")
 
 
 def appendix_mode():
@@ -744,40 +744,36 @@ def appendix_attribution():
 
 
 def appendix_attribution_summary():
-    """One-page distillation (Brian, 7 Sep: option 3 -- attribution distilled, negative
-    results repo-only). The full chapter remains in appendix_attribution(), unwired."""
+    """Concept note only (Brian, 9 Sep): the idea and its two rules, no empirics.
+    The full study, its figures and its withdrawn claims live in the repository."""
     return (
         "\\section{Latent-Owner Attribution} \\label{app:attribution}\n\n"
-        "A pair left bidirected is confounded by some peer's latent variable, and attribution "
-        "asks which peer owns it. The thesis's research questions do not depend on the answer, "
-        "so the machinery and its results are summarised here; the full material, including "
-        "its five withdrawn claims, is in the repository (Appendix~\\ref{app:source}). "
-        "Attribution rests on one sound pruning rule, atomicity, and one named modelling "
-        "assumption, local disturbance, which is unsound and declared as such.\n\n"
-        "The measured ceiling is structural. A self-interested policy, scored only on its "
-        "own recovery, spends $7.6\\%$ of its budget on private variables against "
-        "$38$--$61\\%$ for every other policy. It still attributes worse than a rule not "
-        "scored on attribution at all, an attribution rate of $0.245$ against $0.327$ over "
-        "three seeds of $100$ episodes.\n\n"
-        "What limits attribution is ownership ambiguity. A two-factor decomposition, the "
-        "measured rate at which one-pair latent groups resolve times the share of one-pair "
-        "groups in the graph distribution, predicts the measured attribution share within "
-        "$0.041$ at every configuration with two or more peers "
-        "(Figure~\\ref{fig:attribution_law}). The single-peer configuration is "
-        "under-predicted by $0.263$, because larger groups also resolve there.\n\n"
-        "\\begin{figure}[H]\n\\centering\n"
-        "\\includegraphics[width=0.55\\textwidth]{figures/attribution_law.pdf}\n"
-        "\\caption[The attribution decomposition]{Measured attribution against the two-factor decomposition, with the "
-        "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
-        "\\label{fig:attribution_law}\n\\end{figure}\n\n"
-        "The engine itself scales and stays sound, with $21$, $33$ and $27$ correct "
-        "attributions at $k_v = 30$, $40$ and $50$ over $30$ episodes each, no incorrect "
-        "attribution and no contradiction raised at any size. Detection under the "
-        "randomised intervention mode varies non-monotonically with the interventional "
-        "scale, $63\\%$, $22\\%$ and $92.5\\%$ at $\\sigma_{\\text{int}} = 0.5$, $1.0$ "
-        "and $2.0$. The atomic mode, which clamps the target to a constant, detects "
-        "$90.5\\%$ at any scale, the association itself vanishing under the clamp.\n")
-
+        "This section explains an idea the setting makes possible, one step beyond "
+        "detecting confounding. What follows is the concept; the empirical study of it "
+        "lives in the repository (Appendix~\\ref{app:source}).\n\n"
+        "A bidirected mark tells an agent that some hidden variable, owned by some peer, "
+        "confounds two variables it can see. Detection stops there. Attribution asks the "
+        "further question of which peer owns the hidden variable, and which of the "
+        "observing agent's variables it touches. The unit of the question is the "
+        "\\emph{latent group}, an owner paired with the set of observed variables its "
+        "hidden variable parents.\n\n"
+        "The question is harder than it looks, because the hiddenness is by design. The "
+        "observing agent cannot probe the variable itself; it can only watch what moves "
+        "together when a peer acts. What makes progress possible is that a single hidden "
+        "variable leaves a signature, its children being pairwise confounded, so any "
+        "candidate group whose children are not pairwise confounded can be ruled out. "
+        "That rule, atomicity, is sound. Ruling candidates in takes more, an assumption "
+        "called local disturbance, that the hidden variables responding to a peer's "
+        "private intervention are that peer's own. The assumption is not sound in "
+        "general, so any conclusion resting on it has to be reported beside what "
+        "atomicity alone supports.\n\n"
+        "Attribution matters because it measures what the partition actually hides. "
+        "Forbidding raw data from crossing a boundary is not the same as hiding "
+        "structure, and the degree to which peers can attribute is the degree to which "
+        "the boundary leaks. That leakage is one side of any future decision about how "
+        "much to disclose. The machinery, its assumptions and its measured limits are in "
+        "the repository.\n"
+    )
 
 def main() -> int:
     out = ROOT / "thesis/Appendix.tex"
@@ -806,9 +802,11 @@ def main() -> int:
     # (WRITING_GUIDELINES.md "Appendix register").
     # Attribution precedes the per-seed robustness table so its closing paragraph packs
     # against the table instead of spilling onto a page of its own (render-checked 8 Sep).
-    for fn in (appendix_excluded, appendix_evidence_cost, appendix_epsgreedy,
-               appendix_skeleton, appendix_attribution_summary,
-               appendix_robustness):
+    # LEANED 9 Sep (Brian): excluded runs, the epsilon-greedy grid and the per-seed
+    # robustness table are repo-only (their body claims carry app:source pointers);
+    # attribution is a concept note with the empirical study in the repository.
+    for fn in (appendix_evidence_cost, appendix_skeleton,
+               appendix_attribution_summary):
         parts.append(fn())
         parts.append("")
     # Source-code appendix (required; Brian, 7 Sep). URL filled by Brian on Overleaf, 7 Sep.
