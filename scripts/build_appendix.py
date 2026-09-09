@@ -356,8 +356,9 @@ def appendix_skeleton():
     for r in jload(q)["rows"]:
         if r["alpha"] == 0.01 and r["n_obs"] in (30, 60, 250, 1000, 8000, 64000):
             n = "$" + f"{r['n_obs']:,}".replace(",", "{,}") + "$"
+            missed = "$" + f"{r['missed']:,}".replace(",", "{,}") + "$"
             ceil_rows.append(
-                f"{n} & {r['accuracy']:.1%} & {r['missed']} & {r['spurious']} & "
+                f"{n} & {r['accuracy']:.1%} & {missed} & {r['spurious']} & "
                 f"{r['claims_estimated']:.1%} \\\\".replace("%", "\\%"))
     return (
         "\\section{The Supplied Skeleton, Measured at the Principal Cell} "
@@ -439,7 +440,8 @@ def appendix_evidence_cost():
         "Two fleets are identical except for their evidence. One trained on exactly "
         "answered queries and the other on tests estimated from finite samples, at the "
         "same $k_v=8$ cell, the same intervention budget of "
-        f"{meta['Oracle'].get('budget')}, the same {meta['Oracle'].get('train_episodes'):,} "
+        f"${meta['Oracle'].get('budget')}$, the same $"
+        + f"{meta['Oracle'].get('train_episodes'):,}".replace(",", "{,}") + "$ "
         "training episodes and the same observation features, three seeds each. The "
         "reported quantity is the per-window solve rate of \\S\\ref{sec:meth_gate}, "
         "averaged over each run's last ten checkpoints. Table~\\ref{tab:evidence_cost} "

@@ -36,11 +36,11 @@ CORNERS = [
      "results/power/rho/deterministic/xfer_rho0.50_s?.json"),
     ("uniform", "linear", "bounded, light-tailed",
      "results/noisedist/rho050_uniform_s?.json"),
-    ("Student-$t_3$", "linear", "heavy-tailed",
+    ("Student-$t(3)$", "linear", "heavy-tailed",
      "results/noisedist/rho050_t3_s?.json"),
     ("Gaussian", "saturating", "nonlinear, monotone",
      "results/noisedist/rho050_gaussian_tanh_s?.json"),
-    ("Student-$t_3$", "saturating", "both at once",
+    ("Student-$t(3)$", "saturating", "both at once",
      "results/noisedist/rho050_t3_tanh_s?.json"),
     ("Gaussian", "V-shaped", "adversarial",
      "results/noisedist/rho050_gaussian_vshape_s?.json"),
@@ -96,7 +96,7 @@ def compact(rows, protocol):
         r"\begin{table}[htbp]",
         r"\centering",
         f"\\caption[Robustness across generator corners]{{Pooled SHD on committed marks under generators the policies did not "
-        f"train on, {episodes} paired episodes per seed, three seeds per corner. Lower is "
+        f"train on, ${episodes}$ paired episodes per seed, three seeds per corner. Lower is "
         f"better. The last column counts seeds where the learned arm leads the myopic one "
         f"by more than two standard errors.}}",
         r"\label{tab:robust}",
