@@ -1209,3 +1209,28 @@ with 52-of-60 keeping its number); 3.1.5's natural-scale sentence dropped its po
 the detection measurement, which no longer appears in the thesis. Also all wired tables now
 carry short captions for the List of Tables, emitted by the generators. Build is 95 pages,
 inside Brian's 90-95 target for the first time. Gates clean.
+
+## 9 Sep (agent C): final pre-submission review; a silent cross-reference bug
+
+Two independent proofreads plus a structural audit. The one that matters most, because it
+was invisible: **three bare \label commands in 3.4 all resolved to 3.4.2**. A \label with no
+sectioning command inherits the enclosing subsection's number, so sec:meth_baselines,
+sec:meth_gate and sec:meth_ckpt printed the same wrong section in eight places across
+Chapters 3 and 4 and the appendix. It never rendered as ?? which is why it survived every
+pass. They are now real subsections (3.4.3 Baselines, 3.4.4 Competence Gate, 3.4.5
+Checkpoint Selection), verified from the aux file.
+
+Also fixed: eq:pool asserted p in V_k where p is a pair (now subset); Algorithm 1
+initialised the mark set with 'absent' admitted, contradicting 3.2.2 and its own figure;
+eq:mi's I(S;A)/H(A) had an undefined S and a duplicate entropy symbol (now
+I(O;A)/mathcal{H}(A)); 4.3.2's k=20 ordering was printed backwards (recomputed:
+uncoordinated 0.897, partitioned 0.487); 4.2.3 implied six robustness corners where five
+were run; 4.2.4's false-detection anchors were unnamed; 4.1.3's 'twelve arm-budget
+combinations' belonged to the metric bake-off, not that axis, so the claim now rests on
+Chapter 3's soundness property; 3.5.2 said 'below beta=1' while quoting 166 rounds, which
+is beta=5. Plus grammar: four transitive 'intervene', two dangling participles, one missing
+object, three tense shifts, five broken parallelisms. Front matter: title page said
+'Fulfillment', the declaration had a trailing \\, and BIC/BOED were in the abbreviations
+though only RL-BIC and RL-BOED ever appear.
+
+Gates clean, no dangling refs, no unreferenced floats, 96pp.
