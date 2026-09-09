@@ -33,8 +33,9 @@ def jload(p):
     return json.loads(pathlib.Path(p).read_text())
 
 
-def tbl(caption, label, spec, header, body, note=""):
-    out = [r"\begin{table}[H]", r"\centering", r"\small", f"\\caption{{{caption}}}",
+def tbl(caption, label, spec, header, body, note="", short=None):
+    cap = f"\\caption[{short}]{{{caption}}}" if short else f"\\caption{{{caption}}}"
+    out = [r"\begin{table}[H]", r"\centering", r"\small", cap,
            f"\\label{{{label}}}", f"\\begin{{tabular}}{{{spec}}}", r"\toprule",
            header, r"\midrule", *body, r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     if note:
@@ -69,7 +70,7 @@ def appendix_excluded():
                   r"Cell & Seed & \multicolumn{2}{c}{4{,}000 episodes} & "
                   r"\multicolumn{2}{c}{12{,}000 episodes} & Myopic \\"
                   "\n" r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}"
-                  "\n" r" & & window & joint & window & joint & joint \\", body)
+                  "\n" r" & & window & joint & window & joint & joint \\", body, short="The excluded runs")
             + f"\nAll {len(rows)} are seed 2 and all are at $k_v=12$. Every one clears the floor "
               "when retrained,\nand every one finishes above the myopic rule on its own cell.\n")
 
@@ -281,7 +282,7 @@ def appendix_epsgreedy():
         + (lambda half=(len(body)+1)//2, head=r"Cell & Myopic & $\varepsilon$-g. & Learned & Ahead \\":
            "\n".join([
             r"\begin{table}[H]", r"\centering", r"\scriptsize", r"\setlength{\tabcolsep}{3pt}",
-            "\\caption{Joint recovery rate against the $\\varepsilon$-greedy control "
+            "\\caption[The epsilon-greedy control, all cells]{Joint recovery rate against the $\\varepsilon$-greedy control "
             "across all twenty sweep cells, three seeds each.}",
             r"\label{tab:epsgreedy_all}",
             r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
@@ -325,7 +326,7 @@ def appendix_robustness():
               "$200$ paired episodes per seed. Negative differences favour the learned arm.",
               "tab:robust_seeds", "llccccr",
               r"Noise & Mechanism & Seed & Learned & Myopic & Random & "
-              r"Learned $-$ myopic \\", per_seed(rows)))
+              r"Learned $-$ myopic \\", per_seed(rows), short="Robustness corners per seed"))
 
 
 def appendix_skeleton():
@@ -375,7 +376,7 @@ def appendix_skeleton():
               "principal cell, $\\alpha = 0.01$, thirty episodes. The ceiling is claim "
               "accuracy with every node intervened on.",
               "tab:skeleton_nobs", "rrrrr",
-              r"$n_{\text{obs}}$ & Accuracy & Missed & Spurious & Ceiling \\", ceil_rows)
+              r"$n_{\text{obs}}$ & Accuracy & Missed & Spurious & Ceiling \\", ceil_rows, short="Skeleton quality against sample size")
         + "\nEven at $64{,}000$ observational rows, a thousand times what the agents hold, "
           "the ceiling reaches only $90.2\\%$. Table~\\ref{tab:skeleton_alpha} sweeps the "
           "test's threshold instead, at the operating sample size of sixty rows, at the "
@@ -386,7 +387,7 @@ def appendix_skeleton():
               "horizon; budget $400$ is the ceiling in the same units.",
               "tab:skeleton_alpha", "rrrrr",
               r"$\alpha$ & Myopic, $b{=}50$ & Myopic, $b{=}400$ & Learned, $b{=}50$ & "
-              r"Learned, $b{=}400$ \\", alpha_rows)
+              r"Learned, $b{=}400$ \\", alpha_rows, short="Pooled SHD by skeleton threshold")
         + "\nThe myopic rule reaches its ceiling at every threshold, $0.20732$ against "
           "$0.20725$ at the strictest, so the intervention budget never binds. Retuning "
           "the test from $\\alpha=0.01$ to $\\alpha=0.3$ lowers pooled distance from "
@@ -450,7 +451,7 @@ def appendix_evidence_cost():
               "seeds each.",
               "tab:evidence_cost", "lcccccc",
               r"Regime & $n_{\text{int}}$ & Seeds & \multicolumn{3}{c}{Per seed} & Mean \\",
-              rows)
+              rows, short="Solve rate by evidence regime")
         + "\nThe sampled arm does not approach the competence floor of $0.70$ on any seed, "
           "while the oracle arm clears it on all three. No policy-against-baseline "
           "comparison is drawn from the sampled runs; \\S\\ref{sec:res_transfer} carries "

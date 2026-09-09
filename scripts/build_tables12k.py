@@ -141,7 +141,7 @@ def main() -> int:
     right_rows += [r" & & & & \\"] * (half - len(right_rows))
     parts.append("\n".join([
         r"\begin{table}[H]", r"\centering", r"\footnotesize",
-        r"\caption{Joint recovery (learned) per cell at both training budgets, with the "
+        r"\caption[Joint recovery at both training budgets]{Joint recovery (learned) per cell at both training budgets, with the "
         r"myopic arm's single number; an arrow marks a change of winner.}",
         r"\label{tab:12k_headline}",
         r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule", *left_rows,

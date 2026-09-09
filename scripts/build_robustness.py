@@ -95,7 +95,7 @@ def compact(rows, protocol):
         "",
         r"\begin{table}[htbp]",
         r"\centering",
-        f"\\caption{{Pooled SHD on committed marks under generators the policies did not "
+        f"\\caption[Robustness across generator corners]{{Pooled SHD on committed marks under generators the policies did not "
         f"train on, {episodes} paired episodes per seed, three seeds per corner. Lower is "
         f"better. The last column counts seeds where the learned arm leads the myopic one "
         f"by more than two standard errors.}}",
