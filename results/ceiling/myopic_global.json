@@ -1,0 +1,54 @@
+{
+ "episodes": 60,
+ "seed": 0,
+ "ladder_config": {
+  "n_obs": 60,
+  "n_int": 20,
+  "budget": 50,
+  "turn_order": "round_robin",
+  "belief_backend": "factored",
+  "graph_model": "sf",
+  "sf_m": 2,
+  "claim_bar": 1.0,
+  "episode_mix": "confounded",
+  "vs_evidence": "oracle",
+  "reward_criterion": "claims"
+ },
+ "reachability": {
+  "federation_4x6+6": {
+   "draws": 2000,
+   "confounded": 1821,
+   "rate": 0.9105,
+   "windows": [
+    12,
+    12,
+    12,
+    12
+   ]
+  },
+  "single_1x24+6": {
+   "draws": 2000,
+   "confounded": 0,
+   "rate": 0.0,
+   "windows": [
+    30
+   ]
+  }
+ },
+ "arms": {
+  "federation_4x6+6": {
+   "d": 30,
+   "n_agents": 4,
+   "directed_edges_allowed": 438,
+   "undirected_pairs_allowed": 219,
+   "myopic_hard": 0.000837138508371385,
+   "myopic_hard_se": 0.00042718729106916637,
+   "myopic_soft": 0.00043125317097919834,
+   "random_hard": 0.041780821917808214,
+   "mean_global_pairs_scored": 219.0
+  },
+  "single_1x24+6": {
+   "skipped": "episode_mix=confounded unreachable"
+  }
+ }
+}

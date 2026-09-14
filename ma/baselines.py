@@ -1,24 +1,23 @@
-"""PHASE 4 -- reference policies for the rebuilt two-agent environment.
+"""Reference policies the learned agents are measured against.
 
-Four arms, and the choice of arms is itself a correction. The earlier comparison used a
-random policy whose clamping was incidental, which made "the learned agent clamps" look
-like a discovery when a coin-flipping policy clamps half the time by construction. So
-`random_clamp` is named, explicit, and the PRIMARY floor [U16].
+    pass never acts, establishing what observational data alone yields.
+    random_vary uniform over targets, randomised intervention values.
+    random_clamp uniform over targets, clamped to a constant.
+    greedy_uncertainty intervenes on the variable touching the most unresolved pairs.
+    greedy_partitioned the same rule, restricted to a positional share of the shared
+                        interface, so duplicated effort is impossible by construction.
+    oracle_cover intervenes on exactly the set its own window requires, which is a
+                        per-window ceiling rather than a method. It is uncoordinated across
+                        windows by design, so a policy that allocates a shared budget well
+                        can beat it.
 
-  pass          never acts. What does an agent reach on observational data plus whatever
-                its partner happens to do?
-  random_vary   uniform over targets, VARY only. Never removes itself as a confounder.
-  random_clamp  uniform over (target, mode). The primary floor.
-  greedy        myopic expected information gain over the agent's own window.
-  forced_clamp  always clamps its own private node. Not a serious policy -- it is GATE 3's
-                upper arm, the "coordination is available if you pay for it" reference.
+Two random arms are kept separate because clamping and randomising differ in what they buy:
+a clamped variable stops being a variance source and so can de-confound a pair for a
+partner, while a randomised one identifies its own descendants more efficiently. Collapsing
+them into a single random baseline would make either behaviour look incidental.
 
-THE GREEDY ORACLE ENUMERATES, AND THAT IS DELIBERATE. It needs a full posterior over the
-window to compute the descendant-set partition its criterion is defined on, and no sampler
-for the DP posterior exists that is trustworthy here -- the MH sampler is under-mixed
-(5.8% acceptance) and its current settings are an admitted stopgap. Enumeration is exact,
-and the oracle is a REFERENCE POINT rather than part of the method, so it does not need to
-scale. The guard below makes that limit explicit instead of letting it fail quietly at k=6.
+`greedy_uncertainty` breaks ties uniformly at random, which matters on graphs without hubs
+where its ranking is often tied; `scripts/generator_decision_probe.py` measures how often.
 """
 from __future__ import annotations
 
@@ -26,10 +25,10 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
-from ma.belief_dp import JOINT_CONF, MODULAR_RULES
+from crosscheck.belief_dp import JOINT_CONF, MODULAR_RULES, WindowBeliefDP
 from ma.env import CLAMP, VARY, AgentWindow, TwoAgentEnv
-from sa.graphs import build_graph_space, descendants
-from sa.oracle import _partition_entropy
+from ma.graphs import build_graph_space, descendants
+from ma.stats import _partition_entropy
 
 MAX_ENUMERATED_K = 5
 
@@ -64,7 +63,7 @@ class _Window:
         # `mec_signature` for all 543 graphs on every call, and `singleton_fraction`
         # recomputed it once per DRAW. Stored as integer class ids so membership is an
         # array comparison rather than a set comparison.
-        from sa.graphs import mec_signature
+        from ma.graphs import mec_signature
         lookup: Dict[object, int] = {}
         self.mec_id = np.zeros(self.n_dags, dtype=np.int64)
         for i, dag in enumerate(self.dags):
@@ -78,7 +77,7 @@ class _Window:
 
     def id_of(self, adjacency: np.ndarray) -> int:
         """Class id of an arbitrary graph on this window, or -1 if it is not one."""
-        from sa.graphs import mec_signature
+        from ma.graphs import mec_signature
         return self._sig_to_id.get(mec_signature(adjacency), -1)
 
     @classmethod
@@ -103,10 +102,10 @@ class _PerDagIndex:
     Evaluation ran this twice per episode, so it was roughly 40% of every training job.
 
     Three tables:
-      `own`        [n_dags, k]                 the DAG's own parent set, per node
-      `stripped`   [n_dags, n_assign, k]       parents MINUS that assignment's confounding
+      `own` [n_dags, k] the DAG's own parent set, per node
+      `stripped` [n_dags, n_assign, k] parents MINUS that assignment's confounding
                                                edges, which is what the CLEAN regime scores
-      `compatible` [n_dags, n_assign]          does the DAG contain the assignment's edges
+      `compatible` [n_dags, n_assign] does the DAG contain the assignment's edges
     """
 
     _cache: Dict[tuple, "_PerDagIndex"] = {}
@@ -160,6 +159,14 @@ def enumerated_posterior(window: AgentWindow, samples: np.ndarray,
     agent looking at the SAME belief. Two estimators that disagree would make every
     comparison between them meaningless.
     """
+    if not isinstance(window.belief, WindowBeliefDP):
+        raise NotImplementedError(
+            "enumerated_posterior reads the exact DP's own score tables "
+            "(belief.assignments, belief.scorer); there is no posterior to enumerate "
+            "under the constraint backend. The greedy baseline and the enumerated "
+            "report need their own constraint-side design -- an expected reduction in "
+            "bootstrap disagreement, not an expected posterior gain. Deliberately "
+            "unimplemented in Phase 1; see docs/CB_IMPLEMENTATION_PLAN.md.")
     belief = window.belief
     space = _Window.get(window.k)
     clean = np.asarray(clean, dtype=bool)
@@ -232,7 +239,7 @@ def _agent_seed(seed: int, agent: int) -> int:
     meant the two agents chose the SAME shared target almost every round. Measured
     collision rate 0.784 against the ~0.19 expected of two independent uniform agents.
 
-    That is not a cosmetic bug: `random_clamp` is the PRIMARY floor [U16], and a
+    That is not a cosmetic bug: `random_clamp` is the PRIMARY floor, and a
     perfectly synchronised pair is a different policy from two independent ones -- it
     systematically wastes one of the two moves, and it makes the floor easier to beat for
     the wrong reason.
@@ -274,8 +281,23 @@ class RandomAgent:
 
     def __call__(self, env: TwoAgentEnv, result) -> int:
         window = env.windows[self.agent]
+        # Under `mode_by_role` the mode is not a choice -- it is fixed by the node's role --
+        # so `allow_clamp` has nothing to select on and the arm is "uniform over targets",
+        # which is the floor it was always meant to be. Filtering on mode there would
+        # return an empty candidate list.
         candidates = [i for i, (node, mode) in enumerate(window.actions)
-                      if node != -1 and (self.allow_clamp or mode == VARY)]
+                      if node != -1 and (self.allow_clamp or window.mode_by_role
+                                         or mode == VARY)]
+        if not candidates:
+            # `allow_clamp=False` in a clamp-only environment. `scripts/ma_train.py` guards
+            # this at the call site by only offering `random_vary` when VARY is available,
+            # but the class did not, so the failure surfaced as an opaque numpy error from
+            # `rng.choice` several frames down. Say what is wrong instead.
+            raise ValueError(
+                f"random_vary has no legal move for agent {self.agent}: the environment's "
+                f"action modes are {window.modes} and this arm excludes clamps. Use "
+                f"random_clamp, which is uniform over every action, when the environment "
+                f"offers no vary.")
         return int(self.rng.choice(candidates))
 
 
@@ -303,6 +325,226 @@ class ForcedClampAgent:
         if not private:
             return window.pass_index
         return int(self.rng.choice(private))
+
+
+class UncertaintyGreedyAgent:
+    """Myopic uncertainty targeting for the CONSTRAINT backend -- the greedy analogue.
+
+    `GreedyAgent` below reads the exact DP's score tables and cannot exist on the
+    constraint path (see `enumerated_posterior`). This one is TRUTH-FREE and reads only
+    the agent's own bootstrap frequencies: a claim is UNSURE when no answer reaches the
+    confidence bar, each authority node is scored by how many unsure claims touch it, and
+    the agent intervenes on the argmax -- the node whose experiments would speak to the
+    most open questions. Passes when nothing is unsure. Seeded tie-breaks, so evaluation
+    stays reproducible.
+
+    Myopic by construction, exactly like the exact-path greedy: it values what is unsure
+    NOW, not what an intervention would render decidable later. That is the baseline the
+    thesis question names.
+    """
+
+    def __init__(self, agent: int, seed: int = 0, bar: float = 0.7):
+        self.agent = int(agent)
+        self.bar = float(bar)
+        self._seed = _agent_seed(seed, self.agent)
+        self.rng = np.random.default_rng(self._seed)
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.agent))
+
+    def _unsure_touching(self, belief, k: int) -> np.ndarray:
+        counts = np.zeros(k)
+        adjacency = np.asarray(belief.adjacency)
+        directed = np.asarray(belief.directed)
+        bidirected = np.asarray(belief.bidirected)
+        for u in range(k):
+            for v in range(u + 1, k):
+                f_adj = float(adjacency[u, v])
+                if max(f_adj, 1.0 - f_adj) < self.bar:
+                    counts[u] += 1; counts[v] += 1       # adjacency itself unsettled
+                elif f_adj >= self.bar:
+                    settled = max(float(directed[u, v]), float(directed[v, u]),
+                                  float(bidirected[u, v]))
+                    if settled < self.bar:
+                        counts[u] += 1; counts[v] += 1   # edge known, type not
+        return counts
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        belief = window.belief.last
+        if belief is None:
+            return int(self.rng.integers(0, window.n_actions - 1))
+        counts = self._unsure_touching(belief, window.k)
+        authority_scores = {node: counts[window.pos[node]] for node in window.authority}
+        best = max(authority_scores.values())
+        if best <= 0:
+            return window.pass_index                     # nothing left worth a round
+        candidates = [n for n, s in authority_scores.items() if s == best]
+        node = int(self.rng.choice(candidates))
+        return window.action_index(node, prefer=VARY)
+
+
+class PartitionedGreedyAgent(UncertaintyGreedyAgent):
+    """Uncertainty targeting that DIVIDES THE SHARED SURFACE by convention, without learning.
+
+    The reason this exists: the learned policy's advantage over `UncertaintyGreedyAgent` is
+    almost entirely on the JOINT criterion, and the measured mechanism is division of labour
+    -- duplicate coverage of the shared surface is roughly four times lower. But the obvious
+    objection is that the baseline was never trying to divide anything, so the comparison
+    rewards the learned policy for a job its opponent was not doing. A referee asks this
+    first, and "our baseline is uncoordinated" is not an answer.
+
+    So: the same myopic rule, restricted to a fixed share of the shared nodes. The partition
+    is positional and identical for every agent -- shared node i belongs to agent
+    i mod n_agents -- so it needs NO communication, no central assignment and no learning.
+    Every agent can compute it from the topology it already knows, which keeps the baseline
+    as decentralised as the policy it is being compared against.
+
+    Private nodes are always the agent's own. When its own share is exhausted it falls back
+    to the unrestricted rule rather than passing, so it is never worse off for having a share
+    -- the partition can only redirect effort, never waste it.
+
+    THE PARTITION ALONE IS NOT ENOUGH, which the first version of this class demonstrated by
+    scoring duplicate coverage of 0.167 against the plain rule's 0.169 -- i.e. not
+    coordinating at all. With four agents on four shared nodes each agent owns exactly one,
+    settles it in a single move, and then spends every remaining round in the fallback,
+    piling onto its partners' nodes. The fallback destroys what the partition buys.
+
+    So the rule also breaks ties towards the LEAST ALREADY-TOUCHED node, reading the same
+    disclosed partner counts the learned policy gets in its observation -- no privileged
+    information, no communication beyond what the environment already broadcasts. That is
+    what makes this a control rather than a second uncoordinated arm.
+    """
+
+    def __init__(self, agent: int, n_agents: int, seed: int = 0, bar: float = 0.7):
+        super().__init__(agent, seed=seed, bar=bar)
+        self.n_agents = int(n_agents)
+
+    def _mine(self, window) -> set:
+        """This agent's private nodes plus its positional share of the shared ones."""
+        shared = list(window.shared)
+        return set(window.private) | {
+            node for index, node in enumerate(shared)
+            if index % self.n_agents == self.agent % self.n_agents}
+
+    def _touches(self, env: TwoAgentEnv, window, node: int) -> float:
+        """How many interventions this node has already had, as far as this agent can know.
+
+        Own counts are always known. Partner counts are the DISCLOSED cumulative table, and
+        name a node only when it is shared -- a partner's private work arrives as an unnamed
+        tally, which is exactly the privacy the setting promises and is unusable here.
+        """
+        seen = float(env.own_counts[self.agent][window.pos[node]])
+        table = getattr(env, "partner_counts", {}).get(self.agent)
+        if table is not None and node in window.shared:
+            seen += float(table[:, window.shared.index(node)].sum())
+        return seen
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        belief = window.belief.last
+        if belief is None:
+            return int(self.rng.integers(0, window.n_actions - 1))
+        counts = self._unsure_touching(belief, window.k)
+        mine = self._mine(window)
+        for scope in (mine & set(window.authority), set(window.authority)):
+            scores = {node: counts[window.pos[node]] for node in scope}
+            if not scores:
+                continue
+            best = max(scores.values())
+            if best <= 0:
+                continue                                 # nothing open in this scope
+            candidates = [n for n, s in scores.items() if s == best]
+            # Among equally informative targets, take the one the group has spent least on.
+            fewest = min(self._touches(env, window, n) for n in candidates)
+            candidates = [n for n in candidates
+                          if self._touches(env, window, n) == fewest]
+            return window.action_index(int(self.rng.choice(candidates)), prefer=VARY)
+        return window.pass_index                         # nothing open anywhere
+
+
+class OracleCoverAgent:
+    """The OPTIMAL arm under oracle evidence: intervene on exactly the forced set.
+
+    WHY THIS EXISTS. Above k=5 there was no optimal reference at all. The enumerated greedy
+    oracle caps at `MAX_ENUMERATED_K`, and `scripts/vs_evaluate.py` returns an exact optimum
+    only on an enumerable belief -- on the factored path it degrades to a bound. So every
+    comparison at the sizes this project actually reports was learned-vs-heuristic, with no
+    ceiling: "beats greedy by X" and never "closes Y% of the achievable headroom".
+
+    WHAT MAKES AN OPTIMAL ARM POSSIBLE AT ANY k. Under oracle evidence the belief is a
+    deterministic function of the SET of intervened nodes, and the required set is FORCED
+    rather than chosen: a directed edge is settled by its TAIL, a confounded pair needs BOTH
+    endpoints. So the optimum is closed-form at every window size -- measured at 0.757k for
+    k=4 falling to 0.542k at k=30 -- and this agent simply executes it.
+
+    IT IS A CEILING, NOT A POLICY, and the distinction matters. It reads `env._true_mag`,
+    which no agent may do. It is the reference a learned policy is measured against, exactly
+    as `GreedyAgent` reads the exact DP score tables, and it must never be presented as a
+    method. It also cannot exist under sampled evidence: there the belief is not a function
+    of the intervened set alone, no set is sufficient with certainty, and `required_cover`
+    refuses rather than returning a meaningless number. This class refuses for the same
+    reason.
+
+    WHAT IT DOES NOT SOLVE. The forced set is per WINDOW, and each agent computes only its
+    own -- so on the shared surface two agents can both target the same forced node and
+    duplicate. That is deliberate: the ceiling this arm reports is "every window's required
+    cover, bought without waste WITHIN an agent", which is the right reference for a
+    coordination result. An arm that also divided the shared surface optimally would be
+    measuring a different, easier problem, and would need a central planner to compute.
+    """
+
+    def __init__(self, agent: int, env: TwoAgentEnv, seed: int = 0):
+        if getattr(env.config, "vs_evidence", "oracle") != "oracle":
+            raise ValueError(
+                "OracleCoverAgent is defined only under oracle evidence: under sampling the "
+                "belief is not a function of the intervened SET alone, so no set is "
+                "sufficient with certainty and 'the required cover' does not exist. See "
+                "scripts/required_cover.py, which refuses for the same reason.")
+        self.agent = int(agent)
+        self._seed = _agent_seed(seed, self.agent)
+        self.rng = np.random.default_rng(self._seed)
+        self._plan: Optional[List[int]] = None
+        self._episode_key = None
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.rng = np.random.default_rng(
+            self._seed if seed is None else _agent_seed(seed, self.agent))
+        self._plan, self._episode_key = None, None
+
+    def _build_plan(self, env: TwoAgentEnv) -> List[int]:
+        """The forced positions this agent may actually act on, cheapest first.
+
+        Derived by REPLAY through the belief mechanism rather than by applying the closed
+        form, for the same reason `scripts/required_cover.py` does it that way: the closed
+        form is an assertion ABOUT the mechanism, and an arm that assumed it would report a
+        ceiling that agrees with the theory by construction.
+        """
+        from scripts.required_cover import forced_positions
+
+        window = env.windows[self.agent]
+        needed, _complaints = forced_positions(env._true_mag(self.agent), window.k)
+        authority = {window.pos[node]: node for node in window.authority}
+        # PRIVATE FIRST. A private node is reachable by nobody else, so spending a round on
+        # a shared node that a partner may also cover is the move to defer -- the same
+        # ordering the measured winning behaviour uses.
+        mine = [authority[p] for p in sorted(needed) if p in authority]
+        private = [n for n in mine if n in window.private]
+        shared = [n for n in mine if n not in window.private]
+        return private + shared
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        key = id(env.true_adjacency), env.episode_index if hasattr(env, "episode_index") else None
+        if self._plan is None or self._episode_key != key:
+            self._plan = self._build_plan(env)
+            self._episode_key = key
+        counts = np.asarray(env.own_counts[self.agent])
+        for node in self._plan:
+            if counts[window.pos[node]] == 0:
+                return window.action_index(node, prefer=VARY)
+        return window.pass_index          # cover complete: further rounds buy nothing
 
 
 class GreedyAgent:
@@ -380,11 +622,108 @@ class GreedyAgent:
         return int(self.candidates[slot])
 
 
+class ProbeThenWorkAgent:
+    """Probe your own private variables first, then work on the shared ones.
+
+    THE REFERENCE FOR THE ATTRIBUTED ENVIRONMENT, and it has to exist or the comparison is
+    rigged. `greedy_uncertainty` scores unsure STRUCTURE claims and knows nothing about
+    attribution, so against a learner that is rewarded for attribution it would look
+    artificially bad -- the same unfair comparison found and fixed when the
+    learner was the blindfolded one.
+
+    Not a serious policy either: it is fixed, ignores the belief entirely, and cannot
+    respond to what a partner has already settled. It is the "coordination is available if
+    you pay for it" arm, in the same spirit as `forced_clamp`.
+
+    at 3 agents x 2 private, scale-free, budget 12: attribution 0.907
+    and identification 0.658, against 0.000/0.000 for shared-only and 0.981/0.292 for
+    private-only. A private probe pays only the PARTNERS, so the ordering is the whole
+    point: neither pure strategy comes close to the mixture.
+    """
+
+    def __init__(self, agent: int, seed: int = 0, probe_rounds: Optional[int] = None):
+        self.agent = int(agent)
+        self.probe_rounds = probe_rounds
+        self._seed = _agent_seed(seed, self.agent)
+        self.turn = 0
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        self.turn = 0
+
+    def __call__(self, env: TwoAgentEnv, result) -> int:
+        window = env.windows[self.agent]
+        private, shared = list(window.private), list(window.shared)
+        # HOW MANY MOVES THIS AGENT HAS ACTUALLY MADE, read from the environment rather
+        # than counted here. Under turn-taking the policy is queried EVERY round and the
+        # environment discards the inactive agent's move, so a local counter advances once
+        # per round instead of once per action -- at three agents it ran three times too
+        # fast, the probe phase was over before the agent had acted at all, and the arm
+        # scored 0.000 attribution while the standalone version of the same policy scored
+        # 0.907. `own_counts` is incremented only when a move is APPLIED, so it cannot
+        # drift from what happened.
+        index = int(env.own_counts[self.agent].sum())
+        probe = len(private) if self.probe_rounds is None else self.probe_rounds
+        if index < probe and private:
+            return window.action_index(private[index % len(private)], prefer=VARY)
+        if not shared:
+            return window.pass_index
+        return window.action_index(shared[(index - probe) % len(shared)], prefer=VARY)
+
+
+class _LazyBaselines(dict):
+    """Baselines built ON ACCESS, not up front.
+
+    `GreedyAgent` enumerates the window and refuses past k=5, and raises on any non-exact
+    backend when called. Building it eagerly meant a caller that only wanted
+    `greedy_uncertainty` still crashed -- which took down the frontier sweep at window size
+    6 and an attribution run's report. Nothing changes for a caller that asks for an arm
+    this environment can supply.
+    """
+
+    def __init__(self, builders):
+        super().__init__()
+        self._builders = builders
+
+    def __getitem__(self, key):
+        # `super.__contains__`, NOT `key not in self`: __contains__ below reports what can
+        # be built, so `not in self` was False for every buildable key and nothing was ever
+        # constructed. Caught by a smoke test after the merge, not by the suite, because no
+        # test indexed this mapping.
+        if not super().__contains__(key) and key in self._builders:
+            super().__setitem__(key, self._builders[key]())
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        return key in self._builders
+
+    def keys(self):
+        return self._builders.keys()
+
+
 def make_baselines(env: TwoAgentEnv, agent: int, seed: int = 0) -> Dict[str, object]:
-    return {
-        "pass": PassAgent(agent, seed),
-        "random_vary": RandomAgent(agent, seed, allow_clamp=False),
-        "random_clamp": RandomAgent(agent, seed, allow_clamp=True),
-        "forced_clamp": ForcedClampAgent(agent, seed),
-        "greedy": GreedyAgent(agent, env, seed),
-    }
+    return _LazyBaselines({
+        "pass": lambda: PassAgent(agent, seed),
+        "random_vary": lambda: RandomAgent(agent, seed, allow_clamp=False),
+        "random_clamp": lambda: RandomAgent(agent, seed, allow_clamp=True),
+        "forced_clamp": lambda: ForcedClampAgent(agent, seed),
+        "greedy": lambda: GreedyAgent(agent, env, seed),
+        # AT THE BAR THE TASK IS GRADED ON, not the class default of 0.7. The environment
+        # grades every claims backend at `claim_bar`, so a greedy configured at 0.7 stops
+        # scoring claims the task still counts open.: worth +0.233 to
+        # greedy at four agents, and enough to INVERT the attribution headline.
+        # `scripts/rescore_from_config.py` existed only to correct this after the fact;
+        # reading the env's own bar here removes the whole class of error at source.
+        "greedy_uncertainty": lambda: UncertaintyGreedyAgent(
+            agent, seed, bar=float(getattr(env.config, "claim_bar", 0.7))),
+        # The coordinated control: same rule, shared surface divided by a positional
+        # convention. See `PartitionedGreedyAgent` for why a comparison against the
+        # uncoordinated rule alone is not enough.
+        "greedy_partitioned": lambda: PartitionedGreedyAgent(
+            agent, env.topology.n_agents, seed,
+            bar=float(getattr(env.config, "claim_bar", 0.7))),
+        "probe_then_work": lambda: ProbeThenWorkAgent(agent, seed),
+        # The CEILING. Reads the true MAG, so it is a reference and never a method, and it
+        # exists only under oracle evidence. Registered lazily so a sampled-evidence env
+        # never constructs it.
+        "oracle_cover": lambda: OracleCoverAgent(agent, env, seed),
+    })

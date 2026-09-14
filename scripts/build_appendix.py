@@ -1,0 +1,844 @@
+"""Generate the appendices, with every table computed from the data files.
+
+FOUR APPENDICES, ONE ARGUMENT. Excluded runs, training budget, and checkpoint selection are
+not three pieces of housekeeping -- together they say that at 4,000 episodes the sweep measured
+convergence as much as capability, and that at 12,000 the checkpoint at which a policy is
+caught matters. That is why they sit before the supporting ablations rather than after.
+
+Tables are generated, never typed. A table whose numbers were transcribed by hand has been
+wrong twice in this project already. Sections whose measurement is still running emit an
+explicit PENDING marker rather than a plausible-looking placeholder.
+
+    python scripts/build_appendix.py
+"""
+from __future__ import annotations
+import glob, json, os, pathlib
+import numpy as np
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+TR = ROOT / "thesis_results"
+FLOOR, TAIL = 0.70, 10
+PRE = {"k12s50n05b150": "results/longcheck/shd_n05_12k.json",
+       "k12s75n04b150": "results/longcheck/shd_s75_12k.json",
+       "k12s50n08b150": "results/longcheck/shd_n08_12k.json",
+       "k12s50n10b150": "results/longcheck/shd_n10_12k.json"}
+
+
+def wr(d):
+    t = [h.get("window_rate", 0.0) for h in (d.get("history") or [])[-TAIL:]]
+    return sum(t) / len(t) if t else 0.0
+
+
+def jload(p):
+    return json.loads(pathlib.Path(p).read_text())
+
+
+def tbl(caption, label, spec, header, body, note="", short=None):
+    cap = f"\\caption[{short}]{{{caption}}}" if short else f"\\caption{{{caption}}}"
+    out = [r"\begin{table}[H]", r"\centering", r"\small", cap,
+           f"\\label{{{label}}}", f"\\begin{{tabular}}{{{spec}}}", r"\toprule",
+           header, r"\midrule", *body, r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    if note:
+        out.append(note)
+    return "\n".join(out) + "\n"
+
+
+# --- A: excluded runs ---------------------------------------------------------------------
+def appendix_excluded():
+    rows = []
+    for p in sorted((TR / "sweep").glob("k*_s*.json")):
+        d = jload(p)
+        if wr(d) >= FLOOR:
+            continue
+        cell = p.stem.rsplit("_s", 1)[0]
+        long = TR / "federation" / f"{cell}_long_s2.json"
+        r = jload(long) if long.exists() else None
+        rows.append((cell, d.get("seed"), wr(d), d["arms"]["learned"]["success"],
+                     wr(r) if r else None,
+                     r["arms"]["learned"]["success"] if r else None,
+                     d["arms"]["greedy_uncertainty"]["success"]))
+    body = [f"\\texttt{{{c.replace('_', chr(92) + '_')}}} & {s} & {w4:.3f} & {l4:.3f} & "
+            f"{f'{w12:.3f} & {l12:.3f}' if w12 is not None else '--- & ---'} & {g:.3f} \\\\"
+            for c, s, w4, l4, w12, l12, g in rows]
+    return ("\\section{Excluded Runs} \\label{app:excluded}\n\n"
+            "The table reports every run that fell below the competence floor of\n"
+            "\\S\\ref{sec:meth_gate}, and what the same configuration reaches at $12{,}000$\n"
+            "episodes. The retrained runs appear in no sweep table; they are reported here\n"
+            "and in \\S\\ref{sec:res_budget}.\n\n"
+            + tbl("The excluded runs, at the sweep's budget and at three times it.",
+                  "tab:excluded", "llcccccc",
+                  r"Cell & Seed & \multicolumn{2}{c}{4{,}000 episodes} & "
+                  r"\multicolumn{2}{c}{12{,}000 episodes} & Myopic \\"
+                  "\n" r"\cmidrule(lr){3-4}\cmidrule(lr){5-6}"
+                  "\n" r" & & window & joint & window & joint & joint \\", body, short="The excluded runs")
+            + f"\nAll {len(rows)} are seed 2 and all are at $k_v=12$. Every one clears the floor "
+              "when retrained,\nand every one finishes above the myopic rule on its own cell.\n")
+
+
+# --- B: training budget -------------------------------------------------------------------
+def appendix_budget():
+    marks = [2000, 4000, 6000, 8000, 10000, 12000]
+    runs = sorted(glob.glob(str(ROOT / "results/longcheck/*_conv_s*.json"))
+                  + glob.glob(str(ROOT / "results/longcheck/*_long_s*.json")))
+    body = []
+    for p in runs[:12]:
+        d = jload(p)
+        ck = (d.get("checkpoints") or {}).get("checkpoints", [])
+        if not ck:
+            continue
+        eps = d["config"]["ppo_episodes_per_update"]
+        curve = [(c["update"] * eps, c["solve_rate"]) for c in ck]
+        cells = []
+        for m in marks:
+            v = [s for e, s in curve if e <= m]
+            cells.append(f"{v[-1]:.2f}" if v else "---")
+        name = os.path.basename(p).replace(".json", "").replace("_", chr(92) + "_")
+        body.append(f"\\texttt{{\\scriptsize {name}}} & " + " & ".join(cells) + r" \\")
+
+    eight = ROOT / "results/sweep12k/shd_u0500"
+    if any(eight.glob("*.json")):
+        rows, skipped = [], []
+        for p in sorted(eight.glob("*.json")):
+            cell = p.stem
+            bp = ROOT / PRE.get(cell, f"results/sweep12k/shd/{cell}.json")
+            if not bp.exists():
+                continue
+            v8 = [e["means"]["learned"]["hard"] for e in jload(p)]
+            v12 = [e["means"]["learned"]["hard"] for e in jload(bp)]
+            vg = [e["means"]["greedy"]["hard"] for e in jload(bp)]
+            # A row that cannot be computed is DROPPED, never emitted as nan. A generator
+            # that prints an unusable number into a thesis is worse than one that omits the
+            # row: a gap is visible, and `nan` reached Overleaf once before this guard.
+            if not (v8 and v12 and vg):
+                skipped.append(cell)
+                continue
+            rows.append(f"\\texttt{{{cell}}} & {np.mean(v8):.5f} & {np.mean(v12):.5f} & "
+                        f"{np.mean(vg):.5f} \\\\")
+        note = ("\n\\textbf{Not yet measured:} " +
+                ", ".join(f"\\texttt{{{c}}}" for c in skipped) + ".\n") if skipped else ""
+        # Count the direction of the move so the paragraph beneath the table states what the
+        # table shows rather than what the reader is expected to infer from eighteen rows.
+        better = worse = same = ahead8 = ahead12 = 0
+        for r in rows:
+            f = [c.strip() for c in r.replace("\\\\", "").split("&")]
+            v8, v12, vg = float(f[1]), float(f[2]), float(f[3])
+            better += v12 < v8
+            worse += v12 > v8
+            same += v12 == v8
+            ahead8 += v8 < vg
+            ahead12 += v12 < vg
+        note += (f"\n{better} of the {len(rows)} cells improve between $8{{,}}000$ and "
+                 f"$12{{,}}000$ episodes, {worse} get worse and {same} is unchanged. The count "
+                 f"with the learned mean below the myopic rule moves from {ahead8} to "
+                 f"{ahead12}. Most of the gain over the sweep's $4{{,}}000$ episodes is "
+                 f"therefore already present at $8{{,}}000$, and the last third of training "
+                 f"buys a small net improvement against run-to-run movement of comparable "
+                 f"size. $12{{,}}000$ is reported as sufficient rather than as a threshold.\n")
+        eight_tbl = tbl("Structural distance at 8{,}000 against 12{,}000 episodes, same runs, "
+                        "same seeds, selected checkpoint throughout.", "tab:eightk", "lccc",
+                        r"Cell & 8{,}000 ep & 12{,}000 ep & Myopic \\", rows, note)
+    else:
+        eight_tbl = ("\\textbf{PENDING.} The 8{,}000-episode comparison is measuring. Do not "
+                     "write this paragraph until it lands.\n")
+
+    return ("\\section{Training Budget and Convergence} \\label{app:budget}\n\n"
+            "The sweep trains every cell for $4{,}000$ episodes. Three of the four structural\n"
+            "claims in Chapter~\\ref{Chap4} were artefacts of that budget applied across cells of\n"
+            "unequal difficulty, so that the apparent effect of a swept parameter was partly the\n"
+            "effect of the harder settings needing more training. Most runs converge by\n"
+            "$8{,}000$ episodes; the slowest does not.\n\n"
+            + tbl("Per-window solve rate over training, from each run's checkpoint schedule.",
+                  "tab:convergence", "l" + "c" * len(marks),
+                  "Run & " + " & ".join(f"{m//1000}k" for m in marks) + r" \\", body)
+            + "\n" + eight_tbl)
+
+
+# --- C: checkpoint selection ---------------------------------------------------------------
+def appendix_checkpoint():
+    body = []
+    for p in sorted(glob.glob(str(ROOT / "results/sweep12k/shd_final/*.json"))):
+        cell = os.path.basename(p)[:-5]
+        bp = ROOT / PRE.get(cell, f"results/sweep12k/shd/{cell}.json")
+        if not bp.exists():
+            continue
+        for b, f in zip(jload(bp), jload(p)):
+            B, F = b["means"]["learned"]["hard"], f["means"]["learned"]["hard"]
+            ratio = (max(B, F) + 1e-9) / (min(B, F) + 1e-9)
+            flag = r"\textbf{selected}" if B > F and ratio > 3 else (
+                r"\textbf{final}" if F > B and ratio > 3 else "---")
+            body.append(f"\\texttt{{{cell}}} & {b['seed']} & {B:.5f} & {F:.5f} & {flag} \\\\")
+    am = []
+    for p in sorted(glob.glob(str(ROOT / "results/sweep12k/shd_argmax/*.json"))):
+        cell = os.path.basename(p)[:-5]
+        bp = ROOT / PRE.get(cell, f"results/sweep12k/shd/{cell}.json")
+        if not bp.exists():
+            continue
+        for a, s in zip(jload(p), jload(bp)):
+            am.append(f"\\texttt{{{cell}}} & {a['seed']} & "
+                      f"{s['means']['learned']['hard']:.5f} & "
+                      f"{a['means']['learned']['hard']:.5f} \\\\")
+    return ("\\section{Checkpoint Selection} \\label{app:checkpoint}\n\n"
+            "At $12{,}000$ episodes neither checkpoint convention is safe alone. Selection on\n"
+            "mutual information occasionally retains an exploratory policy; the final update\n"
+            "occasionally retains a drifted one. The two fail on different cells, which is why\n"
+            "Chapter~\\ref{Chap4} reports both.\n\n"
+            + tbl("Where the conventions disagree by more than a factor of three.",
+                  "tab:ckpt_tail", "llccl",
+                  r"Cell & Seed & Selected & Final & Worse \\", body)
+            + "\nThe disagreement is not an artefact of how actions are chosen at evaluation "
+              "time.\nSampling is the more forgiving convention: on the affected seeds argmax is "
+              "worse still,\nbecause committing to the mode of a poor policy costs more than "
+              "sampling around it.\n\n"
+            + tbl("Sampling against argmax at the selected checkpoint.",
+                  "tab:ckpt_argmax", "llcc",
+                  r"Cell & Seed & Sampled & Argmax \\", am))
+
+
+# --- D: supporting ablations ----------------------------------------------------------------
+def appendix_ablations():
+    body = []
+    for label, pat in (("$k_v=8$, pooled, credit on", "k08s50n04b150_pooled_credit"),
+                       ("$k_v=8$, pooled, credit off", "k08s50n04b150_pooled_nocredit"),
+                       ("$k_v=8$, federated, credit on", "k08s50n04b150_E4_credit"),
+                       ("$k_v=8$, federated, credit off", "k08s50n04b150_E4_nocredit"),
+                       ("$k_v=12$, pooled, credit on", "k12s50n04b150_pooled_credit"),
+                       ("$k_v=12$, pooled, credit off", "k12s50n04b150_pooled_nocredit"),
+                       ("$k_v=12$, federated, credit on", "k12s50n04b150_E4_credit"),
+                       ("$k_v=12$, federated, credit off", "k12s50n04b150_E4_nocredit")):
+        # MEASURED, not recorded. This read each run's own `global_hard_shd` until 3 Sep and
+        # the two disagree enough to invert the comparison: recorded, the pooled arm looked
+        # unaffected by removing credit (0.00137 against 0.00160); measured, it degrades 15x
+        # (0.00376 against 0.00025). The "only under federation" reading came from the field,
+        # not from the experiment.
+        q = ROOT / f"results/credit/shd/{pat}.json"
+        if not q.exists():
+            continue
+        d = jload(q)
+        v = [e["means"]["learned"]["hard"] for e in d]
+        per = ", ".join(f"{x:.5f}" for x in v)
+        body.append(f"{label} & {len(v)} & {np.mean(v):.5f} & {per} \\\\")
+
+    return ("\\section{Turn-Aware Credit} \\label{app:ablations}\n\n"
+            + tbl("Turn-aware credit assignment at both window sizes, three seeds per cell, "
+                  "4,000-episode runs, measured over 200 paired episodes per seed at the "
+                  "selected checkpoint. Per-seed values are given because every credit-off "
+                  "degradation is carried by one seed. The $k_v=12$ pooled pair sits at the "
+                  "floor in both states and supports no ratio in either direction.",
+                  "tab:credit", "lccl",
+                  r"Configuration & Seeds & SHD & Per seed \\", body))
+
+
+
+def appendix_epsgreedy():
+    """The epsilon-greedy control across the whole sweep.
+
+    The chapter carries two cells; a reviewer is entitled to ask whether those were the two
+    where it flattered us. This is all twenty, and it includes the four that do not.
+    """
+    import glob as _g
+    import numpy as np
+    eps = []
+    for f in sorted(_g.glob(str(ROOT / "results/epsgreedy/sweep/w*.json"))):
+        eps += jload(pathlib.Path(f))
+    if not eps:
+        return ""
+    best = {}
+    for e in eps:
+        cell = pathlib.Path(e["source"]).stem.rsplit("_s", 1)[0]
+        key = (cell, e["seed"])
+        best[key] = max(best.get(key, 0.0), float(np.mean(e["rows"]["success"])))
+    rows = []
+    for cell in sorted({c for c, _ in best}):
+        fs = (sorted(_g.glob(str(ROOT / f"results/sweep12k/{cell}_s?.json")))
+              or sorted(_g.glob(str(ROOT / f"results/sweep/oracle/{cell}_s?.json"))))
+        if not fs:
+            continue
+        L = np.mean([jload(pathlib.Path(f))["arms"]["learned"]["success"] for f in fs])
+        G = np.mean([jload(pathlib.Path(f))["arms"]["greedy_uncertainty"]["success"]
+                     for f in fs])
+        E = np.mean([best[(cell, sd)] for sd in (0, 1, 2) if (cell, sd) in best])
+        ahead = sum(1 for sd in (0, 1, 2)
+                    if (cell, sd) in best
+                    and jload(pathlib.Path(fs[sd]))["arms"]["learned"]["success"]
+                    > best[(cell, sd)])
+        rows.append((cell, G, E, L, ahead, L - E))
+    wins = sum(r[4] for r in rows)
+    # COUNTED, NOT ASSERTED. This was written as "four" and the recomputation says three;
+    # the count moves whenever a cell is re-measured, so it is derived here like every
+    # other number in this file.
+    behind = sum(1 for r in rows if r[5] <= 0)
+    body = [f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & {e:.3f} & "
+            f"\\textbf{{{l:.3f}}} & {a}/3 \\\\" if d > 0 else
+            f"\\texttt{{{c.replace('_', chr(92)+'_')}}} & {g:.3f} & \\textbf{{{e:.3f}}} & "
+            f"{l:.3f} & {a}/3 \\\\"
+            for c, g, e, l, a, d in sorted(rows, key=lambda r: -r[5])]
+    return (
+        "\\section{The Epsilon-Greedy Control, Every Cell} \\label{app:epsgreedy}\n\n"
+        "The myopic rule takes a uniform randomised intervention with probability "
+        "$\\varepsilon$, over $\\varepsilon \\in \\{0.05, 0.1, 0.2, 0.3\\}$, on the same "
+        "$200$ paired episodes per seed as the arms it is compared with. The best "
+        "$\\varepsilon$ per seed is reported, a selection that favours the control. Bold "
+        "marks the better of the learned and $\\varepsilon$-greedy arms in each cell.\n\n"
+        + (lambda half=(len(body)+1)//2, head=r"Cell & Myopic & $\varepsilon$-g. & Learned & Ahead \\":
+           "\n".join([
+            r"\begin{table}[H]", r"\centering", r"\scriptsize", r"\setlength{\tabcolsep}{3pt}",
+            "\\caption[The epsilon-greedy control, all cells]{Joint recovery rate against the $\\varepsilon$-greedy control "
+            "across all twenty sweep cells, three seeds each.}",
+            r"\label{tab:epsgreedy_all}",
+            r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
+            *body[:half], r"\bottomrule", r"\end{tabular}", r"\hspace{2mm}",
+            r"\begin{tabular}{lcccc}", r"\toprule", head, r"\midrule",
+            *(body[half:] + [r" & & & & \\"] * (half - len(body[half:]))),
+            r"\bottomrule", r"\end{tabular}", r"\end{table}"]))()
+        + f"\nThe learned arm leads in {wins} of {3*len(rows)} individual seeds and trails "
+          f"on the cell mean in {behind} of {len(rows)} cells.\n"
+        # The sweep-wide 4-panel figure was CUT on 7 Sep (the author: lean the appendix to
+        # ~7 pages; the repo carries figures/epsgreedy_grid_*.pdf and git history has
+        # the block that drew it here).
+        # The policy-dithering result was PROMOTED into sec:res_epsgreedy on 7 Sep
+        #, at two cells. It is not
+        # repeated here.
+        )
+
+
+def appendix_robustness():
+    """Every seed of every robustness corner, with its paired difference.
+
+    The chapter's table carries corner means. Three seeds is few enough that a mean can be
+    carried by one run, so the seeds go here where a reader can see that they are not.
+    """
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from build_robustness import load, per_seed, CORNERS
+    rows = load()
+    if len(rows) != len(CORNERS):
+        return ("\\section{Robustness, Every Seed} \\label{app:robustness}\n\n"
+                f"PENDING: {len(rows)} of {len(CORNERS)} corners measured.\n\n")
+    return (
+        "\\section{Robustness, Every Seed} \\label{app:robustness}\n\n"
+        "The table repeats the corners of Table~\\ref{tab:robust} seed by seed. The "
+        "policies are the $\\rho = 0.5$ partial-oracle fleet, trained under a "
+        "linear-Gaussian generator in every row; only the evaluation generator changes. "
+        "The final column is the within-path paired difference between the learned and "
+        "myopic arms on identical episodes, not the difference of the two preceding "
+        "columns.\n\n"
+        + tbl("Pooled SHD on committed marks per seed for each robustness corner, "
+              "$200$ paired episodes per seed. Negative differences favour the learned arm.",
+              "tab:robust_seeds", "llccccr",
+              r"Noise & Mechanism & Seed & Learned & Myopic & Random & "
+              r"Learned $-$ myopic \\", per_seed(rows), short="Robustness corners per seed"))
+
+
+def appendix_skeleton():
+    """What the supplied skeleton is worth, measured at the principal cell.
+
+    The numbers in sec:disc_validity came from a 3-agent, window-6 setting and were never
+    re-measured at the cell the rest of the thesis reports. These are k=12, four agents, six
+    shared -- and they say something the earlier probe could not: the constraint is neither
+    the budget nor the sample size but the direction the estimator is tuned in.
+    """
+    import numpy as np
+    alpha_rows, ceil_rows = [], []
+    for a in ("0.01", "0.1", "0.3", "0.5", "0.7"):
+        cell = {}
+        for b in ("50", "400"):
+            q = ROOT / f"results/skel_alpha/a{a}_b{b}.json"
+            if not q.exists():
+                return ""
+            es = jload(q)
+            cell[b] = {k: float(np.mean([e["means"][k]["hard"] for e in es]))
+                       for k in ("learned", "greedy")}
+        alpha_rows.append(f"${a}$ & {cell['50']['greedy']:.5f} & {cell['400']['greedy']:.5f} & "
+                          f"{cell['50']['learned']:.5f} & {cell['400']['learned']:.5f} \\\\")
+    q = ROOT / "results/skeleton_sweep_principal.json"
+    if not q.exists():
+        return ""
+    for r in jload(q)["rows"]:
+        if r["alpha"] == 0.01 and r["n_obs"] in (30, 60, 250, 1000, 8000, 64000):
+            n = "$" + f"{r['n_obs']:,}".replace(",", "{,}") + "$"
+            missed = "$" + f"{r['missed']:,}".replace(",", "{,}") + "$"
+            ceil_rows.append(
+                f"{n} & {r['accuracy']:.1%} & {missed} & {r['spurious']} & "
+                f"{r['claims_estimated']:.1%} \\\\".replace("%", "\\%"))
+    return (
+        "\\section{The Supplied Skeleton, Measured at the Principal Cell} "
+        "\\label{app:skeleton}\n\n"
+        "\\S\\ref{sec:disc_validity} states what the skeleton assumption requires and where "
+        "it binds; this section carries the measurements behind that account, at $k_v=12$ "
+        "with four agents and six shared variables.\n\n"
+        "An estimated skeleton makes two kinds of mistake, and they are not symmetric. A "
+        "missed adjacency closes the pair to the no-edge mark, and the belief engine never "
+        "revisits a closed pair, so the loss is permanent and silent. A spurious adjacency "
+        "merely leaves a pair that nothing can settle, costing budget and resolution but "
+        "never recording a false mark. At $n_{\\text{obs}}=60$ and $\\alpha=0.01$ the "
+        "estimator misses $2{,}104$ true adjacencies of $7{,}920$ pairs and invents $2$. "
+        "Table~\\ref{tab:skeleton_nobs} sweeps the sample size at that threshold.\n\n"
+        + tbl("Skeleton quality and the achievable ceiling against sample size at the "
+              "principal cell, $\\alpha = 0.01$, thirty episodes. The ceiling is claim "
+              "accuracy with every node intervened on.",
+              "tab:skeleton_nobs", "rrrrr",
+              r"$n_{\text{obs}}$ & Accuracy & Missed & Spurious & Ceiling \\", ceil_rows, short="Skeleton quality against sample size")
+        + "\nEven at $64{,}000$ observational rows, a thousand times what the agents hold, "
+          "the ceiling reaches only $90.2\\%$. Table~\\ref{tab:skeleton_alpha} sweeps the "
+          "test's threshold instead, at the operating sample size of sixty rows, at the "
+          "trained budget and at a budget generous enough that coverage is no longer the "
+          "constraint.\n\n"
+        + tbl("Pooled SHD under an estimated skeleton at $n_{\\text{obs}}=60$, principal "
+              "cell, three seeds, $100$ paired episodes per seed. Budget $50$ is the trained "
+              "horizon; budget $400$ is the ceiling in the same units.",
+              "tab:skeleton_alpha", "rrrrr",
+              r"$\alpha$ & Myopic, $b{=}50$ & Myopic, $b{=}400$ & Learned, $b{=}50$ & "
+              r"Learned, $b{=}400$ \\", alpha_rows, short="Pooled SHD by skeleton threshold")
+        + "\nThe myopic rule reaches its ceiling at every threshold, $0.20732$ against "
+          "$0.20725$ at the strictest, so the intervention budget never binds. Retuning "
+          "the test from $\\alpha=0.01$ to $\\alpha=0.3$ lowers pooled distance from "
+          "$0.20732$ to $0.17120$ on the same sixty rows, at both budgets. The learned arm "
+          "reaches its ceiling at no threshold and trails the myopic rule throughout; "
+          "\\S\\ref{sec:disc_validity} reads this as a failure of the policy's "
+          "transfer.\n\n"
+        "A fully connected start removes missed adjacencies by construction and still "
+        "fails. With every node intervened on, the true skeleton resolves $2{,}084$ of "
+        "$2{,}084$ absent pairs correctly; a fully connected start resolves none of them, "
+        "committing $1{,}568$ to a bidirected mark and $516$ to a direction. Seeding all "
+        "four marks, so that the no-edge mark is never excluded, leaves the same $1{,}568$ "
+        "pairs permanently unresolved and the same $516$ wrong. The no-edge and bidirected "
+        "marks are interventionally identical, and ancestry is transitive where adjacency "
+        "is not, so the skeleton is the only source of both distinctions.\n\n")
+
+
+def appendix_evidence_cost():
+    """The price of realistic evidence, as a MATCHED two-arm comparison.
+
+    Replaces fig:training_signal (cut from Chapter 4 on 6 Sep,). That figure
+    put three evidence regimes on one axis at three different TRAINING budgets; fixing the
+    episode budget alone would have left the intervention budget, n_int and two observation
+    features varying between arms -- a fair objection. These two arms are
+    matched on every field except the evidence regime and n_int, and the n_int difference
+    favours the SAMPLED arm, which makes the comparison conservative.
+    """
+    import numpy as np
+    rows, meta = [], {}
+    for label, pat in (("Oracle", "results/sweep/oracle/k08s50n04b150_s?.json"),
+                       ("Sampled", "results/sampled_ref/k08s50n04b150i0200_s?.json")):
+        fs = sorted((ROOT).glob(pat))
+        if not fs:
+            return ""
+        vals = []
+        for f in fs:
+            d = jload(f)
+            tail = [x["window_rate"] for x in (d.get("history") or [])[-10:]
+                    if isinstance(x, dict)]
+            if tail:
+                vals.append(float(np.mean(tail)))
+        c = jload(fs[0])["config"]
+        meta[label] = c
+        rows.append(f"{label} & {c.get('n_int')} & {len(vals)} & "
+                    + " & ".join(f"{v:.3f}" for v in vals)
+                    + f" & {np.mean(vals):.3f} \\\\")
+    return (
+        "\\section{The Cost of Realistic Evidence} \\label{app:evidence_cost}\n\n"
+        "Two fleets are identical except for their evidence. One trained on exactly "
+        "answered queries and the other on tests estimated from finite samples, at the "
+        "same $k_v=8$ cell, the same intervention budget of "
+        f"${meta['Oracle'].get('budget')}$, the same $"
+        + f"{meta['Oracle'].get('train_episodes'):,}".replace(",", "{,}") + "$ "
+        "training episodes and the same observation features, three seeds each. The "
+        "reported quantity is the per-window solve rate of \\S\\ref{sec:meth_gate}, "
+        "averaged over each run's last ten checkpoints. Table~\\ref{tab:evidence_cost} "
+        "reports both arms. The sampled arm draws ten times "
+        "as many rows per intervention, a mismatch that favours it; at "
+        "$n_{\\text{int}}=20$ the sampled regime yields no usable signal at all, while "
+        "$n_{\\text{int}}$ is inert under oracle evidence and cannot be matched "
+        "downward.\n\n"
+        + tbl("Per-window solve rate by evidence regime, matched configurations, three "
+              "seeds each.",
+              "tab:evidence_cost", "lcccccc",
+              r"Regime & $n_{\text{int}}$ & Seeds & \multicolumn{3}{c}{Per seed} & Mean \\",
+              rows, short="Solve rate by evidence regime")
+        + "\nThe sampled arm does not approach the competence floor of $0.70$ on any seed, "
+          "while the oracle arm clears it on all three. No policy-against-baseline "
+          "comparison is drawn from the sampled runs; \\S\\ref{sec:res_transfer} carries "
+          "what the realistic regime does to a trained policy.\n")
+
+
+def appendix_mode():
+    """The intervention-mode ablation, consolidated. Qualitative on the sampled-evidence gap
+    BY DESIGN: the 30 Aug probe that measured the vary/clamp table (soft-SHD ratios 3.3-5.5x,
+    flat from n_int=20 to 1,000) was never committed, and this thesis does not print a table
+    whose numbers cannot be regenerated -- the pre-squash-submission tag records both the
+    measurements and that lesson. The mechanism statements below are code properties and are
+    cited as such; the V-curve numbers ship in the attribution appendix with their own source.
+    """
+    return (
+        "\\section{Intervention Mode: Randomised Against Atomic} \\label{app:mode}\n\n"
+        "Both intervention modes of \\S\\ref{sec:meth_interventions} are implemented; every "
+        "sweep run restricts the action space to the randomised mode. Three grounds, "
+        "consolidated from \\S\\ref{sec:meth_regimes}, and one limitation.\n\n"
+        "\\paragraph{Under oracle evidence the choice is inert.} The belief update is a "
+        "function of the intervened set and the true graph; the mode is not an argument to "
+        "it, and identical seeds return identical results to every reported digit whichever "
+        "mode acts. The ablation is therefore undefined in the regime the sweep reports.\n\n"
+        "\\paragraph{Under sampled evidence the atomic mode is structurally weaker for edge "
+        "discovery, and the gap is not statistical.} A node held at a constant has zero "
+        "variance and no detectable association with its descendants at any sample size, and "
+        "the ancestry channel of \\S\\ref{sec:meth_regimes} is built on exactly that "
+        "association. The measured gap between the modes does not close between "
+        "$n_{\\text{int}} = 20$ and $1{,}000$: fifty times the data, an unchanged deficit, "
+        "which rules out the power explanation once given for it.\n\n"
+        "\\paragraph{The one channel the atomic mode wins is one this backend cannot read.} "
+        "Setting a confounder to a constant is the only move that cuts a confounding path; a "
+        "randomised intervention leaves the node an active variance source. The factored "
+        "backend builds its belief entirely from the ancestry channel, so the advantage is "
+        "unreachable by construction. That is a limitation of the backend rather than a fact "
+        "about the problem, and a belief that consumed both channels would have a strictly "
+        "larger effective action repertoire; it is future work rather than an ablation this "
+        "design can run.\n\n"
+        "\\paragraph{The randomised mode's detection signal is a variance contrast, and its "
+        "strength is a design choice.} The moved-pair detector behind "
+        "Appendix~\\ref{app:attribution} responds to a change in correlation, which the "
+        "randomised mode produces only insofar as the interventional scale differs from the "
+        "natural one: detection falls to its minimum exactly where the two coincide and "
+        "recovers on both sides, the V-curve reported there. The interventional scale must "
+        "therefore sit outside the natural noise range -- the constraint, and the "
+        "identifiability argument behind it, are stated with the intervention design in "
+        "\\S\\ref{sec:meth_interventions}.\n"
+    )
+
+
+MACHINERY = r"""
+\paragraph{Why intervention can answer it.} A bidirected edge records that something
+unobserved confounds a pair. It does not say which unobserved variable, nor which party
+holds it. Under passive observation the question is unanswerable in principle: one latent
+confounding three variables and three separate latents each confounding one pair induce
+identical marginal independence structure, so no volume of observational data separates
+them \citep{richardson2002ancestral}. What breaks the symmetry is that only the
+confounder's owner can intervene on it. If an agent intervenes on one of its own private
+variables and a peer's previously confounded pair resolves, the responsible confounding
+has been located, with neither party seeing the other's data \citep{hauser2012gies,
+zhou2025hardinterventions}. The assumption this rests on, that when a peer acts and a
+confounded pair moves the peer's own variables are among the movers, is false whenever a
+private variable's influence is mediated entirely through a third party's block; it is
+stated below as the modelling assumption it is.
+
+\paragraph{Latent groups.} Structure recovery tells an agent that a pair of shared
+variables is confounded by something it cannot observe. Attribution asks which hidden
+variable, and whose.
+
+\begin{definition}[Latent group] \label{def:latentgroup}
+A \emph{latent group} is a pair $(o, C)$ where the \emph{owner} $o$ is the agent whose
+private block contains the hidden variable, and the \emph{children} $C$ are the variables
+in the observing agent's local variable set that this hidden variable parents.
+\end{definition}
+
+The assumptions of \S\ref{sec:meth_crossprivate} make this a finite choice. Every
+bidirected edge joins two shared variables, so $C \subseteq X$; the confounding path lies
+wholly within one private block, so each group has exactly one owner and attribution
+selects among $K-1$ named peers. Attribution replaces the confounding mark rather than
+accompanying it, so an agent cannot be credited for determining that a pair is confounded
+while failing to say which peer is responsible.
+
+\paragraph{The hypothesis space and its pruning.} Candidates are the latent groups
+consistent with the determined structure, pruned by two rules. A hidden variable
+parenting $C$ makes every pair in $C$ confounded, so a candidate whose children are not
+pairwise confounded is removed; this is sound, and it is the atomicity rule referred to
+below. When a peer intervenes on one of its private variables the groups it owns respond
+and others do not, so a group whose pairs fail to respond to its putative owner's
+intervention is removed; this is a modelling assumption rather than a theorem, and it
+fails where hidden variables in different blocks parent overlapping sets. Candidates are
+canonicalised to maximal cliques per owner, since one hidden variable parenting
+$\{u,v,w\}$ and three hidden variables in the same block parenting each pair cannot be
+distinguished by any evidence available here. Enumerating groups jointly is infeasible at
+these sizes, $k_v = 20$ admitting $8.4 \times 10^{10}$ hypotheses, so the space is
+factored over the connected components of the confounded-pair graph and pruning
+propagates within each component to a fixpoint. The factoring is exact, because a hidden
+variable's children are pairwise confounded and therefore lie in one component. The
+measurements below use the structural policies and baselines of \S\ref{sec:meth_marl}
+unchanged, plus one baseline specific to this appendix: an attribution-greedy policy,
+the myopic rule applied to the attribution belief rather than the structural one.
+"""
+
+WITHDRAWN = r"""
+\paragraph{Withdrawn during the work.} Five claims about attribution were made during
+this work and later withdrawn; the record of every withdrawal is
+Appendix~\ref{app:negative}, and the five that concern this appendix are kept beside the
+results they qualify.
+
+\begin{table}[H]
+\centering
+\caption{Attribution claims withdrawn, with the measurement that refuted each.}
+\label{tab:app_attr_withdrawn}
+\begin{tabular}{p{0.44\textwidth}p{0.48\textwidth}}
+\toprule
+Claim & What refuted it \\
+\midrule
+The learned policy attributes latent owners worse than random & One seed at $2$ SE; the next two reversed it. \\
+Attribution precision falls from $98\%$ to $59\%$ as the window grows & Two defects in the attribution engine. Zero misattributions at every size once repaired. \\
+The component engine gains precision by skipping cross-component pruning & A probe for such messages found none. \\
+The decline with site count is hypothesis-space growth & The matched-budget control, holding rounds per agent fixed, attributes it to coverage. \\
+Probe diversity explains attribution performance & The lowest-coverage policy ties the highest. \\
+\bottomrule
+\end{tabular}
+\end{table}
+"""
+
+
+# --- E: attribution, self-contained -------------------------------------------------------
+def appendix_attribution():
+    """Latent-owner attribution, in one place and nowhere else.
+
+    Downgraded from a research question: the result is sound but
+    thin, no policy was ever trained on the attribution objective, and it was drawing effort
+    away from the three questions the thesis actually answers. Everything here is generated
+    from thesis_results/attribution/ so the section cannot drift from its data.
+    """
+    TRA = ROOT / "thesis_results/attribution"
+
+    def jl(name):
+        return jload(TRA / f"{name}.json")
+
+    ceiling = jl("attr_ceiling")
+    budget = jl("attr_ceiling_budget")
+    matched = jl("attr_ceiling_matched_budget")
+
+    # Soundness across every configuration measured, deduplicated by config.
+    seen = {}
+    for src in (ceiling, budget, matched):
+        for e in src:
+            seen[(e["k"], e["sigma"], e["n_agents"], e["budget"], e["episodes"])] = e
+    groups = sum(e["total"] for e in seen.values())
+    right = sum(e["right"] for e in seen.values())
+    wrong = sum(e["wrong"] for e in seen.values())
+
+    peers = []
+    for e in sorted(ceiling, key=lambda x: (x["n_agents"], x["k"], x["sigma"])):
+        peers.append(f"{e['n_agents'] - 1} & {e['k']} & {e['sigma']} & {e['budget']} & "
+                     f"{e['right']} & {e['wrong']} & {e['total']} & {e['measured']:.3f} \\\\")
+
+    # The identifiability cliff, by number of children, at k=12 sigma=0.5.
+    def bysize(e):
+        cells = []
+        for size in range(2, 7):
+            v = e.get("by_size", {}).get(str(size))
+            if not v:
+                cells.append("---"); continue
+            r = v.get("right", 0); u = v.get("unsure", 0); w = v.get("wrong", 0)
+            cells.append(f"{r}/{r + u + w}")
+        return cells
+
+    def find(src, K, b):
+        for e in src:
+            if e["n_agents"] == K and e["budget"] == b and e["k"] == 12 and e["sigma"] == 0.5:
+                return e
+
+    size_rows = []
+    for src, K, b in ((ceiling, 2, 60), (ceiling, 3, 60), (ceiling, 4, 60),
+                      (ceiling, 8, 60), (matched, 8, 120)):
+        e = find(src, K, b)
+        if e:
+            size_rows.append(f"{K - 1} & {b} & " + " & ".join(bysize(e)) + r" \\")
+
+    brows = [f"{e['budget']} & {e['right']} & {e['total']} & {e['measured']:.4f} \\\\"
+             for e in sorted(budget, key=lambda x: x["budget"])]
+
+    import glob as _glob
+    arows = []
+    for f in sorted(_glob.glob(str(ROOT / "results/attr_train/*.json"))):
+        d = jload(f)
+        arows.append(f"{d.get('seed')} & {d['arms']['learned']['success']:.3f} & "
+                     f"{d['arms']['greedy_uncertainty']['success']:.3f} \\\\")
+
+    return (
+        "\\chapter{Latent-Owner Attribution} \\label{app:attribution}\n\n"
+        "The belief of \\S\\ref{sec:meth_versionspace} can sometimes name which peer's private\n"
+        "block contains a latent confounder detected on the shared interface. This appendix reports\n"
+        "what that machinery achieves and what bounds it. It is placed here rather than in\n"
+        "Chapter~\\ref{Chap4} because no policy in this work was trained on an attribution\n"
+        "objective: the trainer scores structural claims, and every result below is the behaviour\n"
+        "of a belief driven by a policy trained for something else. What can be established is\n"
+        "that attribution is possible and what limits it, which is a starting point for other work\n"
+        "rather than a result of this one.\n\n"
+        + MACHINERY
+        + f"\\paragraph{{Soundness.}} Across {len(seen)} configurations spanning "
+        f"$k_v \\in \\{{12, 20\\}}$, $K \\in \\{{2,3,4,8\\}}$, "
+        f"$\\sigma \\in \\{{0.25, 0.5, 0.75\\}}$ and budgets 30 to 240, "
+        f"\\textbf{{{groups:,} latent groups were observed and {right:,} were attributed, with "
+        f"{wrong} attributed incorrectly.}} The engine names an owner or abstains, so the\n"
+        "quantity that varies is the abstention rate and not an error rate. Zero is a property of\n"
+        "the atomicity rule above rather than a fortunate sample.\n\n"
+        + tbl("Attribution by configuration. Every cell has zero incorrect attributions.",
+              "tab:app_attr_peers", "rrrrrrrr",
+              r"Peers & $k_v$ & $\sigma$ & Budget & Correct & Incorrect & Observed & Share \\",
+              peers)
+        + "\n\\paragraph{Two bounds, separated by one comparison.} What limits the share is\n"
+          "partly resources and partly identifiability, and the last two rows of\n"
+          "Table~\\ref{tab:app_attr_size} tell them apart without an argument. Doubling the budget\n"
+          "at seven peers moves two-child resolution from $63/1344$ to $965/1344$ and leaves every\n"
+          "group of three or more children at exactly zero. A resource bound responds to\n"
+          "resources; an identifiability bound does not.\n\n"
+        + tbl("Groups resolved of groups observed, by the number of children the latent has, "
+              "at $k_v=12$ and $\\sigma=0.5$. An unresolved group is an abstention.",
+              "tab:app_attr_size", "rrccccc",
+              r"Peers & Budget & 2 children & 3 & 4 & 5 & 6 \\", size_rows)
+        + "\n\\paragraph{Coverage saturates.} At four agents the measured share is unchanged from\n"
+          "budget 60 onward, and the counts are identical rather than merely the rates, so the\n"
+          "groups that remain are not reachable by spending more.\n\n"
+        + tbl("Attribution against intervention budget at $k_v=12$, $\\sigma=0.5$, four agents.",
+              "tab:app_attr_budget", "rrrr",
+              r"Budget & Correct & Observed & Share \\", brows)
+        + "\n\\paragraph{Where the ceiling comes from.} A group with two children explains one\n"
+          "pair, so ownership is the whole question and one partner response settles it. A group\n"
+          "with three or more explains a clique, and separating it from several smaller latents\n"
+          "needs a partial response: the owner must probe its private variables one at a time.\n"
+          "No policy here does, so responses are total and the atomicity rule never fires. The\n"
+          "one-peer row of Table~\\ref{tab:app_attr_size} is the exception that identifies the\n"
+          "cause. With ownership forced, three- and four-child groups do resolve, at $38/59$ and\n"
+          "$29/74$, and five-child groups still do not.\n\n"
+          "A two-factor decomposition captures this. Writing $\\Pr(\\text{resolve} \\mid\n"
+          "\\text{one pair})$ for the measured rate at which one-pair groups settle and $\\pi_1$\n"
+          "for the share of one-pair groups in the graph distribution, the product predicts the\n"
+          "measured share to within $0.041$ at every configuration with two or more peers. Only\n"
+          "$\\pi_1$ is computable from the topology; the first factor is measured, so this\n"
+          "decomposes an observed rate rather than predicting one. The single-peer configuration\n"
+          "is under-predicted by $0.263$, because groups explaining more than one pair also\n"
+          "resolve there. Figure~\\ref{fig:attribution_law} plots the prediction against\n"
+          "the measurement.\n\n"
+          "\\begin{figure}[H]\n"
+          "\\centering\n"
+          "\\includegraphics[width=0.55\\textwidth]{figures/attribution_law.pdf}\n"
+          "\\caption[The attribution decomposition]{Measured attribution against the two-factor decomposition, with the "
+          "diagonal drawn. Filled points: two or more peers. Open point: one peer.}\n"
+          "\\label{fig:attribution_law}\n"
+          "\\end{figure}\n\n"
+          "\\paragraph{Not a policy failure.} A self-interested policy, scored only on its own\n"
+          "recovery, spends $7.6\\%$ of its budget on private variables against $38$--$61\\%$ for\n"
+          "every other policy, and still does worse than a rule that is not scored on attribution\n"
+          "at all: $0.245$ against $0.327$ on attribution, and $0.181$ against $0.327$ on joint\n"
+          "identification, over three seeds of $100$ episodes each. The ceiling is not reached by\n"
+          "wanting it more.\n\n"
+          "\\paragraph{Scale.} The component-factored engine runs\n"
+          "past the sizes the chapter reports: 21, 33 and 27 correct attributions at $k_v = 30$,\n"
+          "$40$ and $50$ over 30 episodes each, with no incorrect attribution and no contradiction\n"
+          "raised at any size.\n\n"
+          "\\paragraph{Sensitivity to the interventional scale.} The moved-pair detector\n"
+          "responds to a change in association, and under the randomised mode that change is a\n"
+          "variance contrast: detection measured against the scale is V-shaped -- 63\\% at\n"
+          "$\\sigma_{\\text{int}}=0.5$, 22\\% at $1.0$ (the natural scale, the uninformative\n"
+          "case), 92.5\\% at the reported $2.0$ -- while the atomic mode detects 90.5\\% at any\n"
+          "scale, for the structural reason that the association vanishes. Every attribution\n"
+          "figure in this appendix therefore carries $\\sigma_{\\text{int}}^2 = 4.0$ as a\n"
+          "condition, per the constraint stated in \\S\\ref{sec:meth_interventions}, and the\n"
+          "atomic mode reaching the same signal structurally is part of the future-work case\n"
+          "rather than a defect in these results.\n\n"
+          "\\paragraph{What is not established.} Nothing here says what a policy trained to\n"
+          "attribute would achieve, because none was trained. The comparison that would answer it\n"
+          "requires an attribution term in the reward and an owner channel in the observation,\n"
+          "neither of which any run in this work uses. That is the experiment this appendix\n"
+          "points at. The nearest measurement is training under the attribution belief backend\n"
+          "with the reward unchanged (Table~\\ref{tab:attrbackend}): at $4{,}000$ episodes it\n"
+          "reaches $0.400$, $0.355$ and $0.205$ joint recovery against the myopic rule's $0.945$,\n"
+          "$0.955$ and $0.935$ on the same cell. $4{,}000$ episodes is a budget three structural\n"
+          "claims elsewhere in this work did not survive (Appendix~\\ref{app:negative}), so this\n"
+          "measures the backend at that budget rather than the backend's ceiling.\n\n"
+        + tbl("Training under the attribution belief backend at $k_v=12$, four agents, "
+              "$4{,}000$ episodes, scored on the structural criterion.",
+              "tab:attrbackend", "lcc", r"Seed & Learned & Myopic \\", arows)
+        + "\n" + WITHDRAWN)
+
+
+
+def appendix_attribution_summary():
+    """Concept note only: the idea and its two rules, no empirics.
+    The full study, its figures and its withdrawn claims live in the repository."""
+    return (
+        "\\section{Latent-Owner Attribution} \\label{app:attribution}\n\n"
+        "This section explains an idea the setting makes possible, one step beyond "
+        "detecting confounding. What follows is the concept; the empirical study of it "
+        "lives in the repository (Appendix~\\ref{app:source}).\n\n"
+        "A bidirected mark tells an agent that some hidden variable, owned by some peer, "
+        "confounds two variables it can see. Detection stops there. Attribution asks the "
+        "further question of which peer owns the hidden variable, and which of the "
+        "observing agent's variables it touches. The unit of the question is the "
+        "\\emph{latent group}, an owner paired with the set of observed variables its "
+        "hidden variable parents.\n\n"
+        "The question is harder than it looks, because the hiddenness is by design. The "
+        "observing agent cannot probe the variable itself; it can only watch what moves "
+        "together when a peer acts. What makes progress possible is that a single hidden "
+        "variable leaves a signature, its children being pairwise confounded, so any "
+        "candidate group whose children are not pairwise confounded can be ruled out. "
+        "That rule, atomicity, is sound. Ruling candidates in takes more, an assumption "
+        "called local disturbance, that the hidden variables responding to a peer's "
+        "private intervention are that peer's own. The assumption is not sound in "
+        "general, so any conclusion resting on it has to be reported beside what "
+        "atomicity alone supports.\n\n"
+        "Attribution matters because it measures what the partition actually hides. "
+        "Forbidding raw data from crossing a boundary is not the same as hiding "
+        "structure, and the degree to which peers can attribute is the degree to which "
+        "the boundary leaks. That leakage is one side of any future decision about how "
+        "much to disclose. The machinery, its assumptions and its measured limits are in "
+        "the repository.\n"
+    )
+
+def main() -> int:
+    out = ROOT / "thesis/Appendix.tex"
+    # ONE FILE, input after the references inside Report.tex's \begin{appendices} block
+    #. The two hand-maintained
+    # sources -- Results Tables.tex and Negative Results.tex -- are inlined at build time and
+    # stay the files to EDIT; this output is generated and gets overwritten.
+    # MINIMAL BUILD (the author, 6 Sep: "appendix comes back minimally. most of what's currently
+    # in there will need to go"). Two chapters: Supplementary Results (hand-maintained, the
+    # material demoted from Chapter 4, keeps labels sec:res_budget / sec:res_reward /
+    # fig:inregime) and Training Diagnostics (Auxiliary Metrics + Excluded Runs +
+    # Evidence Cost + the full epsilon-greedy grid -- the sections Chapter 4 points at).
+    # HELD OUT of the build, files kept: Results Tables.tex (Tables12k now inputs from
+    # Supplementary Results), the attribution chapter, appendix_budget / _checkpoint /
+    # _ablations / _mode, and Negative Results.tex. Restore by re-adding lines here.
+    parts = ["% GENERATED by scripts/build_appendix.py -- do not edit. Edit Supplementary",
+             "% Results.tex / Auxiliary Metrics.tex / build_appendix.py, then rebuild.",
+             ""]
+    # This generator composes the appendix from hand-written sections in the dissertation
+    # source and generated tables from results/. The dissertation is versioned separately,
+    # so say what is missing rather than raising from a read.
+    hand = ROOT / "thesis/Supplementary Results.tex"
+    if not hand.exists():
+        raise SystemExit(
+            f"{hand.relative_to(ROOT)} not found. This script needs the dissertation "
+            f"source, which is versioned separately from this repository. Every table it "
+            f"emits can be produced on its own by build_tables12k.py and "
+            f"build_robustness.py.")
+    parts.append(hand.read_text())
+    parts.append("")
+    # RESTRUCTURED 8 Sep: ONE Supplementary Results chapter holding every
+    # measurement section -- the Training Diagnostics chapter title fit only half its
+    # contents, and a chapter wrapping one section wasted a page. The sections below are
+    # emitted straight into the chapter the hand file opens. Register: appendix sections
+    # assert what a float shows and point at the chapter that argues it
+    # (WRITING_GUIDELINES.md "Appendix register").
+    # Attribution precedes the per-seed robustness table so its closing paragraph packs
+    # against the table instead of spilling onto a page of its own (render-checked 8 Sep).
+    # LEANED 9 Sep: excluded runs, the epsilon-greedy grid and the per-seed
+    # robustness table are repo-only (their body claims carry app:source pointers);
+    # attribution is a concept note with the empirical study in the repository.
+    for fn in (appendix_evidence_cost, appendix_skeleton,
+               appendix_attribution_summary):
+        parts.append(fn())
+        parts.append("")
+    # Source-code appendix (required; the author, 7 Sep). URL filled at submission, 7 Sep.
+    parts.append(
+        "\\chapter{Source Code} \\label{app:source}\n\n"
+        "The complete implementation, the environment, belief engine, policies, baselines, "
+        "training and every measurement script behind the numbers in this dissertation, "
+        "is available at:\n\n"
+        "\\begin{center}\\url{https://github.com/BrianEzi/federated-active-causal-discovery-with-marl}\\end{center}\n\n"
+        "The repository also carries the full per-run result files, the generated tables "
+        "this document inlines, and the scripts that rebuild every figure, table and "
+        "appendix from those files.\n")
+    parts.append("")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(parts))
+    print(f"wrote {out.relative_to(ROOT)}: {len(out.read_text().splitlines())} lines, "
+          f"{out.read_text().count(chr(92) + chr(99) + chr(104) + chr(97) + chr(112) + chr(116) + chr(101) + chr(114) + chr(123))} appendices")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

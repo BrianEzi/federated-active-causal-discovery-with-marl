@@ -2,7 +2,7 @@
 
 Each policy sees ONLY its own agent's belief and acts within its own authority. No policy
 here has access to the other agent's belief, window, or action -- that would be CTDE, which
-the supervisor's constraint rules out.
+the no-sharing constraint rules out.
 
 The greedy policy is the myopic expected-information-gain oracle, the same opponent the
 single-agent work used, restricted to one agent's window. It is the thing a learned policy
@@ -16,8 +16,8 @@ from typing import Optional
 import numpy as np
 
 from legacy.ma_v1.env import CLAMP, PASS_ACTION, VARY, TwoAgentEnv
-from sa.graphs import build_graph_space
-from sa.oracle import _partition_entropy
+from ma.graphs import build_graph_space
+from ma.stats import _partition_entropy
 
 
 class RandomAgentPolicy:

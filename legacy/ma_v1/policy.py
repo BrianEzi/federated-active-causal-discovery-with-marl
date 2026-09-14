@@ -3,7 +3,7 @@
 Each agent has its own actor-critic, sees only its own observation (edge marginals over its
 own window plus its remaining budget), and emits an index into its own (target, mode)
 action list. Nothing in the training loop lets one agent see the other's belief,
-observation, action, or gradient. That is the supervisor's constraint, and it is enforced
+observation, action, or gradient. That is the no-sharing constraint, and it is enforced
 structurally rather than by convention -- `_observe` takes an agent name and can only reach
 that agent's view.
 
@@ -55,7 +55,7 @@ class MAPPOConfig:
     total_episodes: int = 4000
     step_cost: float = 0.05
     # Extra cost charged ONLY for a clamp, on top of step_cost. Zero by default, which is
-    # what the 2026-08-17 runs used.
+    # what the runs used.
     #
     # Why it exists: those runs learned to clamp (84-96%) but not WHEN -- clamp rates on
     # confounded and unconfounded episodes differed by +0.057/+0.036/-0.006. Seed 2 clamped

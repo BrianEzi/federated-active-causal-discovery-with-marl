@@ -1,0 +1,430 @@
+"""A belief that never materialises candidates: one small version space per pair.
+
+Enumerating whole-window structures costs 3^(edges), which is exact but unusable much past
+a six-variable window. This backend keeps a separate set of surviving marks for each pair
+instead, so cost grows with the number of pairs rather than exponentially in edges.
+
+Factoring is sound because the evidence is already pairwise. For an adjacent pair, x being
+an ancestor of y implies the edge is x -> y: not y -> x, which would be a cycle, and not
+x <-> y, because a bidirected edge forbids either endpoint being an ancestor of the other.
+So an intervention speaks to each pair independently and no joint reasoning is discarded at
+update time.
+
+What the factorisation does give up is joint constraints between pairs, which makes the
+belief an outer approximation: it can hold a combination of marks that no single MAG
+realises, so it never claims more than the truth but may remain more uncertain than a fully
+joint representation would.
+
+Marks are NONE, FWD, BACK and BI. A pair the skeleton calls absent is closed to NONE and
+takes no further part; see `docs/BELIEF.md` for why that makes the skeleton load-bearing.
+"""
+from __future__ import annotations
+
+from itertools import combinations
+from typing import Optional, Sequence
+
+import numpy as np
+
+from cb.versionspace import BACK, BI, FWD, NONE, marks_from_mag, pairs
+
+
+class FactoredBelief:
+    """Per-pair surviving marks, exposed as the frequency matrices every consumer reads."""
+
+    def __init__(self, possible, k: int):
+        # possible[(u, v)] -> frozenset of marks still admissible for that pair
+        self.possible = possible
+        self.k = int(k)
+        self.adjacency = np.zeros((k, k), dtype=float)
+        self.directed = np.zeros((k, k), dtype=float)
+        self.bidirected = np.zeros((k, k), dtype=float)
+        for (u, v), marks in possible.items():
+            if not marks:
+                continue
+            weight = 1.0 / len(marks)
+            for mark in marks:
+                if mark == NONE:
+                    continue
+                self.adjacency[u, v] += weight
+                self.adjacency[v, u] += weight
+                if mark == FWD:
+                    self.directed[u, v] += weight
+                elif mark == BACK:
+                    self.directed[v, u] += weight
+                else:
+                    self.bidirected[u, v] += weight
+                    self.bidirected[v, u] += weight
+        # Reporting fields the other beliefs carry, so nothing downstream special-cases this.
+        self.n_boot = 0
+        self.ci_tests = 0
+        self.truncated_fraction = 0.0
+        self.replicates = None
+
+    @property
+    def space(self):
+        """The single settled structure, when every pair has one mark left; else empty.
+
+        Deliberately NOT the product of the per-pair sets -- that product is exactly the
+        object this class exists to avoid building, and it would also be wrong, since it
+        contains combinations the joint constraints forbid.
+        """
+        if all(len(m) == 1 for m in self.possible.values()):
+            return (tuple(next(iter(self.possible[p])) for p in pairs(self.k)),)
+        return ()
+
+    def edge_marginals(self) -> np.ndarray:
+        return self.directed
+
+    def confounded_pairs(self, threshold: float = 0.5) -> tuple:
+        return tuple((u, v) for u, v in combinations(range(self.k), 2)
+                     if self.bidirected[u, v] >= threshold)
+
+    @property
+    def settled(self) -> int:
+        return sum(1 for m in self.possible.values() if len(m) == 1)
+
+
+def credit_for_set(true_mag, k: int, positions) -> float:
+    """Window credit had EXACTLY `positions` been intervened on. Oracle evidence only.
+
+    This is what makes a difference reward computable rather than estimable here: under
+    oracle evidence `edge_marginals` prunes from the SET of intervened nodes and nothing
+    else, so "what would my window look like if I had never acted" is a replay, not a
+    counterfactual guess. Rebuilt from scratch rather than rolled back, because
+    `_apply_ancestry` only ever narrows a pair and undoing it is not defined.
+
+    Denominator matches `FactoredBackend.credit_fraction` -- ALL pairs, not just adjacent
+    ones -- so the two numbers can be subtracted from each other without a scale error.
+    """
+    from cb.versionspace import reveal
+
+    backend = FactoredBackend(k)
+    backend.reset(true_mag)
+    backend.reset_marks()
+    for x in sorted(positions):
+        backend._apply_ancestry(x, reveal(backend.truth, k, x))
+    truth = marks_from_mag(true_mag)
+    hits = sum(1 for index, key in enumerate(pairs(k))
+               if backend._possible[key] == frozenset({truth[index]}))
+    return hits / max(len(backend._possible), 1)
+
+
+def _window_hop_distances(truth, k: int) -> np.ndarray:
+    """`[k, k]` int, shortest-path hop count between window nodes on the ADJACENCY implied by
+    `truth` (any non-NONE mark counts as one edge, direction irrelevant -- BFS distance does
+    not care which way an edge points). Disconnected pairs get `k` (a safe finite ceiling:
+    every real distance in a k-node graph is < k, so this always reads as "farther than any
+    real pair" without needing an inf/NaN special case downstream).
+    """
+    adjacency = np.zeros((k, k), dtype=bool)
+    for (u, v), mark in zip(pairs(k), truth):
+        if mark != NONE:
+            adjacency[u, v] = adjacency[v, u] = True
+    hop = np.full((k, k), k, dtype=np.int64)
+    for start in range(k):
+        hop[start, start] = 0
+        frontier = [start]
+        seen = {start}
+        dist = 0
+        while frontier:
+            dist += 1
+            nxt = []
+            for u in frontier:
+                for v in range(k):
+                    if adjacency[u, v] and v not in seen:
+                        seen.add(v)
+                        hop[start, v] = dist
+                        nxt.append(v)
+            frontier = nxt
+    return hop
+
+
+class FactoredBackend:
+    """Pairwise belief, updated by ancestry. O(k^2) state, O(k^2) per update.
+
+    Call-compatible with the other backends. `evidence="oracle"` prunes by the true ancestry;
+    `evidence="sampled"` prunes by what the data shows, with the same one-sided treatment of
+    an under-powered test as `cb.versionspace` -- silence is not refutation.
+    """
+
+    can_handle_multi_hidden = True
+
+    def __init__(self, k: int, shared_positions: Sequence[int] = (),
+                 evidence: str = "oracle", evidence_alpha: float = 0.001,
+                 assume_skeleton: bool = True, evidence_power: float = 1.0,
+                 power_seed: int = 0, distance_weighted_power: bool = False, **_ignored):
+        self.k = int(k)
+        self.shared_positions = tuple(shared_positions)
+        if evidence not in ("oracle", "sampled"):
+            raise ValueError(f"evidence must be 'oracle' or 'sampled', got {evidence!r}")
+        self.evidence = evidence
+        self.evidence_alpha = float(evidence_alpha)
+        # The ORACLE OBSERVATIONAL SKELETON, which is an accepted arm elsewhere in this
+        # project (`oracle_obs_structure`). Adjacency is fixed and correct from the start;
+        # only the marks are open. Without it the backend would need FCI's skeleton search,
+        # which is where the polynomial cost actually lives -- and the thesis question is
+        # about choosing EXPERIMENTS, not about estimating skeletons.
+        self.assume_skeleton = bool(assume_skeleton)
+        self.truth: Optional[tuple] = None
+        self.last: Optional[FactoredBelief] = None
+        self._possible: dict = {}
+        self._applied: frozenset = frozenset()
+        self._detected: dict = {}
+        # Which pairs the SKELETON declared absent. Kept separately from `truth` so that
+        # `reset_marks` can re-open the belief without silently re-deriving adjacency from
+        # the true MAG, which under an estimated skeleton would hand back the very
+        # assumption the ablation exists to remove.
+        self._seeded_absent: dict = {}
+        # POWER-LIMITED ORACLE EVIDENCE. `evidence_power` is the probability that a given
+        # ancestry question yields a usable answer at all; the rest of the time the pair is
+        # left untouched, exactly as if the test had run and been under-powered.
+        #
+        # WHY THIS SHAPE AND NOT NOISE ON THE ANSWER. Sampled evidence is SOUND BUT NOT
+        # COMPLETE -- it never asserts a false ancestry, it only fails to detect weak and
+        # distant ones, which is why the belief carries intermediate frequencies instead of
+        # all-or-nothing marks. Corrupting the answer would break soundness and produce a
+        # belief the truth can leave; declining to answer reproduces the real failure mode
+        # and keeps the version-space guarantee intact. `evidence_power=1.0` is the
+        # untouched oracle, so this is inert unless asked for.
+        #
+        # WHAT IT IS FOR. Measured 31 Aug: oracle training costs 0.085 s/episode and sampled
+        # training 6.3-9.4, a factor of 74-110, which is why the sampled sweep needs a
+        # cluster. Policies trained under oracle evidence do NOT transfer to sampled
+        # (`FINDINGS_2026_08_27` section 3: 0.171 against random's 0.208) because they have
+        # never seen a half-settled belief. This gives that input distribution at oracle
+        # speed, so "train with the noise you will be tested under" becomes affordable.
+        self.evidence_power = float(evidence_power)
+        if not 0.0 < self.evidence_power <= 1.0:
+            raise ValueError(f"evidence_power must be in (0, 1], got {evidence_power!r}")
+        # RESEEDED PER EPISODE from the episode seed -- see `set_episode`, which the env
+        # calls on every reset. Each episode still meets a DIFFERENT pattern of missing
+        # evidence, which is what domain randomisation needs, but the pattern is a function
+        # of the EPISODE rather than of how many draws happened to be consumed before it.
+        #
+        # It was a free-running generator until 1 Sep 2026, and that made arm comparisons
+        # invalid: arms play sequentially, so the learned arm (50.8 moves an episode)
+        # consumed far more draws than greedy (19.0), and greedy therefore met a different
+        # withholding pattern depending on what ran before it. Measured symptom -- greedy's
+        # own score moved 0.847 -> 0.883 between two runs that differed ONLY in an
+        # observation flag greedy does not read. Nothing was being compared like for like.
+        self._power_seed = int(power_seed)
+        self._power_rng = np.random.default_rng(self._power_seed)
+        # Rows seen per node at the last update. A rising count means another experiment on
+        # that node, which earns another draw against `evidence_power`.
+        self._attempts: dict = {}
+        # RUNG 5 (docs/AGENT_B_INBOX.md, 1 Sep 00:40): flat `evidence_power` treats a
+        # one-hop and a five-hop pair identically, which is not what sampled evidence does
+        # -- `ma/env.py:220`'s own objection is that sampled evidence fails for a REASON
+        # (weak, distant effects don't reach significance), not uniformly at random. Opt-in
+        # and OFF by default so it changes nothing unless asked for.
+        self.distance_weighted_power = bool(distance_weighted_power)
+        self._hop: Optional[np.ndarray] = None
+
+    def set_episode(self, episode_seed: int) -> None:
+        """Reseed the withholding generator so every ARM sees the same evidence.
+
+        The env calls this on each reset. Mixing the episode seed with this backend's own
+        `power_seed` keeps two agents from missing the same questions in lockstep, while
+        making the pattern reproducible for any arm replaying that episode.
+        """
+        self._power_rng = np.random.default_rng(
+            (self._power_seed * 1_000_003 + int(episode_seed)) % (2 ** 63))
+
+    def reset(self, true_mag: np.ndarray, adjacency=None, topology=None,
+              skeleton: Optional[np.ndarray] = None) -> None:
+        """`skeleton` overrides which pairs are treated as adjacent.
+
+        WHY THE OVERRIDE EXISTS. The default seeds absence from `self.truth`, which reads as
+        oracle knowledge and is not: a MAG's adjacencies are exactly the pairs no OBSERVED
+        conditioning set can separate, so the skeleton is recoverable from observational data
+        alone -- measured at 100% agreement over 4,710 pairs (see
+        the pre-squash-submission tag). What the default supplies is the INFINITE-DATA
+        answer. Passing an estimated skeleton here is how the finite-sample cost of that
+        supply gets measured instead of assumed away.
+
+        A [k, k] boolean, True where the pair is taken to be adjacent. A pair the skeleton
+        calls absent is closed to NONE; a pair it calls present is opened to
+        {FWD, BACK, BI} -- INCLUDING a pair that is truly absent, which is exactly the
+        damage a spurious adjacency does: it can never be settled, so it caps identification.
+        """
+        self.truth = marks_from_mag(true_mag)
+        self._possible = {}
+        self._seeded_absent = {}
+        if self.distance_weighted_power:
+            self._hop = _window_hop_distances(self.truth, self.k)
+        if skeleton is not None:
+            skeleton = np.asarray(skeleton, dtype=bool)
+            for index, (u, v) in enumerate(pairs(self.k)):
+                absent = not bool(skeleton[u, v])
+                self._seeded_absent[(u, v)] = absent
+                self._possible[(u, v)] = (frozenset({NONE}) if absent
+                                          else frozenset({FWD, BACK, BI}))
+            self._applied = frozenset()
+            self._attempts = {}
+            self._detected = {}
+            self.last = FactoredBelief(self._possible, self.k)
+            return
+        for index, (u, v) in enumerate(pairs(self.k)):
+            self._seeded_absent[(u, v)] = self.truth[index] == NONE
+            if self.truth[index] == NONE:
+                # Correctly absent, and known to be: this is the observational half.
+                self._possible[(u, v)] = frozenset({NONE})
+            else:
+                # Adjacent, orientation wide open. Deliberately NOT narrowed by observational
+                # orientation rules -- see the module docstring; this backend reports what
+                # pairwise interventional evidence alone can prove.
+                self._possible[(u, v)] = frozenset({FWD, BACK, BI})
+        self._applied = frozenset()
+        self._attempts = {}
+        self._detected = {}
+        self.last = FactoredBelief(self._possible, self.k)
+
+    # -- the update ----------------------------------------------------------------------
+
+    def _apply_ancestry(self, x: int, ancestry, powered=None, blind=None) -> None:
+        """`ancestry[i]` -- is x an ancestor of the i-th other node? Prune each pair on x.
+
+        EXACT AND LOCAL, for the reason in the module docstring: on an adjacent pair,
+        ancestry from x to y admits only x -> y, and its absence admits only {y -> x, x <-> y}.
+        Nothing about any other pair is consulted, which is the whole point.
+
+        `powered` gates the NEGATIVE direction under sampled evidence. An undetected effect
+        refutes `x -> y` only where the test had the power to have seen it; otherwise silence
+        carries no information and the pair is left alone. That is what stops a distant,
+        attenuated effect from being read as absent.
+
+        `blind` gates BOTH directions and is what `evidence_power` uses: the question was
+        asked and the test returned nothing usable, so neither the positive nor the negative
+        conclusion is available. See `FactoredBackend.__init__` for why that is the right
+        shape for simulating a weak test rather than adding noise to the answer.
+        """
+        others = [y for y in range(self.k) if y != x]
+        for position, y in enumerate(others):
+            if blind is not None and blind[position]:
+                continue                      # no power here: the pair learns nothing
+            key = (x, y) if x < y else (y, x)
+            marks = self._possible[key]
+            if marks == frozenset({NONE}) or len(marks) == 1:
+                continue
+            # The mark meaning "x -> y" depends on which way round the pair is stored.
+            forward = FWD if x < y else BACK
+            reverse = BACK if x < y else FWD
+            if ancestry[position]:
+                self._possible[key] = marks & frozenset({forward})
+            elif powered is None or powered[position]:
+                self._possible[key] = marks - frozenset({forward})
+            # An empty set is necessarily wrong -- the truth is one of the marks -- so a
+            # contradiction is refused rather than propagated as unanimous confidence.
+            if not self._possible[key]:
+                self._possible[key] = marks
+                # Contradiction: keep the pair as it was, and record it. Both directions
+                # were refuted, which can only happen if a test fired falsely.
+                self._contradictions = getattr(self, "_contradictions", 0) + 1
+
+    def edge_marginals(self, data, known_intervened, told=None, score_rule=None,
+                       blocks=None) -> np.ndarray:
+        if self.truth is None:
+            raise RuntimeError("FactoredBackend.reset(true_mag) must be called first")
+        mask = np.asarray(known_intervened) > 0.5
+        intervened = frozenset(x for x in range(self.k) if mask[:, x].any())
+
+        if self.evidence == "oracle":
+            fresh = intervened - self._applied
+            # Under power limiting a repeat is informative, so "nothing new was intervened
+            # on" is no longer a reason to skip the update -- the row count may still have
+            # risen. See the block below.
+            if not fresh and (self.evidence_power >= 1.0
+                              or all(int(mask[:, x].sum()) == self._attempts.get(x, 0)
+                                     for x in range(self.k))):
+                if self.last is None:
+                    self.last = FactoredBelief(self._possible, self.k)
+                return self.last.directed
+            from cb.versionspace import reveal
+            if self.evidence_power < 1.0:
+                # A REPEAT MUST BUY ANOTHER DRAW, or this reproduces the wrong thing. Under
+                # plain oracle evidence a second intervention on the same node reveals
+                # nothing -- ancestry is already known -- so `fresh` correctly skips it, and
+                # the learner correctly learns never to repeat. Under SAMPLED evidence a
+                # repeat is exactly how you buy statistical power, and that inverted rule is
+                # the mechanism the transfer failure was traced to (repeat rate: greedy
+                # 0.247/0.331 against the learner's 0.110/0.138,
+                # HANDOVER_CLUSTER_SAMPLED_2026_08_29 section 1).
+                #
+                # So withheld questions have to become ASKABLE AGAIN when the node is
+                # intervened on again. Rows are the currency: `known_intervened` accumulates,
+                # so a rising row count for x means another experiment on x, and each one
+                # gets a fresh draw against `evidence_power`. Without this the prototype
+                # makes evidence scarcer without making repetition worth anything -- it
+                # would teach a policy the same "never repeat" rule, and fail transfer for
+                # the same reason.
+                attempts = {x: int(mask[:, x].sum()) for x in range(self.k)}
+                for x in range(self.k):
+                    if attempts[x] == 0 or attempts[x] == self._attempts.get(x, 0):
+                        continue
+                    if self.distance_weighted_power and self._hop is not None:
+                        # RUNG 5: power decays with hop distance from x instead of being
+                        # flat across every other node. hop=1 (adjacent) reduces to exactly
+                        # `evidence_power`, matching the flat behaviour exactly at distance
+                        # one -- this is a strict generalisation, not a different mechanism.
+                        others = [y for y in range(self.k) if y != x]
+                        per_pair_power = np.array(
+                            [self.evidence_power ** self._hop[x, y] for y in others])
+                        blind = self._power_rng.random(self.k - 1) >= per_pair_power
+                    else:
+                        blind = self._power_rng.random(self.k - 1) >= self.evidence_power
+                    self._apply_ancestry(x, reveal(self.truth, self.k, x), blind=blind)
+                self._attempts = attempts
+            else:
+                for x in fresh:
+                    self._apply_ancestry(x, reveal(self.truth, self.k, x))
+            self._applied = intervened
+        else:
+            if not intervened:
+                if self.last is None:
+                    self.last = FactoredBelief(self._possible, self.k)
+                return self.last.directed
+            from cb.versionspace import estimated_reveal_all
+            detected = estimated_reveal_all(data, known_intervened, tuple(intervened),
+                                            self.k, alpha=self.evidence_alpha, foreign=told)
+            if detected == self._detected and self.last is not None:
+                return self.last.directed
+            self._detected = detected
+            # Rebuild from the start: evidence accumulates with every round, so a pair
+            # refuted on thin data must get its chance back as rows arrive. Cheap here in a
+            # way it is not for the enumerated belief -- the state is O(k^2).
+            self.reset_marks()
+            for x, (ancestry, powered) in detected.items():
+                self._apply_ancestry(x, ancestry, powered)
+            self._applied = intervened
+        self.last = FactoredBelief(self._possible, self.k)
+        return self.last.directed
+
+    def reset_marks(self) -> None:
+        """Re-open every adjacent pair, keeping whatever skeleton `reset` established.
+
+        The skeleton is NOT re-derived from truth here: under an estimated skeleton the
+        sampled path rebuilds marks from scratch every round, and re-deriving would silently
+        restore the true adjacencies partway through the episode -- handing back exactly the
+        assumption the ablation exists to remove.
+        """
+        for index, (u, v) in enumerate(pairs(self.k)):
+            absent = self._seeded_absent.get((u, v), self.truth[index] == NONE)
+            self._possible[(u, v)] = (frozenset({NONE}) if absent
+                                      else frozenset({FWD, BACK, BI}))
+
+    # -- reporting -----------------------------------------------------------------------
+
+    def credit_fraction(self, true_mag: np.ndarray, required_positions=(),
+                        strict: bool = False) -> float:
+        """Fraction of pairs settled to the TRUE mark. Not a posterior mass -- there is no
+        joint here to take a mass of -- so it is reported as what it is."""
+        if self.last is None:
+            return 0.0
+        truth = marks_from_mag(true_mag)
+        hits = sum(1 for index, key in enumerate(pairs(self.k))
+                   if self._possible[key] == frozenset({truth[index]}))
+        return hits / max(len(self._possible), 1)
+
+    @property
+    def bidirected(self) -> np.ndarray:
+        return self.last.bidirected if self.last is not None else np.zeros((self.k, self.k))

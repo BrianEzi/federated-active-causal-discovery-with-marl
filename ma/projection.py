@@ -1,31 +1,12 @@
 """Latent projection of a DAG onto one agent's observable set.
 
-What an agent can learn about its own window, in the limit of infinite observational
-data, is not a DAG -- it is a MAG (maximal ancestral graph). The other agent's private
-nodes are marginalised out, and where one of them is a common cause of two visible
-variables, the projection carries a *bidirected* edge meaning "these two share an
-unobserved common cause", with no claim about what or where that cause is.
+What an agent can learn about its own window from infinite observational data is not a DAG
+but a maximal ancestral graph. Variables outside the window are marginalised out, and where
+one of them is a common cause of two visible variables the projection carries a bidirected
+edge: these two share an unobserved common cause, with no claim about what or where it is.
 
-This module builds that projection so we can ask a structural question the whole
-two-agent belief representation depends on:
-
-    can a bidirected edge ever touch an agent's PRIVATE node?
-
-If it cannot -- if confounding is confined to the shared set `X` -- then an agent's
-belief is a DAG over its own window plus one flag per shared *pair*, the DAG part stays
-decomposable, and the subset DP carries over untouched. If it can, the belief needs full
-MAG machinery and the score stops decomposing. See docs/MA_DESIGN.md sections 3 and 12.
-
-Definitions used here are the textbook ones (Richardson & Spirtes 2002):
-
-  adjacency    u and v are adjacent in the MAG iff NO subset of the remaining observed
-               variables d-separates them. (Equivalently: an inducing path exists. The
-               separation form is used because it is directly checkable.)
-  orientation  u -> v if u is an ancestor of v in the underlying DAG; v -> u if the
-               reverse; u <-> v if neither is an ancestor of the other.
-
-Brute force over all separating subsets: correct by construction and fast enough at the
-sizes we enumerate. It is a verification tool, not an inference engine.
+The projection is the ground truth every window-level belief is scored against, so it is
+computed from the true global graph rather than estimated.
 """
 from __future__ import annotations
 
@@ -41,7 +22,7 @@ BIDIRECTED = 2    # symmetric: proj[u, v] == proj[v, u] == BIDIRECTED
 
 
 def ancestor_matrix(adjacency: np.ndarray) -> np.ndarray:
-    """`[d, d]` bool, `anc[u, v]` iff there is a directed path u -> ... -> v.
+    """`[d, d]` bool, `anc[u, v]` iff there is a directed path u ->... -> v.
 
     Reflexive closure is excluded: a node is not its own ancestor here, which matches the
     way ancestry is used below (`u -> v` requires a genuine path).
@@ -103,6 +84,65 @@ def d_separated(adjacency: np.ndarray, u: int, v: int, cond: Sequence[int]) -> b
     return True
 
 
+def _neighbour_lists(adjacency):
+    """For each node, every node adjacent to it in EITHER direction."""
+    d = adjacency.shape[0]
+    return [np.flatnonzero((adjacency[w] > 0) | (adjacency[:, w] > 0)) for w in range(d)]
+
+
+def _inducing_path_exists(adjacency, anc, observed_set, u: int, v: int,
+                          neighbours=None) -> bool:
+    """Is there an INDUCING PATH between u and v relative to the hidden nodes?
+
+    Verma & Pearl's characterisation, and the reason it matters here is purely
+    computational: u and v are adjacent in the MAG over `observed` exactly when such a path
+    exists, so this replaces a search over every conditioning subset -- 2^(k-2) per pair,
+    which made ground truth, not the belief, the thing that could not scale past k~8.
+
+    A path between u and v is inducing relative to the hidden set when every node strictly
+    between the endpoints is either
+      - a COLLIDER on the path AND an ancestor of u or of v, or
+      - a NON-COLLIDER that is HIDDEN.
+
+    Searched as reachability over states (node, did we arrive by an arrowhead), which is
+    what makes colliders decidable locally: in a DAG the edge x -> w puts an arrowhead at w,
+    so w is a collider on the path exactly when both its edges point into it.
+    """
+    # `neighbours` depends only on `adjacency`, and the caller runs this once per PAIR --
+    # C(k,2) times over the same graph. Building it here cost d flatnonzero calls per pair
+    # and dominated the whole projection: 683k of the 695k array scans in a profiled
+    # training run came from this one line. Hoisted to `latent_projection`; recomputed here
+    # only when called standalone, so the function still works on its own.
+    if neighbours is None:
+        neighbours = _neighbour_lists(adjacency)
+    # state: (node, arrived_by_arrowhead)
+    start = [(int(w), bool(adjacency[u, w] > 0)) for w in neighbours[u]]
+    seen = set()
+    stack = [state for state in start]
+    for state in stack:
+        seen.add(state)
+    while stack:
+        node, in_arrow = stack.pop()
+        if node == v:
+            return True
+        for nxt in neighbours[node]:
+            nxt = int(nxt)
+            if nxt == u:
+                continue
+            out_arrow_at_node = bool(adjacency[nxt, node] > 0)   # nxt -> node
+            collider = in_arrow and out_arrow_at_node
+            if collider:
+                if not (anc[node, u] or anc[node, v]):
+                    continue
+            elif node in observed_set:
+                continue                    # a visible non-collider blocks the path
+            state = (nxt, bool(adjacency[node, nxt] > 0))
+            if state not in seen:
+                seen.add(state)
+                stack.append(state)
+    return False
+
+
 def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndarray:
     """MAG over `observed`, as a `[k, k]` matrix of edge codes indexed by position in
     `observed` (not by global node id).
@@ -112,19 +152,11 @@ def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndar
     anc = ancestor_matrix(adjacency)
     proj = np.zeros((k, k), dtype=np.int8)
 
+    observed_set = set(observed)
+    neighbours = _neighbour_lists(adjacency)
     for i, j in combinations(range(k), 2):
         u, v = observed[i], observed[j]
-        rest = [w for w in observed if w not in (u, v)]
-
-        separable = False
-        for size in range(len(rest) + 1):
-            for cond in combinations(rest, size):
-                if d_separated(adjacency, u, v, cond):
-                    separable = True
-                    break
-            if separable:
-                break
-        if separable:
+        if not _inducing_path_exists(adjacency, anc, observed_set, u, v, neighbours):
             continue                      # non-adjacent in the MAG
 
         if anc[u, v]:
@@ -136,6 +168,40 @@ def latent_projection(adjacency: np.ndarray, observed: Sequence[int]) -> np.ndar
     return proj
 
 
+def observational_skeleton(adjacency: np.ndarray, observed: Sequence[int]):
+    """(adjacency [k, k] bool, sepsets {(i, j): frozenset}) -- the infinite-data limit of
+    what OBSERVATION alone can know about the window: which pairs are connected, and for
+    each unconnected pair one witnessing separating set (window positions).
+
+    Added for the oracle warm start ("start the agents at the equivalence
+    class"): the same search `latent_projection` runs, but keeping the separating set,
+    which is what collider orientation consumes. Conditioning sets range over OBSERVED
+    nodes only, so nothing an observational method could not know leaks through --
+    in particular, a hidden confounder's pair stays ADJACENT here, and detecting the
+    confounding remains entirely the interventions' job.
+    """
+    observed = list(observed)
+    k = len(observed)
+    adj = np.zeros((k, k), dtype=bool)
+    sepsets = {}
+    for i, j in combinations(range(k), 2):
+        u, v = observed[i], observed[j]
+        rest = [w for w in observed if w not in (u, v)]
+        found = None
+        for size in range(len(rest) + 1):
+            for cond in combinations(rest, size):
+                if d_separated(adjacency, u, v, cond):
+                    found = frozenset(observed.index(w) for w in cond)
+                    break
+            if found is not None:
+                break
+        if found is None:
+            adj[i, j] = adj[j, i] = True
+        else:
+            sepsets[(i, j)] = found
+    return adj, sepsets
+
+
 def bidirected_pairs(adjacency: np.ndarray, observed: Sequence[int]) -> Tuple[Tuple[int, int], ...]:
     """Global-node-id pairs carrying a bidirected edge in the projection onto `observed`."""
     observed = list(observed)
@@ -145,3 +211,167 @@ def bidirected_pairs(adjacency: np.ndarray, observed: Sequence[int]) -> Tuple[Tu
         if proj[i, j] == BIDIRECTED:
             out.append((observed[i], observed[j]))
     return tuple(out)
+
+
+# =======================================================================================
+# MERGED FROM ma/confounding.py.
+#
+# The two modules both answered "which observed pairs are confounded", by DIFFERENT
+# criteria, and each had its own graph-walking code. They are now one module -- but the
+# criteria are NOT unified, because they genuinely disagree and one of them backs a
+# reported number.
+#
+# bidirected_pairs the MAG definition (Richardson & Spirtes 2002). A pair is
+# bidirected only if no observed subset d-separates it AND neither
+# node is an ancestor of the other. AUTHORITATIVE -- this is what
+# ma/env._confounded_positions scores identification against, and
+# what produced the 2.3% structural-ceiling figure.
+#
+# common_source_pairs "these two share a hidden common source, reachable through
+# hidden intermediates". A SUFFICIENT condition for confounding,
+# but it OVER-REPORTS relative to the MAG: where a real edge
+# u -> v coexists with a hidden common cause, u IS an ancestor of
+# v, so the MAG carries u -> v and this criterion still returns the
+# pair. Retained because measure_topology's published numbers were
+# computed with it; see test_the_two_confounding_criteria_diverge.
+#
+# Renamed from `latent_projection_pairs` on the merge: the old name implied it computed the
+# latent projection, which is what `latent_projection` above actually does.
+# =======================================================================================
+
+from typing import Dict
+
+from ma.topology import Topology, edge_class, masked_indices
+
+
+def common_source_pairs(adjacency: np.ndarray, observed: Sequence[int],
+                            hidden: Sequence[int]) -> list:
+    """Pairs of observed nodes sharing a hidden common source.
+
+    Each pair is one bidirected edge in the latent projection -- one place where the
+    agent's DAG model is wrong.
+    """
+    adjacency = np.asarray(adjacency) > 0.5
+    observed_set = set(int(x) for x in observed)
+    hidden_set = set(int(x) for x in hidden)
+
+    pairs = set()
+    for source in hidden_set:
+        # Observed nodes reachable from `source` through hidden intermediates only.
+        reached = set()
+        stack = [source]
+        seen = {source}
+        while stack:
+            node = stack.pop()
+            for child in np.flatnonzero(adjacency[node]).tolist():
+                if child in observed_set:
+                    reached.add(child)
+                elif child in hidden_set and child not in seen:
+                    seen.add(child)
+                    stack.append(child)
+        ordered = sorted(reached)
+        for i in range(len(ordered)):
+            for j in range(i + 1, len(ordered)):
+                pairs.add((ordered[i], ordered[j]))
+    return sorted(pairs)
+
+
+def is_confounded(adjacency: np.ndarray, observed: Sequence[int],
+                  hidden: Sequence[int]) -> bool:
+    """Does this agent's view contain at least one latent confounder?"""
+    return len(common_source_pairs(adjacency, observed, hidden)) > 0
+
+
+def measure_topology(space, topology: Topology, max_graphs: int = None) -> Dict:
+    """GATE-M3's first output: how misspecified is each agent's local DAG model?
+
+    Enumerated over the masked space rather than sampled, so this is a computation and not
+    an estimate. Reports, over all graphs the topology permits:
+
+      `confounded_a` / `confounded_b` -- fraction of graphs giving that agent a
+                                          latently-confounded view.
+      `confounded_either` -- fraction where at least one agent's model is
+                                          misspecified. This is the number that decides
+                                          whether local DAG posteriors are defensible.
+      `mean_bidirected` -- average number of bidirected edges induced, i.e.
+                                          how badly wrong, not just how often.
+    """
+    indices = masked_indices(space, topology)
+    if max_graphs is not None and len(indices) > max_graphs:
+        indices = np.random.default_rng(0).choice(indices, size=max_graphs, replace=False)
+
+    observed_a, hidden_a = topology.observed_by(0), topology.hidden_from(0)
+    observed_b, hidden_b = topology.observed_by(1), topology.hidden_from(1)
+
+    n_a = n_b = n_either = 0
+    total_pairs = 0
+    for index in indices:
+        adjacency = space.dags[index]
+        pairs_a = common_source_pairs(adjacency, observed_a, hidden_a)
+        pairs_b = common_source_pairs(adjacency, observed_b, hidden_b)
+        n_a += bool(pairs_a)
+        n_b += bool(pairs_b)
+        n_either += bool(pairs_a or pairs_b)
+        total_pairs += len(pairs_a) + len(pairs_b)
+
+    n = len(indices)
+    return {
+        "topology": topology.name,
+        "n_graphs": int(n),
+        "n_graphs_in_space": int(len(masked_indices(space, topology))),
+        "confounded_a": n_a / n,
+        "confounded_b": n_b / n,
+        "confounded_either": n_either / n,
+        "mean_bidirected": total_pairs / n,
+    }
+
+
+def ambiguity_location(space, topology: Topology, max_graphs: int = None) -> Dict:
+    """GATE-M3's second output: WHERE does residual ambiguity sit?
+
+    For each graph, the edges whose orientation is not determined by its Markov equivalence
+    class are the ones that differ among class members. Classified by position relative to
+    the federation boundary. The design is only interesting if a real share of the
+    difficulty is at the boundary -- if all of it is interior, each agent can solve its own
+    half alone and there is nothing to coordinate about.
+    """
+    indices = masked_indices(space, topology)
+    allowed = topology.allowed_edges()
+    rng = np.random.default_rng(0)
+    if max_graphs is not None and len(indices) > max_graphs:
+        indices = rng.choice(indices, size=max_graphs, replace=False)
+
+    # Group the masked graphs by Markov equivalence class.
+    mec_of = space.mec_id[indices]
+    order = np.argsort(mec_of, kind="stable")
+    indices, mec_of = indices[order], mec_of[order]
+    boundaries = np.flatnonzero(np.diff(mec_of)) + 1
+    groups = np.split(np.arange(len(indices)), boundaries)
+
+    counts = {"interior": 0, "private_exposed": 0, "exposed_exposed": 0}
+    singletons = 0
+    d = topology.d
+    for group in groups:
+        if len(group) == 1:
+            singletons += 1
+            continue
+        members = np.asarray(space.dags[indices[group]]) > 0.5
+        # An edge is ambiguous within the class when it is not present in every member.
+        varies = members.any(axis=0) & ~members.all(axis=0)
+        for u in range(d):
+            for v in range(d):
+                if varies[u, v] and allowed[u, v]:
+                    label = edge_class(topology, u, v)
+                    if label in counts:
+                        counts[label] += 1
+
+    total = sum(counts.values())
+    return {
+        "topology": topology.name,
+        "n_classes": len(groups),
+        "singleton_classes": singletons,
+        "singleton_fraction": singletons / max(len(groups), 1),
+        "ambiguous_edge_counts": counts,
+        "ambiguous_edge_shares": {k: (v / total if total else 0.0)
+                                  for k, v in counts.items()},
+    }

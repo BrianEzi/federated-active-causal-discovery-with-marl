@@ -1,0 +1,273 @@
+<!doctype html><meta charset="utf-8"><title>The setup</title>
+<style>
+ body{font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+   max-width:1600px;margin:0 auto;padding:28px;color:#222;background:#fbfbfc}
+ h1{font-size:24px;margin:0 0 4px} h2{font-size:17px;margin:34px 0 6px}
+ p{color:#555;max-width:820px;margin:0 0 12px}
+ .row{display:flex;gap:20px;flex-wrap:wrap}
+ .meta{color:#777;font-size:13px;margin-bottom:18px}
+ svg{background:#fff;border:1px solid #e6e6ea;border-radius:8px}
+</style>
+<h1>Federated active causal discovery &mdash; the setup</h1>
+<div class="meta">3 agents &middot; 3 private variables each &middot;
+3 shared &middot; d=12 &middot; window k=6 &middot;
+scale-free (m=2) &middot; seed 3</div>
+<h2>1. The system &mdash; the true DAG over every variable</h2><p>Each agent's private block has its own colour; the shared block is grey. <b>No edge ever runs between two different private blocks</b> &mdash; that is the jointly-visible mask, and at this topology it forbids about half of all ordered pairs.</p><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">true DAG</text>
+<line x1="86.3" y1="211.5" x2="121.1" y2="297.7" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="95.7" y1="197.6" x2="157.7" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="94.3" y1="191.4" x2="366.4" y2="67.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="137.3" y1="301.0" x2="369.3" y2="71.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="139.7" y1="304.2" x2="556.9" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="385.6" y1="297.7" x2="420.4" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="411.0" y1="197.6" x2="349.0" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="627.7" y1="297.7" x2="592.9" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="638.9" y1="297.7" x2="673.7" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="620.3" y1="304.2" x2="203.1" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="664.9" y1="193.6" x2="204.4" y2="64.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="670.0" y1="185.9" x2="579.4" y2="72.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="367.5" y1="69.1" x2="185.2" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="380.0" y1="75.8" x2="380.0" y2="296.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="384.8" y1="75.0" x2="421.2" y2="183.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="392.5" y1="69.1" x2="574.8" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="390.7" y1="71.4" x2="622.7" y2="301.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="393.6" y1="67.0" x2="665.7" y2="191.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="557.0" y1="68.3" x2="347.0" y2="190.1" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<circle cx="80.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="80.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">0</text>
+<circle cx="126.7" cy="311.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="126.7" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">1</text>
+<circle cx="172.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="172.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">2</text>
+<circle cx="334.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="334.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">3</text>
+<circle cx="380.0" cy="311.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">4</text>
+<circle cx="426.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="426.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">5</text>
+<circle cx="587.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="587.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">6</text>
+<circle cx="633.3" cy="311.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="633.3" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">7</text>
+<circle cx="679.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="679.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">8</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg>
+<h2>2.1 Agent 0 &mdash; what it can see, and what it must conclude</h2><p>Left: the same system, with everything outside this agent's window faint. Right: the agent's true MAG. A hidden common cause sitting in someone else's private block projects to a <b style='color:#c0392b'>dashed red bidirected edge</b> &mdash; the agent sees the dependence but not the variable causing it. That edge is what the thesis is about.</p><div class="row"><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 0: visible</text>
+<line x1="86.3" y1="211.5" x2="121.1" y2="297.7" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="95.7" y1="197.6" x2="157.7" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="94.3" y1="191.4" x2="366.4" y2="67.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="137.3" y1="301.0" x2="369.3" y2="71.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="139.7" y1="304.2" x2="556.9" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="385.6" y1="297.7" x2="420.4" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="411.0" y1="197.6" x2="349.0" y2="197.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="627.7" y1="297.7" x2="592.9" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="638.9" y1="297.7" x2="673.7" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="620.3" y1="304.2" x2="203.1" y2="68.2" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="664.9" y1="193.6" x2="204.4" y2="64.8" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="670.0" y1="185.9" x2="579.4" y2="72.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="367.5" y1="69.1" x2="185.2" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="380.0" y1="75.8" x2="380.0" y2="296.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="384.8" y1="75.0" x2="421.2" y2="183.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="392.5" y1="69.1" x2="574.8" y2="189.3" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="390.7" y1="71.4" x2="622.7" y2="301.0" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="393.6" y1="67.0" x2="665.7" y2="191.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="557.0" y1="68.3" x2="347.0" y2="190.1" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<circle cx="80.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="80.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">0</text>
+<circle cx="126.7" cy="311.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="126.7" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">1</text>
+<circle cx="172.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="172.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">2</text>
+<circle cx="334.0" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="334.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">3</text>
+<circle cx="380.0" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">4</text>
+<circle cx="426.0" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="426.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">5</text>
+<circle cx="587.3" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="587.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">6</text>
+<circle cx="633.3" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="633.3" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">7</text>
+<circle cx="679.3" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="679.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">8</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 0: its true MAG</text>
+<line x1="86.3" y1="211.5" x2="121.1" y2="297.7" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="95.7" y1="197.6" x2="157.7" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="94.3" y1="191.4" x2="366.4" y2="67.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="137.3" y1="301.0" x2="369.3" y2="71.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="139.7" y1="304.2" x2="556.9" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="367.5" y1="69.1" x2="185.2" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="365.0" y1="60.8" x2="205.0" y2="60.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="395.0" y1="60.8" x2="555.0" y2="60.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M190.0,60.8 Q380.0,14.8 570.0,60.8" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#b)" marker-start="url(#b)"/>
+<circle cx="80.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="80.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">0</text>
+<circle cx="126.7" cy="311.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="126.7" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">1</text>
+<circle cx="172.7" cy="197.6" r="14" fill="#2f6f9f" stroke="#fff" stroke-width="2"/>
+<text x="172.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">2</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg></div>
+<h2>2.2 Agent 1 &mdash; what it can see, and what it must conclude</h2><p>Left: the same system, with everything outside this agent's window faint. Right: the agent's true MAG. A hidden common cause sitting in someone else's private block projects to a <b style='color:#c0392b'>dashed red bidirected edge</b> &mdash; the agent sees the dependence but not the variable causing it. That edge is what the thesis is about.</p><div class="row"><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 1: visible</text>
+<line x1="86.3" y1="211.5" x2="121.1" y2="297.7" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="95.7" y1="197.6" x2="157.7" y2="197.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="94.3" y1="191.4" x2="366.4" y2="67.0" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="137.3" y1="301.0" x2="369.3" y2="71.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="139.7" y1="304.2" x2="556.9" y2="68.2" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="385.6" y1="297.7" x2="420.4" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="411.0" y1="197.6" x2="349.0" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="627.7" y1="297.7" x2="592.9" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="638.9" y1="297.7" x2="673.7" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="620.3" y1="304.2" x2="203.1" y2="68.2" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="664.9" y1="193.6" x2="204.4" y2="64.8" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="670.0" y1="185.9" x2="579.4" y2="72.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="367.5" y1="69.1" x2="185.2" y2="189.3" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="380.0" y1="75.8" x2="380.0" y2="296.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="384.8" y1="75.0" x2="421.2" y2="183.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="392.5" y1="69.1" x2="574.8" y2="189.3" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="390.7" y1="71.4" x2="622.7" y2="301.0" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="393.6" y1="67.0" x2="665.7" y2="191.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="557.0" y1="68.3" x2="347.0" y2="190.1" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<circle cx="80.7" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="80.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">0</text>
+<circle cx="126.7" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="126.7" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">1</text>
+<circle cx="172.7" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="172.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">2</text>
+<circle cx="334.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="334.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">3</text>
+<circle cx="380.0" cy="311.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">4</text>
+<circle cx="426.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="426.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">5</text>
+<circle cx="587.3" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="587.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">6</text>
+<circle cx="633.3" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="633.3" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">7</text>
+<circle cx="679.3" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="679.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">8</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 1: its true MAG</text>
+<line x1="411.0" y1="197.6" x2="349.0" y2="197.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="557.0" y1="68.3" x2="347.0" y2="190.1" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="385.6" y1="297.7" x2="420.4" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="380.0" y1="75.8" x2="380.0" y2="296.6" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="384.8" y1="75.0" x2="421.2" y2="183.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="365.0" y1="60.8" x2="205.0" y2="60.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="395.0" y1="60.8" x2="555.0" y2="60.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M190.0,60.8 Q380.0,14.8 570.0,60.8" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#b)" marker-start="url(#b)"/>
+<circle cx="334.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="334.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">3</text>
+<circle cx="380.0" cy="311.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">4</text>
+<circle cx="426.0" cy="197.6" r="14" fill="#b5651d" stroke="#fff" stroke-width="2"/>
+<text x="426.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">5</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg></div>
+<h2>2.3 Agent 2 &mdash; what it can see, and what it must conclude</h2><p>Left: the same system, with everything outside this agent's window faint. Right: the agent's true MAG. A hidden common cause sitting in someone else's private block projects to a <b style='color:#c0392b'>dashed red bidirected edge</b> &mdash; the agent sees the dependence but not the variable causing it. That edge is what the thesis is about.</p><div class="row"><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 2: visible</text>
+<line x1="86.3" y1="211.5" x2="121.1" y2="297.7" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="95.7" y1="197.6" x2="157.7" y2="197.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="94.3" y1="191.4" x2="366.4" y2="67.0" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="137.3" y1="301.0" x2="369.3" y2="71.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="139.7" y1="304.2" x2="556.9" y2="68.2" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="385.6" y1="297.7" x2="420.4" y2="211.5" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="411.0" y1="197.6" x2="349.0" y2="197.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="627.7" y1="297.7" x2="592.9" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="638.9" y1="297.7" x2="673.7" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="620.3" y1="304.2" x2="203.1" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="664.9" y1="193.6" x2="204.4" y2="64.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="670.0" y1="185.9" x2="579.4" y2="72.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="367.5" y1="69.1" x2="185.2" y2="189.3" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="380.0" y1="75.8" x2="380.0" y2="296.6" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="384.8" y1="75.0" x2="421.2" y2="183.4" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<line x1="392.5" y1="69.1" x2="574.8" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="390.7" y1="71.4" x2="622.7" y2="301.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="393.6" y1="67.0" x2="665.7" y2="191.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="557.0" y1="68.3" x2="347.0" y2="190.1" stroke="#d8d8dd" stroke-width="1.0" marker-end="url(#af)"/>
+<circle cx="80.7" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="80.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">0</text>
+<circle cx="126.7" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="126.7" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">1</text>
+<circle cx="172.7" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="172.7" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">2</text>
+<circle cx="334.0" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="334.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">3</text>
+<circle cx="380.0" cy="311.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">4</text>
+<circle cx="426.0" cy="197.6" r="14" fill="#d8d8dd" stroke="#fff" stroke-width="2"/>
+<text x="426.0" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#aaa">5</text>
+<circle cx="587.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="587.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">6</text>
+<circle cx="633.3" cy="311.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="633.3" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">7</text>
+<circle cx="679.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="679.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">8</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg><svg viewBox="0 0 760 380" width="100%" style="max-width:760px;height:auto">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker><marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d8d8dd"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>
+<text x="380.0" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#222">agent 2: its true MAG</text>
+<line x1="627.7" y1="297.7" x2="592.9" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="392.5" y1="69.1" x2="574.8" y2="189.3" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="638.9" y1="297.7" x2="673.7" y2="211.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="620.3" y1="304.2" x2="203.1" y2="68.2" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="390.7" y1="71.4" x2="622.7" y2="301.0" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="664.9" y1="193.6" x2="204.4" y2="64.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="393.6" y1="67.0" x2="665.7" y2="191.4" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="670.0" y1="185.9" x2="579.4" y2="72.5" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="395.0" y1="60.8" x2="555.0" y2="60.8" stroke="#555" stroke-width="1.6" marker-end="url(#a)"/>
+<circle cx="587.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="587.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">6</text>
+<circle cx="633.3" cy="311.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="633.3" y="315.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">7</text>
+<circle cx="679.3" cy="197.6" r="14" fill="#4d8b5f" stroke="#fff" stroke-width="2"/>
+<text x="679.3" y="201.6" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">8</text>
+<circle cx="190.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="190.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">9</text>
+<circle cx="380.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="380.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">10</text>
+<circle cx="570.0" cy="60.8" r="14" fill="#6b6b76" stroke="#fff" stroke-width="2"/>
+<text x="570.0" y="64.8" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">11</text>
+</svg></div>

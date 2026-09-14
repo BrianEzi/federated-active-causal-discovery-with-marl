@@ -12,7 +12,7 @@ posterior mass on the truth, and would be invisible to a coarser check.
 !! DO NOT MOVE THIS FILE TO legacy/tests/ !!
 
 It imports from `legacy/`, which makes it look like the nineteen retired v1 test files moved
-out on 2026-08-22. It is the opposite. Here v1 is the **independent reference oracle** for
+out. It is the opposite. Here v1 is the **independent reference oracle** for
 CURRENT code: the value of the check is precisely that the reference shares no code with the
 thing under test, so a shared bug cannot hide in both. If `legacy/ma_v1/` is ever deleted,
 convert this to a frozen fixture FIRST -- never drop the check.
@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 
 from legacy.ma_v1.env import AgentView, MAConfig, TwoAgentEnv
-from ma.score_regimes import JOINT, JOINT_CONF, POOLED, RULES, SUBSET, RegimeScorer
+from crosscheck.score_regimes import JOINT, JOINT_CONF, POOLED, RULES, SUBSET, RegimeScorer
 from ma.topology import Topology, two_agent
 
 T113 = two_agent("(1,1,3)", a_private=(0,), b_private=(1,), exposed=(2, 3, 4))

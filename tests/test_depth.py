@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import torch
 
-from sa.policy import PerNodeActorCritic
+from ma.nets import PerNodeActorCritic
 
 
 def _net(d=5, hidden=64, seed=0, **kwargs):

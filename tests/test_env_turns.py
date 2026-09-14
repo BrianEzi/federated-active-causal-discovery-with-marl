@@ -69,7 +69,7 @@ def test_random_turn_order_uses_both_agents_and_still_moves_one():
 
 def test_simultaneous_is_unchanged():
     """The legacy protocol must still let both agents move in one round -- every result
-    before 2026-08-20 was measured under it and has to stay reproducible."""
+ was measured under it and has to stay reproducible."""
     env = _env(turn_order=SIMULTANEOUS)
     env.step({0: _clamp_own_private(env, 0), 1: _clamp_own_private(env, 1)})
     assert env.n_interventions == {0: 1, 1: 1}
@@ -80,9 +80,9 @@ def test_simultaneous_is_unchanged():
 
 
 
-# NOTE. Five tests were REMOVED here on 2026-08-21, not fixed. They pinned the pre-spec
+# NOTE. Five tests were REMOVED here, not fixed. They pinned the pre-spec
 # rules -- a per-agent intervention budget, the consecutive-pass tally, and "a forfeited turn
-# generates no data" -- all of which `docs/TURN_BUDGET_SPEC.md` deliberately replaces. Their
+# generates no data" -- all of which `docs/ARCHITECTURE.md` deliberately replaces. Their
 # successors live in `tests/test_env_turn_budget.py`, numbered to the spec's section 12.
 # A test that encodes a superseded decision is worse than no test: it argues for the old
 # design every time someone runs it.
@@ -121,17 +121,74 @@ def test_a_vary_on_the_hidden_node_does_not_clean_anything():
     assert not env.clean[1].any()
 
 
-def test_multi_private_topology_is_refused_rather_than_scored_wrong():
-    """RESTORED 2026-08-22. A 2026-08-22 attempt at per-block confounding subsets (S_r)
-    briefly lifted this guard, but its mixture tracks only an AGGREGATE clean fraction per
-    round -- how MANY hidden nodes were clamped, not WHICH -- so a confounding hypothesis
-    about a specific hidden node is scored identically whether that node was the one
-    clamped or a different one was. Confirmed directly against the belief_dp.py code: no
-    per-node identity reaches the scoring mixture, only a scalar fraction. Refuse until the
-    subset is tracked exactly, per docs/N_AGENT_REFACTOR_SPEC.md section 4."""
-    config = MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2)
-    with pytest.raises(NotImplementedError, match="hide up to"):
-        TwoAgentEnv(config, seed=0)
+def test_multi_hidden_topology_is_a_backend_capability_question():
+    """CONVERTED TWICE. Originally asserted `NotImplementedError` (the guard); converted
+ to assert acceptance when the guard was removed by instruction; converted
+    again when the backend boundary landed and the soundness constraint became
+    the CAPABILITY CHECK the removal note promised.
+
+    Three facts, each asserted: the EXACT backend refuses a multi-hidden topology by
+    default (it scores the wrong hypothesis there -- see the test below); the refusal can
+    be overridden explicitly for demonstrations; the CONSTRAINT backend accepts the same
+    topology with no override, which is what makes rung 1 runnable at all.
+    """
+    assert max(len(T_2_2_2.hidden_from(a)) for a in T_2_2_2.agents) > 1
+
+    with pytest.raises(ValueError, match="UNSOUND"):
+        TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2), seed=0)
+
+    env = TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2,
+                               allow_unsound_backend=True), seed=0)
+    assert env.topology is T_2_2_2
+
+    env = TwoAgentEnv(MAConfig(topology=T_2_2_2, n_obs=100, n_int=20, budget=2,
+                               belief_backend="constraint", cb_n_boot=4), seed=0)
+    assert env.topology is T_2_2_2
+
+
+def test_clean_fraction_cannot_say_WHICH_node_was_clamped():
+    """The defect the removed guard was protecting, demonstrated rather than asserted.
+
+    THIS IS THE TEST THAT MATTERS. The guard's message is gone; the reason must not be.
+
+    `clean[agent]` is a SCALAR fraction, `n_clamped / len(hidden)`. With two nodes hidden
+    from an agent, clamping either ONE of them yields 0.5 -- an identical value for two
+    materially different experiments. `belief_dp._assignment_weights` then mixes the clean
+    and dirty score tables with that single number, so a confounding hypothesis about `h1`
+    is scored identically whether `h1` or `h2` was the node actually clamped.
+
+    That is unsoundness, not approximation: the exact path scores the wrong hypothesis.
+
+    If someone makes `clean` per-node -- an `[n_rows, n_hidden]` mask, which is the real
+    fix -- this test SHOULD start failing, and the fix is to assert the two clamps now
+    produce DIFFERENT records. A green run here means the defect is still present.
+    """
+    topo = Topology(name="T_3agent_1each", private=((0,), (1,), (2,)), exposed=(3, 4, 5))
+    # allow_unsound_backend: this test EXISTS to demonstrate the unsoundness, which is
+    # exactly what the flag is for. Producing numbers with it is a different act.
+    config = MAConfig(topology=topo, n_obs=100, n_int=20, budget=4,
+                      turn_order=SIMULTANEOUS, action_modes=(CLAMP,),
+                      disclose_regime=True, allow_unsound_backend=True)
+
+    def clean_after_clamping(node_by_agent) -> float:
+        env = TwoAgentEnv(config, seed=0)
+        actions = {}
+        for agent in topo.agents:
+            window = env.windows[agent]
+            target = node_by_agent.get(agent)
+            actions[agent] = (window.pass_index if target is None
+                              else window.actions.index((target, CLAMP)))
+        env.step(actions)
+        # Agent 0 hides {1, 2}: one of the two was clamped, so the fraction is 0.5.
+        return float(env.clean[0][-1])
+
+    only_h1 = clean_after_clamping({1: 1})
+    only_h2 = clean_after_clamping({2: 2})
+
+    assert only_h1 == 0.5 and only_h2 == 0.5
+    assert only_h1 == only_h2, (
+        "two different experiments must currently be indistinguishable -- if this fails, "
+        "`clean` has become per-node and the exact path may now be sound")
 
 
 def test_turn_order_is_validated():

@@ -1,6 +1,6 @@
 """Two-agent active causal discovery on one shared system.
 
-Design of record: docs/MA_DESIGN.md, with the decisions taken tonight recorded in
+Design of record: docs/ARCHITECTURE.md, with the decisions taken tonight recorded in
 docs/MA_BUILD_LOG.md. The short version:
 
   ONE SYSTEM. Both agents study the same physical system, so every intervention perturbs
@@ -35,21 +35,21 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from ma.topology import Topology
-from sa.graphs import build_graph_space
-from sa.scm import sample_multi, sample_scm_params
-from ma.score_regimes import JOINT_CONF, RegimeScorer
-from sa.score import BGeScore
+from ma.graphs import build_graph_space
+from ma.scm import sample_multi, sample_scm_params
+from crosscheck.score_regimes import JOINT_CONF, RegimeScorer
+from crosscheck.score import BGeScore
 
 PASS_ACTION = -1
 
 # Intervention modes. The two-agent case needs BOTH, and that is a finding rather than a
 # convenience -- see docs/MA_BUILD_LOG.md.
 #
-#   VARY   do(v ~ N(0, scale)). The single-agent intervention. The node keeps varying, so
-#          its descendants move with it and orientations separate.
-#   CLAMP  do(v := 0). The node stops varying, so it stops transmitting variance. This is
-#          the ONLY kind that cuts a confounding path, because a randomised value replaces
-#          a latent common cause with a different latent common cause.
+# VARY do(v ~ N(0, scale)). The single-agent intervention. The node keeps varying, so
+# its descendants move with it and orientations separate.
+# CLAMP do(v := 0). The node stops varying, so it stops transmitting variance. This is
+# the ONLY kind that cuts a confounding path, because a randomised value replaces
+# a latent common cause with a different latent common cause.
 VARY = "vary"
 CLAMP = "clamp"
 MODES = (VARY, CLAMP)
@@ -60,7 +60,7 @@ class MAConfig:
     topology: Topology
     n_obs: int = 2000
     n_int: int = 200
-    # PER AGENT -- separate budgets, not a shared pool. Lowered 8 -> 5 on 2026-08-19 to
+    # PER AGENT -- separate budgets, not a shared pool. Lowered 8 -> 5 to
     # match the single-agent operating point, for the same measured reason: above ~8 the
     # budget stops binding and every arm converges, so the comparison measures nothing.
     budget: int = 5
@@ -68,17 +68,17 @@ class MAConfig:
     prior_p: float = 0.5
     intervene_scale: float = 2.0     # used by VARY; CLAMP always uses 0.0
     # Announce that SOME variable outside the other agent's window has been clamped --
-    # one bit per round, naming nothing. Measured 2026-08-16 to be the difference between
+    # one bit per round, naming nothing. to be the difference between
     # 0% and 100% rescue of a confounded agent, and therefore not optional if coordination
     # is to be possible at all. See docs/MA_BUILD_LOG.md.
     disclose_regime: bool = True
-    # How an agent scores data spanning two regimes. Measured 2026-08-17 over 300 episodes:
+    # How an agent scores data spanning two regimes. over 300 episodes:
     #
-    #   rule        unconfounded curve over p(clamp)   confounded payoff
-    #   pooled      0.815 0.838 0.804 0.808            +0.000
-    #   subset      0.815 0.454 0.708 0.956            +0.931   <- the valley
-    #   joint       0.815 0.852 0.841 0.856            +0.000
-    #   joint_conf  0.244 0.686 0.908 0.982            +0.690
+    # rule unconfounded curve over p(clamp) confounded payoff
+    # pooled 0.815 0.838 0.804 0.808 +0.000
+    # subset 0.815 0.454 0.708 0.956 +0.931 <- the valley
+    # joint 0.815 0.852 0.841 0.856 +0.000
+    # joint_conf 0.244 0.686 0.908 0.982 +0.690
     #
     # JOINT_CONF is the only rule that is both monotone (a learner can climb) and pays off
     # under confounding. It costs baseline accuracy when nobody clamps -- 0.244 against
@@ -107,7 +107,7 @@ class AgentView:
 
     def __init__(self, name: str, topology: Topology):
         self.name = name
-        # ma.topology indexes agents by INTEGER since 2026-08-22; this module is the v1
+        # ma.topology indexes agents by INTEGER; this module is the v1
         # reference oracle and still keys by name. Translating here keeps the cross-check
         # alive -- the oracle's independence is in its SCORING, not in how it numbers
         # agents, so this costs nothing that the comparison relies on.
@@ -331,7 +331,7 @@ class TwoAgentEnv:
         # Global identification needs nothing extra: cross-private edges are forbidden, so
         # every permitted edge lies in one window or the other, and two correct induced
         # DAGs union to the true global graph. Agreement on X and global acyclicity are
-        # then automatic. See MA_DESIGN section 5 and the derivation of 2026-08-16.
+        # then automatic. See docs/ARCHITECTURE.md.
         both = identified["A"] and identified["B"]
         out_of_budget = all(self.n_interventions[n] >= self.config.budget
                             for n in ("A", "B"))

@@ -1,0 +1,392 @@
+"""Attribution at larger windows: the candidate set factored over connected components.
+
+Enumerating whole attributions is bounded by the hypothesis space itself, which grows from
+5 candidates at a four-variable window to roughly 9e15 at thirty. Factoring per pair, the
+way `cb/factored.py` factors marks, does not work here: latent groups are atomic, so a
+latent confounding three variables explains all three pairs or none, and splitting the pairs
+apart admits combinations no single latent realises.
+
+Connected components of the bidirected graph are the right unit. Two pairs that share no
+variable cannot be explained by the same latent, so their hypotheses are independent and the
+product of per-component candidate sets is exactly the joint set, with no approximation.
+"""
+from __future__ import annotations
+
+from collections import Counter
+from itertools import combinations
+from typing import Dict, FrozenSet, List, Sequence, Tuple
+
+import numpy as np
+
+from cb.attribution import LatentGroup, attributions_for, consistent_with_partner
+from cb.factored_attribution import FactoredAttributedBackend
+
+Pair = Tuple[int, int]
+
+
+def connected_components(pairs: Sequence[Pair]) -> Tuple[Tuple[Pair, ...], ...]:
+    """The bidirected graph's connected components, as pair lists, deterministically ordered.
+
+    Deterministic because the components index the belief's candidate lists and the pruning
+    replays the whole message log against them -- an ordering that depended on set iteration
+    would make the belief depend on hash order rather than on evidence.
+    """
+    parent: Dict[int, int] = {}
+
+    def find(x: int) -> int:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for u, v in pairs:
+        a, b = find(u), find(v)
+        if a != b:
+            parent[a] = b
+    buckets: Dict[int, List[Pair]] = {}
+    for pair in pairs:
+        buckets.setdefault(find(pair[0]), []).append((min(pair), max(pair)))
+    return tuple(tuple(sorted(group)) for group in
+                 sorted(buckets.values(), key=lambda g: sorted(g)))
+
+
+def frequency_tables(components):
+    """(total, group_frequency, owner_frequency) for a set of per-component candidate lists.
+
+    EXACT for the product this belief represents: a group lives in exactly one component and
+    the components are independent, so a group's global frequency equals its frequency within
+    its own component. No sampling, no bound, no approximation on this side.
+    """
+    # COUNT IN INTEGERS, DIVIDE ONCE. Accumulating `+= 1/n` per candidate loses exactness:
+    # adding 1/1120 to itself 1120 times gives 0.9999999999999998, so a group present in
+    # EVERY candidate fails `freq >= 1.0` by one ulp and `score_groups` refuses to settle it
+    # at bar 1.0. Measured 31 Aug: that alone was the entire gap against the enumerated
+    # backend, which counts integers and divides once -- 36 right against 49 at k=12, every
+    # missing claim one the belief was fully certain of. A single division of int by int is
+    # exact where the count equals the denominator.
+    groups: Counter = Counter()
+    owners: Counter = Counter()
+    total = 1
+    for _, candidates in components:
+        n = len(candidates)
+        total *= n
+        local_groups: Counter = Counter()
+        local_owners: Counter = Counter()
+        for hypothesis in candidates:
+            for group in hypothesis:
+                local_groups[group] += 1
+                owner = group.owner
+                for u, v in group.pairs():
+                    local_owners[(u, v, owner)] += 1
+        denominator = max(n, 1)
+        for group, count in local_groups.items():
+            groups[group] += count / denominator
+        for key, count in local_owners.items():
+            owners[key] += count / denominator
+    return (total if components else 0), dict(groups), dict(owners)
+
+
+class ComponentAttributedBelief:
+    """Per-component candidate lists, read as one belief.
+
+    Frequencies are EXACT for the product this belief represents: a group lives in exactly
+    one component, and the components are independent, so its global frequency equals its
+    frequency within its own component. No sampling, no bound, no approximation on this side.
+    """
+
+    def __init__(self, structure, components, k: int, scope=(), tables=None):
+        self.k = int(k)
+        self.adjacency = structure.adjacency
+        self.directed = structure.directed
+        self.bidirected = structure.bidirected
+        # components: ((pairs, candidates),...) -- candidates is a tuple of attributions,
+        # each a tuple of LatentGroup whose pairs lie inside that component.
+        self.components = tuple(components)
+        # THE FREQUENCY TABLES ARE PASSED IN, NOT RECOMPUTED. They are a function of the
+        # CANDIDATES alone, and the candidates change only when the settled set does --
+        # perhaps a dozen times an episode. The structure matrices above change every round,
+        # so this object is rebuilt roughly (rounds x agents) times: profiled at 578 rebuilds
+        # over two episodes at k=12, of which this constructor was 64 s out of 77. The
+        # backend now computes the tables once per candidate change and hands them over.
+        if tables is None:
+            tables = frequency_tables(self.components)
+        self.total, self.group_frequency, self.owner_frequency = tables
+        # OUT OF SCOPE IS UNSURE, NOT WRONG -- see `cb/factored_attribution.py`. Scope here is
+        # the union of the components kept, so a component too dense to enumerate takes its
+        # own pairs out of scope and leaves every other component fully attributable.
+        self.scope = frozenset(scope or ())
+
+        self.n_boot = 0
+        self.ci_tests = 0
+        self.truncated_fraction = 0.0
+        self.replicates = None
+
+    @property
+    def space(self):
+        """No structure enumeration exists here, so there is no candidate list to expose."""
+        return ()
+
+    def edge_marginals(self) -> np.ndarray:
+        return self.directed
+
+    def confounded_pairs(self, threshold: float = 0.5) -> tuple:
+        return tuple((u, v) for u, v in combinations(range(self.k), 2)
+                     if self.bidirected[u, v] >= threshold)
+
+    def owner_channel(self, n_agents: int) -> np.ndarray:
+        """[pairs, n_agents] -- how much of the belief blames each agent for each pair."""
+        pair_list = list(combinations(range(self.k), 2))
+        out = np.zeros((len(pair_list), n_agents), dtype=float)
+        for index, (u, v) in enumerate(pair_list):
+            for owner in range(n_agents):
+                out[index, owner] = self.owner_frequency.get((u, v, owner), 0.0)
+        return out
+
+
+class ComponentAttributedBackend(FactoredAttributedBackend):
+    """Factored structure, component-factored ownership. Call-compatible with the others.
+
+    Inherits the lifecycle, the two evidence channels and the replay log from
+    `FactoredAttributedBackend` and replaces only how the candidate set is held. The parent
+    stays as the crosscheck reference; this is not a drop-in replacement for it in tests.
+    """
+
+    can_handle_multi_hidden = True
+
+    def __init__(self, k: int, shared_positions: Sequence[int] = (), n_agents: int = 2,
+                 agent: int = 0, evidence: str = "oracle", evidence_alpha: float = 0.001,
+                 max_component_pairs: int = 8, max_component_candidates: int = 50_000,
+                 local_disturbance: bool = True, **_ignored):
+        super().__init__(k, shared_positions=shared_positions, n_agents=n_agents, agent=agent,
+                         evidence=evidence, evidence_alpha=evidence_alpha,
+                         # The parent's global pair cap is exactly what this class removes.
+                         max_attribution_pairs=10 ** 9,
+                         local_disturbance=local_disturbance)
+        self.max_component_pairs = int(max_component_pairs)
+        self.max_component_candidates = int(max_component_candidates)
+        # Messages skipped because the pairs that could have supported rule 1 sit in a
+        # component this belief dropped. NOT a contradiction -- the belief simply was not
+        # asked -- and kept apart from `contradictions` so the two cannot be confused.
+        self.out_of_scope = 0
+        self._components: Tuple[Tuple[Tuple[Pair, ...], Tuple[tuple, ...]], ...] = ()
+        self._masks: Dict[tuple, Tuple[set, set]] = {}
+        self._tables = None
+        # THE MECHANISM COUNTERS. The claim this backend makes is that its precision comes
+        # from declining to apply rule 1 where it spans components -- and that those are
+        # disproportionately the clauses on which rule 1 is WRONG. That is a claim about
+        # where violations land, so it is counted rather than inferred: a message is
+        # `cross` when its moved pairs touch two or more of the belief's components, and
+        # `violation` when it refutes the TRUE attribution. If the violation RATE is higher
+        # among cross messages, the mechanism is real; if it is flat, the precision gain is
+        # a coincidence and must be reported as one.
+        self.messages_single = 0
+        self.messages_cross = 0
+        self.violations_single = 0
+        self.violations_cross = 0
+
+    # -- the candidate set ---------------------------------------------------------------
+
+    def reset(self, true_mag: np.ndarray, adjacency=None, topology=None) -> None:
+        self._masks = {}
+        self._components = ()
+        self._tables = None
+        self.messages_single = self.messages_cross = 0
+        self.violations_single = self.violations_cross = 0
+        super().reset(true_mag, adjacency=adjacency, topology=topology)
+
+    def observe_partner(self, owner: int, moved) -> None:
+        """Instrumented, then delegated. Counts WHERE each message lands before applying it.
+
+        Measured against the components as they stand WHEN THE MESSAGE ARRIVES, which is the
+        state the propagation will actually face -- not against the final component structure,
+        which the message itself may go on to change.
+        """
+        if moved:
+            touched = sum(1 for pairs, _ in self._components
+                          if any(pair in moved for pair in pairs))
+            cross = touched >= 2
+            violated = bool(self.true_groups) and not consistent_with_partner(
+                self.true_groups, owner, moved,
+                local_disturbance=self.local_disturbance)
+            if cross:
+                self.messages_cross += 1
+                self.violations_cross += int(violated)
+            else:
+                self.messages_single += 1
+                self.violations_single += int(violated)
+        super().observe_partner(owner, moved)
+
+    def _rebuild(self, force: bool = False) -> None:
+        settled = self.settled_bidirected()
+        if settled == self._settled and not force:
+            # The settled set is unchanged, so the candidates are too -- but the STRUCTURE
+            # frequencies move on every own intervention, so the belief object is rebuilt.
+            self.last = ComponentAttributedBelief(
+                self.structure.last or self._empty_structure(), self._components, self.k,
+                scope=self._scope_of(self._components), tables=self._tables)
+            return
+
+        blocks: List[Tuple[Tuple[Pair, ...], tuple]] = []
+        self.truncated = False
+        for pairs in connected_components(settled):
+            # A component too dense to enumerate is TRUNCATED, not dropped. Dropping it takes
+            # every one of its pairs out of scope; truncating keeps a prefix, and a prefix is
+            # exactly the belief this agent would hold if only those pairs had settled --
+            # sound by the same argument as the global cap it replaces. A true group naming a
+            # pair that was cut is out of scope and scores UNSURE, never wrong. Measured
+            # before this: dropping put component scope BELOW the global cap it was meant to
+            # beat, 0.66 against 0.80 at k=12.
+            budget = self._pair_budget()
+            if len(pairs) > budget:
+                self.truncated = True
+                pairs = pairs[:budget]
+            blocks.append((pairs, attributions_for(pairs, self.owners)))
+
+        # COUNTED PER REPLAY, NOT ACCUMULATED ACROSS REPLAYS. The log is replayed in full
+        # every time the settled set changes, so incrementing a running total would count the
+        # same contradicting message once per rebuild and report an episode as far more
+        # broken than it is. These are counts of MESSAGES.
+        self.contradictions = 0
+        self.out_of_scope = 0
+        live = self._prune(blocks)
+
+        self._components = tuple(
+            (pairs, tuple(candidates[i] for i in sorted(alive)))
+            for (pairs, candidates), alive in zip(blocks, live))
+        self._settled = settled
+        self._tables = frequency_tables(self._components)
+        self.last = ComponentAttributedBelief(
+            self.structure.last or self._empty_structure(), self._components, self.k,
+            scope=self._scope_of(self._components), tables=self._tables)
+
+    def _pair_budget(self) -> int:
+        """How many pairs one component may hold, from the enumeration cost it implies.
+
+        The COST of enumerating a component is (2^owners - 1)^pairs -- the owner-set
+        assignments tried, before canonical dedup collapses them, which is not the number
+        that survives. So the budget is derived from the estimate BEFORE any enumeration
+        happens: a budget checked on the result is a budget checked after the work it was
+        meant to prevent, and at three partners a seven-pair component is 800,000
+        assignments.
+        """
+        span = 2 ** len(self.owners) - 1
+        if span <= 1:
+            return self.max_component_pairs
+        allowed, size = 0, 1
+        while (allowed < self.max_component_pairs
+               and size * span <= self.max_component_candidates):
+            size *= span
+            allowed += 1
+        return max(1, allowed)
+
+    @staticmethod
+    def _scope_of(components) -> frozenset:
+        return frozenset(pair for pairs, _ in components for pair in pairs)
+
+    def _masks_for(self, pairs, candidates, owner, moved):
+        """(atomicity survivors, atomicity-and-rule-1 survivors) as INDEX SETS, memoised.
+
+        WHY THIS IS THE OBJECT TO CACHE AND THE PRUNED LIST IS NOT. Whether a message may be
+        applied depends on the whole scope -- a clause that is unit today can stop being unit
+        when a pair settles somewhere else -- so carrying a component's PRUNED list across
+        rebuilds is unsound: it would keep a rule-1 prune that the enlarged scope no longer
+        licenses. Caught before it shipped, and it is exactly the failure the replay log was
+        introduced to prevent.
+
+        These two sets have no such dependence. Both are a function of (this component's
+        candidate list, this message) alone, and the candidate list is a function of the
+        component's pairs alone. So they survive any change of scope, and the fixpoint below
+        becomes intersections of small integer sets instead of rescans of every candidate.
+        """
+        key = (pairs, owner, moved)
+        hit = self._masks.get(key)
+        if hit is None:
+            atomic, satisfying = set(), set()
+            for index, candidate in enumerate(candidates):
+                if not consistent_with_partner(candidate, owner, moved,
+                                               local_disturbance=False):
+                    continue
+                atomic.add(index)
+                if consistent_with_partner(candidate, owner, moved, local_disturbance=True):
+                    satisfying.add(index)
+            hit = (atomic, satisfying)
+            self._masks[key] = hit
+        return hit
+
+    def _prune(self, blocks) -> List[set]:
+        """Replay the whole message log to a FIXPOINT. Returns one live index set per block.
+
+        A fixpoint rather than one pass in log order, because a clause that spans components
+        can become unit only after some other message has pruned one of them, and a single
+        pass would leave that inference on the table.
+
+        NOT order-independent, and the enumerated backend is not either: a message is DROPPED
+        when nothing can satisfy it, and whether it reaches that state can depend on what has
+        already been applied. What the replay log does guarantee is independence from the
+        order messages ARRIVED in relative to structure updates, which is the property that
+        was actually at risk. The pass order here is log order, so it is deterministic.
+        """
+        live = [set(range(len(candidates))) for _, candidates in blocks]
+        scope = frozenset(pair for pairs, _ in blocks for pair in pairs)
+        dropped: set = set()
+        # A message need only be re-examined when some block has CHANGED since it was last
+        # examined; otherwise it re-derives the filtering it already performed. Without this
+        # the fixpoint costs (passes x messages x blocks) set operations on every rebuild.
+        version = [0] * len(blocks)
+        seen: Dict[int, tuple] = {}
+        changed = True
+        while changed:
+            changed = False
+            for index, (owner, moved) in enumerate(self._log):
+                if index in dropped or seen.get(index) == tuple(version):
+                    continue
+                seen[index] = tuple(version)
+                masks = [self._masks_for(pairs, candidates, owner, moved)
+                         for pairs, candidates in blocks]
+                atomic = [live[i] & masks[i][0] for i in range(len(blocks))]
+                if any(not survivors for survivors in atomic):
+                    # Some block has no candidate left at all, so no global assignment
+                    # survives. Refuse the MESSAGE rather than the belief, exactly as the
+                    # enumerated backend does -- the truth is in the set, so the evidence is
+                    # what is at fault.
+                    dropped.add(index)
+                    self.contradictions += 1
+                    continue
+                if self.local_disturbance:
+                    support = [i for i in range(len(blocks))
+                               if atomic[i] & masks[i][1]]
+                    if not support:
+                        dropped.add(index)
+                        if set(moved) <= scope:
+                            self.contradictions += 1
+                        else:
+                            self.out_of_scope += 1
+                        continue
+                    if len(support) == 1:
+                        only = support[0]
+                        atomic[only] = atomic[only] & masks[only][1]
+                for i in range(len(blocks)):
+                    if atomic[i] != live[i]:
+                        live[i] = atomic[i]
+                        version[i] += 1
+                        changed = True
+        return live
+
+    # -- reporting -----------------------------------------------------------------------
+
+    @property
+    def n_candidates(self) -> int:
+        """The size of the product, which is never built. Big integers, deliberately."""
+        total = 1
+        for _, candidates in self._components:
+            total *= len(candidates)
+        return total if self._components else 0
+
+    @property
+    def n_components(self) -> int:
+        return len(self._components)
+
+    @property
+    def largest_component(self) -> int:
+        return max((len(pairs) for pairs, _ in self._components), default=0)

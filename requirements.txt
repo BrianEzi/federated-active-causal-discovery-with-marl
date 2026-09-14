@@ -1,15 +1,17 @@
-jax==0.4.30
-jaxlib==0.4.30
-flax==0.8.4
-orbax-checkpoint==0.5.3
-optax==0.2.2
-chex==0.1.86
+# Complete set of hard dependencies, verified against every module-level and
+# function-level import across ma/, cb/, crosscheck/, scripts/ and tests/.
+# Versions are pinned: the reported results were produced under exactly these.
+
 numpy==1.26.4
 scipy==1.13.1
-dm-haiku==0.0.12
+torch==2.10.0
 pytest==7.4.4
-wandb==0.17.9
-avici
-matplotlib==3.9.2
-networkx==3.3
 
+# Figure generation only (scripts/figures.py). Not needed to train, evaluate or
+# reproduce a number.
+matplotlib==3.11.1
+
+# Optional. scripts/ma_train.py imports wandb lazily for run logging and falls back
+# to no logging when it is absent or --no_wandb is passed, so it is not installed
+# by default.
+# wandb

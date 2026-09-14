@@ -1,4 +1,4 @@
-"""Acceptance tests for `docs/TURN_BUDGET_SPEC.md`.
+"""Acceptance tests for `docs/ARCHITECTURE.md`.
 
 Written BEFORE the implementation, and numbered to the spec's section 12, because every bug
 on 20-21 August was a design decision made silently while implementing. Each test names the
@@ -142,8 +142,10 @@ def test_the_partners_signal_reaches_the_observation():
     env.step({0: _action(env, 0, private=True), 1: _action(env, 1, private=True)})
     obs = env.observation(1)
     assert len(obs) == env.windows[1].obs_size
-    # The three signal slots are one-hot over the partner's reported region.
-    assert np.isclose(obs[-3:].sum(), 1.0)
+    # The three signal slots are one-hot over the partner's reported region. They sit
+    # before the per-node own-count block (k entries, appended).
+    k = env.windows[1].k
+    assert np.isclose(obs[-3 - k:-k].sum(), 1.0)
 
 
 # -- 12.5 the done bit must not leak the credit set --------------------------------------
@@ -231,9 +233,9 @@ def test_acting_is_not_punished_relative_to_declining():
 
 @pytest.mark.parametrize("order", [SIMULTANEOUS, ROUND_ROBIN, RANDOM_TURN])
 def test_clean_rounds_are_still_reachable(order):
-    """DELIBERATE DUPLICATE of test_env_turns.py::test_clean_rounds_are_reachable.
+    """DELIBERATE DUPLICATE of test_env_turns.py:test_clean_rounds_are_reachable.
 
-    Checked 2026-08-22 and kept. It is item 12.8 of the turn-budget spec: the point is that
+    Checked and kept. It is item 12.8 of the turn-budget spec: the point is that
     the OLDER guard still holds under the new shared-budget semantics, which is a different
     claim from the original even though the assertion is identical. Sub-second either way.
     Do not "deduplicate" these without also removing 12.8 from the spec.

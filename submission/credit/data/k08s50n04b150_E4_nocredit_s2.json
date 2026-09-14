@@ -1,0 +1,6052 @@
+{
+ "arm": "nobit",
+ "seed": 2,
+ "config": {
+  "n_obs": 60,
+  "n_int": 20,
+  "budget": 35,
+  "rule": "joint_conf",
+  "disclose_regime": false,
+  "skeleton_source": "true",
+  "turn_order": "round_robin",
+  "action_modes": [
+   "vary"
+  ],
+  "prior_p": 0.2995732273553991,
+  "graph_model": "sf",
+  "vs_evidence": "oracle",
+  "vs_evidence_alpha": 0.001,
+  "sf_m": 2,
+  "identify_threshold": 0.7,
+  "intervene_scale": 2.0,
+  "reward_criterion": "claims",
+  "belief_backend": "factored",
+  "policy_arch": "gnn_portable",
+  "cb_n_boot": 12,
+  "cb_alpha": 0.01,
+  "episode_mix": "confounded",
+  "oracle_obs_structure": false,
+  "claim_bar": 1.0,
+  "claim_penalty": 1.0,
+  "per_agent_reward": true,
+  "difference_reward": false,
+  "difference_reward_mode": "both",
+  "reward_scale": 1.0,
+  "observe_belief_channels": false,
+  "observe_partner_counts": false,
+  "mode_by_role": false,
+  "claims_require_all_types": true,
+  "topology": {
+   "name": "T_4agent_4each_4shared",
+   "private": [
+    [
+     0,
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6,
+     7
+    ],
+    [
+     8,
+     9,
+     10,
+     11
+    ],
+    [
+     12,
+     13,
+     14,
+     15
+    ]
+   ],
+   "exposed": [
+    16,
+    17,
+    18,
+    19
+   ]
+  },
+  "train_episodes": 12000,
+  "potential_shaping": 0.0,
+  "step_cost": 0.0,
+  "entropy_coef": 0.01,
+  "orthogonal_init": false,
+  "gnn_layers": 2,
+  "turn_aware_credit": false,
+  "normalise_returns": false,
+  "mask_pass_updates": 0,
+  "local_epochs": 0,
+  "observe_owner_channel": false,
+  "max_edges": null,
+  "noise_dist": "gaussian",
+  "mechanism": "linear",
+  "skeleton_alpha": 0.05,
+  "skeleton_max_cond": 2,
+  "vs_evidence_power": 1.0,
+  "distance_weighted_power": false,
+  "score_rule": "joint_conf",
+  "disclose_shared_targets": true,
+  "disclose_signals": true,
+  "observe_reprobe_signal": false,
+  "attribution_local_disturbance": true,
+  "cb_skeleton_alpha": null,
+  "cb_n_jobs": 1,
+  "allow_unsound_backend": false,
+  "ppo_hidden": 128,
+  "ppo_lr": 0.0003,
+  "ppo_local_epochs": 0,
+  "ppo_server_optimiser": "none",
+  "ppo_server_lr": 1.0,
+  "ppo_server_beta1": 0.9,
+  "ppo_server_beta2": 0.99,
+  "ppo_server_tau": 0.001,
+  "ppo_client_optimiser": "adam",
+  "ppo_gamma": 0.99,
+  "ppo_gae_lambda": 0.95,
+  "ppo_clip": 0.2,
+  "ppo_entropy_coef": 0.01,
+  "ppo_orthogonal_init": false,
+  "ppo_turn_aware_credit": false,
+  "ppo_value_coef": 0.5,
+  "ppo_epochs": 4,
+  "ppo_episodes_per_update": 16,
+  "ppo_total_episodes": 12000,
+  "ppo_seed": 2,
+  "ppo_mask_pass_updates": 0,
+  "ppo_potential_shaping": 0.0,
+  "ppo_gnn_layers": 2,
+  "ppo_normalise_returns": false,
+  "k": 8,
+  "sigma_contended": 0.5,
+  "n_agents": 4
+ },
+ "train_seconds": 1298.4619851112366,
+ "first_success_episode": 1,
+ "final_entropy": 1.7440396063811296,
+ "history": [
+  {
+   "update": 0,
+   "entropy": 2.1972245970639315,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 1,
+   "entropy": 2.197224540542983,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 2,
+   "entropy": 2.197207836785178,
+   "solve_rate": 0.125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 3,
+   "entropy": 2.197224379669536,
+   "solve_rate": 0.125,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 4,
+   "entropy": 2.1972149939409324,
+   "solve_rate": 0.0,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 5,
+   "entropy": 2.197213698604277,
+   "solve_rate": 0.0,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 6,
+   "entropy": 2.19721024179199,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 7,
+   "entropy": 2.1972242042422296,
+   "solve_rate": 0.0,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 8,
+   "entropy": 2.197207001916,
+   "solve_rate": 0.0625,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 9,
+   "entropy": 2.197191695296719,
+   "solve_rate": 0.3125,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 10,
+   "entropy": 2.197222566626171,
+   "solve_rate": 0.0625,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 11,
+   "entropy": 2.1971591032183366,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 12,
+   "entropy": 2.1971265549949757,
+   "solve_rate": 0.0625,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 13,
+   "entropy": 2.1970423926200184,
+   "solve_rate": 0.0,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 14,
+   "entropy": 2.1969892218708993,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 15,
+   "entropy": 2.196876787061621,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 16,
+   "entropy": 2.1970005831548147,
+   "solve_rate": 0.0,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 17,
+   "entropy": 2.1970924630652378,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 18,
+   "entropy": 2.1970898231087705,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 19,
+   "entropy": 2.1970358808125767,
+   "solve_rate": 0.0,
+   "window_rate": 0.34375,
+   "mask_pass": false
+  },
+  {
+   "update": 20,
+   "entropy": 2.1969321823733696,
+   "solve_rate": 0.125,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 21,
+   "entropy": 2.1969424723921454,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 22,
+   "entropy": 2.1969056199262806,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 23,
+   "entropy": 2.196616911610892,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 24,
+   "entropy": 2.196813646218051,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 25,
+   "entropy": 2.1967070860522133,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 26,
+   "entropy": 2.196878523486001,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 27,
+   "entropy": 2.1968393271520923,
+   "solve_rate": 0.0625,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 28,
+   "entropy": 2.1969736787889684,
+   "solve_rate": 0.0,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 29,
+   "entropy": 2.19710985741445,
+   "solve_rate": 0.0,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 30,
+   "entropy": 2.1971639679919046,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 31,
+   "entropy": 2.1971600008862358,
+   "solve_rate": 0.0,
+   "window_rate": 0.359375,
+   "mask_pass": false
+  },
+  {
+   "update": 32,
+   "entropy": 2.197166452024664,
+   "solve_rate": 0.0625,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 33,
+   "entropy": 2.197181486469858,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 34,
+   "entropy": 2.1971959126059843,
+   "solve_rate": 0.0625,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 35,
+   "entropy": 2.1971298444463017,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 36,
+   "entropy": 2.1971902131152903,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 37,
+   "entropy": 2.1971801310777663,
+   "solve_rate": 0.0,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 38,
+   "entropy": 2.197206072869354,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 39,
+   "entropy": 2.197205379578151,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 40,
+   "entropy": 2.197202921765191,
+   "solve_rate": 0.0,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 41,
+   "entropy": 2.1972163879380884,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 42,
+   "entropy": 2.197194952973359,
+   "solve_rate": 0.0625,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 43,
+   "entropy": 2.197176833557231,
+   "solve_rate": 0.0,
+   "window_rate": 0.40625,
+   "mask_pass": false
+  },
+  {
+   "update": 44,
+   "entropy": 2.1972072136600445,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 45,
+   "entropy": 2.197212461213738,
+   "solve_rate": 0.125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 46,
+   "entropy": 2.197210883620844,
+   "solve_rate": 0.125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 47,
+   "entropy": 2.1972039914556913,
+   "solve_rate": 0.0,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 48,
+   "entropy": 2.1971525959737424,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 49,
+   "entropy": 2.1971370647871904,
+   "solve_rate": 0.125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 50,
+   "entropy": 2.197096956403632,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 51,
+   "entropy": 2.19716420525955,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 52,
+   "entropy": 2.197148451242305,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 53,
+   "entropy": 2.197077186757868,
+   "solve_rate": 0.125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 54,
+   "entropy": 2.197099873226316,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 55,
+   "entropy": 2.197003584320813,
+   "solve_rate": 0.125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 56,
+   "entropy": 2.1970719737665996,
+   "solve_rate": 0.0,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 57,
+   "entropy": 2.1970657414763513,
+   "solve_rate": 0.0625,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 58,
+   "entropy": 2.197153425353435,
+   "solve_rate": 0.125,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 59,
+   "entropy": 2.1971141672177668,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 60,
+   "entropy": 2.197167842622314,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 61,
+   "entropy": 2.1971353026570886,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 62,
+   "entropy": 2.1971086725592612,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 63,
+   "entropy": 2.197144606177296,
+   "solve_rate": 0.0,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 64,
+   "entropy": 2.1971149066834306,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 65,
+   "entropy": 2.1970239813838686,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 66,
+   "entropy": 2.1969207286834718,
+   "solve_rate": 0.0,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 67,
+   "entropy": 2.1969304639792098,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 68,
+   "entropy": 2.196772451773822,
+   "solve_rate": 0.0625,
+   "window_rate": 0.34375,
+   "mask_pass": false
+  },
+  {
+   "update": 69,
+   "entropy": 2.196568667236036,
+   "solve_rate": 0.0625,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 70,
+   "entropy": 2.196473258095128,
+   "solve_rate": 0.0,
+   "window_rate": 0.40625,
+   "mask_pass": false
+  },
+  {
+   "update": 71,
+   "entropy": 2.196408297425957,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 72,
+   "entropy": 2.1959433186267105,
+   "solve_rate": 0.0,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 73,
+   "entropy": 2.1961894771374695,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 74,
+   "entropy": 2.1956000501556057,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 75,
+   "entropy": 2.1952035459282233,
+   "solve_rate": 0.1875,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 76,
+   "entropy": 2.1945244200268874,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 77,
+   "entropy": 2.19473617545196,
+   "solve_rate": 0.0,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 78,
+   "entropy": 2.1952835148485907,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 79,
+   "entropy": 2.195441502243725,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 80,
+   "entropy": 2.1957042936397637,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 81,
+   "entropy": 2.1958955031420504,
+   "solve_rate": 0.0,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 82,
+   "entropy": 2.1956020723689686,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 83,
+   "entropy": 2.1953516059475673,
+   "solve_rate": 0.0625,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 84,
+   "entropy": 2.1953193573518233,
+   "solve_rate": 0.0625,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 85,
+   "entropy": 2.1953832522114904,
+   "solve_rate": 0.0625,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 86,
+   "entropy": 2.1944125885390893,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 87,
+   "entropy": 2.1945408473300576,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 88,
+   "entropy": 2.195373323948487,
+   "solve_rate": 0.125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 89,
+   "entropy": 2.1949153938791253,
+   "solve_rate": 0.0625,
+   "window_rate": 0.40625,
+   "mask_pass": false
+  },
+  {
+   "update": 90,
+   "entropy": 2.1946331498799503,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 91,
+   "entropy": 2.194210557357685,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 92,
+   "entropy": 2.1945363921778545,
+   "solve_rate": 0.0,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 93,
+   "entropy": 2.1945056628097186,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 94,
+   "entropy": 2.1943739040030374,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 95,
+   "entropy": 2.1938515799723084,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 96,
+   "entropy": 2.193486643131589,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 97,
+   "entropy": 2.193830577911233,
+   "solve_rate": 0.0625,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 98,
+   "entropy": 2.1933572968802038,
+   "solve_rate": 0.25,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 99,
+   "entropy": 2.1928166713033406,
+   "solve_rate": 0.0,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 100,
+   "entropy": 2.192482654146246,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 101,
+   "entropy": 2.1917803263664246,
+   "solve_rate": 0.25,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 102,
+   "entropy": 2.1930539238560307,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 103,
+   "entropy": 2.192610109916755,
+   "solve_rate": 0.0,
+   "window_rate": 0.375,
+   "mask_pass": false
+  },
+  {
+   "update": 104,
+   "entropy": 2.1920672922490914,
+   "solve_rate": 0.125,
+   "window_rate": 0.375,
+   "mask_pass": false
+  },
+  {
+   "update": 105,
+   "entropy": 2.1937876747992617,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 106,
+   "entropy": 2.1919466049172156,
+   "solve_rate": 0.0625,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 107,
+   "entropy": 2.1909980045794555,
+   "solve_rate": 0.0625,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 108,
+   "entropy": 2.1905150591036042,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 109,
+   "entropy": 2.1887082447663198,
+   "solve_rate": 0.1875,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 110,
+   "entropy": 2.188987145315517,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 111,
+   "entropy": 2.1877854518592357,
+   "solve_rate": 0.0,
+   "window_rate": 0.40625,
+   "mask_pass": false
+  },
+  {
+   "update": 112,
+   "entropy": 2.189363737901052,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 113,
+   "entropy": 2.1882687532499934,
+   "solve_rate": 0.125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 114,
+   "entropy": 2.1899448164714657,
+   "solve_rate": 0.1875,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 115,
+   "entropy": 2.1892842751528536,
+   "solve_rate": 0.0,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 116,
+   "entropy": 2.189080345211981,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 117,
+   "entropy": 2.1872745300458227,
+   "solve_rate": 0.1875,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 118,
+   "entropy": 2.1863680579801548,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 119,
+   "entropy": 2.1861524411301683,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 120,
+   "entropy": 2.1848927929997446,
+   "solve_rate": 0.0,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 121,
+   "entropy": 2.184882757868584,
+   "solve_rate": 0.125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 122,
+   "entropy": 2.1833100469253144,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 123,
+   "entropy": 2.1829707622528076,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 124,
+   "entropy": 2.181374823435759,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 125,
+   "entropy": 2.18217519143202,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 126,
+   "entropy": 2.1812548335993065,
+   "solve_rate": 0.25,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 127,
+   "entropy": 2.180501127243042,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 128,
+   "entropy": 2.1795386818588756,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 129,
+   "entropy": 2.1799193208788603,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 130,
+   "entropy": 2.1797409174854265,
+   "solve_rate": 0.1875,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 131,
+   "entropy": 2.180125030424322,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 132,
+   "entropy": 2.180324627110532,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 133,
+   "entropy": 2.1805878247813726,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 134,
+   "entropy": 2.1780692416495993,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 135,
+   "entropy": 2.1788747558360093,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 136,
+   "entropy": 2.1770132017864596,
+   "solve_rate": 0.0625,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 137,
+   "entropy": 2.175034367308325,
+   "solve_rate": 0.1875,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 138,
+   "entropy": 2.1749069712418243,
+   "solve_rate": 0.0625,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 139,
+   "entropy": 2.1736096926637596,
+   "solve_rate": 0.0625,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 140,
+   "entropy": 2.1680962849054892,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 141,
+   "entropy": 2.1682215942179455,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 142,
+   "entropy": 2.169762119437967,
+   "solve_rate": 0.0,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 143,
+   "entropy": 2.1661938013775006,
+   "solve_rate": 0.0,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 144,
+   "entropy": 2.1625999050740976,
+   "solve_rate": 0.25,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 145,
+   "entropy": 2.1594276036659297,
+   "solve_rate": 0.125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 146,
+   "entropy": 2.1606984657900674,
+   "solve_rate": 0.0,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 147,
+   "entropy": 2.155531418083352,
+   "solve_rate": 0.125,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 148,
+   "entropy": 2.156360475150022,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 149,
+   "entropy": 2.1536513509323996,
+   "solve_rate": 0.1875,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 150,
+   "entropy": 2.1509486358585974,
+   "solve_rate": 0.125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 151,
+   "entropy": 2.146892286247092,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 152,
+   "entropy": 2.1512512951702267,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 153,
+   "entropy": 2.146348609240007,
+   "solve_rate": 0.3125,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 154,
+   "entropy": 2.143384486436844,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 155,
+   "entropy": 2.1373630267168795,
+   "solve_rate": 0.0,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 156,
+   "entropy": 2.1433037578736247,
+   "solve_rate": 0.125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 157,
+   "entropy": 2.1370667972120114,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 158,
+   "entropy": 2.135412527124087,
+   "solve_rate": 0.25,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 159,
+   "entropy": 2.1362863072642573,
+   "solve_rate": 0.125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 160,
+   "entropy": 2.1396357349325172,
+   "solve_rate": 0.125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 161,
+   "entropy": 2.1322528949872717,
+   "solve_rate": 0.3125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 162,
+   "entropy": 2.1371039948293142,
+   "solve_rate": 0.0625,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 163,
+   "entropy": 2.1330446805024623,
+   "solve_rate": 0.0625,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 164,
+   "entropy": 2.1345588264125355,
+   "solve_rate": 0.125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 165,
+   "entropy": 2.140221406485288,
+   "solve_rate": 0.25,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 166,
+   "entropy": 2.1392920224324747,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 167,
+   "entropy": 2.1346122515024306,
+   "solve_rate": 0.3125,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 168,
+   "entropy": 2.134031849463637,
+   "solve_rate": 0.125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 169,
+   "entropy": 2.136705793803104,
+   "solve_rate": 0.25,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 170,
+   "entropy": 2.131705800264967,
+   "solve_rate": 0.125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 171,
+   "entropy": 2.1297437774051318,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 172,
+   "entropy": 2.128660136278025,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 173,
+   "entropy": 2.13270954473303,
+   "solve_rate": 0.25,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 174,
+   "entropy": 2.1331926261717684,
+   "solve_rate": 0.3125,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 175,
+   "entropy": 2.1424674002151916,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 176,
+   "entropy": 2.1371347905321514,
+   "solve_rate": 0.1875,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 177,
+   "entropy": 2.132512322062623,
+   "solve_rate": 0.125,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 178,
+   "entropy": 2.1339776301474283,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 179,
+   "entropy": 2.134015122728963,
+   "solve_rate": 0.0625,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 180,
+   "entropy": 2.13124330460254,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 181,
+   "entropy": 2.1278051035744805,
+   "solve_rate": 0.0,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 182,
+   "entropy": 2.122969033958715,
+   "solve_rate": 0.1875,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 183,
+   "entropy": 2.120272470123573,
+   "solve_rate": 0.3125,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 184,
+   "entropy": 2.1161199769553014,
+   "solve_rate": 0.375,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 185,
+   "entropy": 2.107766754631701,
+   "solve_rate": 0.3125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 186,
+   "entropy": 2.104306131103707,
+   "solve_rate": 0.375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 187,
+   "entropy": 2.094583553188252,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 188,
+   "entropy": 2.0807229423839035,
+   "solve_rate": 0.25,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 189,
+   "entropy": 2.0786070711910725,
+   "solve_rate": 0.125,
+   "window_rate": 0.375,
+   "mask_pass": false
+  },
+  {
+   "update": 190,
+   "entropy": 2.0848538653026445,
+   "solve_rate": 0.3125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 191,
+   "entropy": 2.0883517007836523,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 192,
+   "entropy": 2.0886874812022422,
+   "solve_rate": 0.25,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 193,
+   "entropy": 2.0891178255914746,
+   "solve_rate": 0.25,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 194,
+   "entropy": 2.0880839669726035,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 195,
+   "entropy": 2.079978512912771,
+   "solve_rate": 0.25,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 196,
+   "entropy": 2.087655188624497,
+   "solve_rate": 0.375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 197,
+   "entropy": 2.0857163821789704,
+   "solve_rate": 0.1875,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 198,
+   "entropy": 2.0803467542753307,
+   "solve_rate": 0.1875,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 199,
+   "entropy": 2.0718089114055176,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 200,
+   "entropy": 2.068762186649587,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 201,
+   "entropy": 2.0522770107349504,
+   "solve_rate": 0.25,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 202,
+   "entropy": 2.0342993947623147,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 203,
+   "entropy": 2.028348387793944,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 204,
+   "entropy": 2.0306672576131803,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 205,
+   "entropy": 2.0438347928469103,
+   "solve_rate": 0.25,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 206,
+   "entropy": 2.0528319922105744,
+   "solve_rate": 0.0625,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 207,
+   "entropy": 2.055066033641794,
+   "solve_rate": 0.25,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 208,
+   "entropy": 2.0625868394203923,
+   "solve_rate": 0.25,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 209,
+   "entropy": 2.0589960340094304,
+   "solve_rate": 0.3125,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 210,
+   "entropy": 2.056163651794733,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 211,
+   "entropy": 2.053785039443272,
+   "solve_rate": 0.375,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 212,
+   "entropy": 2.058996290550567,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 213,
+   "entropy": 2.0559176710258993,
+   "solve_rate": 0.25,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 214,
+   "entropy": 2.0420543464816685,
+   "solve_rate": 0.1875,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 215,
+   "entropy": 2.0353900087615324,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 216,
+   "entropy": 2.0359071963970816,
+   "solve_rate": 0.25,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 217,
+   "entropy": 2.0242493903460654,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 218,
+   "entropy": 2.022659201568929,
+   "solve_rate": 0.125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 219,
+   "entropy": 2.012941907175252,
+   "solve_rate": 0.25,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 220,
+   "entropy": 2.0158301143466217,
+   "solve_rate": 0.1875,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 221,
+   "entropy": 2.0172100265447357,
+   "solve_rate": 0.25,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 222,
+   "entropy": 2.008342822985007,
+   "solve_rate": 0.375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 223,
+   "entropy": 2.0015839813707497,
+   "solve_rate": 0.375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 224,
+   "entropy": 2.002309350913221,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 225,
+   "entropy": 2.00091036940561,
+   "solve_rate": 0.125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 226,
+   "entropy": 2.019569604912868,
+   "solve_rate": 0.3125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 227,
+   "entropy": 2.0245264120527193,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 228,
+   "entropy": 2.0153259065189806,
+   "solve_rate": 0.0625,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 229,
+   "entropy": 2.0073579839742393,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 230,
+   "entropy": 2.009464846755944,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 231,
+   "entropy": 1.9900686602467454,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 232,
+   "entropy": 1.9862476001525748,
+   "solve_rate": 0.25,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 233,
+   "entropy": 1.9630013930667294,
+   "solve_rate": 0.25,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 234,
+   "entropy": 1.962006582485931,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 235,
+   "entropy": 1.961174094745614,
+   "solve_rate": 0.375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 236,
+   "entropy": 1.96210893320723,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 237,
+   "entropy": 1.9572343693958723,
+   "solve_rate": 0.125,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 238,
+   "entropy": 1.9642030556996664,
+   "solve_rate": 0.125,
+   "window_rate": 0.34375,
+   "mask_pass": false
+  },
+  {
+   "update": 239,
+   "entropy": 1.9638952904829272,
+   "solve_rate": 0.25,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 240,
+   "entropy": 1.9707616453661638,
+   "solve_rate": 0.125,
+   "window_rate": 0.40625,
+   "mask_pass": false
+  },
+  {
+   "update": 241,
+   "entropy": 1.9652387244122052,
+   "solve_rate": 0.25,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 242,
+   "entropy": 1.9637342157394626,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 243,
+   "entropy": 1.9731374065653027,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 244,
+   "entropy": 1.9660070434103918,
+   "solve_rate": 0.1875,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 245,
+   "entropy": 1.9571462210737829,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 246,
+   "entropy": 1.9598464775530435,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 247,
+   "entropy": 1.9532666330443882,
+   "solve_rate": 0.3125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 248,
+   "entropy": 1.9633497762245318,
+   "solve_rate": 0.1875,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 249,
+   "entropy": 1.9668315342836886,
+   "solve_rate": 0.1875,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 250,
+   "entropy": 1.9722608076201544,
+   "solve_rate": 0.25,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 251,
+   "entropy": 1.978495377417907,
+   "solve_rate": 0.3125,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 252,
+   "entropy": 1.9701001107233338,
+   "solve_rate": 0.3125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 253,
+   "entropy": 1.9777553987086696,
+   "solve_rate": 0.125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 254,
+   "entropy": 1.9906691656579047,
+   "solve_rate": 0.25,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 255,
+   "entropy": 1.9832969401610616,
+   "solve_rate": 0.3125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 256,
+   "entropy": 1.9800286181844198,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 257,
+   "entropy": 1.9678201770716366,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 258,
+   "entropy": 1.9783753434672762,
+   "solve_rate": 0.125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 259,
+   "entropy": 1.9742715929713204,
+   "solve_rate": 0.25,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 260,
+   "entropy": 1.9816642859507174,
+   "solve_rate": 0.375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 261,
+   "entropy": 1.9688474849509678,
+   "solve_rate": 0.125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 262,
+   "entropy": 1.9839032783158241,
+   "solve_rate": 0.5,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 263,
+   "entropy": 1.9884510969447198,
+   "solve_rate": 0.375,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 264,
+   "entropy": 1.987982501899599,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 265,
+   "entropy": 1.9923806877167367,
+   "solve_rate": 0.3125,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 266,
+   "entropy": 2.001116662374651,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 267,
+   "entropy": 1.9763681369514043,
+   "solve_rate": 0.1875,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 268,
+   "entropy": 1.9736590372153031,
+   "solve_rate": 0.4375,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 269,
+   "entropy": 1.9945436078462244,
+   "solve_rate": 0.5,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 270,
+   "entropy": 1.9834234507563497,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 271,
+   "entropy": 1.97683441509839,
+   "solve_rate": 0.0625,
+   "window_rate": 0.375,
+   "mask_pass": false
+  },
+  {
+   "update": 272,
+   "entropy": 1.9663531826927796,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 273,
+   "entropy": 1.9824541004928382,
+   "solve_rate": 0.0625,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 274,
+   "entropy": 1.9690596842042662,
+   "solve_rate": 0.25,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 275,
+   "entropy": 1.9809619350916279,
+   "solve_rate": 0.1875,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 276,
+   "entropy": 1.9796461779555994,
+   "solve_rate": 0.125,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 277,
+   "entropy": 1.9897331910357317,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 278,
+   "entropy": 1.9784818015514163,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 279,
+   "entropy": 1.9769272229378603,
+   "solve_rate": 0.3125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 280,
+   "entropy": 1.9684240041725711,
+   "solve_rate": 0.25,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 281,
+   "entropy": 1.9745340630656383,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 282,
+   "entropy": 1.9598816167494468,
+   "solve_rate": 0.25,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 283,
+   "entropy": 1.9679615325258888,
+   "solve_rate": 0.4375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 284,
+   "entropy": 1.9814748328030676,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 285,
+   "entropy": 1.9612560693876466,
+   "solve_rate": 0.0625,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 286,
+   "entropy": 1.9650357324790775,
+   "solve_rate": 0.25,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 287,
+   "entropy": 1.9803579650350807,
+   "solve_rate": 0.4375,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 288,
+   "entropy": 1.9700291729721195,
+   "solve_rate": 0.25,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 289,
+   "entropy": 1.9797557249719056,
+   "solve_rate": 0.0625,
+   "window_rate": 0.375,
+   "mask_pass": false
+  },
+  {
+   "update": 290,
+   "entropy": 1.9836356107486643,
+   "solve_rate": 0.0625,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 291,
+   "entropy": 1.976055502145047,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 292,
+   "entropy": 1.9799999738098086,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 293,
+   "entropy": 1.9727669092792053,
+   "solve_rate": 0.3125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 294,
+   "entropy": 1.9644296934387901,
+   "solve_rate": 0.125,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 295,
+   "entropy": 1.9722268567661865,
+   "solve_rate": 0.4375,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 296,
+   "entropy": 1.9677644007365798,
+   "solve_rate": 0.375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 297,
+   "entropy": 1.9789127228432335,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 298,
+   "entropy": 1.9721734923912382,
+   "solve_rate": 0.25,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 299,
+   "entropy": 1.9744267976523315,
+   "solve_rate": 0.125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 300,
+   "entropy": 1.9637459069490433,
+   "solve_rate": 0.1875,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 301,
+   "entropy": 1.958316075402265,
+   "solve_rate": 0.375,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 302,
+   "entropy": 1.9812947076145966,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 303,
+   "entropy": 1.9597692350939948,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 304,
+   "entropy": 1.9590745232015285,
+   "solve_rate": 0.25,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 305,
+   "entropy": 1.9597506794615447,
+   "solve_rate": 0.25,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 306,
+   "entropy": 1.9606443753397023,
+   "solve_rate": 0.375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 307,
+   "entropy": 1.9690406944039525,
+   "solve_rate": 0.125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 308,
+   "entropy": 1.9655931071961874,
+   "solve_rate": 0.1875,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 309,
+   "entropy": 1.9619800812076955,
+   "solve_rate": 0.4375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 310,
+   "entropy": 1.9703532484444706,
+   "solve_rate": 0.1875,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 311,
+   "entropy": 1.968922682891546,
+   "solve_rate": 0.5,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 312,
+   "entropy": 1.9687123891895753,
+   "solve_rate": 0.25,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 313,
+   "entropy": 1.9670506186398675,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 314,
+   "entropy": 1.9526344964845481,
+   "solve_rate": 0.4375,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 315,
+   "entropy": 1.9602730450225851,
+   "solve_rate": 0.5,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 316,
+   "entropy": 1.9660263359546661,
+   "solve_rate": 0.25,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 317,
+   "entropy": 1.9772468959864187,
+   "solve_rate": 0.1875,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 318,
+   "entropy": 1.9720448980554504,
+   "solve_rate": 0.4375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 319,
+   "entropy": 1.9622341037931896,
+   "solve_rate": 0.1875,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 320,
+   "entropy": 1.9567204802062925,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 321,
+   "entropy": 1.9537661716229084,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 322,
+   "entropy": 1.9518775378924813,
+   "solve_rate": 0.125,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 323,
+   "entropy": 1.960838000056366,
+   "solve_rate": 0.3125,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 324,
+   "entropy": 1.9395732726778052,
+   "solve_rate": 0.375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 325,
+   "entropy": 1.948229069407811,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 326,
+   "entropy": 1.9467846914536535,
+   "solve_rate": 0.3125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 327,
+   "entropy": 1.9408527352122413,
+   "solve_rate": 0.25,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 328,
+   "entropy": 1.943321055944822,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 329,
+   "entropy": 1.9340058149460084,
+   "solve_rate": 0.375,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 330,
+   "entropy": 1.9242092975011063,
+   "solve_rate": 0.375,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 331,
+   "entropy": 1.9366340597696377,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 332,
+   "entropy": 1.928644539041912,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 333,
+   "entropy": 1.9166671153975696,
+   "solve_rate": 0.3125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 334,
+   "entropy": 1.912204600927484,
+   "solve_rate": 0.375,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 335,
+   "entropy": 1.9117596324547719,
+   "solve_rate": 0.375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 336,
+   "entropy": 1.9133395048116477,
+   "solve_rate": 0.3125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 337,
+   "entropy": 1.9087542850376302,
+   "solve_rate": 0.25,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 338,
+   "entropy": 1.8919580246978536,
+   "solve_rate": 0.1875,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 339,
+   "entropy": 1.8938459928456743,
+   "solve_rate": 0.25,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 340,
+   "entropy": 1.8946034198715573,
+   "solve_rate": 0.3125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 341,
+   "entropy": 1.9152413885902475,
+   "solve_rate": 0.25,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 342,
+   "entropy": 1.895138747551862,
+   "solve_rate": 0.375,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 343,
+   "entropy": 1.9408201475157485,
+   "solve_rate": 0.4375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 344,
+   "entropy": 1.933749075076937,
+   "solve_rate": 0.25,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 345,
+   "entropy": 1.9298289613738941,
+   "solve_rate": 0.5625,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 346,
+   "entropy": 1.9007851038706431,
+   "solve_rate": 0.1875,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 347,
+   "entropy": 1.9092645459972761,
+   "solve_rate": 0.25,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 348,
+   "entropy": 1.9190253334433225,
+   "solve_rate": 0.25,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 349,
+   "entropy": 1.9206528362282163,
+   "solve_rate": 0.25,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 350,
+   "entropy": 1.9210519135565984,
+   "solve_rate": 0.375,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 351,
+   "entropy": 1.914629743666876,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 352,
+   "entropy": 1.916227047041659,
+   "solve_rate": 0.25,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 353,
+   "entropy": 1.9540751733966457,
+   "solve_rate": 0.4375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 354,
+   "entropy": 1.9359348272793067,
+   "solve_rate": 0.3125,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 355,
+   "entropy": 1.9063751632495531,
+   "solve_rate": 0.375,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 356,
+   "entropy": 1.9188246494090115,
+   "solve_rate": 0.1875,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 357,
+   "entropy": 1.9092387904818822,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 358,
+   "entropy": 1.9166269551438115,
+   "solve_rate": 0.125,
+   "window_rate": 0.390625,
+   "mask_pass": false
+  },
+  {
+   "update": 359,
+   "entropy": 1.9134429675528646,
+   "solve_rate": 0.375,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 360,
+   "entropy": 1.9114003031338014,
+   "solve_rate": 0.3125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 361,
+   "entropy": 1.9182288336354916,
+   "solve_rate": 0.4375,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 362,
+   "entropy": 1.8979609531262962,
+   "solve_rate": 0.1875,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 363,
+   "entropy": 1.9017826354549836,
+   "solve_rate": 0.375,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 364,
+   "entropy": 1.9082401673545537,
+   "solve_rate": 0.375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 365,
+   "entropy": 1.9078790276456798,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 366,
+   "entropy": 1.9050744479954844,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 367,
+   "entropy": 1.9167133304354262,
+   "solve_rate": 0.4375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 368,
+   "entropy": 1.9185551271580232,
+   "solve_rate": 0.5,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 369,
+   "entropy": 1.911642217036669,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 370,
+   "entropy": 1.9118084457044897,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 371,
+   "entropy": 1.9103594072933854,
+   "solve_rate": 0.125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 372,
+   "entropy": 1.921661655474635,
+   "solve_rate": 0.25,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 373,
+   "entropy": 1.9238305956823751,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 374,
+   "entropy": 1.9171283535170751,
+   "solve_rate": 0.625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 375,
+   "entropy": 1.915328113526867,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 376,
+   "entropy": 1.918084565424683,
+   "solve_rate": 0.5625,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 377,
+   "entropy": 1.9270907609647596,
+   "solve_rate": 0.375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 378,
+   "entropy": 1.9160558627789777,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 379,
+   "entropy": 1.9140025183916534,
+   "solve_rate": 0.25,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 380,
+   "entropy": 1.916558847566093,
+   "solve_rate": 0.375,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 381,
+   "entropy": 1.9295610682277828,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 382,
+   "entropy": 1.915613740792981,
+   "solve_rate": 0.375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 383,
+   "entropy": 1.9228043884729327,
+   "solve_rate": 0.375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 384,
+   "entropy": 1.9100941687270447,
+   "solve_rate": 0.25,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 385,
+   "entropy": 1.9236590742939923,
+   "solve_rate": 0.4375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 386,
+   "entropy": 1.9076430229801433,
+   "solve_rate": 0.4375,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 387,
+   "entropy": 1.9009970449967402,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 388,
+   "entropy": 1.8980764322762884,
+   "solve_rate": 0.1875,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 389,
+   "entropy": 1.8979746024398243,
+   "solve_rate": 0.375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 390,
+   "entropy": 1.8895205376116004,
+   "solve_rate": 0.5,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 391,
+   "entropy": 1.9152439883954133,
+   "solve_rate": 0.4375,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 392,
+   "entropy": 1.9041485653142445,
+   "solve_rate": 0.25,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 393,
+   "entropy": 1.8915359669710508,
+   "solve_rate": 0.25,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 394,
+   "entropy": 1.8965517415388211,
+   "solve_rate": 0.375,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 395,
+   "entropy": 1.8927355576685307,
+   "solve_rate": 0.3125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 396,
+   "entropy": 1.882046350951378,
+   "solve_rate": 0.1875,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 397,
+   "entropy": 1.8915585425654144,
+   "solve_rate": 0.25,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 398,
+   "entropy": 1.8808547644900935,
+   "solve_rate": 0.125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 399,
+   "entropy": 1.8761363890500384,
+   "solve_rate": 0.3125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 400,
+   "entropy": 1.8709133333829513,
+   "solve_rate": 0.375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 401,
+   "entropy": 1.8794162964591614,
+   "solve_rate": 0.375,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 402,
+   "entropy": 1.8679205785636976,
+   "solve_rate": 0.5,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 403,
+   "entropy": 1.872290624963226,
+   "solve_rate": 0.375,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 404,
+   "entropy": 1.8652834165663945,
+   "solve_rate": 0.5,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 405,
+   "entropy": 1.8814907097220421,
+   "solve_rate": 0.5,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 406,
+   "entropy": 1.8811199366487212,
+   "solve_rate": 0.3125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 407,
+   "entropy": 1.8798942757762878,
+   "solve_rate": 0.5625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 408,
+   "entropy": 1.884162566795641,
+   "solve_rate": 0.6875,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 409,
+   "entropy": 1.8764196565210591,
+   "solve_rate": 0.3125,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 410,
+   "entropy": 1.8720608132835515,
+   "solve_rate": 0.4375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 411,
+   "entropy": 1.8684023053578611,
+   "solve_rate": 0.375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 412,
+   "entropy": 1.8733805573655282,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 413,
+   "entropy": 1.8818469854442903,
+   "solve_rate": 0.125,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 414,
+   "entropy": 1.8613718816377585,
+   "solve_rate": 0.3125,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 415,
+   "entropy": 1.8717896341137858,
+   "solve_rate": 0.3125,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 416,
+   "entropy": 1.871998659805818,
+   "solve_rate": 0.375,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 417,
+   "entropy": 1.867468725566594,
+   "solve_rate": 0.3125,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 418,
+   "entropy": 1.8613647875671615,
+   "solve_rate": 0.4375,
+   "window_rate": 0.484375,
+   "mask_pass": false
+  },
+  {
+   "update": 419,
+   "entropy": 1.8704565548552916,
+   "solve_rate": 0.375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 420,
+   "entropy": 1.8757479662118957,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 421,
+   "entropy": 1.8817446357859877,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 422,
+   "entropy": 1.8771060441571439,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 423,
+   "entropy": 1.8756831593972527,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 424,
+   "entropy": 1.8654317940246163,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 425,
+   "entropy": 1.8780152354738675,
+   "solve_rate": 0.375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 426,
+   "entropy": 1.8857462547392836,
+   "solve_rate": 0.4375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 427,
+   "entropy": 1.8831380045184722,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 428,
+   "entropy": 1.8812582805281022,
+   "solve_rate": 0.3125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 429,
+   "entropy": 1.8739083297090766,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 430,
+   "entropy": 1.876571075200583,
+   "solve_rate": 0.25,
+   "window_rate": 0.453125,
+   "mask_pass": false
+  },
+  {
+   "update": 431,
+   "entropy": 1.875611389025313,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 432,
+   "entropy": 1.8763258884312541,
+   "solve_rate": 0.375,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 433,
+   "entropy": 1.891138944113366,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 434,
+   "entropy": 1.8725321685283975,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 435,
+   "entropy": 1.8827862520285739,
+   "solve_rate": 0.5,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 436,
+   "entropy": 1.859814068347604,
+   "solve_rate": 0.1875,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 437,
+   "entropy": 1.8484260120602083,
+   "solve_rate": 0.4375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 438,
+   "entropy": 1.8600421138816006,
+   "solve_rate": 0.5625,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 439,
+   "entropy": 1.8531449988099482,
+   "solve_rate": 0.25,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 440,
+   "entropy": 1.8403345973327243,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 441,
+   "entropy": 1.850223266305285,
+   "solve_rate": 0.6875,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 442,
+   "entropy": 1.8398607169806844,
+   "solve_rate": 0.3125,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 443,
+   "entropy": 1.8400245306609702,
+   "solve_rate": 0.25,
+   "window_rate": 0.46875,
+   "mask_pass": false
+  },
+  {
+   "update": 444,
+   "entropy": 1.851317586377263,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 445,
+   "entropy": 1.8707105369275245,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 446,
+   "entropy": 1.8722495379736084,
+   "solve_rate": 0.3125,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 447,
+   "entropy": 1.8590294492595336,
+   "solve_rate": 0.5625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 448,
+   "entropy": 1.8634033963237842,
+   "solve_rate": 0.4375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 449,
+   "entropy": 1.8656234220686945,
+   "solve_rate": 0.375,
+   "window_rate": 0.515625,
+   "mask_pass": false
+  },
+  {
+   "update": 450,
+   "entropy": 1.8520958909682972,
+   "solve_rate": 0.3125,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 451,
+   "entropy": 1.8517570694479768,
+   "solve_rate": 0.3125,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 452,
+   "entropy": 1.8774760145701483,
+   "solve_rate": 0.3125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 453,
+   "entropy": 1.866284695919603,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 454,
+   "entropy": 1.8372512933594576,
+   "solve_rate": 0.375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 455,
+   "entropy": 1.8660720857706936,
+   "solve_rate": 0.625,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 456,
+   "entropy": 1.8546496334006486,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 457,
+   "entropy": 1.847223223784031,
+   "solve_rate": 0.375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 458,
+   "entropy": 1.861137709269921,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 459,
+   "entropy": 1.8555772668146258,
+   "solve_rate": 0.4375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 460,
+   "entropy": 1.854342576251659,
+   "solve_rate": 0.4375,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 461,
+   "entropy": 1.8603980901340644,
+   "solve_rate": 0.375,
+   "window_rate": 0.53125,
+   "mask_pass": false
+  },
+  {
+   "update": 462,
+   "entropy": 1.8538259088531914,
+   "solve_rate": 0.375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 463,
+   "entropy": 1.860929994482147,
+   "solve_rate": 0.625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 464,
+   "entropy": 1.8588109903361487,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 465,
+   "entropy": 1.8545091410603705,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 466,
+   "entropy": 1.8559059590264095,
+   "solve_rate": 0.1875,
+   "window_rate": 0.359375,
+   "mask_pass": false
+  },
+  {
+   "update": 467,
+   "entropy": 1.867922448736476,
+   "solve_rate": 0.375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 468,
+   "entropy": 1.862122029364109,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 469,
+   "entropy": 1.8677143844047395,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 470,
+   "entropy": 1.8829378625239008,
+   "solve_rate": 0.375,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 471,
+   "entropy": 1.8706330641840412,
+   "solve_rate": 0.625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 472,
+   "entropy": 1.8655509365668435,
+   "solve_rate": 0.5,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 473,
+   "entropy": 1.864875718868594,
+   "solve_rate": 0.3125,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 474,
+   "entropy": 1.8655703983453127,
+   "solve_rate": 0.3125,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 475,
+   "entropy": 1.8701665469818192,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 476,
+   "entropy": 1.8685904457815923,
+   "solve_rate": 0.4375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 477,
+   "entropy": 1.8593317986449902,
+   "solve_rate": 0.4375,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 478,
+   "entropy": 1.8548800037142545,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 479,
+   "entropy": 1.8661471026003822,
+   "solve_rate": 0.375,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 480,
+   "entropy": 1.8520423729455142,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 481,
+   "entropy": 1.8575812073154303,
+   "solve_rate": 0.5625,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 482,
+   "entropy": 1.8595028527804065,
+   "solve_rate": 0.625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 483,
+   "entropy": 1.8474904682608804,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 484,
+   "entropy": 1.8361775361488912,
+   "solve_rate": 0.125,
+   "window_rate": 0.421875,
+   "mask_pass": false
+  },
+  {
+   "update": 485,
+   "entropy": 1.8575191041243444,
+   "solve_rate": 0.4375,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 486,
+   "entropy": 1.8583131394808805,
+   "solve_rate": 0.6875,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 487,
+   "entropy": 1.872082405620151,
+   "solve_rate": 0.6875,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 488,
+   "entropy": 1.8722147468802999,
+   "solve_rate": 0.3125,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 489,
+   "entropy": 1.8733287399204879,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 490,
+   "entropy": 1.8533145566972402,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 491,
+   "entropy": 1.8631647302133403,
+   "solve_rate": 0.3125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 492,
+   "entropy": 1.8673646179826942,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 493,
+   "entropy": 1.8479391369554732,
+   "solve_rate": 0.25,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 494,
+   "entropy": 1.8552406004981705,
+   "solve_rate": 0.375,
+   "window_rate": 0.640625,
+   "mask_pass": false
+  },
+  {
+   "update": 495,
+   "entropy": 1.8553908999477113,
+   "solve_rate": 0.4375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 496,
+   "entropy": 1.857605002425155,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 497,
+   "entropy": 1.8624433622269811,
+   "solve_rate": 0.3125,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 498,
+   "entropy": 1.8524921411119957,
+   "solve_rate": 0.625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 499,
+   "entropy": 1.8699058470266239,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 500,
+   "entropy": 1.879239382956064,
+   "solve_rate": 0.25,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 501,
+   "entropy": 1.8745231585675934,
+   "solve_rate": 0.375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 502,
+   "entropy": 1.874613708913205,
+   "solve_rate": 0.625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 503,
+   "entropy": 1.8731157513459524,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 504,
+   "entropy": 1.8784816617818223,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 505,
+   "entropy": 1.8725737471544244,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 506,
+   "entropy": 1.8702444981519633,
+   "solve_rate": 0.4375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 507,
+   "entropy": 1.876142808302181,
+   "solve_rate": 0.4375,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 508,
+   "entropy": 1.856629246275792,
+   "solve_rate": 0.4375,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 509,
+   "entropy": 1.8663641286262296,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 510,
+   "entropy": 1.8528958842648298,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 511,
+   "entropy": 1.8535744657672069,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 512,
+   "entropy": 1.8561722378755354,
+   "solve_rate": 0.5,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 513,
+   "entropy": 1.834444750385681,
+   "solve_rate": 0.8125,
+   "window_rate": 0.953125,
+   "mask_pass": false
+  },
+  {
+   "update": 514,
+   "entropy": 1.854541497255109,
+   "solve_rate": 0.6875,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 515,
+   "entropy": 1.852263881434356,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 516,
+   "entropy": 1.8598543303517194,
+   "solve_rate": 0.5,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 517,
+   "entropy": 1.8411011826442223,
+   "solve_rate": 0.6875,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 518,
+   "entropy": 1.862792101870495,
+   "solve_rate": 0.3125,
+   "window_rate": 0.578125,
+   "mask_pass": false
+  },
+  {
+   "update": 519,
+   "entropy": 1.8583496865497566,
+   "solve_rate": 0.4375,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 520,
+   "entropy": 1.84892448970652,
+   "solve_rate": 0.375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 521,
+   "entropy": 1.8716958102553782,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 522,
+   "entropy": 1.8709424802654822,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 523,
+   "entropy": 1.867245064919752,
+   "solve_rate": 0.375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 524,
+   "entropy": 1.8721726410177224,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 525,
+   "entropy": 1.8644009664098258,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 526,
+   "entropy": 1.8920529402777817,
+   "solve_rate": 0.25,
+   "window_rate": 0.4375,
+   "mask_pass": false
+  },
+  {
+   "update": 527,
+   "entropy": 1.8737237488058094,
+   "solve_rate": 0.75,
+   "window_rate": 0.9375,
+   "mask_pass": false
+  },
+  {
+   "update": 528,
+   "entropy": 1.8596078311472717,
+   "solve_rate": 0.5625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 529,
+   "entropy": 1.8579698938311953,
+   "solve_rate": 0.4375,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 530,
+   "entropy": 1.8595601939053898,
+   "solve_rate": 0.4375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 531,
+   "entropy": 1.8651381184458733,
+   "solve_rate": 0.5,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 532,
+   "entropy": 1.8815642710011375,
+   "solve_rate": 0.625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 533,
+   "entropy": 1.8591728129982947,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 534,
+   "entropy": 1.875898816525936,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 535,
+   "entropy": 1.8795674357661891,
+   "solve_rate": 0.4375,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 536,
+   "entropy": 1.8605806106870824,
+   "solve_rate": 0.375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 537,
+   "entropy": 1.8598838557111155,
+   "solve_rate": 0.5,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 538,
+   "entropy": 1.8786560112692745,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 539,
+   "entropy": 1.8662736992460753,
+   "solve_rate": 0.5,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 540,
+   "entropy": 1.8671743926862556,
+   "solve_rate": 0.625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 541,
+   "entropy": 1.8661467102235425,
+   "solve_rate": 0.375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 542,
+   "entropy": 1.8430842803999983,
+   "solve_rate": 0.75,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 543,
+   "entropy": 1.8638810792758693,
+   "solve_rate": 0.625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 544,
+   "entropy": 1.857153579334676,
+   "solve_rate": 0.625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 545,
+   "entropy": 1.8515237973052627,
+   "solve_rate": 0.5,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 546,
+   "entropy": 1.876946486955647,
+   "solve_rate": 0.625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 547,
+   "entropy": 1.875085590694978,
+   "solve_rate": 0.625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 548,
+   "entropy": 1.8605324483463026,
+   "solve_rate": 0.625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 549,
+   "entropy": 1.8728967826086211,
+   "solve_rate": 0.4375,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 550,
+   "entropy": 1.871786994419896,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 551,
+   "entropy": 1.8720478723312024,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 552,
+   "entropy": 1.854401239407809,
+   "solve_rate": 0.375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 553,
+   "entropy": 1.8638001373264848,
+   "solve_rate": 0.625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 554,
+   "entropy": 1.8732827501604783,
+   "solve_rate": 0.3125,
+   "window_rate": 0.546875,
+   "mask_pass": false
+  },
+  {
+   "update": 555,
+   "entropy": 1.8744644064842604,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 556,
+   "entropy": 1.8610785268545151,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 557,
+   "entropy": 1.859795349485734,
+   "solve_rate": 0.5,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 558,
+   "entropy": 1.864654543234309,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 559,
+   "entropy": 1.8668639430999756,
+   "solve_rate": 0.4375,
+   "window_rate": 0.5625,
+   "mask_pass": false
+  },
+  {
+   "update": 560,
+   "entropy": 1.8525374072022958,
+   "solve_rate": 0.5,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 561,
+   "entropy": 1.851691469759167,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 562,
+   "entropy": 1.8556751541027094,
+   "solve_rate": 0.625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 563,
+   "entropy": 1.8715410642778343,
+   "solve_rate": 0.5,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 564,
+   "entropy": 1.8354695006452426,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 565,
+   "entropy": 1.8386760176273815,
+   "solve_rate": 0.75,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 566,
+   "entropy": 1.8613624837393674,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 567,
+   "entropy": 1.8402861265341441,
+   "solve_rate": 0.6875,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 568,
+   "entropy": 1.8368090103517791,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 569,
+   "entropy": 1.8406738315152436,
+   "solve_rate": 0.5625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 570,
+   "entropy": 1.8399538364083994,
+   "solve_rate": 0.4375,
+   "window_rate": 0.609375,
+   "mask_pass": false
+  },
+  {
+   "update": 571,
+   "entropy": 1.8207972945769628,
+   "solve_rate": 0.75,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 572,
+   "entropy": 1.8273123943398142,
+   "solve_rate": 0.5625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 573,
+   "entropy": 1.837627253558741,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 574,
+   "entropy": 1.8590059015421552,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 575,
+   "entropy": 1.8668184040999802,
+   "solve_rate": 0.375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 576,
+   "entropy": 1.8630223407322526,
+   "solve_rate": 0.6875,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 577,
+   "entropy": 1.84203762547257,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 578,
+   "entropy": 1.8578859243358745,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 579,
+   "entropy": 1.8669894593102592,
+   "solve_rate": 0.5625,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 580,
+   "entropy": 1.8608542298415742,
+   "solve_rate": 0.4375,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 581,
+   "entropy": 1.8423621603081712,
+   "solve_rate": 0.6875,
+   "window_rate": 0.921875,
+   "mask_pass": false
+  },
+  {
+   "update": 582,
+   "entropy": 1.8243184715141485,
+   "solve_rate": 0.5,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 583,
+   "entropy": 1.8265389139672246,
+   "solve_rate": 0.6875,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 584,
+   "entropy": 1.8431726538562576,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 585,
+   "entropy": 1.8375349221229553,
+   "solve_rate": 0.4375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 586,
+   "entropy": 1.8832770085423574,
+   "solve_rate": 0.25,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 587,
+   "entropy": 1.8620373820200626,
+   "solve_rate": 0.6875,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 588,
+   "entropy": 1.8593856656819248,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 589,
+   "entropy": 1.8909447817131877,
+   "solve_rate": 0.5,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 590,
+   "entropy": 1.8768740917342182,
+   "solve_rate": 0.3125,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 591,
+   "entropy": 1.856304923505903,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 592,
+   "entropy": 1.8677641421737825,
+   "solve_rate": 0.6875,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 593,
+   "entropy": 1.8771099923745445,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 594,
+   "entropy": 1.8801597591584698,
+   "solve_rate": 0.375,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 595,
+   "entropy": 1.8775455151669314,
+   "solve_rate": 0.5625,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 596,
+   "entropy": 1.8550545733078054,
+   "solve_rate": 0.5,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 597,
+   "entropy": 1.8867090581934114,
+   "solve_rate": 0.375,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 598,
+   "entropy": 1.8879066300760838,
+   "solve_rate": 0.5625,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 599,
+   "entropy": 1.8833386790104796,
+   "solve_rate": 0.6875,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 600,
+   "entropy": 1.8845483824471447,
+   "solve_rate": 0.3125,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 601,
+   "entropy": 1.8664257493082101,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 602,
+   "entropy": 1.8986069543651205,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 603,
+   "entropy": 1.8630321529728395,
+   "solve_rate": 0.25,
+   "window_rate": 0.5,
+   "mask_pass": false
+  },
+  {
+   "update": 604,
+   "entropy": 1.84144187902703,
+   "solve_rate": 0.6875,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 605,
+   "entropy": 1.8420844242136964,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 606,
+   "entropy": 1.8468005259416094,
+   "solve_rate": 0.5625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 607,
+   "entropy": 1.8605922597517393,
+   "solve_rate": 0.5625,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 608,
+   "entropy": 1.8070034748579125,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 609,
+   "entropy": 1.8402274164873644,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 610,
+   "entropy": 1.886801476034608,
+   "solve_rate": 0.4375,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 611,
+   "entropy": 1.8760239254168378,
+   "solve_rate": 0.375,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 612,
+   "entropy": 1.8404667725165684,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 613,
+   "entropy": 1.8280906487422384,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 614,
+   "entropy": 1.8551556914119247,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 615,
+   "entropy": 1.8353069494535894,
+   "solve_rate": 0.5,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 616,
+   "entropy": 1.848882635874031,
+   "solve_rate": 0.6875,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 617,
+   "entropy": 1.8681828857095617,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 618,
+   "entropy": 1.852822008562702,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 619,
+   "entropy": 1.8350027142396155,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 620,
+   "entropy": 1.810014704742817,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 621,
+   "entropy": 1.8403011405517762,
+   "solve_rate": 0.5,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 622,
+   "entropy": 1.8705928477524185,
+   "solve_rate": 0.75,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 623,
+   "entropy": 1.8498879087132376,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 624,
+   "entropy": 1.8488671885105807,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 625,
+   "entropy": 1.8211656752538783,
+   "solve_rate": 0.625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 626,
+   "entropy": 1.8288808078885828,
+   "solve_rate": 0.5,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 627,
+   "entropy": 1.85623002652224,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 628,
+   "entropy": 1.8394893891868014,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 629,
+   "entropy": 1.81464920332542,
+   "solve_rate": 0.8125,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 630,
+   "entropy": 1.8576421722357452,
+   "solve_rate": 0.4375,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 631,
+   "entropy": 1.8589683781481452,
+   "solve_rate": 0.8125,
+   "window_rate": 0.921875,
+   "mask_pass": false
+  },
+  {
+   "update": 632,
+   "entropy": 1.850153944536782,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 633,
+   "entropy": 1.8719625828113962,
+   "solve_rate": 0.375,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 634,
+   "entropy": 1.8523859935422098,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 635,
+   "entropy": 1.8504664735412781,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 636,
+   "entropy": 1.8414038560763308,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 637,
+   "entropy": 1.81903460008083,
+   "solve_rate": 0.5625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 638,
+   "entropy": 1.8380061737791507,
+   "solve_rate": 0.5625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 639,
+   "entropy": 1.8625631580425503,
+   "solve_rate": 0.75,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 640,
+   "entropy": 1.8646897594006653,
+   "solve_rate": 0.6875,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 641,
+   "entropy": 1.827361583898339,
+   "solve_rate": 0.5,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 642,
+   "entropy": 1.8040774421770225,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 643,
+   "entropy": 1.8759612365516123,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 644,
+   "entropy": 1.8275812697666947,
+   "solve_rate": 0.5625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 645,
+   "entropy": 1.831927186524731,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 646,
+   "entropy": 1.8568847899857377,
+   "solve_rate": 0.6875,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 647,
+   "entropy": 1.8963167298055394,
+   "solve_rate": 0.625,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 648,
+   "entropy": 1.882147108966654,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 649,
+   "entropy": 1.8562401263101613,
+   "solve_rate": 0.5625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 650,
+   "entropy": 1.85805740758401,
+   "solve_rate": 0.5,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 651,
+   "entropy": 1.8665241190522421,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 652,
+   "entropy": 1.8494214628765244,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 653,
+   "entropy": 1.8450590403387792,
+   "solve_rate": 0.6875,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 654,
+   "entropy": 1.8137724483308713,
+   "solve_rate": 0.5625,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 655,
+   "entropy": 1.8175554904155433,
+   "solve_rate": 0.4375,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 656,
+   "entropy": 1.790920609789612,
+   "solve_rate": 0.625,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 657,
+   "entropy": 1.8240093287681884,
+   "solve_rate": 0.5,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 658,
+   "entropy": 1.7960976744597812,
+   "solve_rate": 0.5625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 659,
+   "entropy": 1.8080956259208596,
+   "solve_rate": 0.5,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 660,
+   "entropy": 1.8222479575558712,
+   "solve_rate": 0.6875,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 661,
+   "entropy": 1.811978277034741,
+   "solve_rate": 0.3125,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 662,
+   "entropy": 1.8065104428271412,
+   "solve_rate": 0.5625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 663,
+   "entropy": 1.8194631705450457,
+   "solve_rate": 0.5625,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 664,
+   "entropy": 1.830632610339068,
+   "solve_rate": 0.8125,
+   "window_rate": 0.90625,
+   "mask_pass": false
+  },
+  {
+   "update": 665,
+   "entropy": 1.7819910352307606,
+   "solve_rate": 0.5,
+   "window_rate": 0.59375,
+   "mask_pass": false
+  },
+  {
+   "update": 666,
+   "entropy": 1.792377985713335,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 667,
+   "entropy": 1.8259982384691302,
+   "solve_rate": 0.8125,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 668,
+   "entropy": 1.7921213202084167,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 669,
+   "entropy": 1.807069833492965,
+   "solve_rate": 0.75,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 670,
+   "entropy": 1.826847652815498,
+   "solve_rate": 0.6875,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 671,
+   "entropy": 1.855671598376899,
+   "solve_rate": 0.75,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 672,
+   "entropy": 1.8128407871851357,
+   "solve_rate": 0.75,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 673,
+   "entropy": 1.8313569288901999,
+   "solve_rate": 0.4375,
+   "window_rate": 0.6875,
+   "mask_pass": false
+  },
+  {
+   "update": 674,
+   "entropy": 1.8558712360681966,
+   "solve_rate": 0.375,
+   "window_rate": 0.65625,
+   "mask_pass": false
+  },
+  {
+   "update": 675,
+   "entropy": 1.863022952453763,
+   "solve_rate": 0.625,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 676,
+   "entropy": 1.8155095834652082,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 677,
+   "entropy": 1.8042842241337425,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 678,
+   "entropy": 1.8602562723806622,
+   "solve_rate": 0.625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 679,
+   "entropy": 1.8541836933268263,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 680,
+   "entropy": 1.84145038999602,
+   "solve_rate": 0.625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 681,
+   "entropy": 1.8109425784725892,
+   "solve_rate": 0.5625,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 682,
+   "entropy": 1.861798327190642,
+   "solve_rate": 0.625,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 683,
+   "entropy": 1.810523977856231,
+   "solve_rate": 0.625,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 684,
+   "entropy": 1.8324047506580972,
+   "solve_rate": 0.75,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 685,
+   "entropy": 1.8582895480330215,
+   "solve_rate": 0.75,
+   "window_rate": 0.90625,
+   "mask_pass": false
+  },
+  {
+   "update": 686,
+   "entropy": 1.8761357524675761,
+   "solve_rate": 0.5,
+   "window_rate": 0.703125,
+   "mask_pass": false
+  },
+  {
+   "update": 687,
+   "entropy": 1.855951372443176,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 688,
+   "entropy": 1.8330424230522904,
+   "solve_rate": 0.5,
+   "window_rate": 0.671875,
+   "mask_pass": false
+  },
+  {
+   "update": 689,
+   "entropy": 1.8294433572705655,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 690,
+   "entropy": 1.824491389623258,
+   "solve_rate": 0.75,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 691,
+   "entropy": 1.830293752300714,
+   "solve_rate": 0.6875,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 692,
+   "entropy": 1.8150642055776591,
+   "solve_rate": 0.5625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 693,
+   "entropy": 1.8057306064772851,
+   "solve_rate": 0.5625,
+   "window_rate": 0.71875,
+   "mask_pass": false
+  },
+  {
+   "update": 694,
+   "entropy": 1.8188064855089934,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 695,
+   "entropy": 1.8200263026436525,
+   "solve_rate": 0.5625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 696,
+   "entropy": 1.8319400728259403,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 697,
+   "entropy": 1.8494235698295676,
+   "solve_rate": 0.75,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 698,
+   "entropy": 1.8200443253541987,
+   "solve_rate": 0.75,
+   "window_rate": 0.75,
+   "mask_pass": false
+  },
+  {
+   "update": 699,
+   "entropy": 1.8220737543096186,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 700,
+   "entropy": 1.8234237909062838,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 701,
+   "entropy": 1.818201602191969,
+   "solve_rate": 0.6875,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 702,
+   "entropy": 1.8168376807354758,
+   "solve_rate": 0.8125,
+   "window_rate": 0.890625,
+   "mask_pass": false
+  },
+  {
+   "update": 703,
+   "entropy": 1.8149209977820735,
+   "solve_rate": 0.5625,
+   "window_rate": 0.765625,
+   "mask_pass": false
+  },
+  {
+   "update": 704,
+   "entropy": 1.8279420654988454,
+   "solve_rate": 0.8125,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 705,
+   "entropy": 1.840205452398959,
+   "solve_rate": 0.5625,
+   "window_rate": 0.78125,
+   "mask_pass": false
+  },
+  {
+   "update": 706,
+   "entropy": 1.7921678350369135,
+   "solve_rate": 0.75,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 707,
+   "entropy": 1.7769797818346338,
+   "solve_rate": 0.8125,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 708,
+   "entropy": 1.804594394961993,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 709,
+   "entropy": 1.8124109395243813,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 710,
+   "entropy": 1.8032588597904942,
+   "solve_rate": 0.8125,
+   "window_rate": 0.9375,
+   "mask_pass": false
+  },
+  {
+   "update": 711,
+   "entropy": 1.7992844838838178,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 712,
+   "entropy": 1.8350907364835987,
+   "solve_rate": 0.6875,
+   "window_rate": 0.90625,
+   "mask_pass": false
+  },
+  {
+   "update": 713,
+   "entropy": 1.8219910046410939,
+   "solve_rate": 0.625,
+   "window_rate": 0.828125,
+   "mask_pass": false
+  },
+  {
+   "update": 714,
+   "entropy": 1.8058918091442364,
+   "solve_rate": 0.75,
+   "window_rate": 0.9375,
+   "mask_pass": false
+  },
+  {
+   "update": 715,
+   "entropy": 1.7935970632695408,
+   "solve_rate": 0.8125,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 716,
+   "entropy": 1.8350365070511057,
+   "solve_rate": 0.8125,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 717,
+   "entropy": 1.8549456763591161,
+   "solve_rate": 0.625,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 718,
+   "entropy": 1.8245006206962797,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 719,
+   "entropy": 1.8283955242545311,
+   "solve_rate": 0.75,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 720,
+   "entropy": 1.8634154018219011,
+   "solve_rate": 0.5625,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 721,
+   "entropy": 1.786840983718567,
+   "solve_rate": 0.75,
+   "window_rate": 0.90625,
+   "mask_pass": false
+  },
+  {
+   "update": 722,
+   "entropy": 1.8158638131537772,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 723,
+   "entropy": 1.8343686639434762,
+   "solve_rate": 0.75,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 724,
+   "entropy": 1.8631320981034245,
+   "solve_rate": 0.6875,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 725,
+   "entropy": 1.8190207349531577,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 726,
+   "entropy": 1.7884502901331238,
+   "solve_rate": 0.8125,
+   "window_rate": 0.9375,
+   "mask_pass": false
+  },
+  {
+   "update": 727,
+   "entropy": 1.7927416563034058,
+   "solve_rate": 0.5625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 728,
+   "entropy": 1.7683647952813806,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 729,
+   "entropy": 1.8209673067633534,
+   "solve_rate": 0.6875,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 730,
+   "entropy": 1.846366652577627,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 731,
+   "entropy": 1.7992149391447998,
+   "solve_rate": 0.9375,
+   "window_rate": 0.984375,
+   "mask_pass": false
+  },
+  {
+   "update": 732,
+   "entropy": 1.7862635292784723,
+   "solve_rate": 0.5625,
+   "window_rate": 0.796875,
+   "mask_pass": false
+  },
+  {
+   "update": 733,
+   "entropy": 1.792439901363959,
+   "solve_rate": 0.8125,
+   "window_rate": 0.921875,
+   "mask_pass": false
+  },
+  {
+   "update": 734,
+   "entropy": 1.8132566509661696,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 735,
+   "entropy": 1.7933518281791,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 736,
+   "entropy": 1.7864328456041008,
+   "solve_rate": 0.8125,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 737,
+   "entropy": 1.871119203402003,
+   "solve_rate": 0.4375,
+   "window_rate": 0.625,
+   "mask_pass": false
+  },
+  {
+   "update": 738,
+   "entropy": 1.821841473459926,
+   "solve_rate": 0.75,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 739,
+   "entropy": 1.7725887124230262,
+   "solve_rate": 0.9375,
+   "window_rate": 0.984375,
+   "mask_pass": false
+  },
+  {
+   "update": 740,
+   "entropy": 1.778489729768325,
+   "solve_rate": 0.75,
+   "window_rate": 0.9375,
+   "mask_pass": false
+  },
+  {
+   "update": 741,
+   "entropy": 1.7678063997036018,
+   "solve_rate": 0.8125,
+   "window_rate": 0.859375,
+   "mask_pass": false
+  },
+  {
+   "update": 742,
+   "entropy": 1.7453601577589588,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 743,
+   "entropy": 1.8053861502802007,
+   "solve_rate": 0.6875,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 744,
+   "entropy": 1.803781449988291,
+   "solve_rate": 0.5625,
+   "window_rate": 0.734375,
+   "mask_pass": false
+  },
+  {
+   "update": 745,
+   "entropy": 1.7782027644014033,
+   "solve_rate": 0.75,
+   "window_rate": 0.84375,
+   "mask_pass": false
+  },
+  {
+   "update": 746,
+   "entropy": 1.7610250451642535,
+   "solve_rate": 0.6875,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 747,
+   "entropy": 1.7416842180106407,
+   "solve_rate": 0.75,
+   "window_rate": 0.875,
+   "mask_pass": false
+  },
+  {
+   "update": 748,
+   "entropy": 1.77918292067484,
+   "solve_rate": 0.625,
+   "window_rate": 0.8125,
+   "mask_pass": false
+  },
+  {
+   "update": 749,
+   "entropy": 1.7440396063811296,
+   "solve_rate": 0.75,
+   "window_rate": 0.90625,
+   "mask_pass": false
+  }
+ ],
+ "checkpoints": {
+  "schedule": [
+   5,
+   10,
+   20,
+   40,
+   70,
+   100,
+   150,
+   200,
+   250,
+   350,
+   500,
+   700,
+   749
+  ],
+  "resume_every": 50,
+  "best_update": 749,
+  "best_mi_ratio": 0.055764765957500864,
+  "best_path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_best.pt",
+  "checkpoints": [
+   {
+    "update": 5,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0005.pt",
+    "mi_ratio": 2.9549507767407157e-08,
+    "entropy": 2.197213698604277,
+    "solve_rate": 0.0
+   },
+   {
+    "update": 10,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0010.pt",
+    "mi_ratio": 6.38574366239503e-07,
+    "entropy": 2.197222566626171,
+    "solve_rate": 0.0625
+   },
+   {
+    "update": 20,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0020.pt",
+    "mi_ratio": 7.37681224350613e-06,
+    "entropy": 2.1969321823733696,
+    "solve_rate": 0.125
+   },
+   {
+    "update": 40,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0040.pt",
+    "mi_ratio": 5.425466163448453e-07,
+    "entropy": 2.197202921765191,
+    "solve_rate": 0.0
+   },
+   {
+    "update": 70,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0070.pt",
+    "mi_ratio": 5.061885270684951e-05,
+    "entropy": 2.196473258095128,
+    "solve_rate": 0.0
+   },
+   {
+    "update": 100,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0100.pt",
+    "mi_ratio": 0.0002317469968618992,
+    "entropy": 2.192482654146246,
+    "solve_rate": 0.1875
+   },
+   {
+    "update": 150,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0150.pt",
+    "mi_ratio": 0.0014133712059116311,
+    "entropy": 2.1509486358585974,
+    "solve_rate": 0.125
+   },
+   {
+    "update": 200,
+    "path": "results/credit/k08s50n04b150_E4_nocredit_s2_u0200.pt",
+    "mi_ratio": 0.005913482463715834,
+    "entropy": 2.068762186649587,
+    "solve_rate": 0.1875
+   },
+   {
+    "update": 250,
+    "path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_u0250.pt",
+    "mi_ratio": 0.011176278741698556,
+    "entropy": 1.9722608076201544,
+    "solve_rate": 0.25
+   },
+   {
+    "update": 350,
+    "path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_u0350.pt",
+    "mi_ratio": 0.03644565885653047,
+    "entropy": 1.9210519135565984,
+    "solve_rate": 0.375
+   },
+   {
+    "update": 500,
+    "path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_u0500.pt",
+    "mi_ratio": 0.028064830448637813,
+    "entropy": 1.879239382956064,
+    "solve_rate": 0.25
+   },
+   {
+    "update": 700,
+    "path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_u0700.pt",
+    "mi_ratio": 0.04752070265796307,
+    "entropy": 1.8234237909062838,
+    "solve_rate": 0.625
+   },
+   {
+    "update": 749,
+    "path": "results/credit12k/k08s50n04b150_E4_nocredit_s2_u0749.pt",
+    "mi_ratio": 0.055764765957500864,
+    "entropy": 1.7440396063811296,
+    "solve_rate": 0.75
+   }
+  ]
+ },
+ "arms": {
+  "learned": {
+   "episodes": 200,
+   "success": 0.63,
+   "success_ci": [
+    0.565,
+    0.7
+   ],
+   "threshold_identified": 0.63,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.165,
+   "union_matches_truth": 0.165,
+   "mean_steps": 7.575,
+   "mean_rounds": 29.09,
+   "global_soft_shd": 0.00701241134751773,
+   "global_hard_shd": 0.011595744680851063,
+   "global_resolved_fraction": 0.9600531914893619,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.3012100954600955,
+   "duplicate_coverage_floor": 0.2526007881007881,
+   "duplicate_coverage_excess": 0.04860930735930736,
+   "interventions_per_agent": {
+    "0": 7.575,
+    "1": 7.46,
+    "2": 7.32,
+    "3": 6.73
+   },
+   "forfeits_per_agent": {
+    "0": 0.005,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 0.9919047619047618,
+    "1": 0.990952380952381,
+    "2": 0.9894940476190476,
+    "3": 0.9907142857142857
+   },
+   "free_rider_index": 0.8863988095238097,
+   "effort_evenness": 0.8863988095238097,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 0.0,
+   "some_agent_never_acted": 0.0,
+   "success_feasible": 0.63,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 0.175,
+     "median_rounds": 22.0,
+     "restricted_mean": 23.595,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 0.195,
+     "median_rounds": 26.0,
+     "restricted_mean": 25.31,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 0.21,
+     "median_rounds": 23.0,
+     "restricted_mean": 25.5,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 0.205,
+     "median_rounds": 24.0,
+     "restricted_mean": 24.705,
+     "n": 200
+    }
+   },
+   "success_connected": 0.6333333333333333,
+   "episodes_connected": 180,
+   "success_disconnected": 0.6,
+   "episodes_disconnected": 20,
+   "clamp_fraction": 0.0,
+   "seconds": 15.925098180770874
+  },
+  "random_vary": {
+   "episodes": 200,
+   "success": 0.095,
+   "success_ci": [
+    0.055,
+    0.135
+   ],
+   "threshold_identified": 0.095,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.085,
+   "union_matches_truth": 0.085,
+   "mean_steps": 8.78,
+   "mean_rounds": 34.075,
+   "global_soft_shd": 0.0306427304964539,
+   "global_hard_shd": 0.05803191489361701,
+   "global_resolved_fraction": 0.9136170212765958,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.7596058896423196,
+   "duplicate_coverage_floor": 0.7561564116392425,
+   "duplicate_coverage_excess": 0.0034494780030770744,
+   "interventions_per_agent": {
+    "0": 8.78,
+    "1": 8.765,
+    "2": 8.73,
+    "3": 7.8
+   },
+   "forfeits_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 0.9733928571428572,
+    "1": 0.9755952380952381,
+    "2": 0.9735416666666665,
+    "3": 0.9696428571428573
+   },
+   "free_rider_index": 0.8876190476190478,
+   "effort_evenness": 0.8876190476190478,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 0.0,
+   "some_agent_never_acted": 0.0,
+   "success_feasible": 0.095,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 0.47,
+     "median_rounds": 33.0,
+     "restricted_mean": 27.545,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 0.435,
+     "median_rounds": 34.0,
+     "restricted_mean": 27.06,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 0.445,
+     "median_rounds": 32.0,
+     "restricted_mean": 28.555,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 0.49,
+     "median_rounds": 32.0,
+     "restricted_mean": 27.9,
+     "n": 200
+    }
+   },
+   "success_connected": 0.09444444444444444,
+   "episodes_connected": 180,
+   "success_disconnected": 0.1,
+   "episodes_disconnected": 20,
+   "clamp_fraction": 0.0,
+   "seconds": 6.683995246887207
+  },
+  "greedy_uncertainty": {
+   "episodes": 200,
+   "success": 0.94,
+   "success_ci": [
+    0.905,
+    0.97
+   ],
+   "threshold_identified": 0.94,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.21,
+   "union_matches_truth": 0.21,
+   "mean_steps": 5.04,
+   "mean_rounds": 18.86,
+   "global_soft_shd": 0.00045212765957446804,
+   "global_hard_shd": 0.0009042553191489361,
+   "global_resolved_fraction": 0.9707446808510639,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.17876366688866688,
+   "duplicate_coverage_floor": 0.1596267621267621,
+   "duplicate_coverage_excess": 0.01913690476190476,
+   "interventions_per_agent": {
+    "0": 3.705,
+    "1": 3.405,
+    "2": 3.225,
+    "3": 3.08
+   },
+   "forfeits_per_agent": {
+    "0": 1.345,
+    "1": 1.425,
+    "2": 1.405,
+    "3": 1.27
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 0.9994642857142858,
+    "1": 0.9995535714285715,
+    "2": 0.9996428571428573,
+    "3": 0.9998214285714286
+   },
+   "free_rider_index": 0.43330357142857145,
+   "effort_evenness": 0.43330357142857145,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 0.0,
+   "some_agent_never_acted": 0.015,
+   "success_feasible": 0.9390862944162437,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 0.02,
+     "median_rounds": 10.0,
+     "restricted_mean": 12.325,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 0.015,
+     "median_rounds": 10.0,
+     "restricted_mean": 12.125,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 0.015,
+     "median_rounds": 11.0,
+     "restricted_mean": 12.425,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 0.01,
+     "median_rounds": 12.0,
+     "restricted_mean": 12.68,
+     "n": 200
+    }
+   },
+   "success_connected": 0.9388888888888889,
+   "episodes_connected": 180,
+   "success_disconnected": 0.95,
+   "episodes_disconnected": 20,
+   "clamp_fraction": 0.0,
+   "seconds": 4.699160099029541
+  },
+  "greedy_partitioned": {
+   "episodes": 200,
+   "success": 0.81,
+   "success_ci": [
+    0.75,
+    0.8601249999999993
+   ],
+   "threshold_identified": 0.81,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.16,
+   "union_matches_truth": 0.16,
+   "mean_steps": 4.76,
+   "mean_rounds": 17.99,
+   "global_soft_shd": 0.0027992021276595745,
+   "global_hard_shd": 0.004042553191489362,
+   "global_resolved_fraction": 0.9676063829787235,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.14209202942403912,
+   "duplicate_coverage_floor": 0.12204069531670823,
+   "duplicate_coverage_excess": 0.020051334107330877,
+   "interventions_per_agent": {
+    "0": 3.85,
+    "1": 3.72,
+    "2": 3.47,
+    "3": 3.3
+   },
+   "forfeits_per_agent": {
+    "0": 0.93,
+    "1": 0.91,
+    "2": 1.005,
+    "3": 0.805
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 0.9954464285714286,
+    "1": 0.9949107142857143,
+    "2": 0.9958035714285713,
+    "3": 0.9966071428571428
+   },
+   "free_rider_index": 0.5434027777777778,
+   "effort_evenness": 0.5434027777777778,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 0.0,
+   "some_agent_never_acted": 0.0,
+   "success_feasible": 0.81,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 0.11,
+     "median_rounds": 12.0,
+     "restricted_mean": 13.565,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 0.115,
+     "median_rounds": 11.0,
+     "restricted_mean": 13.805,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 0.095,
+     "median_rounds": 11.0,
+     "restricted_mean": 13.665,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 0.085,
+     "median_rounds": 12.0,
+     "restricted_mean": 14.11,
+     "n": 200
+    }
+   },
+   "success_connected": 0.8111111111111111,
+   "episodes_connected": 180,
+   "success_disconnected": 0.8,
+   "episodes_disconnected": 20,
+   "clamp_fraction": 0.0,
+   "seconds": 4.651158094406128
+  },
+  "oracle_cover": {
+   "episodes": 200,
+   "success": 1.0,
+   "success_ci": [
+    1.0,
+    1.0
+   ],
+   "threshold_identified": 1.0,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.21,
+   "union_matches_truth": 0.21,
+   "mean_steps": 4.38,
+   "mean_rounds": 15.75,
+   "global_soft_shd": 0.0,
+   "global_hard_shd": 0.0,
+   "global_resolved_fraction": 0.971648936170213,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.5573834915084915,
+   "duplicate_coverage_floor": 0.5187624597624597,
+   "duplicate_coverage_excess": 0.03862103174603174,
+   "interventions_per_agent": {
+    "0": 4.295,
+    "1": 3.99,
+    "2": 3.72,
+    "3": 3.525
+   },
+   "forfeits_per_agent": {
+    "0": 0.085,
+    "1": 0.06,
+    "2": 0.03,
+    "3": 0.045
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 1.0,
+    "1": 1.0,
+    "2": 1.0,
+    "3": 1.0
+   },
+   "free_rider_index": 0.7885714285714286,
+   "effort_evenness": 0.7885714285714286,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 0.0,
+   "some_agent_never_acted": 0.0,
+   "success_feasible": 1.0,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 0.0,
+     "median_rounds": 15.0,
+     "restricted_mean": 14.92,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 0.0,
+     "median_rounds": 15.0,
+     "restricted_mean": 15.05,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 0.0,
+     "median_rounds": 15.0,
+     "restricted_mean": 15.18,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 0.0,
+     "median_rounds": 15.0,
+     "restricted_mean": 14.935,
+     "n": 200
+    }
+   },
+   "success_connected": 1.0,
+   "episodes_connected": 180,
+   "success_disconnected": 1.0,
+   "episodes_disconnected": 20,
+   "clamp_fraction": 0.0,
+   "seconds": 10.778481245040894
+  },
+  "pass": {
+   "episodes": 200,
+   "success": 0.0,
+   "success_ci": [
+    0.0,
+    0.0
+   ],
+   "threshold_identified": 0.0,
+   "union_acyclic": 1.0,
+   "union_equivalent": 0.0,
+   "union_matches_truth": 0.0,
+   "mean_steps": 0.0,
+   "mean_rounds": 35.0,
+   "global_soft_shd": 0.25915780141843975,
+   "global_hard_shd": 0.3680319148936171,
+   "global_resolved_fraction": 0.6036170212765957,
+   "global_mark_disagreement": 0.02835106382978723,
+   "global_contradiction": 0.0,
+   "global_pairs": 94,
+   "duplicate_coverage": 0.0,
+   "duplicate_coverage_floor": 0.0,
+   "duplicate_coverage_excess": 0.0,
+   "interventions_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "forfeits_per_agent": {
+    "0": 9.0,
+    "1": 9.0,
+    "2": 9.0,
+    "3": 8.0
+   },
+   "clamps_private_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "clamps_shared_per_agent": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "done_bit_per_agent": {
+    "0": 0.7016666666666665,
+    "1": 0.7022619047619049,
+    "2": 0.700952380952381,
+    "3": 0.7017857142857145
+   },
+   "free_rider_index": NaN,
+   "effort_evenness": NaN,
+   "effort_evenness_null": 1.0,
+   "never_acted_episodes": 1.0,
+   "some_agent_never_acted": 1.0,
+   "success_feasible": NaN,
+   "connected_fraction": 0.9,
+   "time_to_identification": {
+    "0": {
+     "censored_fraction": 1.0,
+     "median_rounds": NaN,
+     "restricted_mean": 36.0,
+     "n": 200
+    },
+    "1": {
+     "censored_fraction": 1.0,
+     "median_rounds": NaN,
+     "restricted_mean": 36.0,
+     "n": 200
+    },
+    "2": {
+     "censored_fraction": 1.0,
+     "median_rounds": NaN,
+     "restricted_mean": 36.0,
+     "n": 200
+    },
+    "3": {
+     "censored_fraction": 1.0,
+     "median_rounds": NaN,
+     "restricted_mean": 36.0,
+     "n": 200
+    }
+   },
+   "success_connected": 0.0,
+   "episodes_connected": 180,
+   "success_disconnected": 0.0,
+   "episodes_disconnected": 20,
+   "clamp_fraction": NaN,
+   "seconds": 5.9696571826934814
+  }
+ },
+ "collapsed": false
+}

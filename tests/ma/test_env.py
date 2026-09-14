@@ -1,15 +1,15 @@
-"""PHASE 2 GATES -- the checks the implementation plan specified for the environment.
+"""Gate checks for the environment.
 
 Three properties, each of which would be invisible in ordinary results if violated:
 
-  NO LEAK          an agent's observation must be a function of its own columns only. A
+  NO LEAK an agent's observation must be a function of its own columns only. A
                    federation whose observations quietly depend on hidden variables is not
                    a federation, and the failure would look like unusually good performance
                    rather than like a bug.
   DISCLOSURE TIMING what the partner did in round t must not be readable at the moment of
                    choosing round t's action. This is the "before or after acting" question
                    turned into an assertion.
-  DETERMINISM      same seed, same episode. Without it no fixture, no regression test, and
+  DETERMINISM same seed, same episode. Without it no fixture, no regression test, and
                    no bug report is reproducible.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import pytest
 
 from ma.env import CLAMP, MAConfig, MODES, TwoAgentEnv, VARY
 from ma.topology import Topology, two_agent
-from sa.priors import connectivity_prior_p
+from ma.priors import connectivity_prior_p
 
 
 @pytest.fixture(scope="module")
@@ -28,7 +28,7 @@ def topology():
 
 
 def make(topology, **kwargs):
-    # BOTH modes, explicitly. The default became clamp-only on 2026-08-22, but these are
+    # BOTH modes, explicitly. The default became clamp-only, but these are
     # MECHANISM gates -- several assert vary-specific semantics (a vary cleans nothing, a
     # clamp wins a collision), and those properties still have to hold for any caller who
     # opts back into `MODES`. Testing them requires the mode to exist.
@@ -156,7 +156,7 @@ def test_episodes_are_deterministic_under_a_fixed_seed(topology):
 
 def test_passing_does_not_consume_the_partners_opportunities(topology):
     """Under SIMULTANEOUS action both agents act every round, so a round A wastes by passing
-    is still a round B gets to use. Renamed 2026-08-22: the old name said the budget was
+    is still a round B gets to use. Renamed: the old name said the budget was
     per-agent, which stopped being true at the turn-budget change -- it is a shared pool of
     ROUNDS. Under simultaneous action the two readings coincide, which is why this kept
     passing under a name that contradicted the config it was testing."""
@@ -186,7 +186,7 @@ def test_observation_features_are_all_in_unit_range(topology):
 
 # -- defaults, guarded ------------------------------------------------------------------
 #
-# Both of these changed on 2026-08-22 and both change measured numbers, so they are pinned
+# Both of these and both change measured numbers, so they are pinned
 # here rather than left to a docstring. A default that drifts silently is how this project
 # lost a budget's meaning once already.
 
@@ -241,7 +241,7 @@ def test_three_agent_smoke_environment():
 
 
 def test_pre_refactor_checkpoints_still_load():
-    """REGRESSION, 2026-08-22. The n-agent refactor switched agents from "A"/"B" to
+    """REGRESSION. The n-agent refactor switched agents from "A"/"B" to
     integers and silently broke `IndependentPPO.load` for every checkpoint written before
     it -- which is every policy behind the current headline numbers. It surfaced only as a
     bare KeyError deep inside the shape check, with nothing naming the cause.

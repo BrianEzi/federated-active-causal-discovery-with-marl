@@ -31,7 +31,7 @@ import numpy as np
 from ma.confounding import latent_projection_pairs
 from legacy.ma_v1.env import PASS_ACTION, MAConfig, TwoAgentEnv
 from ma.projection import bidirected_pairs
-from sa.graphs import build_graph_space
+from ma.graphs import build_graph_space
 
 
 def _singleton_lookup(k: int) -> np.ndarray:
@@ -46,7 +46,7 @@ def episode_facts(env: TwoAgentEnv, singleton: Dict[str, np.ndarray]) -> Dict[st
     for name, view in env.views.items():
         # TRUE confounding: a bidirected edge in the agent's latent projection. Not the
         # `ma.confounding` proxy, which overcounts by including ancestrally related pairs
-        # (measured 2026-08-16: 36/36, 6024/6024 of the excess).
+        # (measured: 36/36, 6024/6024 of the excess).
         bidirected = bidirected_pairs(env.true_adjacency, view.nodes)
         out[name] = {
             "confounded": len(bidirected) > 0,

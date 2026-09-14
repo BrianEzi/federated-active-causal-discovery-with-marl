@@ -1,0 +1,460 @@
+"""The deterministic belief: a version space over maximal ancestral graphs.
+
+A belief here is the set of MAGs still consistent with everything established so far. It
+begins as the observational equivalence class of the window's true MAG, which is what
+infinite observational data determines, and an intervention on X prunes it to the members
+that agree with the truth about X's ancestry.
+
+This backend uses no statistics. It answers the infinite-data question -- given perfect
+measurement, can agents learn to divide experiments between them -- so that policy
+behaviour can be studied without finite-sample test errors in the way. The reveal channel
+is the infinite-data limit of the ancestral evidence `cb/citest.py` estimates, which makes
+this an idealisation of the same method rather than a different one.
+
+It enumerates candidates explicitly and so is exact but bounded in size; `cb/factored.py`
+is the representation used at the window sizes the experiments report.
+"""
+from __future__ import annotations
+
+from itertools import combinations, product
+from typing import Optional, Sequence
+
+import numpy as np
+
+from ma.projection import BIDIRECTED as MAG_BIDIRECTED
+from ma.projection import DIRECTED as MAG_DIRECTED
+
+NONE, FWD, BACK, BI = 0, 1, 2, 3
+
+
+def pairs(k: int):
+    return list(combinations(range(k), 2))
+
+
+def marks_from_mag(mag: np.ndarray) -> tuple:
+    """A true MAG (`ma.projection.latent_projection` output) as a mark tuple."""
+    mag = np.asarray(mag)
+    k = mag.shape[0]
+    out = []
+    for (u, v) in pairs(k):
+        if mag[u, v] == MAG_BIDIRECTED:
+            out.append(BI)
+        elif mag[u, v] == MAG_DIRECTED:
+            out.append(FWD)
+        elif mag[v, u] == MAG_DIRECTED:
+            out.append(BACK)
+        else:
+            out.append(NONE)
+    return tuple(out)
+
+
+def _edges(marks, k):
+    directed, bidirected = set(), set()
+    for (u, v), m in zip(pairs(k), marks):
+        if m == FWD:
+            directed.add((u, v))
+        elif m == BACK:
+            directed.add((v, u))
+        elif m == BI:
+            bidirected.add((u, v))
+    return directed, bidirected
+
+
+def _ancestors(directed, k):
+    reach = [[False] * k for _ in range(k)]
+    for (u, v) in directed:
+        reach[u][v] = True
+    for mid in range(k):
+        for u in range(k):
+            if reach[u][mid]:
+                for v in range(k):
+                    if reach[mid][v]:
+                        reach[u][v] = True
+    return reach
+
+
+def valid_mag(marks, k):
+    """Ancestral: no directed cycle, and no almost-directed cycle (u <-> v forbids either
+    from being an ancestor of the other). Returns (directed, bidirected, ancestors) or
+    None."""
+    directed, bidirected = _edges(marks, k)
+    anc = _ancestors(directed, k)
+    if any(anc[u][u] for u in range(k)):
+        return None
+    for (u, v) in bidirected:
+        if anc[u][v] or anc[v][u]:
+            return None
+    return directed, bidirected, anc
+
+
+def _structure(marks, k):
+    """(directed, bidirected, ancestors, adjacency) for a valid MAG, or None.
+
+    Split out of `m_separated` because the equivalence-class search asks ~80 separation
+    questions of the SAME candidate, and recomputing the transitive closure (O(k^3)) once
+    per question was most of the cost of building a k=5 or k=6 version space.
+    """
+    parts = valid_mag(marks, k)
+    if parts is None:
+        return None
+    directed, bidirected, anc = parts
+    adjacency = [[False] * k for _ in range(k)]
+    for (u, v), m in zip(pairs(k), marks):
+        if m != NONE:
+            adjacency[u][v] = adjacency[v][u] = True
+    return directed, bidirected, anc, adjacency
+
+
+def m_separated(marks, k, x, y, cond) -> bool:
+    """m-separation: every path between x and y is blocked given `cond`.
+
+    A path is m-connecting iff every intermediate node is either a COLLIDER that is in
+    `cond` or has a descendant there, or a NON-COLLIDER outside `cond`.
+    """
+    return _m_separated(_structure(marks, k), k, x, y, cond)
+
+
+def _m_separated(structure, k, x, y, cond) -> bool:
+    """`m_separated` against a prebuilt `_structure`."""
+    directed, bidirected, anc, adjacency = structure
+
+    def arrow_into(a, b):
+        return (a, b) in directed or (a, b) in bidirected or (b, a) in bidirected
+
+    def opens_collider(node):
+        return node in cond or any(anc[node][z] for z in cond)
+
+    stack = [(x, (x,))]
+    while stack:
+        node, path = stack.pop()
+        for nxt in range(k):
+            if not adjacency[node][nxt] or nxt in path:
+                continue
+            extended = path + (nxt,)
+            if nxt == y:
+                if all(opens_collider(mid)
+                       if (arrow_into(extended[i], mid) and arrow_into(extended[i + 2], mid))
+                       else mid not in cond
+                       for i, mid in enumerate(extended[1:-1])):
+                    return False
+                continue
+            stack.append((nxt, extended))
+    return True
+
+
+def separation_queries(k):
+    """Every (pair, conditioning set) question, smallest sets first so a mismatched
+    candidate is rejected early."""
+    queries = []
+    for (x, y) in pairs(k):
+        others = [c for c in range(k) if c not in (x, y)]
+        for r in range(len(others) + 1):
+            for cond in combinations(others, r):
+                queries.append((x, y, frozenset(cond)))
+    queries.sort(key=lambda q: len(q[2]))
+    return queries
+
+
+def equivalence_class(true_marks, k):
+    """Every MAG observationally indistinguishable from the truth -- the starting PAG.
+
+    Searches orientations of the TRUE SKELETON only, which is exact because Markov
+    equivalent MAGs share adjacencies, and which is what makes larger windows tractable.
+    """
+    queries = separation_queries(k)
+    truth_structure = _structure(true_marks, k)
+    target = tuple(_m_separated(truth_structure, k, x, y, cond) for x, y, cond in queries)
+    slots = [i for i, m in enumerate(true_marks) if m != NONE]
+    members = []
+    for assignment in product((FWD, BACK, BI), repeat=len(slots)):
+        marks = [NONE] * len(true_marks)
+        for slot, mark in zip(slots, assignment):
+            marks[slot] = mark
+        marks = tuple(marks)
+        structure = _structure(marks, k)
+        if structure is None:
+            continue
+        # Queries are ordered smallest conditioning set first, so a candidate that differs
+        # from the truth usually dies on one of the cheap ones.
+        if all(_m_separated(structure, k, x, y, cond) == value
+               for value, (x, y, cond) in zip(target, queries)):
+            members.append(marks)
+    return tuple(members)
+
+
+def reveal(marks, k, x) -> tuple:
+    """What do(x) shows with infinite data: whether x is an ancestor of each other node.
+
+    Deliberately the same channel `cb.citest.FisherZ.ancestral_evidence` estimates, so this
+    is that engine's infinite-data limit.
+    """
+    _, _, anc = valid_mag(marks, k)
+    return tuple(anc[x][y] for y in range(k) if y != x)
+
+
+class VersionSpaceBelief:
+    """Frequencies over the surviving candidates, shaped exactly like `BootstrapBelief`.
+
+    Every consumer -- `cb.claims`, the observation vector, the greedy baseline -- reads
+    `.adjacency`, `.directed` and `.bidirected`, so nothing downstream knows the difference.
+    A frequency here is the fraction of SURVIVORS asserting the feature, which is 0 or 1
+    once a claim is resolved.
+    """
+
+    def __init__(self, space, k: int):
+        self.space = tuple(space)
+        self.k = int(k)
+        n = max(len(self.space), 1)
+        self.adjacency = np.zeros((k, k), dtype=float)
+        self.directed = np.zeros((k, k), dtype=float)
+        self.bidirected = np.zeros((k, k), dtype=float)
+        for marks in self.space:
+            for (u, v), m in zip(pairs(k), marks):
+                if m == NONE:
+                    continue
+                self.adjacency[u, v] += 1.0
+                self.adjacency[v, u] += 1.0
+                if m == FWD:
+                    self.directed[u, v] += 1.0
+                elif m == BACK:
+                    self.directed[v, u] += 1.0
+                else:
+                    self.bidirected[u, v] += 1.0
+                    self.bidirected[v, u] += 1.0
+        self.adjacency /= n
+        self.directed /= n
+        self.bidirected /= n
+        # Compatibility with the bootstrap belief's reporting fields.
+        self.n_boot = len(self.space)
+        self.ci_tests = 0
+        self.truncated_fraction = 0.0
+        self.replicates = None
+
+    def edge_marginals(self) -> np.ndarray:
+        return self.directed
+
+    def confounded_pairs(self, threshold: float = 0.5) -> tuple:
+        return tuple((u, v) for u, v in pairs(self.k)
+                     if self.bidirected[u, v] >= threshold)
+
+
+class VersionSpaceBackend:
+    """Deterministic belief for one window. Call-compatible with `ConstraintBackend`.
+
+    `reset(true_mag)` must be called at the start of every episode -- the environment does
+    this -- because the version space is defined relative to the episode's truth. Truth is
+    used ONLY to prune (oracle-side, exactly as the reward is); nothing about it reaches the
+    observation vector.
+    """
+
+    can_handle_multi_hidden = True
+
+    def __init__(self, k: int, shared_positions: Sequence[int] = (),
+                 evidence: str = "oracle", evidence_alpha: float = 0.001, **_ignored):
+        self.k = int(k)
+        self.shared_positions = tuple(shared_positions)
+        # "oracle": prune by the true ancestry, exactly, at any distance -- the original
+        # idealisation. "sampled": prune by what the DATA shows, which is sound but not
+        # complete, so weak and distant effects simply fail to prune. One code path with a
+        # flag rather than two backends, so the two cannot drift apart.
+        if evidence not in ("oracle", "sampled"):
+            raise ValueError(f"evidence must be 'oracle' or 'sampled', got {evidence!r}")
+        self.evidence = evidence
+        self.evidence_alpha = float(evidence_alpha)
+        self.truth: Optional[tuple] = None
+        self.last: Optional[VersionSpaceBelief] = None
+        self._space: tuple = ()
+        # Reveal signature of every candidate, [candidate][node], computed once per episode.
+        # `reveal` runs the transitive closure, and it was being run once per candidate per
+        # intervened node on EVERY belief refresh -- the dominant cost of a long episode.
+        self._signatures: tuple = ()
+        self._truth_signature: tuple = ()
+        self._current: tuple = ()
+        self._current_signatures: tuple = ()
+        self._applied: frozenset = frozenset()
+        self._detected: dict = {}
+
+    def reset(self, true_mag: np.ndarray) -> None:
+        self.truth = marks_from_mag(true_mag)
+        self._space = equivalence_class(self.truth, self.k)
+        self._signatures = tuple(tuple(reveal(m, self.k, x) for x in range(self.k))
+                                 for m in self._space)
+        self._truth_signature = tuple(reveal(self.truth, self.k, x) for x in range(self.k))
+        self._current = self._space
+        self._current_signatures = self._signatures
+        self._applied = frozenset()
+        self._detected = {}
+        self.last = VersionSpaceBelief(self._space, self.k)
+
+    def edge_marginals(self, data, known_intervened, told=None, score_rule=None,
+                       blocks=None) -> np.ndarray:
+        """Prune by which nodes have been intervened on, and report the frequencies.
+
+        `data` is ignored -- that is the whole point. Only the intervention MASK matters,
+        because with infinite data the values add nothing the mask does not already imply.
+
+        INCREMENTAL, and exact because it can be: pruning by a node is monotone (survivors
+        only leave), idempotent (a second intervention on the same node removes nobody) and
+        commutative (each candidate is tested against the truth independently, so order
+        cannot matter). So carrying the pruned space forward and applying only the NEWLY
+        intervened nodes gives the same set as re-pruning from the start. A mask that
+        shrinks -- which only happens if a caller reuses the backend across episodes without
+        `reset` -- falls back to a rebuild rather than silently returning a stale subset.
+        """
+        if self.truth is None:
+            raise RuntimeError("VersionSpaceBackend.reset(true_mag) must be called first")
+        mask = np.asarray(known_intervened) > 0.5
+        intervened = frozenset(x for x in range(self.k) if mask[:, x].any())
+
+        if self.evidence == "sampled":
+            # NOT INCREMENTAL, and it cannot be. Every round adds rows, so a weak effect
+            # invisible at round two can clear the threshold at round six -- and evidence
+            # can only ever ACCUMULATE, never be withdrawn. Pruning incrementally would
+            # freeze each node's verdict at the moment it was first intervened on and throw
+            # away every later row. So the space is rebuilt from the start each refresh,
+            # against all the evidence gathered so far.
+            if not intervened:
+                if self.last is None:
+                    self.last = VersionSpaceBelief(self._space, self.k)
+                return self.last.directed
+            detected = estimated_reveal_all(data, known_intervened, tuple(intervened),
+                                            self.k, alpha=self.evidence_alpha, foreign=told)
+            if detected == self._detected and self.last is not None:
+                return self.last.directed          # nothing new was resolved this round
+            self._detected = detected
+            survivors = tuple(
+                marks for marks in self._space
+                if all(consistent_with_evidence(reveal(marks, self.k, x), *detected[x])
+                       for x in intervened))
+            # AN EMPTY VERSION SPACE IS NECESSARILY WRONG -- the truth is one of the
+            # candidates, so if nothing survives, the evidence contradicted itself and at
+            # least one test fired falsely. Keeping the previous set is not a repair (the
+            # truth may already be gone) but it prevents the belief reporting frequencies
+            # over nothing, which reads downstream as unanimous confidence.
+            self._current = survivors if survivors else self._current
+            self._current_signatures = tuple(
+                self._signatures[self._space.index(m)] for m in self._current)
+            self._applied = intervened
+            self.last = VersionSpaceBelief(self._current, self.k)
+            return self.last.directed
+
+        if not intervened >= self._applied:
+            self._current, self._current_signatures = self._space, self._signatures
+            self._applied = frozenset()
+        fresh = intervened - self._applied
+        if fresh or self.last is None:
+            if fresh:
+                keep = [i for i, signature in enumerate(self._current_signatures)
+                        if all(signature[x] == self._truth_signature[x] for x in fresh)]
+                self._current = tuple(self._current[i] for i in keep)
+                self._current_signatures = tuple(self._current_signatures[i] for i in keep)
+                self._applied = intervened
+            self.last = VersionSpaceBelief(self._current, self.k)
+        return self.last.directed
+
+    def credit_fraction(self, true_mag: np.ndarray, required_positions: Sequence[int] = (),
+                        strict: bool = False) -> float:
+        """Fraction of survivors that ARE the truth -- the analogue of posterior mass.
+
+        Exact here rather than approximate: with the truth guaranteed present, this is
+        1/|space| when nothing is resolved and 1.0 when the space collapses to the truth.
+        """
+        if self.last is None or not self.last.space:
+            return 0.0
+        truth = marks_from_mag(true_mag)
+        return sum(m == truth for m in self.last.space) / len(self.last.space)
+
+    @property
+    def bidirected(self) -> np.ndarray:
+        return self.last.bidirected if self.last is not None else np.zeros((self.k, self.k))
+
+
+# =========================================================================================
+# SAMPLED EVIDENCE -- the same version space, fed by finite data instead of by an oracle.
+# =========================================================================================
+
+
+def estimated_reveal(data, intervened, x: int, k: int, alpha: float = 0.001,
+                     foreign=None) -> tuple:
+    """What do(x) shows on FINITE data: the same tuple `reveal` returns, estimated.
+
+    `reveal` asks the true graph whether x is an ancestor of each other window node and
+    answers exactly, at any distance. This asks the DATA, with
+    `cb.citest.FisherZ.ancestral_evidence` -- did intervening on x demonstrably change y.
+
+    SOUND, NOT COMPLETE, and everything downstream depends on that asymmetry. What the test
+    reports is real; what it misses is real too. So a `True` here is trustworthy and a
+    `False` means only "not detected", never "not there".
+
+    THIS IS WHERE EFFECT RANGE ENTERS THE MODEL, and it enters for free. An effect along a
+    chain multiplies coefficients while each intermediate adds noise, so a distant ancestor
+    moves its descendant too little to detect, returns False, and prunes nothing. Under the
+    oracle a five-hop ancestor is exactly as informative as a direct parent, which is not a
+    small idealisation -- it changes which experiment is WORTH RUNNING, not merely what the
+    agent sees. Nothing here models decay explicitly; the data does it.
+
+    STRICTER THRESHOLD THAN THE REST OF THE ENGINE, deliberately. The errors are not
+    symmetric: a false positive prunes the TRUTH out of the version space and destroys the
+    property the whole environment exists for, while a false negative only leaves the belief
+    coarser for another round. 0.001 rather than 0.01 buys the expensive direction.
+    """
+    return estimated_reveal_all(data, intervened, (x,), k, alpha=alpha,
+                                foreign=foreign)[x]
+
+
+def estimated_reveal_all(data, intervened, nodes, k: int, alpha: float = 0.001,
+                         foreign=None) -> dict:
+    """`estimated_reveal` for MANY x at once, building the test exactly once.
+
+    WHY THIS EXISTS. `FisherZ` depends only on (data, intervened, alpha, foreign) -- never
+    on x -- and `ancestral_evidence` / `pair_power` each return the FULL [k, k] matrix.
+    Both callers ran `{x: estimated_reveal(data, known_intervened, x,...) for x in
+    intervened}`, so with m intervened nodes they computed the same two k x k matrices m
+    times and kept one row of each. m grows to the budget over an episode, so the waste grows
+    with BOTH window size and budget -- which is why sampled-evidence training cost was
+    scaling nearer k^4 than the k^2 the test count predicts.
+
+    Exactly equivalent by construction: same matrices, same rows, same order. Verified in
+    `tests/cb/test_reveal_batching.py`.
+    """
+    from cb.citest import FisherZ
+    test = FisherZ(np.asarray(data), np.asarray(intervened) > 0.5, alpha=alpha,
+                   foreign=foreign)
+    evidence = test.ancestral_evidence()
+    # POWER, alongside the verdict, and it is what lets the belief converge. Without it the
+    # rule can only prune candidates that DENY detected evidence, so a candidate that
+    # OVER-claims an effect survives however much data arrives --:
+    # 4.48 survivors at 4000 rows an experiment against the oracle's 1.40, and flat in the
+    # row count. `pair_power` says whether an effect of detectable size WOULD have shown,
+    # which turns a silent test from "no information" into "no effect" exactly when the
+    # data can support that reading.
+    powered = test.pair_power()
+    return {x: (tuple(bool(evidence[x, y]) for y in range(k) if y != x),
+                tuple(bool(powered[x, y]) for y in range(k) if y != x))
+            for x in nodes}
+
+
+def consistent_with_evidence(candidate_reveal: tuple, detected: tuple,
+                             powered: tuple = None) -> bool:
+    """Prune a candidate that contradicts the evidence, in EITHER direction where the data
+    can support the reading.
+
+    DETECTED ancestry must be present in the candidate -- the test is sound, so what it
+    reports is real.
+
+    UNDETECTED ancestry refutes a candidate ONLY where the pair was POWERED: an effect of
+    detectable size would have shown, and did not, so the candidate claiming it is wrong.
+    Where the pair is under-powered, silence means nothing and the candidate stands. That is
+    what keeps weak and DISTANT effects from being read as absent -- an effect along a chain
+    multiplies coefficients and accumulates noise, so a far-off ancestor is under-powered by
+    nature and its candidates must survive.
+
+    `powered=None` restores the purely one-directional rule, which is sound but does not
+    converge: over-claiming candidates are never eliminated.
+    """
+    for index, (claimed, hit) in enumerate(zip(candidate_reveal, detected)):
+        if hit and not claimed:
+            return False
+        if powered is not None and claimed and not hit and powered[index]:
+            return False
+    return True
