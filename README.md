@@ -78,8 +78,13 @@ explains why.
 
 ## Provenance
 
-This branch is the reviewer-facing repository. The full working history — 755 commits, the
-complete results tree including every training checkpoint, and the running experiment log —
-is preserved on the `pre-squash-submission` tag.
+This branch is the reviewer-facing repository. The full working history is preserved on the
+`pre-squash-submission` tag: 755 commits that are not on this branch, the complete results
+tree including every training checkpoint, and the running experiment log.
+
+The tag carries about 2.6 GB of checkpoints, so a default clone fetches all of it. To take
+only the reviewer-facing branch:
+
+    git clone --single-branch --branch main <url>
 
 The dissertation text is versioned separately and is not in this repository.
